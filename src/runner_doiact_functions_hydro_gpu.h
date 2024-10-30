@@ -204,7 +204,7 @@ double runner_doself1_pack_f4(struct runner *r, struct scheduler *s, struct pack
 	  clock_gettime(CLOCK_REALTIME, &t1);
 		/* Release the lock on the cell */
 //		task_unlock(t);
-		cell_unlocktree(ci);
+//		cell_unlocktree(ci);
 	  return (t1.tv_sec - t0.tv_sec) +
 			(t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 
