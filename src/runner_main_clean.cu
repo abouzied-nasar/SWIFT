@@ -19,9 +19,9 @@
  *
  ******************************************************************************/
 /* Config parameters. */
-//#define GPUOFFLOAD 1 //off-load hydro to GPU
-//#define DO_CORNERS 1 //do corner pair tasks on CPU
-//#define DUMP_TIMINGS 1
+#define GPUOFFLOAD 1 //off-load hydro to GPU
+#define DO_CORNERS 1 //do corner pair tasks on CPU
+#define DUMP_TIMINGS 1
 #include "../config.h"
 
 /* MPI headers. */
@@ -1763,28 +1763,17 @@ void *runner_main2(void *data) {
       prev = t;
 #ifdef GPUOFFLOAD
 //      if (t->type == task_type_self && t->subtype == task_subtype_gpu_pack){
-      if (t->subtype == task_subtype_gpu_pack){
+      if (t->subtype == task_subtype_gpu_pack ||
+    	  t->subtype == task_subtype_gpu_pack_g ||
+		  t->subtype == task_subtype_gpu_pack_f){
     	/* Don't enqueue unpacks yet. Just signal the runners */
-        t->skip = 1;
-        t = NULL;
-      }
-//      else if (t->subtype == task_subtype_gpu_pack_g && t->type == task_type_self){
-      else if (t->subtype == task_subtype_gpu_pack_g){
-      	/* Don't enqueue unpacks yet. Just signal the runners */
-        t->skip = 1;
-        t = NULL;
-      }
-//      else if (t->subtype == task_subtype_gpu_pack_f && t->type == task_type_self){
-      else if (t->subtype == task_subtype_gpu_pack_f){
-      	/* Don't enqueue unpacks yet. Just signal the runners */
-        t->skip = 1;
-        t = NULL;
+//        t->skip = 1;
+//        t = NULL;
       }
       else{ /* Mark task as done, as per usual */
         t = scheduler_done(sched, t);
       }
-#endif //GPUOFFLOAD
-#ifndef GPUOFFLOAD
+#else //GPUOFFLOAD
         t = scheduler_done(sched, t);
 #endif //GPUOFFLOAD
 
@@ -1848,8 +1837,8 @@ void *runner_main2(void *data) {
 
 		else fprintf(fgpu_steps,"%e, %e, %e, %e, %e, %e,\n", time_for_density_cpu, time_for_density_cpu_pair,
 				time_for_cpu_f, time_for_cpu_pair_f, time_for_cpu_g, time_for_cpu_pair_g);
-#endif
-#endif
+#endif //GPUOFFLOAD
+#endif //DUMPTIMINGS
 //    }
 	fflush(fgpu_steps);
 	fclose(fgpu_steps);
