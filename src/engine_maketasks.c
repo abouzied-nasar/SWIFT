@@ -2196,10 +2196,10 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
         engine_addlink(e, &ci->hydro.density, t);
       } else if (t_subtype == task_subtype_gpu_pack) { // A. Nasar
         engine_addlink(e, &ci->hydro.density_pack, t);
-      } else if (t_subtype == task_subtype_gpu_pack_f) {
-        engine_addlink(e, &ci->hydro.force_pack, t);
-      } else if (t_subtype == task_subtype_gpu_pack_g) {
-        engine_addlink(e, &ci->hydro.gradient_pack, t);
+//      } else if (t_subtype == task_subtype_gpu_pack_f) {
+//        engine_addlink(e, &ci->hydro.force_pack, t);
+//      } else if (t_subtype == task_subtype_gpu_pack_g) {
+//        engine_addlink(e, &ci->hydro.gradient_pack, t);
       } else if (t_subtype == task_subtype_grav) {
         engine_addlink(e, &ci->grav.grav, t);
       } else if (t_subtype == task_subtype_external_grav) {
@@ -2219,12 +2219,12 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
       } else if (t_subtype == task_subtype_gpu_pack) { // A. Nasar
         engine_addlink(e, &ci->hydro.density_pack, t);
         engine_addlink(e, &cj->hydro.density_pack, t);
-      } else if (t_subtype == task_subtype_gpu_pack_f) {
-        engine_addlink(e, &ci->hydro.force_pack, t);
-        engine_addlink(e, &cj->hydro.force_pack, t);
-      } else if (t_subtype == task_subtype_gpu_pack_g) {
-        engine_addlink(e, &ci->hydro.gradient_pack, t);
-        engine_addlink(e, &cj->hydro.gradient_pack, t);
+//      } else if (t_subtype == task_subtype_gpu_pack_f) {
+//        engine_addlink(e, &ci->hydro.force_pack, t);
+//        engine_addlink(e, &cj->hydro.force_pack, t);
+//      } else if (t_subtype == task_subtype_gpu_pack_g) {
+//        engine_addlink(e, &ci->hydro.gradient_pack, t);
+//        engine_addlink(e, &cj->hydro.gradient_pack, t);
       } else if (t_subtype == task_subtype_grav) {
         engine_addlink(e, &ci->grav.grav, t);
         engine_addlink(e, &cj->grav.grav, t);
@@ -2578,7 +2578,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       /* Task for the second GPU hydro loop A. Nasar */
       t_force_gpu = scheduler_addtask(sched, task_type_self, task_subtype_gpu_pack_f,
                                   0, 0, ci, NULL);
-//      engine_addlink(e, &ci->hydro.force_pack, t_force_gpu);
+      engine_addlink(e, &ci->hydro.force_pack, t_force_gpu);
       /* and the task for the time-step limiter */
       if (with_timestep_limiter) {
         t_limiter = scheduler_addtask(sched, task_type_self,
@@ -2693,7 +2693,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       /* Add the link between the new loops and the cell */
       engine_addlink(e, &ci->hydro.gradient, t_gradient);
 
-//      engine_addlink(e, &ci->hydro.gradient_pack, t_gradient_gpu);
+      engine_addlink(e, &ci->hydro.gradient_pack, t_gradient_gpu);
 
       /* Now, build all the dependencies for the hydro for the cells */
       /* that are local and are not descendant of the same super_hydro-cells */
@@ -2877,8 +2877,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       t_force_gpu = scheduler_addtask(sched, task_type_pair, task_subtype_gpu_pack_f,
                                   0, 0, ci, cj);
 //      /* Add the link between the new loop and both cells */
-//      engine_addlink(e, &ci->hydro.force_pack, t_force_gpu);
-//      engine_addlink(e, &cj->hydro.force_pack, t_force_gpu);
+      engine_addlink(e, &ci->hydro.force_pack, t_force_gpu);
+      engine_addlink(e, &cj->hydro.force_pack, t_force_gpu);
 
 #ifdef MPI_SYMMETRIC_FORCE_INTERACTION
       /* The order of operations for an inactive local cell interacting
@@ -3042,8 +3042,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       engine_addlink(e, &ci->hydro.gradient, t_gradient);
       engine_addlink(e, &cj->hydro.gradient, t_gradient);
 //      /* Add the link between the new loop and both cells */
-//      engine_addlink(e, &ci->hydro.gradient_pack, t_gradient_gpu);
-//      engine_addlink(e, &cj->hydro.gradient_pack, t_gradient_gpu);
+      engine_addlink(e, &ci->hydro.gradient_pack, t_gradient_gpu);
+      engine_addlink(e, &cj->hydro.gradient_pack, t_gradient_gpu);
 
       /* Now, build all the dependencies for the hydro for the cells */
       /* that are local and are not descendant of the same super_hydro-cells */
@@ -3081,6 +3081,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
         // GPU tasks A. Nasar
         scheduler_addunlock(sched, cj->hydro.super->hydro.extra_ghost, t_force_gpu);
       }
+
 #endif
 
       if (with_feedback) {
@@ -3094,6 +3095,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
       if (with_rt) {
         scheduler_addunlock(sched, ci->hydro.super->hydro.sorts, t_rt_gradient);
+
         if (ci->hydro.super != cj->hydro.super) {
           scheduler_addunlock(sched, cj->hydro.super->hydro.sorts,
                               t_rt_gradient);
@@ -3239,8 +3241,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
           scheduler_addunlock(sched, t_rt_transport,
                               ci->hydro.super->rt.rt_transport_out);
         }
-      } else /* ci->nodeID != nodeID */ {
 
+      } else /* ci->nodeID != nodeID  */ {
         if (with_feedback) {
 #ifdef EXTRA_STAR_LOOPS
           scheduler_addunlock(sched, ci->hydro.super->stars.sorts,
@@ -3249,8 +3251,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
           scheduler_addunlock(sched, ci->hydro.super->stars.sorts,
                               t_star_feedback);
         }
-        if (with_black_holes && (bcount_i > 0 || bcount_j > 0)) {
 
+        if (with_black_holes && (bcount_i > 0 || bcount_j > 0)) {
           scheduler_addunlock(sched, t_bh_swallow,
                               ci->hydro.super->black_holes.swallow_ghost_1);
         }
@@ -3372,6 +3374,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
             scheduler_addunlock(sched, t_bh_feedback,
                                 cj->hydro.super->black_holes.black_holes_out);
           }
+
           if (with_rt) {
             scheduler_addunlock(sched, cj->hydro.super->hydro.drift,
                                 t_rt_gradient);
@@ -3418,6 +3421,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
         }
 
         if (with_black_holes && (bcount_i > 0 || bcount_j > 0)) {
+
           scheduler_addunlock(sched, t_bh_swallow,
                               cj->hydro.super->black_holes.swallow_ghost_1);
         }
@@ -4050,21 +4054,6 @@ void engine_maketasks(struct engine *e) {
 
   tic2 = getticks();
 
-  /* Run through the tasks and make force tasks for each density task.
-     Each force task depends on the cell ghosts and unlocks the kick task
-     of its super-cell. */
-  if (e->policy & engine_policy_hydro) {
-
-    /* Note that this does not scale well at all so we do not use the
-     * threadpool version here until the reason for this is found.
-     * We call the mapper function directly as if there was only 1 thread
-     * in the pool. */
-    engine_make_extra_hydroloop_tasks_mapper(sched->tasks, sched->nr_tasks, e);
-    /* threadpool_map(&e->threadpool, engine_make_extra_hydroloop_tasks_mapper,
-     *                sched->tasks, sched->nr_tasks, sizeof(struct task),
-     *                threadpool_auto_chunk_size, e); */
-  }
-
   /* Now, create unpack tasks based on the existing packs and create
    * the dependencies pack->unpack->ghost_in A. Nasar */
 
@@ -4148,6 +4137,22 @@ void engine_maketasks(struct engine *e) {
       if(l->t->type == task_type_pair)scheduler_addunlock(sched, l->t, t);
     }
   }
+  /* Run through the tasks and make force tasks for each density task.
+     Each force task depends on the cell ghosts and unlocks the kick task
+     of its super-cell. */
+  if (e->policy & engine_policy_hydro) {
+
+    /* Note that this does not scale well at all so we do not use the
+     * threadpool version here until the reason for this is found.
+     * We call the mapper function directly as if there was only 1 thread
+     * in the pool. */
+    engine_make_extra_hydroloop_tasks_mapper(sched->tasks, sched->nr_tasks, e);
+    /* threadpool_map(&e->threadpool, engine_make_extra_hydroloop_tasks_mapper,
+     *                sched->tasks, sched->nr_tasks, sizeof(struct task),
+     *                threadpool_auto_chunk_size, e); */
+  }
+
+
   /*Now create unpacks for all gpu_pack_g (gradient) tasks A. Nasar */
   count_current_self = 0;
   count_current_pair = 0;
