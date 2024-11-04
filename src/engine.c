@@ -2278,8 +2278,24 @@ void engine_init_particles(struct engine *e, int flag_entropy_ICs,
   /* Zero the list of cells that have had their time-step updated */
   bzero(e->s->cells_top_updated, e->s->nr_cells * sizeof(char));
 
-  scheduler_write_dependencies(&e->sched, e->verbose, e->step); // A. Nasar write deps before running first step
+//  scheduler_write_dependencies(&e->sched, e->verbose, e->step); // A. Nasar write deps before running first step
   /* Now, launch the calculation */
+//  message("n tasks %i", e->sched.nr_tasks);
+//  for (int i = 0; i < e->sched.nr_tasks; i++){
+//	  struct task *tmp_t = &e->sched.tasks[i];
+//	  if(tmp_t->subtype == task_subtype_density){
+//		if(tmp_t->skip == 1)error("inactive density task");
+//	  }
+////	  if(tmp_t->subtype == task_subtype_force){
+////		if(tmp_t->skip == 1)error("inactive force task");
+////	  }
+//	  if(tmp_t->subtype == task_subtype_gpu_pack){
+//		if(tmp_t->skip == 1)error("inactive pack task");
+//	  }
+//	  if(tmp_t->subtype == task_subtype_gpu_unpack){
+//	    if(tmp_t->skip == 1)error("inactive unpack task");
+//	  }
+//  }
   TIMER_TIC;
   engine_launch(e, "tasks");
   TIMER_TOC(timer_runners);
@@ -2369,6 +2385,21 @@ void engine_init_particles(struct engine *e, int flag_entropy_ICs,
 
   /* Zero the list of cells that have had their time-step updated */
   bzero(e->s->cells_top_updated, e->s->nr_cells * sizeof(char));
+//  for (int i = 0; i < e->sched.nr_tasks; i++){
+//	  struct task *tmp_t = &e->sched.tasks[i];
+//	  if(tmp_t->subtype == task_subtype_density){
+//		if(tmp_t->skip == 1)error("inactive density task");
+//	  }
+//	  if(tmp_t->subtype == task_subtype_force){
+//		if(tmp_t->skip == 1)error("inactive force task");
+//	  }
+//	  if(tmp_t->subtype == task_subtype_gpu_pack){
+//		if(tmp_t->skip == 1)error("inactive pack task");
+//	  }
+//	  if(tmp_t->subtype == task_subtype_gpu_unpack){
+//	    if(tmp_t->skip == 1)error("inactive unpack task");
+//	  }
+//  }
 
   /* Run the 0th time-step */
   TIMER_TIC2;
