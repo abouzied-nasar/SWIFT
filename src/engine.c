@@ -1153,9 +1153,11 @@ int engine_estimate_nr_tasks(const struct engine *e) {
      */
     n1 += 38;
     n2 += 2;
-#ifdef WITH_CUDA // A. Nasar
-    n1 += 4; //Self force and density packs should be 2 but doubled to prevent code crash due to unpack tasks
-    n1 += 52; //Pair force and density packs should be 26 but doubled to prevent code crash due to unpack tasks
+#ifdef WITH_CUDA  // A. Nasar
+    n1 += 4;  // Self force and density packs should be 2 but doubled to prevent
+              // code crash due to unpack tasks
+    n1 += 52;  // Pair force and density packs should be 26 but doubled to
+               // prevent code crash due to unpack tasks
 #endif
 #ifdef WITH_MPI
     n1 += 6;
@@ -1164,8 +1166,8 @@ int engine_estimate_nr_tasks(const struct engine *e) {
 #ifdef EXTRA_HYDRO_LOOP
     n1 += 15;
 #ifdef WITH_CUDA
-    n1 += 1; //Self gradient packs
-    n1 += 13; //Pair gradient packs
+    n1 += 1;   // Self gradient packs
+    n1 += 13;  // Pair gradient packs
 #endif
 #ifdef WITH_MPI
     n1 += 2;
@@ -1787,7 +1789,7 @@ void engine_skip_force_and_kick(struct engine *e) {
         t->type == task_type_rt_ghost2 || t->type == task_type_rt_tchem ||
         t->type == task_type_rt_advance_cell_time ||
         t->type == task_type_neutrino_weight || t->type == task_type_csds ||
-        t->subtype == task_subtype_force || // A. Nasar
+        t->subtype == task_subtype_force ||  // A. Nasar
         t->subtype == task_subtype_gpu_pack_f ||
         t->subtype == task_subtype_gpu_unpack_f ||
         t->subtype == task_subtype_limiter ||
@@ -2280,22 +2282,22 @@ void engine_init_particles(struct engine *e, int flag_entropy_ICs,
 
 //  scheduler_write_dependencies(&e->sched, e->verbose, e->step); // A. Nasar write deps before running first step
   /* Now, launch the calculation */
-//  message("n tasks %i", e->sched.nr_tasks);
-//  for (int i = 0; i < e->sched.nr_tasks; i++){
-//	  struct task *tmp_t = &e->sched.tasks[i];
-//	  if(tmp_t->subtype == task_subtype_density){
-//		if(tmp_t->skip == 1)error("inactive density task");
-//	  }
-////	  if(tmp_t->subtype == task_subtype_force){
-////		if(tmp_t->skip == 1)error("inactive force task");
-////	  }
-//	  if(tmp_t->subtype == task_subtype_gpu_pack){
-//		if(tmp_t->skip == 1)error("inactive pack task");
-//	  }
-//	  if(tmp_t->subtype == task_subtype_gpu_unpack){
-//	    if(tmp_t->skip == 1)error("inactive unpack task");
-//	  }
-//  }
+  //  message("n tasks %i", e->sched.nr_tasks);
+  //  for (int i = 0; i < e->sched.nr_tasks; i++){
+  //	  struct task *tmp_t = &e->sched.tasks[i];
+  //	  if(tmp_t->subtype == task_subtype_density){
+  //		if(tmp_t->skip == 1)error("inactive density task");
+  //	  }
+  ////	  if(tmp_t->subtype == task_subtype_force){
+  ////		if(tmp_t->skip == 1)error("inactive force task");
+  ////	  }
+  //	  if(tmp_t->subtype == task_subtype_gpu_pack){
+  //		if(tmp_t->skip == 1)error("inactive pack task");
+  //	  }
+  //	  if(tmp_t->subtype == task_subtype_gpu_unpack){
+  //	    if(tmp_t->skip == 1)error("inactive unpack task");
+  //	  }
+  //  }
   TIMER_TIC;
   engine_launch(e, "tasks");
   TIMER_TOC(timer_runners);
