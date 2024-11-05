@@ -770,7 +770,7 @@ void engine_addtasks_recv_hydro(
 
     for (struct link *l = c->hydro.force_pack; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_gradient, l->t);
-      scheduler_addunlock(s, l->t, t_ti);
+      scheduler_addunlock(s, l->t, tend);
     }
     //scheduler_addunlock(s, c->hydro.super->hydro.f_unpack, tend);
 #endif /*WITH_CUDA*/
@@ -4132,9 +4132,9 @@ void engine_maketasks(struct engine *e) {
       }
 
       /* pack -> unpack -> ghost_in */
-      if (t->ci->hydro.ghost_in == NULL)
+      if (t->ci->hydro.ghost_in == NULL && t->ci->nodeID != e->nodeID)
         message("Ghost in for cell i is NULL\n");
-      if (t->cj->hydro.ghost_in == NULL)
+      if (t->cj->hydro.ghost_in == NULL && t->cj->nodeID != e->nodeID)
         message("Ghost in for cell j is NULL\n");
 
       scheduler_addunlock(sched, t, last_created_pair_unpack);
