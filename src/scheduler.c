@@ -1747,6 +1747,8 @@ struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
   t->tic = 0;
   t->toc = 0;
   t->total_ticks = 0;
+  t->total_cpu_pack_ticks = 0;
+  t->total_cpu_unpack_ticks = 0;
 
   if (ci != NULL) cell_set_flag(ci, cell_flag_has_tasks);
   if (cj != NULL) cell_set_flag(cj, cell_flag_has_tasks);
@@ -3370,6 +3372,14 @@ void scheduler_report_task_times_mapper(void *map_data, int num_elements,
     const float total_time = clocks_from_ticks(t->total_ticks);
     const enum task_categories cat = task_get_category(t);
     time_local[cat] += total_time;
+
+    if(t->type == task_type_pair && t->subtype == task_subtype_pack) {
+      time_local[task_category_gpu_pack] += clock_from_ticks(t->total_cpu_pack_ticks);
+      time_local[task_category_gpu_unpack] += clock_from_ticks(t->total_cpu_unpack_ticks);
+
+      time_local[task_category_gpu] -= clock_from_ticks(t->total_cpu_pack_ticks);
+      time_local[task_category_gpu] -= clock_from_ticks(t->total_cpu_unpack_ticks);
+    }
   }
 
   /* Update the global counters */
