@@ -2287,7 +2287,7 @@ void engine_link_gravity_tasks_mapper(void *map_data, int num_elements,
     /* Get a pointer to the task. */
     struct task *t = &tasks[k];
 
-    if (t->type == task_type_none) continue;
+    if (t->type == task_type_none || t->ci == NULL) continue;
 
     /* Get the cells we act on */
     struct cell *restrict ci = t->ci;
