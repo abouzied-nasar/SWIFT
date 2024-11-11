@@ -1460,7 +1460,7 @@ void runner_doself1_launch_f4(
         cell_unlocktree(cii);
 
         /*schedule my dependencies (Only unpacks really)*/
-//        enqueue_dependencies(s, tii);
+        enqueue_dependencies(s, tii);
         /*Signal sleeping runners*/
         // MATTHIEU signal_sleeping_runners(s, tii);
 
@@ -1859,7 +1859,7 @@ void runner_doself1_launch_f4_g(
         cell_unlocktree(cii);
 
         /*schedule my dependencies (Only unpacks really)*/
-//        enqueue_dependencies(s, tii);
+        enqueue_dependencies(s, tii);
         /*Signal sleeping runners*/
         // MATTHIEU signal_sleeping_runners(s, tii);
 
@@ -2261,7 +2261,7 @@ void runner_doself1_launch_f4_f(
         cell_unlocktree(cii);
 
         /*schedule my dependencies (Only unpacks really)*/
-//        enqueue_dependencies(s, tii);
+        enqueue_dependencies(s, tii);
         /*Signal sleeping runners*/
         // MATTHIEU signal_sleeping_runners(s, tii);
 
@@ -2871,7 +2871,6 @@ void runner_dopair1_launch_f4_one_memcpy(
         struct task *tii = pack_vars->task_list[tid];
 
         /*Let's lock ci*/
-        if (tii->corner_pair == 1) fprintf(stderr, "Corner task\n");
         while (cell_locktree(cii)) {
           ; /* spin until we acquire the lock */
         }
@@ -2906,7 +2905,7 @@ void runner_dopair1_launch_f4_one_memcpy(
                         (tp1.tv_nsec - tp0.tv_nsec) / 1000000000.0;
 
         /*schedule my dependencies (Only unpacks really)*/
-//        enqueue_dependencies(s, tii);
+        enqueue_dependencies(s, tii);
         /*Signal sleeping runners*/
         // MATTHIEU signal_sleeping_runners(s, tii);
 
@@ -3633,7 +3632,7 @@ void runner_dopair1_launch_f4_g_one_memcpy(
                         (tp1.tv_nsec - tp0.tv_nsec) / 1000000000.0;
 
         /*schedule my dependencies (Only unpacks really)*/
-//        enqueue_dependencies(s, tii);
+        enqueue_dependencies(s, tii);
         /*Signal sleeping runners*/
         // MATTHIEU signal_sleeping_runners(s, tii);
 
@@ -4385,7 +4384,7 @@ void runner_dopair1_launch_f4_f_one_memcpy(
                         (tp1.tv_nsec - tp0.tv_nsec) / 1000000000.0;
 
         /*schedule my dependencies (Only unpacks really)*/
-//        enqueue_dependencies(s, tii);
+        enqueue_dependencies(s, tii);
         /*Signal sleeping runners*/
         // MATTHIEU signal_sleeping_runners(s, tii);
 
