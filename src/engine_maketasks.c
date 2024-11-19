@@ -3102,7 +3102,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
         // GPU tasks A. Nasar
 //        scheduler_addunlock(sched, cj->hydro.super->hydro.ghost_out, t_force_gpu);
       }
-
 #endif
 
       if (with_feedback) {
