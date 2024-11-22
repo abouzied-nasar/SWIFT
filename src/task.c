@@ -164,15 +164,22 @@ const char *subtaskID_names[task_subtype_count] = {
     "sink_do_gas_swallow",
     "rt_gradient",
     "rt_transport",
+    "gpu_pack",  // A. Nasar
+    "gpu_pack_g",
+    "gpu_pack_f",
+    "gpu_unpack",
+    "gpu_unpack_g",
+    "gpu_unpack_f",
 };
 
 const char *task_category_names[task_category_count] = {
-    "drift",       "sorts",    "resort",
-    "hydro",       "gravity",  "feedback",
-    "black holes", "cooling",  "star formation",
-    "limiter",     "sync",     "time integration",
-    "mpi",         "pack",     "fof",
-    "others",      "neutrino", "sink",
+    "drift",       "sorts",      "resort",
+    "hydro",       "gravity",    "feedback",
+    "black holes", "cooling",    "star formation",
+    "limiter",     "sync",       "time integration",
+    "mpi",         "pack",       "gpu",
+    "gpu_pack",    "gpu_unpack", "fof",
+    "others",      "neutrino",   "sink",
     "RT",          "CSDS"};
 
 #ifdef WITH_MPI
@@ -187,22 +194,22 @@ MPI_Comm subtaskMPI_comms[task_subtype_count];
  * @param ARRAY is the array of this specific type.
  * @param COUNT is the number of elements in the array.
  */
-#define TASK_CELL_OVERLAP(TYPE, ARRAY, COUNT)                    \
-  __attribute__((always_inline)) INLINE static size_t            \
-      task_cell_overlap_##TYPE(const struct cell *restrict ci,   \
-                               const struct cell *restrict cj) { \
-                                                                 \
-    if (ci == NULL || cj == NULL) return 0;                      \
-                                                                 \
-    if (ci->ARRAY <= cj->ARRAY &&                                \
-        ci->ARRAY + ci->COUNT >= cj->ARRAY + cj->COUNT) {        \
-      return cj->COUNT;                                          \
-    } else if (cj->ARRAY <= ci->ARRAY &&                         \
-               cj->ARRAY + cj->COUNT >= ci->ARRAY + ci->COUNT) { \
-      return ci->COUNT;                                          \
-    }                                                            \
-                                                                 \
-    return 0;                                                    \
+#define TASK_CELL_OVERLAP(TYPE, ARRAY, COUNT)                           \
+  __attribute__((always_inline))                                        \
+  INLINE static size_t task_cell_overlap_##TYPE(                        \
+      const struct cell *restrict ci, const struct cell *restrict cj) { \
+                                                                        \
+    if (ci == NULL || cj == NULL) return 0;                             \
+                                                                        \
+    if (ci->ARRAY <= cj->ARRAY &&                                       \
+        ci->ARRAY + ci->COUNT >= cj->ARRAY + cj->COUNT) {               \
+      return cj->COUNT;                                                 \
+    } else if (cj->ARRAY <= ci->ARRAY &&                                \
+               cj->ARRAY + cj->COUNT >= ci->ARRAY + ci->COUNT) {        \
+      return ci->COUNT;                                                 \
+    }                                                                   \
+                                                                        \
+    return 0;                                                           \
   }
 
 TASK_CELL_OVERLAP(part, hydro.parts, hydro.count);
@@ -598,6 +605,22 @@ void task_unlock(struct task *t) {
 #ifdef SWIFT_TASKS_WITHOUT_ATOMICS
         cell_unlocktree(ci);
 #endif
+      } else if (subtype == task_subtype_gpu_unpack) {
+        //        for(int pp = 0; pp < 128 /*should be sched->pack_size*/;
+        //        pp++){
+        //		  cell_unlocktree(t->ci_unpack[pp]);
+        //	    }
+        /*Do nothing and be on your way*/
+      } else if (subtype == task_subtype_gpu_unpack_f) {
+        /*Do nothing and be on your way*/
+      } else if (subtype == task_subtype_gpu_unpack_g) {
+        /*Do nothing and be on your way*/
+      } else if (subtype == task_subtype_gpu_pack) {
+        cell_unlocktree(ci);
+      } else if (subtype == task_subtype_gpu_pack_f) {
+        cell_unlocktree(ci);
+      } else if (subtype == task_subtype_gpu_pack_g) {
+        cell_unlocktree(ci);
       } else { /* hydro */
         cell_unlocktree(ci);
       }
@@ -645,6 +668,21 @@ void task_unlock(struct task *t) {
         cell_unlocktree(ci);
         cell_unlocktree(cj);
 #endif
+      } else if (subtype == task_subtype_gpu_pack) {
+        cell_unlocktree(ci);
+        cell_unlocktree(cj);
+      } else if (subtype == task_subtype_gpu_pack_f) {
+        cell_unlocktree(ci);
+        cell_unlocktree(cj);
+      } else if (subtype == task_subtype_gpu_pack_g) {
+        cell_unlocktree(ci);
+        cell_unlocktree(cj);
+      } else if (subtype == task_subtype_gpu_unpack) {
+        /* Nothing to do */
+      } else if (subtype == task_subtype_gpu_unpack_f) {
+        /* Nothing to do */
+      } else if (subtype == task_subtype_gpu_unpack_g) {
+        /* Nothing to do */
       } else { /* hydro */
         cell_unlocktree(ci);
         cell_unlocktree(cj);
@@ -848,6 +886,38 @@ int task_lock(struct task *t) {
         if (ci->hydro.hold) return 0;
         if (cell_locktree(ci) != 0) return 0;
 #endif
+      } else if (subtype == task_subtype_gpu_pack) {
+        /* Attempt to lock the cell */
+        if (ci->hydro.hold) return 0;
+        if (cell_locktree(ci) != 0) return 0;
+      } else if (subtype == task_subtype_gpu_pack_f) {
+        /* Attempt to lock the cell */
+        if (ci->hydro.hold) return 0;
+        if (cell_locktree(ci) != 0) return 0;
+      } else if (subtype == task_subtype_gpu_pack_g) {
+        /* Attempt to lock the cell */
+        if (ci->hydro.hold) return 0;
+        if (cell_locktree(ci) != 0) return 0;
+      } else if (subtype == task_subtype_gpu_unpack) {
+        //        for(int pp = 0; pp < 128 /*should be sched->pack_size*/;
+        //        pp++){
+        //    	  if (t->ci_unpack[pp]->gpu_done == 0){
+        //    		  message("trying to queue an unpack before all packs
+        //    done on GPU"); 		  return 0;
+        //    	  }
+        ////          if (t->ci_unpack[pp]->hydro.hold)
+        ////    		return 0;
+        ////    	  if (cell_locktree(t->ci_unpack[pp]) != 0)
+        ////            return 0;
+        //        }
+        /* Nothing to do here */
+        return 1;
+      } else if (subtype == task_subtype_gpu_unpack_f) {
+        /* Nothing to do here */
+        return 1;
+      } else if (subtype == task_subtype_gpu_unpack_g) {
+        /* Nothing to do here */
+        return 1;
       } else { /* subtype == hydro */
         if (ci->hydro.hold) return 0;
         if (cell_locktree(ci) != 0) return 0;
@@ -964,6 +1034,39 @@ int task_lock(struct task *t) {
           return 0;
         }
 #endif
+      } else if (subtype == task_subtype_gpu_pack) {
+        /* Lock the parts in both cells */
+        if (ci->hydro.hold || cj->hydro.hold) return 0;
+        if (cell_locktree(ci) != 0) return 0;
+        if (cell_locktree(cj) != 0) {
+          cell_unlocktree(ci);
+          return 0;
+        }
+      } else if (subtype == task_subtype_gpu_pack_f) {
+        /* Lock the parts in both cells */
+        if (ci->hydro.hold || cj->hydro.hold) return 0;
+        if (cell_locktree(ci) != 0) return 0;
+        if (cell_locktree(cj) != 0) {
+          cell_unlocktree(ci);
+          return 0;
+        }
+      } else if (subtype == task_subtype_gpu_pack_g) {
+        /* Lock the parts in both cells */
+        if (ci->hydro.hold || cj->hydro.hold) return 0;
+        if (cell_locktree(ci) != 0) return 0;
+        if (cell_locktree(cj) != 0) {
+          cell_unlocktree(ci);
+          return 0;
+        }
+      } else if (subtype == task_subtype_gpu_unpack) {
+        /* Nothing to do here. */
+        return 1;
+      } else if (subtype == task_subtype_gpu_unpack_f) {
+        /* Nothing to do here. */
+        return 1;
+      } else if (subtype == task_subtype_gpu_unpack_g) {
+        /* Nothing to do here. */
+        return 1;
       } else { /* subtype == hydro */
         /* Lock the parts in both cells */
         if (ci->hydro.hold || cj->hydro.hold) return 0;
@@ -1127,6 +1230,19 @@ void task_get_group_name(int type, int subtype, char *cluster) {
   }
 
   switch (subtype) {
+    /* A. Nasar */
+    case task_subtype_gpu_pack:
+    case task_subtype_gpu_unpack:
+      strcpy(cluster, "Density");
+      break;
+    case task_subtype_gpu_pack_f:
+    case task_subtype_gpu_unpack_f:
+      strcpy(cluster, "Force");
+      break;
+    case task_subtype_gpu_pack_g:
+    case task_subtype_gpu_unpack_g:
+      strcpy(cluster, "Gradient");
+      break;
     case task_subtype_density:
       strcpy(cluster, "Density");
       break;
@@ -1756,6 +1872,14 @@ enum task_categories task_get_category(const struct task *t) {
         case task_subtype_gradient:
         case task_subtype_force:
           return task_category_hydro;
+
+        case task_subtype_gpu_pack:  // A. Nasar
+        case task_subtype_gpu_unpack:
+        case task_subtype_gpu_pack_f:
+        case task_subtype_gpu_unpack_f:
+        case task_subtype_gpu_pack_g:
+        case task_subtype_gpu_unpack_g:
+          return task_category_gpu;
 
         case task_subtype_limiter:
           return task_category_limiter;
