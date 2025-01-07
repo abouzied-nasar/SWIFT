@@ -3306,8 +3306,8 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
           /* Pick a queue at random among the non-empty ones */
           const int ind = rand_r(&seed) % count;
           /*Get a pointer to the queue we're stealing from*/
-          int qstl = qids[ind];
-      	  struct queue * q_stl = &s->queues[qstl];
+          int qstl_id = qids[ind];
+      	  struct queue * q_stl = &s->queues[qstl_id];
           /* Try to get a task from that random queue */
           TIMER_TIC;
           res = queue_gettask(q_stl, prev, 0);
