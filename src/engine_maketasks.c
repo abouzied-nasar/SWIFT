@@ -2208,7 +2208,7 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
 #endif
       if (t_subtype == task_subtype_density) {
         engine_addlink(e, &ci->hydro.density, t);
-      } else if (t_subtype == task_subtype_gpu_pack) {  // A. Nasar
+      } else if (t_subtype == task_subtype_gpu_pack_d) {  // A. Nasar
         engine_addlink(e, &ci->hydro.density_pack, t);
         //      } else if (t_subtype == task_subtype_gpu_pack_f) {
         //        engine_addlink(e, &ci->hydro.force_pack, t);
@@ -2230,7 +2230,7 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
       if (t_subtype == task_subtype_density) {
         engine_addlink(e, &ci->hydro.density, t);
         engine_addlink(e, &cj->hydro.density, t);
-      } else if (t_subtype == task_subtype_gpu_pack) {  // A. Nasar
+      } else if (t_subtype == task_subtype_gpu_pack_d) {  // A. Nasar
         engine_addlink(e, &ci->hydro.density_pack, t);
         engine_addlink(e, &cj->hydro.density_pack, t);
         //      } else if (t_subtype == task_subtype_gpu_pack_f) {
@@ -2554,7 +2554,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
     }
 
     /*Make packing depend on sorts and drift A. Nasar */
-    else if (t_type == task_type_self && t_subtype == task_subtype_gpu_pack) {
+    else if (t_type == task_type_self && t_subtype == task_subtype_gpu_pack_d) {
       scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
     }
 
@@ -2855,7 +2855,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       }
     }
 
-    /*Make packing depend on sorts and drift A. Nasar */
     else if (t_type == task_type_pair && t_subtype == task_subtype_gpu_pack) {
       /* Make all density tasks depend on the drift */
       if (ci->nodeID == nodeID) {
@@ -3521,8 +3520,8 @@ void engine_make_hydroloop_tasks_mapper(void *map_data, int num_elements,
       scheduler_addtask(sched, task_type_self, task_subtype_density, 0, 0, ci,
                         NULL);
       // A. Nasar also add a pack task for GPU
-      scheduler_addtask(sched, task_type_self, task_subtype_gpu_pack, 0, 0, ci,
-                        NULL);
+      scheduler_addtask(sched, task_type_self, task_subtype_gpu_pack_d, 0, 0,
+                        ci, NULL);
     }
 
     /* Now loop over all the neighbours of this cell */
@@ -3556,7 +3555,7 @@ void engine_make_hydroloop_tasks_mapper(void *map_data, int num_elements,
           const int sid = sortlistID[(kk + 1) + 3 * ((jj + 1) + 3 * (ii + 1))];
           scheduler_addtask(sched, task_type_pair, task_subtype_density, sid, 0,
                             ci, cj);
-          scheduler_addtask(sched, task_type_pair, task_subtype_gpu_pack, sid,
+          scheduler_addtask(sched, task_type_pair, task_subtype_gpu_pack_d, sid,
                             0, ci, cj);  // A. Nasar
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -4105,17 +4104,17 @@ void engine_maketasks(struct engine *e) {
   //  for (int i = 0; i < sched->nr_tasks; i++) {
   //	  struct task * t = &sched->tasks[i];
   //	  if(t->type == task_type_sub_self && t->subtype ==
-  //task_subtype_gpu_pack){
+  // task_subtype_gpu_pack_d){
   //        t->type = task_type_self;
   //        fprintf(stderr, "sub_self");
   //	  }
   //      if(t->type == task_type_sub_pair && t->subtype ==
-  //      task_subtype_gpu_pack){
+  //      task_subtype_gpu_pack_d){
   //    	t->type = task_type_pair;
   //        fprintf(stderr, "sub_pair");
   //      }
   //	  if(t->type == task_type_sub_self && t->subtype ==
-  //task_subtype_gpu_pack_g){
+  // task_subtype_gpu_pack_g){
   //        t->type = task_type_self;
   //        fprintf(stderr, "sub_self");
   //	  }
@@ -4125,7 +4124,7 @@ void engine_maketasks(struct engine *e) {
   //        fprintf(stderr, "sub_pair");
   //      }
   //	  if(t->type == task_type_sub_self && t->subtype ==
-  //task_subtype_gpu_pack_f){
+  // task_subtype_gpu_pack_f){
   //        t->type = task_type_self;
   //        fprintf(stderr, "sub_self");
   //	  }
@@ -4153,13 +4152,13 @@ void engine_maketasks(struct engine *e) {
   for (int i = 0; i < sched->nr_tasks; i++) {
 
     struct task *t = &sched->tasks[i];
-    if (t->subtype != task_subtype_gpu_pack) continue;
+    if (t->subtype != task_subtype_gpu_pack_d) continue;
 
     if (t->type == task_type_self) {
 
       if (count_current_self % pack_size == 0) {
         last_created_self_unpack = scheduler_addtask(
-            sched, task_type_self, task_subtype_gpu_unpack, 0, 0, NULL, NULL);
+            sched, task_type_self, task_subtype_gpu_unpack_d, 0, 0, NULL, NULL);
         last_created_self_unpack->gpu_done = 0;
       }
 
@@ -4178,7 +4177,7 @@ void engine_maketasks(struct engine *e) {
     else if (t->type == task_type_pair) {
       if (count_current_pair % pack_size_pair == 0) {
         last_created_pair_unpack = scheduler_addtask(
-            sched, task_type_pair, task_subtype_gpu_unpack, 0, 0, NULL, NULL);
+            sched, task_type_pair, task_subtype_gpu_unpack_d, 0, 0, NULL, NULL);
       }
 
       scheduler_addunlock(sched, t, last_created_pair_unpack);
@@ -4345,7 +4344,7 @@ void engine_maketasks(struct engine *e) {
   //    if(t->ci != NULL){
   ////      if(t->type == task_type_pair && ((t->ci->split && !t->cj->split) ||
   ///(!t->ci->split && t->cj->split))) /    	  error("one is split the other
-  ///isn't");
+  /// isn't");
   //      if(t->ci->hydro.count > 80 && t->type == task_type_self)
   //    	  error("Count is %i task subtype (%s)",
   //                  t->ci->hydro.count, subtaskID_names[t->subtype]);
@@ -4516,10 +4515,10 @@ void engine_maketasks(struct engine *e) {
         t->subtype == task_subtype_force) {
       t->implicit = 1;
     }
-    //    if (t->subtype == task_subtype_gpu_pack ||
+    //    if (t->subtype == task_subtype_gpu_pack_d ||
     //      t->subtype == task_subtype_gpu_pack_g ||
     //	  t->subtype == task_subtype_gpu_pack_f ||
-    //	  t->subtype == task_subtype_gpu_unpack ||
+    //	  t->subtype == task_subtype_gpu_unpack_d ||
     //	  t->subtype == task_subtype_gpu_unpack_g ||
     //	  t->subtype == task_subtype_gpu_unpack_f){
     //    	t->implicit = 1;
@@ -4529,10 +4528,10 @@ void engine_maketasks(struct engine *e) {
     //	  t->subtype == task_subtype_gpu_unpack_g ||
     //	  t->subtype == task_subtype_gpu_unpack_f){// ||
     ////	  (t->type == task_type_pair &&
-    ////	   t->subtype == task_subtype_gpu_pack)){
+    ////	   t->subtype == task_subtype_gpu_pack_d)){
     //    	t->implicit = 1;
     //    }
-    //    if ((t->subtype == task_subtype_gpu_pack ||
+    //    if ((t->subtype == task_subtype_gpu_pack_d ||
     //      t->subtype == task_subtype_gpu_pack_g  ||
     //	  t->subtype == task_subtype_gpu_pack_f) &&
     //	  (t->type == task_type_sub_pair ||
