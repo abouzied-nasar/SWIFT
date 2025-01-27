@@ -175,7 +175,7 @@ void DOSELF1_STARS(struct runner *r, const struct cell *c,
 #endif
       }
     } /* loop over the parts in ci. */
-  }   /* loop over the sparts in ci. */
+  } /* loop over the sparts in ci. */
 
   TIMER_TOC(TIMER_DOSELF_STARS);
 }
@@ -340,7 +340,7 @@ void DO_NONSYM_PAIR1_STARS_NAIVE(struct runner *r,
 #endif
       }
     } /* loop over the parts in cj. */
-  }   /* loop over the parts in ci. */
+  } /* loop over the parts in ci. */
 }
 
 /**
@@ -567,8 +567,8 @@ void DO_SYM_PAIR1_STARS(struct runner *r, const struct cell *restrict ci,
 #endif
         }
       } /* loop over the parts in cj. */
-    }   /* loop over the parts in ci. */
-  }     /* do_ci_stars */
+    } /* loop over the parts in ci. */
+  } /* do_ci_stars */
 
   if (do_cj_stars) {
     /* Pick-out the sorted lists. */
@@ -731,8 +731,8 @@ void DO_SYM_PAIR1_STARS(struct runner *r, const struct cell *restrict ci,
 #endif
         }
       } /* loop over the parts in ci. */
-    }   /* loop over the parts in cj. */
-  }     /* Cell cj is active */
+    } /* loop over the parts in cj. */
+  } /* Cell cj is active */
 
   TIMER_TOC(TIMER_DOPAIR_STARS);
 }
@@ -859,7 +859,7 @@ void DOPAIR1_SUBSET_STARS(struct runner *r, const struct cell *restrict ci,
 #endif
         }
       } /* loop over the parts in cj. */
-    }   /* loop over the sparts in ci. */
+    } /* loop over the sparts in ci. */
   }
 
   /* Sparts are on the right. */
@@ -922,7 +922,7 @@ void DOPAIR1_SUBSET_STARS(struct runner *r, const struct cell *restrict ci,
 #endif
         }
       } /* loop over the parts in cj. */
-    }   /* loop over the sparts in ci. */
+    } /* loop over the sparts in ci. */
   }
 }
 
@@ -1021,7 +1021,7 @@ void DOPAIR1_SUBSET_STARS_NAIVE(struct runner *r,
 #endif
       }
     } /* loop over the parts in cj. */
-  }   /* loop over the parts in ci. */
+  } /* loop over the parts in ci. */
 }
 
 /**
@@ -1108,7 +1108,7 @@ void DOSELF1_SUBSET_STARS(struct runner *r, const struct cell *ci,
 #endif
       }
     } /* loop over the parts in cj. */
-  }   /* loop over the parts in ci. */
+  } /* loop over the parts in ci. */
 }
 
 /**

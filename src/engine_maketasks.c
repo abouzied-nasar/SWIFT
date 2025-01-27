@@ -2864,6 +2864,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       if ((cj->nodeID == nodeID) && (ci->hydro.super != cj->hydro.super)) {
         scheduler_addunlock(sched, cj->hydro.super->hydro.drift, t);
       }
+
       /* Make all density tasks depend on the sorts */
       scheduler_addunlock(sched, ci->hydro.super->hydro.sorts, t);
       if (ci->hydro.super != cj->hydro.super) {
@@ -2894,9 +2895,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       /* New task for the force */
       t_force = scheduler_addtask(sched, task_type_pair, task_subtype_force,
                                   flags, 0, ci, cj);
-      /* New task for the force A. Nasar */
-//      t_force_gpu = scheduler_addtask(sched, task_type_pair, task_subtype_gpu_pack_f,
-//                                  0, 0, ci, cj);
+      t_force_gpu = scheduler_addtask(
+          sched, task_type_pair, task_subtype_gpu_pack_f, flags, 0, ci, cj);
 
 #ifdef MPI_SYMMETRIC_FORCE_INTERACTION
       /* The order of operations for an inactive local cell interacting
@@ -2910,7 +2910,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 //      scheduler_addunlock(sched, ci->hydro.super->hydro.sorts, t_force_gpu);
       if (ci->hydro.super != cj->hydro.super) {
         scheduler_addunlock(sched, cj->hydro.super->hydro.sorts, t_force);
-//        scheduler_addunlock(sched, cj->hydro.super->hydro.sorts, t_force_gpu);
+        scheduler_addunlock(sched, cj->hydro.super->hydro.sorts, t_force_gpu);
       }
 #endif
 
@@ -3055,9 +3055,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       /* Start by constructing the task for the second and third hydro loop */
       t_gradient = scheduler_addtask(sched, task_type_pair,
                                      task_subtype_gradient, flags, 0, ci, cj);
-      /* Start by constructing the task for the second and third GPU hydro loop A. Nasar */
-//      t_gradient_gpu = scheduler_addtask(sched, task_type_pair,
-//                                     task_subtype_gpu_pack_g, 0, 0, ci, cj);
+      t_gradient_gpu = scheduler_addtask(
+          sched, task_type_pair, task_subtype_gpu_pack_g, flags, 0, ci, cj);
 
       /* Add the link between the new loop and both cells */
       engine_addlink(e, &ci->hydro.gradient, t_gradient);
@@ -3072,17 +3071,19 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
         engine_make_hydro_loops_dependencies(sched, t, t_gradient, t_force,
                                              t_limiter, ci, with_cooling,
                                              with_timestep_limiter);
-        /*Same for GPU tasks*/
-//        scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out, t_gradient_gpu);
-//        scheduler_addunlock(sched, ci->hydro.super->hydro.extra_ghost, t_force_gpu);
+        scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out,
+                            t_gradient_gpu);
+        scheduler_addunlock(sched, ci->hydro.super->hydro.extra_ghost,
+                            t_force_gpu);
       }
       if ((cj->nodeID == nodeID) && (ci->hydro.super != cj->hydro.super)) {
         engine_make_hydro_loops_dependencies(sched, t, t_gradient, t_force,
                                              t_limiter, cj, with_cooling,
                                              with_timestep_limiter);
-        /*Same for GPU tasks*/
-//        scheduler_addunlock(sched, cj->hydro.super->hydro.ghost_out, t_gradient_gpu);
-//        scheduler_addunlock(sched, cj->hydro.super->hydro.extra_ghost, t_force_gpu);
+        scheduler_addunlock(sched, cj->hydro.super->hydro.ghost_out,
+                            t_gradient_gpu);
+        scheduler_addunlock(sched, cj->hydro.super->hydro.extra_ghost,
+                            t_force_gpu);
       }
 #else
 
@@ -3092,15 +3093,15 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
         engine_make_hydro_loops_dependencies(sched, t, t_force, t_limiter, ci,
                                              with_cooling,
                                              with_timestep_limiter);
-        // GPU tasks A. Nasar
-//        scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out, t_force_gpu);
+        scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out,
+                            t_force_gpu);
       }
       if ((cj->nodeID == nodeID) && (ci->hydro.super != cj->hydro.super)) {
         engine_make_hydro_loops_dependencies(sched, t, t_force, t_limiter, cj,
                                              with_cooling,
                                              with_timestep_limiter);
-        // GPU tasks A. Nasar
-//        scheduler_addunlock(sched, cj->hydro.super->hydro.ghost_out, t_force_gpu);
+        scheduler_addunlock(sched, cj->hydro.super->hydro.ghost_out,
+                            t_force_gpu);
       }
 #endif
 
@@ -4085,7 +4086,6 @@ void engine_maketasks(struct engine *e) {
 
   tic2 = getticks();
 
-
   /* Run through the tasks and make force tasks for each density task.
      Each force task depends on the cell ghosts and unlocks the kick task
      of its super-cell. */
@@ -4100,35 +4100,41 @@ void engine_maketasks(struct engine *e) {
      *                sched->tasks, sched->nr_tasks, sizeof(struct task),
      *                threadpool_auto_chunk_size, e); */
   }
-//  int unsplit = 0, split = 0;
-//  /*These loops should really be threadmapped A. Nasar*/
-//  for (int i = 0; i < sched->nr_tasks; i++) {
-//	  struct task * t = &sched->tasks[i];
-//	  if(t->type == task_type_sub_self && t->subtype == task_subtype_gpu_pack){
-//        t->type = task_type_self;
-//        fprintf(stderr, "sub_self");
-//	  }
-//      if(t->type == task_type_sub_pair && t->subtype == task_subtype_gpu_pack){
-//    	t->type = task_type_pair;
-//        fprintf(stderr, "sub_pair");
-//      }
-//	  if(t->type == task_type_sub_self && t->subtype == task_subtype_gpu_pack_g){
-//        t->type = task_type_self;
-//        fprintf(stderr, "sub_self");
-//	  }
-//      if(t->type == task_type_sub_pair && t->subtype == task_subtype_gpu_pack_g){
-//    	t->type = task_type_pair;
-//        fprintf(stderr, "sub_pair");
-//      }
-//	  if(t->type == task_type_sub_self && t->subtype == task_subtype_gpu_pack_f){
-//        t->type = task_type_self;
-//        fprintf(stderr, "sub_self");
-//	  }
-//      if(t->type == task_type_sub_pair && t->subtype == task_subtype_gpu_pack_f){
-//    	t->type = task_type_pair;
-//        fprintf(stderr, "sub_pair");
-//      }
-//  }
+  //  int unsplit = 0, split = 0;
+  //  /*These loops should really be threadmapped A. Nasar*/
+  //  for (int i = 0; i < sched->nr_tasks; i++) {
+  //	  struct task * t = &sched->tasks[i];
+  //	  if(t->type == task_type_sub_self && t->subtype ==
+  //task_subtype_gpu_pack){
+  //        t->type = task_type_self;
+  //        fprintf(stderr, "sub_self");
+  //	  }
+  //      if(t->type == task_type_sub_pair && t->subtype ==
+  //      task_subtype_gpu_pack){
+  //    	t->type = task_type_pair;
+  //        fprintf(stderr, "sub_pair");
+  //      }
+  //	  if(t->type == task_type_sub_self && t->subtype ==
+  //task_subtype_gpu_pack_g){
+  //        t->type = task_type_self;
+  //        fprintf(stderr, "sub_self");
+  //	  }
+  //      if(t->type == task_type_sub_pair && t->subtype ==
+  //      task_subtype_gpu_pack_g){
+  //    	t->type = task_type_pair;
+  //        fprintf(stderr, "sub_pair");
+  //      }
+  //	  if(t->type == task_type_sub_self && t->subtype ==
+  //task_subtype_gpu_pack_f){
+  //        t->type = task_type_self;
+  //        fprintf(stderr, "sub_self");
+  //	  }
+  //      if(t->type == task_type_sub_pair && t->subtype ==
+  //      task_subtype_gpu_pack_f){
+  //    	t->type = task_type_pair;
+  //        fprintf(stderr, "sub_pair");
+  //      }
+  //  }
 
   /* Now, create unpack tasks based on the existing packs and create
    * the dependencies pack->unpack->ghost_in A. Nasar */
@@ -4142,7 +4148,8 @@ void engine_maketasks(struct engine *e) {
   struct task *last_created_pair_unpack = NULL;
 
   /* Loop over all the currently existing pack tasks
-   * These loops should be thread-mapped too but will be a bit more tricky: A. Nasar*/
+   * These loops should be thread-mapped too but will be a bit more tricky: A.
+   * Nasar*/
   for (int i = 0; i < sched->nr_tasks; i++) {
 
     struct task *t = &sched->tasks[i];
@@ -4331,17 +4338,19 @@ void engine_maketasks(struct engine *e) {
   if (count_current_pair != sched->nr_pair_pack_tasks_f)
     error("We did not find the correct number of F pair pack tasks!!");
 #endif
-/*Debug code to check if some tasks are not split to desired level in tree for GPU*/
-//  for (int i = 0; i < sched->nr_tasks; i++) {
-//    struct task *t = &sched->tasks[i];
-//    if(t->ci != NULL){
-////      if(t->type == task_type_pair && ((t->ci->split && !t->cj->split) || (!t->ci->split && t->cj->split)))
-////    	  error("one is split the other isn't");
-//      if(t->ci->hydro.count > 80 && t->type == task_type_self)
-//    	  error("Count is %i task subtype (%s)",
-//                  t->ci->hydro.count, subtaskID_names[t->subtype]);
-//    }
-//  }
+  /*Debug code to check if some tasks are not split to desired level in tree for
+   * GPU*/
+  //  for (int i = 0; i < sched->nr_tasks; i++) {
+  //    struct task *t = &sched->tasks[i];
+  //    if(t->ci != NULL){
+  ////      if(t->type == task_type_pair && ((t->ci->split && !t->cj->split) ||
+  ///(!t->ci->split && t->cj->split))) /    	  error("one is split the other
+  ///isn't");
+  //      if(t->ci->hydro.count > 80 && t->type == task_type_self)
+  //    	  error("Count is %i task subtype (%s)",
+  //                  t->ci->hydro.count, subtaskID_names[t->subtype]);
+  //    }
+  //  }
   if (e->verbose)
     message("Making extra hydroloop tasks took %.3f %s.",
             clocks_from_ticks(getticks() - tic2), clocks_getunit());
@@ -4503,34 +4512,33 @@ void engine_maketasks(struct engine *e) {
 
     struct task *t = &sched->tasks[i];
     if (t->subtype == task_subtype_density ||
-      t->subtype == task_subtype_gradient  ||
-	  t->subtype == task_subtype_force){
-    	t->implicit = 1;
+        t->subtype == task_subtype_gradient ||
+        t->subtype == task_subtype_force) {
+      t->implicit = 1;
     }
-//    if (t->subtype == task_subtype_gpu_pack ||
-//      t->subtype == task_subtype_gpu_pack_g ||
-//	  t->subtype == task_subtype_gpu_pack_f ||
-//	  t->subtype == task_subtype_gpu_unpack ||
-//	  t->subtype == task_subtype_gpu_unpack_g ||
-//	  t->subtype == task_subtype_gpu_unpack_f){
-//    	t->implicit = 1;
-//    }
-//    if (t->subtype == task_subtype_gpu_pack_g ||
-//	  t->subtype == task_subtype_gpu_pack_f ||
-//	  t->subtype == task_subtype_gpu_unpack_g ||
-//	  t->subtype == task_subtype_gpu_unpack_f){// ||
-////	  (t->type == task_type_pair &&
-////	   t->subtype == task_subtype_gpu_pack)){
-//    	t->implicit = 1;
-//    }
-//    if ((t->subtype == task_subtype_gpu_pack ||
-//      t->subtype == task_subtype_gpu_pack_g  ||
-//	  t->subtype == task_subtype_gpu_pack_f) &&
-//	  (t->type == task_type_sub_pair ||
-//	  t->type == task_type_sub_self)){
-//    	t->implicit = 1;
-////    	error("STill have subs");
-//    }
+    //    if (t->subtype == task_subtype_gpu_pack ||
+    //      t->subtype == task_subtype_gpu_pack_g ||
+    //	  t->subtype == task_subtype_gpu_pack_f ||
+    //	  t->subtype == task_subtype_gpu_unpack ||
+    //	  t->subtype == task_subtype_gpu_unpack_g ||
+    //	  t->subtype == task_subtype_gpu_unpack_f){
+    //    	t->implicit = 1;
+    //    }
+    //    if (t->subtype == task_subtype_gpu_pack_g ||
+    //	  t->subtype == task_subtype_gpu_pack_f ||
+    //	  t->subtype == task_subtype_gpu_unpack_g ||
+    //	  t->subtype == task_subtype_gpu_unpack_f){// ||
+    ////	  (t->type == task_type_pair &&
+    ////	   t->subtype == task_subtype_gpu_pack)){
+    //    	t->implicit = 1;
+    //    }
+    //    if ((t->subtype == task_subtype_gpu_pack ||
+    //      t->subtype == task_subtype_gpu_pack_g  ||
+    //	  t->subtype == task_subtype_gpu_pack_f) &&
+    //	  (t->type == task_type_sub_pair ||
+    //	  t->type == task_type_sub_self)){
+    //    	t->implicit = 1;
+    ////    	error("STill have subs");
+    //    }
   }
-
 }
