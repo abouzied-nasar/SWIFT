@@ -2534,345 +2534,51 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
   for (int ind = 0; ind < num_elements; ind++) {
 
-    struct task *t = &((struct task *)map_data)[ind];
-    const enum task_types t_type = t->type;
-    const enum task_subtypes t_subtype = t->subtype;
-    const long long flags = t->flags;
-    struct cell *const ci = t->ci;
-    struct cell *const cj = t->cj;
-
-    /* Escape early */
-    if (t->type == task_type_none) continue;
-    if (t->type == task_type_stars_resort) continue;
-    if (t->type == task_type_star_formation) continue;
-    if (t->type == task_type_star_formation_sink) continue;
-    if (t->type == task_type_sink_formation) continue;
-
-    /* Sort tasks depend on the drift of the cell (gas version). */
-    if (t_type == task_type_sort && ci->nodeID == nodeID) {
-      scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
-    }
-
-    /*Make packing depend on sorts and drift A. Nasar */
-    else if (t_type == task_type_self && t_subtype == task_subtype_gpu_pack_d) {
-      scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
-    }
-
-    /* Sort tasks depend on the drift of the cell (stars version). */
-    else if (t_type == task_type_stars_sort && ci->nodeID == nodeID) {
-      scheduler_addunlock(sched, ci->hydro.super->stars.drift, t);
-    }
-
-    /* Otherwise, self interaction? */
-    else if (t_type == task_type_self && t_subtype == task_subtype_density) {
-
-      const int bcount_i = ci->black_holes.count;
-
-      /* Make all density tasks depend on the drift and sorts. */
-      scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
-      scheduler_addunlock(sched, ci->hydro.super->hydro.sorts, t);
-
-      /* Start by constructing the task for the second hydro loop */
-      t_force = scheduler_addtask(sched, task_type_self, task_subtype_force,
-                                  flags, 0, ci, NULL);
-      /* Task for the second GPU hydro loop A. Nasar */
-      t_force_gpu = scheduler_addtask(sched, task_type_self,
-                                      task_subtype_gpu_pack_f, 0, 0, ci, NULL);
-
-      /* and the task for the time-step limiter */
-      if (with_timestep_limiter) {
-        t_limiter = scheduler_addtask(sched, task_type_self,
-                                      task_subtype_limiter, flags, 0, ci, NULL);
+      t_force_gpu = scheduler_addtask(
+          sched, task_type_pair, task_subtype_gpu_pack_f, flags, 0, ci, cj);
+#ifdef MPI_SYMMETRIC_FORCE_INTERACTION
+      /* Make all force tasks depend on the sorts */
+      scheduler_addunlock(sched, ci->hydro.super->hydro.sorts, t_force_gpu);
+      if (ci->hydro.super != cj->hydro.super) {
+        scheduler_addunlock(sched, cj->hydro.super->hydro.sorts, t_force_gpu);
       }
-
-      /* The stellar feedback tasks */
-      if (with_feedback) {
-        t_star_density =
-            scheduler_addtask(sched, task_type_self, task_subtype_stars_density,
-                              flags, 0, ci, NULL);
-        t_star_feedback =
-            scheduler_addtask(sched, task_type_self,
-                              task_subtype_stars_feedback, flags, 0, ci, NULL);
-
-#ifdef EXTRA_STAR_LOOPS
-        t_star_prep1 =
-            scheduler_addtask(sched, task_type_self, task_subtype_stars_prep1,
-                              flags, 0, ci, NULL);
-        t_star_prep2 =
-            scheduler_addtask(sched, task_type_self, task_subtype_stars_prep2,
-                              flags, 0, ci, NULL);
 #endif
-      }
-
-      /* The sink tasks */
-      if (with_sink) {
-        t_sink_density =
-            scheduler_addtask(sched, task_type_self, task_subtype_sink_density,
-                              flags, 0, ci, NULL);
-        t_sink_swallow =
-            scheduler_addtask(sched, task_type_self, task_subtype_sink_swallow,
-                              flags, 0, ci, NULL);
-        t_sink_do_sink_swallow = scheduler_addtask(
-            sched, task_type_self, task_subtype_sink_do_sink_swallow, flags, 0,
-            ci, NULL);
-        t_sink_do_gas_swallow = scheduler_addtask(
-            sched, task_type_self, task_subtype_sink_do_gas_swallow, flags, 0,
-            ci, NULL);
-      }
-
-      /* The black hole feedback tasks */
-      if (with_black_holes && bcount_i > 0) {
-        t_bh_density = scheduler_addtask(
-            sched, task_type_self, task_subtype_bh_density, flags, 0, ci, NULL);
-        t_bh_swallow = scheduler_addtask(
-            sched, task_type_self, task_subtype_bh_swallow, flags, 0, ci, NULL);
-
-        t_do_gas_swallow =
-            scheduler_addtask(sched, task_type_self,
-                              task_subtype_do_gas_swallow, flags, 0, ci, NULL);
-
-        t_do_bh_swallow =
-            scheduler_addtask(sched, task_type_self, task_subtype_do_bh_swallow,
-                              flags, 0, ci, NULL);
-
-        t_bh_feedback =
-            scheduler_addtask(sched, task_type_self, task_subtype_bh_feedback,
-                              flags, 0, ci, NULL);
-      }
-
-      if (with_rt) {
-        t_rt_gradient =
-            scheduler_addtask(sched, task_type_self, task_subtype_rt_gradient,
-                              flags, 0, ci, NULL);
-        t_rt_transport =
-            scheduler_addtask(sched, task_type_self, task_subtype_rt_transport,
-                              flags, 0, ci, NULL);
-      }
-
-      /* Link the tasks to the cells. Do the same for GPU tasks A. Nasar */
-      engine_addlink(e, &ci->hydro.force, t_force);
       engine_addlink(e, &ci->hydro.force_pack, t_force_gpu);
-
-      if (with_timestep_limiter) {
-        engine_addlink(e, &ci->hydro.limiter, t_limiter);
-      }
-      if (with_feedback) {
-        engine_addlink(e, &ci->stars.density, t_star_density);
-        engine_addlink(e, &ci->stars.feedback, t_star_feedback);
-#ifdef EXTRA_STAR_LOOPS
-        engine_addlink(e, &ci->stars.prepare1, t_star_prep1);
-        engine_addlink(e, &ci->stars.prepare2, t_star_prep2);
-#endif
-      }
-      if (with_sink) {
-        engine_addlink(e, &ci->sinks.density, t_sink_density);
-        engine_addlink(e, &ci->sinks.swallow, t_sink_swallow);
-        engine_addlink(e, &ci->sinks.do_sink_swallow, t_sink_do_sink_swallow);
-        engine_addlink(e, &ci->sinks.do_gas_swallow, t_sink_do_gas_swallow);
-      }
-      if (with_black_holes && bcount_i > 0) {
-        engine_addlink(e, &ci->black_holes.density, t_bh_density);
-        engine_addlink(e, &ci->black_holes.swallow, t_bh_swallow);
-        engine_addlink(e, &ci->black_holes.do_gas_swallow, t_do_gas_swallow);
-        engine_addlink(e, &ci->black_holes.do_bh_swallow, t_do_bh_swallow);
-        engine_addlink(e, &ci->black_holes.feedback, t_bh_feedback);
-      }
-      if (with_rt) {
-        engine_addlink(e, &ci->rt.rt_gradient, t_rt_gradient);
-        engine_addlink(e, &ci->rt.rt_transport, t_rt_transport);
-      }
-
+      engine_addlink(e, &cj->hydro.force_pack, t_force_gpu);
 #ifdef EXTRA_HYDRO_LOOP
-
-      /* Start by constructing the task for the second and third hydro loop */
-      t_gradient = scheduler_addtask(sched, task_type_self,
-                                     task_subtype_gradient, flags, 0, ci, NULL);
-      /* Same work for the additional GPU hydro loop A. Nasar */
       t_gradient_gpu = scheduler_addtask(
-          sched, task_type_self, task_subtype_gpu_pack_g, 0, 0, ci, NULL);
-
-      /* Add the link between the new loops and the cell. Same for GPU task A.
-       * Nasar */
-      engine_addlink(e, &ci->hydro.gradient, t_gradient);
+          sched, task_type_pair, task_subtype_gpu_pack_g, flags, 0, ci, cj);
       engine_addlink(e, &ci->hydro.gradient_pack, t_gradient_gpu);
-
+      engine_addlink(e, &cj->hydro.gradient_pack, t_gradient_gpu);
       /* Now, build all the dependencies for the hydro for the cells */
       /* that are local and are not descendant of the same super_hydro-cells */
-      engine_make_hydro_loops_dependencies(sched, t, t_gradient, t_force,
-                                           t_limiter, ci, with_cooling,
-                                           with_timestep_limiter);
-
-      // A. Nasar add unlocks for pack tasks here. Unpacks depend on packs and
-      // will be used to create downstream deps later
-      scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out,
-                          t_gradient_gpu);
-      scheduler_addunlock(sched, ci->hydro.super->hydro.extra_ghost,
-                          t_force_gpu);
-#else
-
-      /* Now, build all the dependencies for the hydro for the cells */
-      /* that are local and are not descendant of the same super_hydro-cells */
-      engine_make_hydro_loops_dependencies(sched, t, t_force, t_limiter, ci,
-                                           with_cooling, with_timestep_limiter);
-      scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out, t_force_gpu);
-#endif
-
-      /* Create the task dependencies */
-      scheduler_addunlock(sched, t_force, ci->hydro.super->hydro.end_force);
-
-      if (with_feedback) {
-
-        if (with_cooling)
-          scheduler_addunlock(sched, ci->hydro.super->hydro.cooling_out,
-                              t_star_density);
-
-        scheduler_addunlock(sched, ci->hydro.super->stars.drift,
-                            t_star_density);
-        scheduler_addunlock(sched, ci->hydro.super->stars.sorts,
-                            t_star_density);
-        scheduler_addunlock(sched, ci->hydro.super->hydro.drift,
-                            t_star_density);
-        scheduler_addunlock(sched, ci->hydro.super->hydro.sorts,
-                            t_star_density);
-        scheduler_addunlock(sched, ci->hydro.super->stars.stars_in,
-                            t_star_density);
-        scheduler_addunlock(sched, t_star_density,
-                            ci->hydro.super->stars.density_ghost);
-#ifdef EXTRA_STAR_LOOPS
-        scheduler_addunlock(sched, ci->hydro.super->stars.density_ghost,
-                            t_star_prep1);
-        scheduler_addunlock(sched, t_star_prep1,
-                            ci->hydro.super->stars.prep1_ghost);
-        scheduler_addunlock(sched, t_star_prep1,
-                            ci->hydro.super->hydro.prep1_ghost);
-        scheduler_addunlock(sched, ci->hydro.super->stars.prep1_ghost,
-                            t_star_prep2);
-        scheduler_addunlock(sched, ci->hydro.super->hydro.prep1_ghost,
-                            t_star_prep2);
-        scheduler_addunlock(sched, t_star_prep2,
-                            ci->hydro.super->stars.prep2_ghost);
-        scheduler_addunlock(sched, ci->hydro.super->stars.prep2_ghost,
-                            t_star_feedback);
-#else
-        scheduler_addunlock(sched, ci->hydro.super->stars.density_ghost,
-                            t_star_feedback);
-#endif
-        scheduler_addunlock(sched, t_star_feedback,
-                            ci->hydro.super->stars.stars_out);
-      }
-
-      if (with_sink) {
-
-        /* Sink density */
-        scheduler_addunlock(sched, ci->hydro.super->sinks.drift,
-                            t_sink_density);
-        scheduler_addunlock(sched, ci->hydro.super->hydro.drift,
-                            t_sink_density);
-        scheduler_addunlock(sched, ci->hydro.super->sinks.sink_in,
-                            t_sink_density);
-        scheduler_addunlock(sched, t_sink_density,
-                            ci->hydro.super->sinks.density_ghost);
-
-        /* Do the sink_swallow */
-        scheduler_addunlock(sched, ci->hydro.super->sinks.density_ghost,
-                            t_sink_swallow);
-        scheduler_addunlock(sched, t_sink_swallow,
-                            ci->hydro.super->sinks.sink_ghost1);
-
-        /* Do the sink_do_gas_swallow */
-        scheduler_addunlock(sched, ci->hydro.super->sinks.sink_ghost1,
-                            t_sink_do_gas_swallow);
-        scheduler_addunlock(sched, t_sink_do_gas_swallow,
-                            ci->hydro.super->sinks.sink_ghost2);
-
-        /* Do the sink_do_sink_swallow */
-        scheduler_addunlock(sched, ci->hydro.super->sinks.sink_ghost2,
-                            t_sink_do_sink_swallow);
-        scheduler_addunlock(sched, t_sink_do_sink_swallow,
-                            ci->hydro.super->sinks.sink_out);
-      }
-
-      if (with_black_holes && bcount_i > 0) {
-
-        if (with_cooling)
-          scheduler_addunlock(sched, ci->hydro.super->hydro.cooling_out,
-                              t_bh_density);
-
-        scheduler_addunlock(sched, ci->hydro.super->black_holes.drift,
-                            t_bh_density);
-        scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t_bh_density);
-        scheduler_addunlock(sched, ci->hydro.super->black_holes.black_holes_in,
-                            t_bh_density);
-        scheduler_addunlock(sched, t_bh_density,
-                            ci->hydro.super->black_holes.density_ghost);
-
-        scheduler_addunlock(sched, ci->hydro.super->black_holes.density_ghost,
-                            t_bh_swallow);
-        scheduler_addunlock(sched, t_bh_swallow,
-                            ci->hydro.super->black_holes.swallow_ghost_1);
-
-        scheduler_addunlock(sched, ci->hydro.super->black_holes.swallow_ghost_1,
-                            t_do_gas_swallow);
-        scheduler_addunlock(sched, t_do_gas_swallow,
-                            ci->hydro.super->black_holes.swallow_ghost_2);
-
-        scheduler_addunlock(sched, ci->hydro.super->black_holes.swallow_ghost_2,
-                            t_do_bh_swallow);
-        scheduler_addunlock(sched, t_do_bh_swallow,
-                            ci->hydro.super->black_holes.swallow_ghost_3);
-
-        scheduler_addunlock(sched, ci->hydro.super->black_holes.swallow_ghost_3,
-                            t_bh_feedback);
-        scheduler_addunlock(sched, t_bh_feedback,
-                            ci->hydro.super->black_holes.black_holes_out);
-      }
-
-      if (with_timestep_limiter) {
-        scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t_limiter);
-        scheduler_addunlock(sched, ci->super->timestep, t_limiter);
-        scheduler_addunlock(sched, t_limiter, ci->super->kick1);
-        scheduler_addunlock(sched, t_limiter, ci->super->timestep_limiter);
-      }
-
-      if (with_timestep_sync && with_feedback) {
-        scheduler_addunlock(sched, t_star_feedback, ci->super->timestep_sync);
-      }
-      if (with_timestep_sync && with_black_holes && bcount_i > 0) {
-        scheduler_addunlock(sched, t_bh_feedback, ci->super->timestep_sync);
-      }
-
-      if (with_rt) {
-        scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t_rt_gradient);
-        scheduler_addunlock(sched, ci->hydro.super->hydro.sorts, t_rt_gradient);
-        scheduler_addunlock(sched, ci->hydro.super->rt.rt_ghost1,
-                            t_rt_gradient);
-        scheduler_addunlock(sched, t_rt_gradient,
-                            ci->hydro.super->rt.rt_ghost2);
-        scheduler_addunlock(sched, ci->hydro.super->rt.rt_ghost2,
-                            t_rt_transport);
-        scheduler_addunlock(sched, t_rt_transport,
-                            ci->hydro.super->rt.rt_transport_out);
-      }
-    }
-
-    else if (t_type == task_type_pair && t_subtype == task_subtype_gpu_pack) {
-      /* Make all density tasks depend on the drift */
       if (ci->nodeID == nodeID) {
-        scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
+        scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out,
+                            t_gradient_gpu);
+        scheduler_addunlock(sched, ci->hydro.super->hydro.extra_ghost,
+                            t_force_gpu);
       }
       if ((cj->nodeID == nodeID) && (ci->hydro.super != cj->hydro.super)) {
-        scheduler_addunlock(sched, cj->hydro.super->hydro.drift, t);
+        scheduler_addunlock(sched, cj->hydro.super->hydro.ghost_out,
+                            t_gradient_gpu);
+        scheduler_addunlock(sched, cj->hydro.super->hydro.extra_ghost,
+                            t_force_gpu);
       }
-
-      /* Make all density tasks depend on the sorts */
-      scheduler_addunlock(sched, ci->hydro.super->hydro.sorts, t);
-      if (ci->hydro.super != cj->hydro.super) {
-        scheduler_addunlock(sched, cj->hydro.super->hydro.sorts, t);
+#else
+      /* Now, build all the dependencies for the hydro for the cells */
+      /* that are local and are not descendant of the same super_hydro-cells */
+      if (ci->nodeID == nodeID) {
+        scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out,
+                            t_force_gpu);
       }
-    }
+      if ((cj->nodeID == nodeID) && (ci->hydro.super != cj->hydro.super)) {
+        scheduler_addunlock(sched, cj->hydro.super->hydro.ghost_out,
+                            t_force_gpu);
+      }
+#endif
 
-    /* Otherwise, pair interaction? */
-    else if (t_type == task_type_pair && t_subtype == task_subtype_density) {
+    } else if (t_type == task_type_pair &&
+               t_subtype == task_subtype_density) {
 
       const int bcount_i = ci->black_holes.count;
       const int bcount_j = cj->black_holes.count;
@@ -2894,8 +2600,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       /* New task for the force */
       t_force = scheduler_addtask(sched, task_type_pair, task_subtype_force,
                                   flags, 0, ci, cj);
-      t_force_gpu = scheduler_addtask(
-          sched, task_type_pair, task_subtype_gpu_pack_f, flags, 0, ci, cj);
 
 #ifdef MPI_SYMMETRIC_FORCE_INTERACTION
       /* The order of operations for an inactive local cell interacting
@@ -2905,11 +2609,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
       /* Make all force tasks depend on the sorts */
       scheduler_addunlock(sched, ci->hydro.super->hydro.sorts, t_force);
-      /* Make GPU force tasks depend on the sorts A. Nasar */
-//      scheduler_addunlock(sched, ci->hydro.super->hydro.sorts, t_force_gpu);
       if (ci->hydro.super != cj->hydro.super) {
         scheduler_addunlock(sched, cj->hydro.super->hydro.sorts, t_force);
-        scheduler_addunlock(sched, cj->hydro.super->hydro.sorts, t_force_gpu);
       }
 #endif
 
@@ -3001,9 +2702,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
       engine_addlink(e, &ci->hydro.force, t_force);
       engine_addlink(e, &cj->hydro.force, t_force);
-      /* Do teh same for GPU tasks A. Nasar*/
-//      engine_addlink(e, &ci->hydro.force_pack, t_force_gpu);
-//      engine_addlink(e, &cj->hydro.force_pack, t_force_gpu);
       if (with_timestep_limiter) {
         engine_addlink(e, &ci->hydro.limiter, t_limiter);
         engine_addlink(e, &cj->hydro.limiter, t_limiter);
@@ -3054,15 +2752,10 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       /* Start by constructing the task for the second and third hydro loop */
       t_gradient = scheduler_addtask(sched, task_type_pair,
                                      task_subtype_gradient, flags, 0, ci, cj);
-      t_gradient_gpu = scheduler_addtask(
-          sched, task_type_pair, task_subtype_gpu_pack_g, flags, 0, ci, cj);
 
       /* Add the link between the new loop and both cells */
       engine_addlink(e, &ci->hydro.gradient, t_gradient);
       engine_addlink(e, &cj->hydro.gradient, t_gradient);
-//      /* Add the link between the new loop and both cells */
-//      engine_addlink(e, &ci->hydro.gradient_pack, t_gradient_gpu);
-//      engine_addlink(e, &cj->hydro.gradient_pack, t_gradient_gpu);
 
       /* Now, build all the dependencies for the hydro for the cells */
       /* that are local and are not descendant of the same super_hydro-cells */
@@ -3070,19 +2763,11 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
         engine_make_hydro_loops_dependencies(sched, t, t_gradient, t_force,
                                              t_limiter, ci, with_cooling,
                                              with_timestep_limiter);
-        scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out,
-                            t_gradient_gpu);
-        scheduler_addunlock(sched, ci->hydro.super->hydro.extra_ghost,
-                            t_force_gpu);
       }
       if ((cj->nodeID == nodeID) && (ci->hydro.super != cj->hydro.super)) {
         engine_make_hydro_loops_dependencies(sched, t, t_gradient, t_force,
                                              t_limiter, cj, with_cooling,
                                              with_timestep_limiter);
-        scheduler_addunlock(sched, cj->hydro.super->hydro.ghost_out,
-                            t_gradient_gpu);
-        scheduler_addunlock(sched, cj->hydro.super->hydro.extra_ghost,
-                            t_force_gpu);
       }
 #else
 
@@ -3092,15 +2777,11 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
         engine_make_hydro_loops_dependencies(sched, t, t_force, t_limiter, ci,
                                              with_cooling,
                                              with_timestep_limiter);
-        scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out,
-                            t_force_gpu);
       }
       if ((cj->nodeID == nodeID) && (ci->hydro.super != cj->hydro.super)) {
         engine_make_hydro_loops_dependencies(sched, t, t_force, t_limiter, cj,
                                              with_cooling,
                                              with_timestep_limiter);
-        scheduler_addunlock(sched, cj->hydro.super->hydro.ghost_out,
-                            t_force_gpu);
       }
 #endif
 
