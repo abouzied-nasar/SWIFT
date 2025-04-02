@@ -1,3 +1,4 @@
+#include "hip/hip_runtime.h"
 #ifndef DEVICE_FUNCTIONS_H
 #define DEVICE_FUNCTIONS_H
 #include "../../config.h"
@@ -110,8 +111,8 @@ __device__ float d_pow_three_gamma_minus_five_over_two(float x) {
  * @param W (return) The value of the kernel function \f$W(x,h)\f$.
  * @param dW_dx (return) The norm of the gradient of \f$|\nabla W(x,h)|\f$.
  */
-__device__ void d_kernel_deval(float u, float *restrict W,
-                               float *restrict dW_dx) {
+__device__ void d_kernel_deval(float u, float *__restrict__ W,
+                               float *__restrict__ dW_dx) {
 
   /* Go to the range [0,1[ from [0,H[ */
   const float x = u * kernel_gamma_inv;
@@ -134,8 +135,8 @@ __device__ void d_kernel_deval(float u, float *restrict W,
     w = x * w + coeffs[k];
   }
 
-  w = max(w, 0.f);
-  dw_dx = min(dw_dx, 0.f);
+  w = fmaxf(w, 0.f);
+  dw_dx = fminf(dw_dx, 0.f);
 
   /* Return everything */
   *W = w * kernel_constant * kernel_gamma_inv_dim;
