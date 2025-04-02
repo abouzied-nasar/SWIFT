@@ -4,7 +4,7 @@
  *runner_main.c. Consider this a translator allowing .cu based functions to be
  *called from within runner_main.c
  ******************************************************************************/
-#ifdef WITH_CUDA
+#ifdef WITH_HIP
 #ifndef static
 #define static
 #endif
@@ -21,7 +21,7 @@
 extern "C" {
 #endif
 #include "cell_gpu.h"
-#include "cuda_headers.h"
+#include "hip_headers.h"
 #ifdef __cplusplus
 }
 #endif
@@ -43,7 +43,7 @@ void Initialise_GPU() {
 }
 #endif
 
-#ifdef WITH_CUDA
+#ifdef WITH_HIP
 extern "C" {
 #endif
 void CPU_runner_doself1_branch_gradient(struct cell_gpu *restrict ci_gpu) {
@@ -57,11 +57,11 @@ void CPU_runner_doself1_branch_gradient(struct cell_gpu *restrict ci_gpu) {
   //  	if (!cell_is_active_hydro(ci_gpu, e) && !cell_is_active_hydro(cj_gpu,
   //  e)) return;
 }
-#ifdef WITH_CUDA
+#ifdef WITH_HIP
 }
 #endif
 
-#ifdef WITH_CUDA
+#ifdef WITH_HIP
 extern "C" {
 #endif
 void GPU_runner_doself1_branch_gradient(struct cell_gpu *restrict ci_gpu) {
@@ -75,11 +75,11 @@ void GPU_runner_doself1_branch_gradient(struct cell_gpu *restrict ci_gpu) {
   SPH_Sum_Self<<<numBlocks, BLOCK_SIZE>>>(d_ci_gpu);
   hipMemcpy(ci_gpu, d_ci_gpu, sizeof(cell_gpu), hipMemcpyDeviceToHost);
 }
-#ifdef WITH_CUDA
+#ifdef WITH_HIP
 }
 #endif
 
-#ifdef WITH_CUDA
+#ifdef WITH_HIP
 extern "C" {
 #endif
 __device__ void SPH_Sum_Self(cell_gpu *d_ci_gpu) {
@@ -110,6 +110,6 @@ __device__ void SPH_Sum_Self(cell_gpu *d_ci_gpu) {
   }
   // d_Particles[i].ker_sum=sumLoc;
 }
-#ifdef WITH_CUDA
+#ifdef WITH_HIP
 }
 #endif
