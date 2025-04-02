@@ -35,7 +35,7 @@
  * Alpha can be set in the parameter file.
  * Beta is defined as in e.g. Price (2010) Eqn (103) */
 #define const_viscosity_beta 3.0f
-#ifdef WITH_CUDA
+#ifdef WITH_HIP
 extern "C" {
 #endif
 /**
@@ -143,7 +143,7 @@ __device__ void d_kernel_deval(float u, float *__restrict__ W,
   *dW_dx = dw_dx * kernel_constant * kernel_gamma_inv_dim_plus_one;
 }
 
-#ifdef WITH_CUDA
+#ifdef WITH_HIP
 }
 #endif
 
