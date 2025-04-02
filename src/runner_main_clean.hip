@@ -157,13 +157,13 @@ extern "C" {
 extern "C" {
 #endif
 
-#include "cuda/part_gpu.h"
+#include "hip/part_gpu.h"
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
 #include <hip/hip_runtime.h>
 #include "runner_doiact_functions_hydro_gpu.h"
 #include "runner_gpu_pack_functions.h"
-#include "cuda/GPU_runner_functions.h"
+#include "hip/GPU_runner_functions.h"
 
 #ifdef __cplusplus
 }
