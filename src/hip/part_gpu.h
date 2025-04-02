@@ -6,7 +6,7 @@
 #include "../align.h"
 typedef int8_t timebin_t;
 
-#ifdef __WITH_CUDA
+#ifdef __WITH_HIP
 extern "C" {
 #endif
 
@@ -407,7 +407,7 @@ typedef struct part_aos_f4_g_recv {
 
 } part_aos_f4_g_recv;
 
-#ifdef __WITH_CUDA
+#ifdef __WITH_HIP
 }
 #endif
 
