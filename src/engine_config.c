@@ -1009,7 +1009,7 @@ void engine_config(int restart, int fof, struct engine *e,
                        &e->runners[k]) != 0)
       error("Failed to create GPU runner thread.");
 #elif WITH_HIP
-    if (pthread_create(&e->runners[k].thread, NULL, &runner_main_hip,
+    if (pthread_create(&e->runners[k].thread, NULL, &runner_main2,
                        &e->runners[k]) != 0)
       error("Failed to create runner thread.");
 #else

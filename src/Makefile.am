@@ -564,6 +564,7 @@ libswiftsim_cuda_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) li
 # Sources and flags for regular HIP library
 libswiftsim_hip_la_SOURCES = $(AM_SOURCES)
 libswiftsim_hip_la_CFLAGS = $(AM_CFLAGS) $(HIP_CFLAGS) -DWITH_HIP
+libswiftsim_hip_la_CXXFLAGS = $(AM_CFLAGS) $(HIP_CFLAGS) -DWITH_HIP
 libswiftsim_hip_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) $(HIP_LIBS) -lamdhip64
 libswiftsim_hip_la_SHORTNAME = hip
 libswiftsim_hip_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav.la
@@ -575,6 +576,15 @@ libswiftsim_mpicuda_la_CXXFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(CUDA_CFLAGS) -DWIT
 libswiftsim_mpicuda_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS) $(CUDA_LIBS)
 libswiftsim_mpicuda_la_SHORTNAME = mpicuda
 libswiftsim_mpicuda_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav_mpi.la
+
+# Sources and flags for MPI HIP library
+libswiftsim_mpihip_la_SOURCES = $(AM_SOURCES)
+libswiftsim_mpihip_la_CFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_CFLAGS) -DWITH_HIP
+libswiftsim_mpihip_la_CXXFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_CFLAGS) -DWITH_HIP
+libswiftsim_mpihip_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS) $(HIP_LIBS)
+libswiftsim_mpihip_la_SHORTNAME = mpihip
+libswiftsim_mpihip_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav_mpi.la
+
 
 #subdir
 SUBDIRS = . cuda

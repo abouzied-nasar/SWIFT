@@ -110,8 +110,15 @@ struct pack_vars_pair_f4 {
 
 } pack_vars_pair_f4;
 
+#ifdef WITH_CUDA
 #include "cuda/BLOCK_SIZE.h"
 #include "cuda/GPU_runner_functions.h"
+#endif
+#ifdef WITH_HIP
+#include "hip/BLOCK_SIZE.h"
+#include "hip/GPU_runner_functions.h"
+#endif
+
 #include "runner_gpu_pack_functions.h"
 #include "task.h"
 #define CUDA_DEBUG
