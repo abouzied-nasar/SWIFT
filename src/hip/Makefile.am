@@ -1,11 +1,11 @@
-SOURCES_HIP = HIP_runner_functions.hip
-include_HEADERS = HIP_runner_functions.h device_functions.h BLOCK_SIZE.h tester.h
+SOURCES_HIP = GPU_runner_functions.hip tester.hip
+include_HEADERS = GPU_runner_functions.h device_functions.h BLOCK_SIZE.h tester.h
 EXTRA_DIST = $(SOURCES_HIP) $(include_HEADERS)
 
 if HAVEHIP
 
 AM_CFLAGS = -I.. $(HDF5_CPPFLAGS)
-HIP_MYFLAGS = -D_FORCE_INLINES -O3 -g -DWITH_HIP --offload-arch=gfx90a
+HIP_MYFLAGS = -D_FORCE_INLINES -O4 -DWITH_HIP --offload-arch=gfx90a
 #HIP_MYFLAGS = -D_FORCE_INLINES -O3 -g -v -lineinfo -src-in-ptx --maxrregcount=32 -ftz=true -DWITH_HIP -ccbin=gcc -m64 --default-stream per-thread#-dlink
 
 # Assign a "safe" version number
@@ -30,11 +30,14 @@ libswiftHIP_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC \
 
 libswiftHIP_la_SOURCES = $(SOURCES_HIP)
 libswiftHIP_la_CFLAGS = $(AM_CFLAGS) $(HIP_CFLAGS) $(HIP_MYFLAGS) ../libswiftsim_hip.la -I../
+libswiftHIP_la_CXXFLAGS = $(AM_CFLAGS) $(HIP_CFLAGS) $(HIP_MYFLAGS) ../libswiftsim_hip.la -I../
+
 libswiftHIP_la_LIBADD = ../.libs/libswiftsim_hip.la
 libswiftHIP_la_LDFLAGS = $(AM_LDFLAGS)
 
 if HAVEMPI
 libswiftHIP_la_CFLAGS += ../libswiftsim_mpihip.la
+libswiftHIP_la_CXXFLAGS += ../libswiftsim_mpihip.la
 libswiftHIP_la_LIBADD += ../.libs/libswiftsim_mpihip.la
 endif
 
