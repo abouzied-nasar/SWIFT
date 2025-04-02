@@ -1,4 +1,15 @@
+#ifdef WITH_CUDA
 #include "cuda/part_gpu.h"
+#endif
+
+//#define WITH_HIP
+#ifdef WITH_HIP
+//#pragma message "YES"
+#include "hip/part_gpu.h"
+//#else 
+//#error "NOPE"
+#endif
+
 void runner_doself1_gpu_pack(
     struct runner *r, struct cell *c, int timer, int *pack_length, double *x_p,
     double *y_p, double *z_p, int tid, int *tid_p, long long *id, float *ux,
