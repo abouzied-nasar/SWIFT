@@ -1,2 +1,2 @@
 #include <stdio.h>
-void swiftcudadummy() {}
+void swifthipdummy() {}
