@@ -152,7 +152,7 @@ extern "C" {
  **/
 
 /* CUDA Header. Wrap in extern "C" to prevent C++ function name mangling */
-#ifdef WITH_CUDA
+#ifdef WITH_HIP
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1889,5 +1889,5 @@ void *runner_main2(void *data) {
   return NULL;
 }
 
-#endif  // WITH_CUDA
+#endif  // WITH_HIP
 
