@@ -161,7 +161,7 @@ extern "C" {
 #include <hip/hip_runtime.h>
 #include <hip/hip_runtime_api.h>
 #include <hip/hip_runtime.h>
-#include "runner_doiact_functions_hydro_gpu.h"
+#include "runner_doiact_functions_hydro_hip.h"
 #include "runner_gpu_pack_functions.h"
 #include "hip/GPU_runner_functions.h"
 
