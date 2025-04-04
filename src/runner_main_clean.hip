@@ -186,18 +186,18 @@ void *runner_main2(void *data) {
   struct pack_vars_pair *pack_vars_pair_forc;
   struct pack_vars_pair *pack_vars_pair_grad;
 
-  hipHostMalloc((void **)&pack_vars_self_dens,
+  hipMallocHost((void **)&pack_vars_self_dens,
                  sizeof(struct pack_vars_self *));
-  hipHostMalloc((void **)&pack_vars_self_forc,
+  hipMallocHost((void **)&pack_vars_self_forc,
                  sizeof(struct pack_vars_self *));
-  hipHostMalloc((void **)&pack_vars_self_grad,
+  hipMallocHost((void **)&pack_vars_self_grad,
                  sizeof(struct pack_vars_self *));
 
-  hipHostMalloc((void **)&pack_vars_pair_dens,
+  hipMallocHost((void **)&pack_vars_pair_dens,
                  sizeof(struct pack_vars_pair *));
-  hipHostMalloc((void **)&pack_vars_pair_forc,
+  hipMallocHost((void **)&pack_vars_pair_forc,
                  sizeof(struct pack_vars_pair *));
-  hipHostMalloc((void **)&pack_vars_pair_grad,
+  hipMallocHost((void **)&pack_vars_pair_grad,
                  sizeof(struct pack_vars_pair *));
   ///////////////////////////////////////////////////////////////////////////
   /*Find and print GPU name(s)*/
@@ -223,8 +223,8 @@ void *runner_main2(void *data) {
 #endif
   //Now tell me some info about my device
   hipGetDeviceProperties(&prop, devId);
-  hipDeviceGetAttribute(&maxBlocksSM, hipDeviceAttributeMaxBlocksPerMultiprocessor,
-                         devId);
+  //hipDeviceGetAttribute(&maxBlocksSM, hipDeviceAttributeMaxBlocksPerMultiprocessor,
+  //                       devId);
   hipDeviceGetAttribute(&nSMs, hipDeviceAttributeMultiprocessorCount, devId);
   int nPartsPerCell = space->nr_parts / space->tot_cells;
 
@@ -274,11 +274,11 @@ void *runner_main2(void *data) {
   int2 *d_task_first_part_f4;
   int2 *d_task_first_part_f4_f;
   int2 *d_task_first_part_f4_g;
-  hipHostMalloc((void **)&task_first_part_f4, target_n_tasks * sizeof(int2));
+  hipMallocHost((void **)&task_first_part_f4, target_n_tasks * sizeof(int2));
   hipMalloc((void **)&d_task_first_part_f4, target_n_tasks * sizeof(int2));
-  hipHostMalloc((void **)&task_first_part_f4_f, target_n_tasks * sizeof(int2));
+  hipMallocHost((void **)&task_first_part_f4_f, target_n_tasks * sizeof(int2));
   hipMalloc((void **)&d_task_first_part_f4_f, target_n_tasks * sizeof(int2));
-  hipHostMalloc((void **)&task_first_part_f4_g, target_n_tasks * sizeof(int2));
+  hipMallocHost((void **)&task_first_part_f4_g, target_n_tasks * sizeof(int2));
   hipMalloc((void **)&d_task_first_part_f4_g, target_n_tasks * sizeof(int2));
 
   /*A. N.: Needed but only for small part in launch functions. Might
@@ -286,11 +286,11 @@ void *runner_main2(void *data) {
   int4 *fparti_fpartj_lparti_lpartj_dens;
   int4 *fparti_fpartj_lparti_lpartj_forc;
   int4 *fparti_fpartj_lparti_lpartj_grad;
-  hipHostMalloc((void **)&fparti_fpartj_lparti_lpartj_dens,
+  hipMallocHost((void **)&fparti_fpartj_lparti_lpartj_dens,
                  target_n_tasks * sizeof(int4));
-  hipHostMalloc((void **)&fparti_fpartj_lparti_lpartj_forc,
+  hipMallocHost((void **)&fparti_fpartj_lparti_lpartj_forc,
                  target_n_tasks * sizeof(int4));
-  hipHostMalloc((void **)&fparti_fpartj_lparti_lpartj_grad,
+  hipMallocHost((void **)&fparti_fpartj_lparti_lpartj_grad,
                  target_n_tasks * sizeof(int4));
 
   /* nBundles is the number of task bundles each
@@ -315,46 +315,46 @@ void *runner_main2(void *data) {
   // first part and last part are the first and last particle ids (locally
   // within this thread). A. Nasar: All these are used in GPU offload setup
 
-  hipHostMalloc((void **)&pack_vars_self_dens->bundle_first_part,
+  hipMallocHost((void **)&pack_vars_self_dens->bundle_first_part,
                  nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_self_dens->bundle_last_part,
+  hipMallocHost((void **)&pack_vars_self_dens->bundle_last_part,
                  nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_self_dens->bundle_first_task_list,
-                 nBundles * sizeof(int));
-
-  hipHostMalloc((void **)&pack_vars_pair_dens->bundle_first_part,
-                 2 * nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_pair_dens->bundle_last_part,
-                 2 * nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_pair_dens->bundle_first_task_list,
-                 2 * nBundles * sizeof(int));
-
-  hipHostMalloc((void **)&pack_vars_self_forc->bundle_first_part,
-                 nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_self_forc->bundle_last_part,
-                 nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_self_forc->bundle_first_task_list,
+  hipMallocHost((void **)&pack_vars_self_dens->bundle_first_task_list,
                  nBundles * sizeof(int));
 
-  hipHostMalloc((void **)&pack_vars_pair_forc->bundle_first_part,
+  hipMallocHost((void **)&pack_vars_pair_dens->bundle_first_part,
                  2 * nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_pair_forc->bundle_last_part,
+  hipMallocHost((void **)&pack_vars_pair_dens->bundle_last_part,
                  2 * nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_pair_forc->bundle_first_task_list,
+  hipMallocHost((void **)&pack_vars_pair_dens->bundle_first_task_list,
                  2 * nBundles * sizeof(int));
 
-  hipHostMalloc((void **)&pack_vars_self_grad->bundle_first_part,
+  hipMallocHost((void **)&pack_vars_self_forc->bundle_first_part,
                  nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_self_grad->bundle_last_part,
+  hipMallocHost((void **)&pack_vars_self_forc->bundle_last_part,
                  nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_self_grad->bundle_first_task_list,
+  hipMallocHost((void **)&pack_vars_self_forc->bundle_first_task_list,
                  nBundles * sizeof(int));
 
-  hipHostMalloc((void **)&pack_vars_pair_grad->bundle_first_part,
+  hipMallocHost((void **)&pack_vars_pair_forc->bundle_first_part,
                  2 * nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_pair_grad->bundle_last_part,
+  hipMallocHost((void **)&pack_vars_pair_forc->bundle_last_part,
                  2 * nBundles * sizeof(int));
-  hipHostMalloc((void **)&pack_vars_pair_grad->bundle_first_task_list,
+  hipMallocHost((void **)&pack_vars_pair_forc->bundle_first_task_list,
+                 2 * nBundles * sizeof(int));
+
+  hipMallocHost((void **)&pack_vars_self_grad->bundle_first_part,
+                 nBundles * sizeof(int));
+  hipMallocHost((void **)&pack_vars_self_grad->bundle_last_part,
+                 nBundles * sizeof(int));
+  hipMallocHost((void **)&pack_vars_self_grad->bundle_first_task_list,
+                 nBundles * sizeof(int));
+
+  hipMallocHost((void **)&pack_vars_pair_grad->bundle_first_part,
+                 2 * nBundles * sizeof(int));
+  hipMallocHost((void **)&pack_vars_pair_grad->bundle_last_part,
+                 2 * nBundles * sizeof(int));
+  hipMallocHost((void **)&pack_vars_pair_grad->bundle_first_task_list,
                  2 * nBundles * sizeof(int));
 
   /*Create streams so that we can off-load different batches of work in
@@ -483,19 +483,19 @@ void *runner_main2(void *data) {
   hipMalloc((void **)&d_parts_aos_grad_f4_recv,
              count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
 
-  hipHostMalloc((void **)&parts_aos_f4_send,
+  hipMallocHost((void **)&parts_aos_f4_send,
                  count_max_parts_tmp * sizeof(struct part_aos_f4_send));
-  hipHostMalloc((void **)&parts_aos_f4_recv,
+  hipMallocHost((void **)&parts_aos_f4_recv,
                  count_max_parts_tmp * sizeof(struct part_aos_f4_recv));
 
-  hipHostMalloc((void **)&parts_aos_forc_f4_send,
+  hipMallocHost((void **)&parts_aos_forc_f4_send,
                  count_max_parts_tmp * sizeof(struct part_aos_f4_f_send));
-  hipHostMalloc((void **)&parts_aos_forc_f4_recv,
+  hipMallocHost((void **)&parts_aos_forc_f4_recv,
                  count_max_parts_tmp * sizeof(struct part_aos_f4_f_recv));
 
-  hipHostMalloc((void **)&parts_aos_grad_f4_send,
+  hipMallocHost((void **)&parts_aos_grad_f4_send,
                  count_max_parts_tmp * sizeof(struct part_aos_f4_g_send));
-  hipHostMalloc((void **)&parts_aos_grad_f4_recv,
+  hipMallocHost((void **)&parts_aos_grad_f4_recv,
                  count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
 
   hipMalloc((void **)&d_parts_aos_pair_f4_send,
@@ -513,19 +513,19 @@ void *runner_main2(void *data) {
   hipMalloc((void **)&d_parts_aos_pair_f4_g_recv,
              2 * count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
 
-  hipHostMalloc((void **)&parts_aos_pair_f4_send,
+  hipMallocHost((void **)&parts_aos_pair_f4_send,
                  2 * count_max_parts_tmp * sizeof(struct part_aos_f4_send));
-  hipHostMalloc((void **)&parts_aos_pair_f4_recv,
+  hipMallocHost((void **)&parts_aos_pair_f4_recv,
                  2 * count_max_parts_tmp * sizeof(struct part_aos_f4_recv));
 
-  hipHostMalloc((void **)&parts_aos_pair_f4_g_send,
+  hipMallocHost((void **)&parts_aos_pair_f4_g_send,
                  2 * count_max_parts_tmp * sizeof(struct part_aos_f4_g_send));
-  hipHostMalloc((void **)&parts_aos_pair_f4_g_recv,
+  hipMallocHost((void **)&parts_aos_pair_f4_g_recv,
                  2 * count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
 
-  hipHostMalloc((void **)&parts_aos_pair_f4_f_send,
+  hipMallocHost((void **)&parts_aos_pair_f4_f_send,
                  2 * count_max_parts_tmp * sizeof(struct part_aos_f4_f_send));
-  hipHostMalloc((void **)&parts_aos_pair_f4_f_recv,
+  hipMallocHost((void **)&parts_aos_pair_f4_f_recv,
                  2 * count_max_parts_tmp * sizeof(struct part_aos_f4_f_recv));
 
   /*Declare some global variables*/
@@ -960,6 +960,12 @@ void *runner_main2(void *data) {
           else if (t->subtype == task_subtype_gpu_pack_d) {
             packed_pair++;
 #ifdef GPUOFFLOAD_DENSITY
+	    message("Creating event\n");
+            hipEvent_t stopEvent;
+            hipEventCreate(&stopEvent);
+            hipEventRecord(stopEvent,0);
+            hipEventSynchronize(stopEvent);
+            message("synchronised with event");
 
             ticks tic_cpu_pack = getticks();
             /*Pack data and increment counters checking if we should run on the GPU after packing this task*/

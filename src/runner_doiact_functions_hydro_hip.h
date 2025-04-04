@@ -114,6 +114,7 @@ struct pack_vars_pair_f4 {
 #include "cuda/BLOCK_SIZE.h"
 #include "cuda/GPU_runner_functions.h"
 #endif
+#define WITH_HIP
 #ifdef WITH_HIP
 #include "hip/BLOCK_SIZE.h"
 #include "hip/GPU_runner_functions.h"
@@ -1568,11 +1569,9 @@ void runner_dopair1_launch_f4_one_memcpy(
         hipPeekAtLastError();  // hipGetLastError();        //
                                 // Get error code
     if (cu_error != hipSuccess) {
-      fprintf(stderr,
-              "CUDA error with pair density H2D async  memcpy ci: %s cpuid id "
+      error("CUDA error with pair density H2D async  memcpy ci: %s cpuid id "
               "is: %i\n ",
               hipGetErrorString(cu_error), r->cpuid);
-      error("Something's up with your cuda code");
     }
 #endif
 
@@ -1580,7 +1579,7 @@ void runner_dopair1_launch_f4_one_memcpy(
     /* LAUNCH THE GPU KERNELS for ci & cj */
     // Setup 2d grid of GPU thread blocks for ci (number of tasks is
     // the y dimension and max_parts is the x dimension
-    int numBlocks_y = 0;  // tasks_left;
+    int numBlocks_y = 1;  // tasks_left;
     int numBlocks_x = (bundle_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int bundle_part_0 = pack_vars->bundle_first_part[bid];
     //              fprintf(stderr, "bundle_part_0 %i bundle_first_task %i\n",
@@ -1594,13 +1593,11 @@ void runner_dopair1_launch_f4_one_memcpy(
 #ifdef CUDA_DEBUG
     cu_error = hipPeekAtLastError();  // Get error code
     if (cu_error != hipSuccess) {
-      fprintf(
-          stderr,
+      error(
           "CUDA error with pair density kernel launch: %s cpuid id is: %i\n "
           "nbx %i nby %i max_parts_i %i max_parts_j %i\n",
           hipGetErrorString(cu_error), r->cpuid, numBlocks_x, numBlocks_y,
           max_parts_i, max_parts_j);
-      exit(0);
     }
 #endif
 
@@ -1620,6 +1617,7 @@ void runner_dopair1_launch_f4_one_memcpy(
               hipGetErrorString(cu_error), r->cpuid);
       error("Something's up with your cuda code");
     }
+    message("Event %i recorded by thread %i", bid, r->cpuid);
 #endif
   } /*End of looping over bundles to launch in streams*/
 
@@ -1807,7 +1805,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
     /* LAUNCH THE GPU KERNELS for ci & cj */
     // Setup 2d grid of GPU thread blocks for ci (number of tasks is
     // the y dimension and max_parts is the x dimension
-    int numBlocks_y = 0;  // tasks_left;
+    int numBlocks_y = 1;  // tasks_left;
     int numBlocks_x = (bundle_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int bundle_part_0 = pack_vars->bundle_first_part[bid];
     /* Launch the kernel for ci using data for ci and cj */
@@ -2090,7 +2088,7 @@ void runner_dopair1_launch_f4_g_one_memcpy(
     /* LAUNCH THE GPU KERNELS for ci & cj */
     // Setup 2d grid of GPU thread blocks for ci (number of tasks is
     // the y dimension and max_parts is the x dimension
-    int numBlocks_y = 0;  // tasks_left;
+    int numBlocks_y = 1;  // tasks_left;
     int numBlocks_x = (bundle_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int bundle_part_0 = pack_vars->bundle_first_part[bid];
     //              fprintf(stderr, "bundle_part_0 %i bundle_first_task %i\n",
@@ -2335,7 +2333,7 @@ void runner_dopair1_launch_f4_f_one_memcpy(
 
     // Setup 2d grid of GPU thread blocks for ci (number of tasks is
     // the y dimension and max_parts is the x dimension
-    int numBlocks_y = 0;  // tasks_left;
+    int numBlocks_y = 1;  // tasks_left;
     int numBlocks_x = (bundle_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int bundle_part_0 = pack_vars->bundle_first_part[bid];
     //      int bundle_first_task = pack_vars->bundle_first_task_list[bid];

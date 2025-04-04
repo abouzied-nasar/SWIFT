@@ -5,7 +5,7 @@ EXTRA_DIST = $(SOURCES_HIP) $(include_HEADERS)
 if HAVEHIP
 
 AM_CFLAGS = -I.. $(HDF5_CPPFLAGS)
-HIP_MYFLAGS = -D_FORCE_INLINES -O4 -DWITH_HIP --offload-arch=gfx90a
+HIP_MYFLAGS = -D_FORCE_INLINES -O0 -g -ggdb -DWITH_HIP --offload-arch=gfx942 -fPIE
 #HIP_MYFLAGS = -D_FORCE_INLINES -O3 -g -v -lineinfo -src-in-ptx --maxrregcount=32 -ftz=true -DWITH_HIP -ccbin=gcc -m64 --default-stream per-thread#-dlink
 
 # Assign a "safe" version number
