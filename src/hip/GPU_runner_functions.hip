@@ -2130,18 +2130,18 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
   //  printf("js %i je %i\n", cj_start, cj_end);
   /*Particles copied in blocks to shared memory*/
   for (int j = cj_start; j < cj_end; j++) {
-    struct part_aos_f4_send pj = parts_send[j];
+    //struct part_aos_f4_send pj = parts_send[j];
 
-    const float4 x_p_h_j = pj.x_p_h;
-    const float4 ux_m_j = pj.ux_m;
+    //const float4 x_p_h_j = parts_send[j].x_p_h;
+    //const float4 ux_m_j = parts_send[j].ux_m;
 
-    const float xij = x_pi.x - x_p_h_j.x, yij = x_pi.y - x_p_h_j.y,
-                zij = x_pi.z - x_p_h_j.z;
+    const float xij = x_pi.x - parts_send[j].x_p_h.x, yij = x_pi.y - parts_send[j].x_p_h.y,
+                zij = x_pi.z - parts_send[j].x_p_h.z;
     const float r2 = xij * xij + yij * yij + zij * zij;
     //	printf("r2 %f \n", r2);
     if (r2 < hig2) {
       /* Recover some data */
-      const float mj = ux_m_j.w;
+      const float mj = parts_send[j].ux_m.w;
       const float r = sqrt(r2);
       /* Get the kernel for hi. */
       const float h_inv = 1.f / hi;
@@ -2158,8 +2158,8 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
       const float r_inv = 1.f / r;
       const float faci = mj * wi_dx * r_inv;
       /* Compute dv dot r */
-      const float dvx = ux_pi.x - ux_m_j.x, dvy = ux_pi.y - ux_m_j.y,
-                  dvz = ux_pi.z - ux_m_j.z;
+      const float dvx = ux_pi.x - parts_send[j].ux_m.x, dvy = ux_pi.y - parts_send[j].ux_m.y,
+                  dvz = ux_pi.z - parts_send[j].ux_m.z;
       const float dvdr = dvx * xij + dvy * yij + dvz * zij;
       /* Compute dv cross r */
       const float curlvrx = dvy * zij - dvz * yij;
