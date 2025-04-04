@@ -1,10 +1,12 @@
 #ifndef BLOCK_SIZE_H
 #define BLOCK_SIZE_H
-#ifdef WITH_CUDA
-// extern "C" {
-#endif
-#define BLOCK_SIZE 512
-#ifdef WITH_CUDA
-//}
-#endif
+
+#define BLOCK_SIZE 64
+#define N_TASKS_PER_PACK_SELF 8
+#define N_TASKS_BUNDLE_SELF 2 
+
+#define BLOCK_SIZE_PAIR 64
+#define N_TASKS_PER_PACK_PAIR 4
+#define N_TASKS_BUNDLE_PAIR 1
+
 #endif  // BLOCK_SIZE_H

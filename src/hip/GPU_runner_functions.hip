@@ -3430,9 +3430,9 @@ __global__ void runner_do_pair_cj_density_GPU_aos_f4(
 }
 #endif
 
-#ifdef WITH_HIP
-extern "C" {
-#endif
+//#ifdef WITH_HIP
+//extern "C" {
+//#endif
 __global__ void runner_do_pair_density_GPU_aos_f4(
     struct part_aos_f4_send *parts_send, struct part_aos_f4_recv *parts_recv,
     float d_a, float d_H, int bundle_first_part, int bundle_n_parts) {
@@ -3456,9 +3456,9 @@ __global__ void runner_do_pair_density_GPU_aos_f4(
                          d_H);
   }
 }
-#ifdef WITH_HIP
-}
-#endif
+//#ifdef WITH_HIP
+//}
+//#endif
 
 #ifdef WITH_HIP
 extern "C" {
@@ -3874,7 +3874,7 @@ void runner_dopair_branch_density_gpu_aos_f4(
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
   int nBlocks_per_task = numBlocks_x;
 
-  //	  fprintf(stderr, "nblocks %i\n", numBlocks_x);
+  fprintf(stderr, "nblocks %i\n", numBlocks_x);
   runner_do_pair_density_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
