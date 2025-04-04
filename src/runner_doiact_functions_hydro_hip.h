@@ -1559,10 +1559,10 @@ void runner_dopair1_launch_f4_one_memcpy(
     const int bundle_n_parts =
         pack_vars->bundle_last_part[bid] - first_part_tmp_i;
 
-    hipMemcpyAsync(&d_parts_send[first_part_tmp_i],
-                    &parts_send[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_send),
-                    hipMemcpyHostToDevice, stream[bid]);
+//    hipMemcpyAsync(&d_parts_send[first_part_tmp_i],
+//                    &parts_send[first_part_tmp_i],
+//                    bundle_n_parts * sizeof(struct part_aos_f4_send),
+//                    hipMemcpyHostToDevice, stream[bid]);
 
 #ifdef CUDA_DEBUG
     hipError_t cu_error =
@@ -1575,6 +1575,7 @@ void runner_dopair1_launch_f4_one_memcpy(
     }
 #endif
 
+    hipStreamSynchronize(stream[bid]);
     //    const int tasksperbundle = pack_vars->tasksperbundle;
     /* LAUNCH THE GPU KERNELS for ci & cj */
     // Setup 2d grid of GPU thread blocks for ci (number of tasks is
@@ -1587,7 +1588,7 @@ void runner_dopair1_launch_f4_one_memcpy(
 
     /* Launch the kernel for ci using data for ci and cj */
     runner_dopair_branch_density_gpu_aos_f4(
-        d_parts_send, d_parts_recv, d_a, d_H, stream[bid], numBlocks_x,
+        parts_send, parts_recv, d_a, d_H, stream[bid], numBlocks_x,
         numBlocks_y, bundle_part_0, bundle_n_parts);
 
 #ifdef CUDA_DEBUG
@@ -1602,10 +1603,10 @@ void runner_dopair1_launch_f4_one_memcpy(
 #endif
 
     // Copy results back to CPU BUFFERS
-    hipMemcpyAsync(&parts_recv[first_part_tmp_i],
-                    &d_parts_recv[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_recv),
-                    hipMemcpyDeviceToHost, stream[bid]);
+    //hipmemcpyAsync(&parts_recv[first_part_tmp_i],
+    //                &d_parts_recv[first_part_tmp_i],
+    //                bundle_n_parts * sizeof(struct part_aos_f4_recv),
+    //                hipMemcpyDeviceToHost, stream[bid]);
     hipEventRecord(pair_end[bid], stream[bid]);
 
 #ifdef CUDA_DEBUG
