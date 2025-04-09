@@ -1011,6 +1011,12 @@ void *runner_main2(void *data) {
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
                       parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks);
 
+            for (int tt=0; tt < n_leaves_found; tt++){
+              if( pack_vars_pair_dens->leaf_list[top_tasks_packed]->ci[tt] == NULL
+                  ||pack_vars_pair_dens->leaf_list[top_tasks_packed]->cj[tt] == NULL){
+                error("Recursed task has NULL cell pointer");
+              }
+            }
             n_leafs_total += n_leaves_found;
             int cstart = 0, cid = 0;
 
