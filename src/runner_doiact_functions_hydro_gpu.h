@@ -341,13 +341,14 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
 	/* if any cell empty: skip */
 	if(ci->hydro.count == 0 || cj->hydro.count == 0) return;
 	int leafs_found = *n_leafs_found;
+	int tt_packed = pack_vars->top_tasks_packed;
 	/*for all leafs to be sent add to cell list */
 //	cells_left[leafs_found] = ci;
 //	cells_right[leafs_found] = cj;
 	/*Add leaf cells to list for each top_level task*/
-	pack_vars->leaf_list[pack_vars->top_tasks_packed].ci[leafs_found] = ci;
-	pack_vars->leaf_list[pack_vars->top_tasks_packed].cj[leafs_found] = cj;
-	pack_vars->leaf_list[pack_vars->top_tasks_packed].n_leaves++;
+	pack_vars->leaf_list[tt_packed].ci[leafs_found] = ci;
+	pack_vars->leaf_list[tt_packed].cj[leafs_found] = cj;
+	pack_vars->leaf_list[tt_packed].n_leaves++;
 //	error("stop");
 	*n_leafs_found = leafs_found + 1;
 	if(*n_leafs_found >= n_expected_tasks)
