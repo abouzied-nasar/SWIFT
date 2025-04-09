@@ -1,13 +1,16 @@
-#ifdef WITH_CUDA
+#include "../config.h"
+
+#ifdef HAVE_CUDA
+#pragma message "HAVE_CUDA"
 #include "cuda/part_gpu.h"
 #endif
 
-#define WITH_HIP
-#ifdef WITH_HIP
+//#define WITH_HIP
+#ifdef HAVE_HIP
 #pragma message "YES"
 #include "hip/part_gpu.h"
-#else 
-#error "NOPE"
+//#else
+//#error "NOPE"
 #endif
 //#include "hip/part_gpu.h"
 void runner_doself1_gpu_pack(

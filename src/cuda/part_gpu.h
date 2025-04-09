@@ -5,12 +5,8 @@
 #include "../align.h"
 typedef int8_t timebin_t;
 
-#ifdef __WITH_CUDA
-extern "C" {
-#endif
-
 // #include </usr/local/cuda-12.2/targets/x86_64-linux/include/vector_types.h>
-#ifdef __WITH_CUDA
+#ifdef HAVE_CUDA
 #include <vector_types.h>
 #endif
 
@@ -406,9 +402,5 @@ typedef struct part_aos_f4_g_recv {
   float3 vsig_lapu_aviscmax;
 
 } part_aos_f4_g_recv;
-
-#ifdef __WITH_CUDA
-}
-#endif
 
 #endif  // PART_GPU_H
