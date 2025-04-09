@@ -1011,9 +1011,10 @@ void *runner_main2(void *data) {
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
                       parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks);
 
+            message("Found %i daughter tasks", n_leaves_found);
             for (int tt=0; tt < n_leaves_found; tt++){
-              if( pack_vars_pair_dens->leaf_list[top_tasks_packed]->ci[tt] == NULL
-                  ||pack_vars_pair_dens->leaf_list[top_tasks_packed]->cj[tt] == NULL){
+              if( pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[tt]->hydro.count == 0
+                  || pack_vars_pair_dens->leaf_list[top_tasks_packed].cj[tt]->hydro.count == 0){
                 error("Recursed task has NULL cell pointer");
               }
             }
@@ -1094,14 +1095,13 @@ void *runner_main2(void *data) {
 //                    pack_vars_pair_dens->leaf_list[i].n_packed = 0;
 //                    pack_vars_pair_dens->leaf_list[i].n_start = 0;
 //                  }
+                  message("Packed all recursed tasks");
                 }
                 // A. Nasar: We've launched but we have not packed all daughters.
                 // Need to set counters so we start from the last top-task packed
                 // and it's last packed daughter-task and start packing to the beginning of GPU arrays
                 // which is reset to zero (count_parts) in "....unpack_f4()"
                 else{
-                  for(int i = 1; i < pack_vars_pair_dens->top_tasks_packed; i++)
-                    pack_vars_pair_dens->leaf_list[i].n_start = 0;
                   pack_vars_pair_dens->top_tasks_packed = 1;
                   pack_vars_pair_dens->top_task_list[0]= t;
                   // A. Nasar: We've launched so need to restart counting tasks
@@ -1116,13 +1116,14 @@ void *runner_main2(void *data) {
                 }
                 // A. Nasar: These need to be reset to zero either way as our GPU array counters
                 // need to re-start from zero
+                pack_vars_pair_dens->count_parts = 0;
                 pack_vars_pair_dens->tasks_packed = 0;
+                //Launch counter re-set to zero
                 pack_vars_pair_dens->launch_leftovers = 0;
                 pack_vars_pair_dens->launch = 0;
               }
               ///////////////////////////////////////////////////////////////////////
             }
-            ttop_prev = t;
             cell_unlocktree(ci);
             cell_unlocktree(cj);
             pack_vars_pair_dens->launch_leftovers = 0;
