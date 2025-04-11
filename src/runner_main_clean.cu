@@ -1036,39 +1036,84 @@ void *runner_main2(void *data) {
 
             while(cstart < n_leaves_found){
               tic_cpu_pack = getticks();
-
 //              if(pack_vars_pair_dens->top_task_list[0] == ttop_prev)
 //                error("Working on prev top level task");
               pack_vars_pair_dens->launch_leftovers = 0;
               pack_vars_pair_dens->launch = 0;
-              /*Loop through n_daughters such that the pack_vars_pair_dens counters are updated*/
-              while(cstart < n_leaves_found && pack_vars_pair_dens->tasks_packed < n_t_tasks){
-                // n_start is incremented in pack. However, for cases where we have launched
-                // but there are still some daughters left unpacked, we need to restart the
-                // count from zero for the packed arrays as the daughters we previously worked on are no longer necessary.
-                // Thus, the counter for cii and cjj should remain cstart but counter for packing/unpacking arrays
-                // should be n_start which is set to zero after launch. count_parts should also be zero ater launch
-                struct cell * cii = pack_vars_pair_dens->leaf_list[ntop_packed - 1].ci[cstart];
-                struct cell * cjj = pack_vars_pair_dens->leaf_list[ntop_packed - 1].cj[cstart];
-                packing_time_pair += runner_dopair1_pack_f4(
-                    /////////////////////////////Are we sure we should use
-                    /////////////////////////////cells_left/cells right and not
-                    /////////////////////////////pack_vars_pair_dens->leaf_list[top_tasks_packed].ci & cj?
+              int launch = 0;
+              // n_start is incremented in pack. However, for cases where we have launched
+              // but there are still some daughters left unpacked, we need to restart the
+              // count from zero for the packed arrays as the daughters we previously worked on are no longer necessary.
+              // Thus, the counter for cii and cjj should remain cstart but counter for packing/unpacking arrays
+              // should be n_start which is set to zero after launch. count_parts should also be zero ater launch
+              struct cell * cii = pack_vars_pair_dens->leaf_list[ntop_packed - 1].ci[cstart];
+              struct cell * cjj = pack_vars_pair_dens->leaf_list[ntop_packed - 1].cj[cstart];
+              packing_time_pair += runner_dopair1_pack_f4(
+                  /////////////////////////////Are we sure we should use
+                  /////////////////////////////cells_left/cells right and not
+                  /////////////////////////////pack_vars_pair_dens->leaf_list[top_tasks_packed].ci & cj?
                   r, sched, pack_vars_pair_dens, cii, cjj, t,
-                    /////////////////////////////      HERE        //////////////////////////////////////////
+                  /////////////////////////////      HERE        //////////////////////////////////////////
                   parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens);
-                if(pack_vars_pair_dens->count_parts > count_max_parts_tmp)
-                  error("Packed more parts than possible");
-                cstart++;
+              c_start++;
+              if(packed_enough_tasks_to_launch){
+                //Launch
+
+                //Unpack
+
+                //I am now the zeroth top_task
+
+                //Packing counters need to be re-set to zero(tasks_packed && count_parts)
+
+                //Set a counter to say that we have launched (Will need to re-set
+                //counters at the end of while loop so that we start from scratch)
+
+                continue;// This makes sure that we do go back to the start of while loop
               }
+              if(packed_all_leaf_tasks){
+                if(some_left_over && launch_leftovers){
+                  //Launch
+                  //Unpack
+                  //Reset all counters (tasks_packed && top_tasks_packed ** count_parts)
+                }
+                else if (some_left_over){
+                  //Prepare to continue packing.
+                }
+              }
+              if(packed_all_leaf_tasks && some_left_over){
+                //Reset counters to start
+              }
+              int ntasks_before_launch = n_t_tasks - pack_vars_pair_dens->tasks_packed;
+              if(ntasks_before_launch <= 0){
+                //do some magic here to prepare for launch
+
+              }
+              else{
+
+              }
+              if(pack_vars_pair_dens->count_parts > count_max_parts_tmp)
+                error("Packed more parts than possible");
+              pack_vars_pair_dens->launch = 0;
+              pack_vars_pair_dens->launch_leftovers = 0;
+              //A. Nasar: Need to come back to this at some point!
+              //Here we are decrementing n_packs_pair_left for every daughter task but we should be decrementing for every parent task as things stand
+              //After we sort out recursion we can look at how to use a smarter way to decide when to offload
+              //Maybe based on the number of particles packed and NOT the number of tasks packed
+              if (pack_vars_pair_dens->tasks_packed == pack_vars_pair_dens->target_n_tasks){
+                pack_vars_pair_dens->launch = 1;
+              }
+              lock_lock(&sched->queues[qid].lock);
+              sched->queues[qid].n_packs_pair_left_d--;
+              if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
+              lock_unlock(&sched->queues[qid].lock);
               /* Copies done. Release the lock ! */
               t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
               /* Packed enough tasks or no pack tasks left in queue, flag that
                * we want to run */
-              int launch = pack_vars_pair_dens->launch;
+              launch = pack_vars_pair_dens->launch;
               int launch_leftovers = pack_vars_pair_dens->launch_leftovers;
               /* Do we have enough stuff to run the GPU ? */
-              if (launch || launch_leftovers) {
+              if (launch) {
                 /*Launch GPU tasks*/
                 int t_packed = pack_vars_pair_dens->tasks_packed;
                 runner_dopair1_launch_f4_one_memcpy_no_unpack(

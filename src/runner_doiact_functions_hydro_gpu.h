@@ -430,21 +430,9 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   /* Record that we have now done a packing (self) */
   t->done = 1;
   pack_vars->tasks_packed++;
-  pack_vars->launch = 0;
-  pack_vars->launch_leftovers = 0;
   pack_vars->leaf_list[pack_vars->top_tasks_packed - 1].n_packed++;
 
-  //A. Nasar: Need to come back to this at some point!
-  //Here we are decrementing n_packs_pair_left for every daughter task but we should be decrementing for every parent task as things stand
-  //After we sort out recursion we can look at how to use a smarter way to decide when to offload
-  //Maybe based on the number of particles packed and NOT the number of tasks packed
-  lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_pair_left_d--;
-  if (s->queues[qid].n_packs_pair_left_d < 1) pack_vars->launch_leftovers = 1;
-  lock_unlock(&s->queues[qid].lock);
-  if (pack_vars->tasks_packed == pack_vars->target_n_tasks){
-    pack_vars->launch = 1;
-  }
+
   /*Add time to packing_time. Timer for end of GPU work after the if(launch ||
    * launch_leftovers statement)*/
   clock_gettime(CLOCK_REALTIME, &t1);
