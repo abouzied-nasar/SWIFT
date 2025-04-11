@@ -384,8 +384,9 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
 
   /*Get pointers to the list of tasks and cells packed*/
 //  pack_vars->task_list[tasks_packed] = t;
-  pack_vars->ci_list[tasks_packed] = ci;
-  pack_vars->cj_list[tasks_packed] = cj;
+  //This should not be used anymore
+//  pack_vars->ci_list[tasks_packed] = ci;
+//  pack_vars->cj_list[tasks_packed] = cj;
 
   float3 shift_tmp = {x_tmp, y_tmp, z_tmp};
 
