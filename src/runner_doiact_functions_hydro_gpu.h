@@ -424,6 +424,7 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
     int bid = tasks_packed / bundle_size;
     pack_vars->bundle_first_part[bid] =
         fparti_fpartj_lparti_lpartj[tasks_packed].x;
+
     pack_vars->bundle_first_task_list[bid] = tasks_packed;
   }
   /* Record that we have now done a packing (self) */
@@ -434,6 +435,9 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   pack_vars->leaf_list[pack_vars->top_tasks_packed - 1].n_packed++;
 
   //A. Nasar: Need to come back to this at some point!
+  //Here we are decrementing n_packs_pair_left for every daughter task but we should be decrementing for every parent task as things stand
+  //After we sort out recursion we can look at how to use a smarter way to decide when to offload
+  //Maybe based on the number of particles packed and NOT the number of tasks packed
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_pair_left_d--;
   if (s->queues[qid].n_packs_pair_left_d < 1) pack_vars->launch_leftovers = 1;
