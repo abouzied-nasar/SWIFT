@@ -1012,12 +1012,14 @@ void *runner_main2(void *data) {
                       parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks);
 
             message("Found %i daughter tasks", n_leaves_found);
-            for (int tt=0; tt < n_leaves_found; tt++){
-              if( pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[tt]->hydro.count == 0
-                  || pack_vars_pair_dens->leaf_list[top_tasks_packed].cj[tt]->hydro.count == 0){
-                error("Recursed task has NULL cell pointer");
-              }
-            }
+//            if(pack_vars_pair_dens->leaf_list[top_tasks_packed].n_leaves != n_leaves_found)
+//              error("Some thing's up");
+//            for (int tt=0; tt < n_leaves_found; tt++){
+//              if( pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[tt]->hydro.count == 0
+//                  || pack_vars_pair_dens->leaf_list[top_tasks_packed].cj[tt]->hydro.count == 0){
+//                error("Recursed task has NULL cell pointer");
+//              }
+//            }
             n_leafs_total += n_leaves_found;
             int cstart = 0, cid = 0;
 
@@ -1086,7 +1088,6 @@ void *runner_main2(void *data) {
                     pair_end, cstart, n_leaves_found);
                 /*This ensure that if we still have leaves left we start at index 1.
                   Otherwise, reset the index since we will be grabbing a new task*/
-                int n_packed = pack_vars_pair_dens->tasks_packed;
                 //A. Nasar: We've packed all daughters and have launched --> one way or the other
                 if(cstart == n_leaves_found){
                   pack_vars_pair_dens->top_tasks_packed = 0;
@@ -1126,8 +1127,6 @@ void *runner_main2(void *data) {
             }
             cell_unlocktree(ci);
             cell_unlocktree(cj);
-            pack_vars_pair_dens->launch_leftovers = 0;
-            pack_vars_pair_dens->launch = 0;
             /////////////////////W.I.P!!!////////////////////////////////////////////////////////
 #endif  //RECURSE
 #endif  // GPUOFFLOAD_DENSITY

@@ -264,7 +264,7 @@ text_fontsize = 5
 text(
     -0.49,
     0.9,
-    "Gresho-Chan vortex (3D) with $\\gamma=%.3f$ at $t=%.2f$" % (gas_gamma, time),
+    "Gresho-Chan vortex (3D) with $\\gamma=%.3f$ at $t=%.4f$" % (gas_gamma, time),
     fontsize=text_fontsize,
 )
 text(-0.49, 0.8, "Background $\\rho_0=%.3f$" % rho0, fontsize=text_fontsize)

@@ -372,13 +372,13 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   int qid = r->qid;
 
   double x_tmp = 0.0, y_tmp = 0.0, z_tmp = 0.0;
-  struct cell *citmp, *cjtmp;
-  citmp=ci;
-  cjtmp=cj;
+//  struct cell *citmp, *cjtmp;
+//  citmp=ci;
+//  cjtmp=cj;
   /* Get the type of pair and flip ci/cj if needed. */
   double shift[3];
-  const int sid = space_getsid_and_swap_cells(s, &citmp, &cjtmp, shift);
-  if(citmp != ci) error("I'm flipped");
+  const int sid = space_getsid_and_swap_cells(s, &ci, &cj, shift);
+//  if(citmp != ci) error("I'm flipped");
   /*Get the shifts in case of periodics*/
   space_getsid_GPU(e->s, &ci, &cj, &x_tmp, &y_tmp, &z_tmp);
 
