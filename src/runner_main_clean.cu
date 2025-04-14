@@ -1012,20 +1012,14 @@ void *runner_main2(void *data) {
                       parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks);
 
             message("Found %i daughter tasks", n_leaves_found);
-//            if(pack_vars_pair_dens->leaf_list[top_tasks_packed].n_leaves != n_leaves_found)
-//              error("Some thing's up");
-//            for (int tt=0; tt < n_leaves_found; tt++){
-//              if( pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[tt]->hydro.count == 0
-//                  || pack_vars_pair_dens->leaf_list[top_tasks_packed].cj[tt]->hydro.count == 0){
-//                error("Recursed task has NULL cell pointer");
-//              }
-//            }
+
             n_leafs_total += n_leaves_found;
             int cstart = 0, cid = 0;
 
             pack_vars_pair_dens->top_task_list[top_tasks_packed] = t;
 
             pack_vars_pair_dens->top_tasks_packed++;
+            //A. Nasar: Remove this from struct as not needed. Was only used for de-bugging
             pack_vars_pair_dens->task_locked = 1;
             int t_s, t_e;
             t_s = 0;
@@ -1034,6 +1028,10 @@ void *runner_main2(void *data) {
 
             int ntop_packed = pack_vars_pair_dens->top_tasks_packed;
 
+            lock_lock(&sched->queues[qid].lock);
+            sched->queues[qid].n_packs_pair_left_d--;
+            if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
+            lock_unlock(&sched->queues[qid].lock);
             while(cstart < n_leaves_found){
               tic_cpu_pack = getticks();
 //              if(pack_vars_pair_dens->top_task_list[0] == ttop_prev)
@@ -1068,8 +1066,12 @@ void *runner_main2(void *data) {
                 //Set a counter to say that we have launched (Will need to re-set
                 //counters at the end of while loop so that we start from scratch)
 
+            	//If I packed all daughters -> Re-set toptask counters to zero
+
                 continue;// This makes sure that we do go back to the start of while loop
+                         // WILL EXIT if packed all daughters
               }
+
               if(packed_all_leaf_tasks){
                 if(some_left_over && launch_leftovers){
                   //Launch
@@ -1102,10 +1104,6 @@ void *runner_main2(void *data) {
               if (pack_vars_pair_dens->tasks_packed == pack_vars_pair_dens->target_n_tasks){
                 pack_vars_pair_dens->launch = 1;
               }
-              lock_lock(&sched->queues[qid].lock);
-              sched->queues[qid].n_packs_pair_left_d--;
-              if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
-              lock_unlock(&sched->queues[qid].lock);
               /* Copies done. Release the lock ! */
               t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
               /* Packed enough tasks or no pack tasks left in queue, flag that
