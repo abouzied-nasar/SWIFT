@@ -414,9 +414,9 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
       shift[k] = -e->s->dim[k];
   }
 
-  shift_tmp.x = shift[0];
-  shift_tmp.y = shift[1];
-  shift_tmp.z = shift[2];
+  shift_tmp.x = pack_vars->leaf_list[current_tt].shiftx[tid];// shift[0];
+  shift_tmp.y = pack_vars->leaf_list[current_tt].shifty[tid];// shift[1];
+  shift_tmp.z = pack_vars->leaf_list[current_tt].shiftz[tid];// shift[2];
 //  shift_tmp.x =
   /* Find first parts in task for ci and cj. Packed_tmp is index for cell i.
    * packed_tmp+1 is index for cell j */
@@ -1994,14 +1994,28 @@ void runner_dopair1_unpack_f4(
 	   *but likely due to incorrect book keeping*/
 	  struct cell * cii_l = pack_vars->leaf_list[topid].ci[tid];
 	  struct cell * cjj_l = pack_vars->leaf_list[topid].cj[tid];
-//	  for(int i = pack_length_unpack; i < pack_length_unpack + cii_l->hydro.count; i++){// + cjj_l->hydro.count){
-//		  int j = i - pack_length_unpack;
-//		  if((parts_send[i].x_p_h.x != cii_l->hydro.parts[j].x[0])&&
-//			 (parts_send[i].x_p_h.x != cjj_l->hydro.parts[j].x[0])){
-//			  message("i %f ci %f cj %f", parts_send[i].x_p_h.x, cii_l->hydro.parts[j].x[0], cjj_l->hydro.parts[j].x[0]);
+	  /* Get the relative distance between the pairs, wrapping. */
+	  double shift[3] = {0.0, 0.0, 0.0};
+	  for (int k = 0; k < 3; k++) {
+	    if (cjj_l->loc[k] - cii_l->loc[k] < -e->s->dim[k] / 2)
+	      shift[k] = e->s->dim[k];
+	    else if (cjj_l->loc[k] - cii_l->loc[k] > e->s->dim[k] / 2)
+	      shift[k] = -e->s->dim[k];
+	  }
+	  for(int i = pack_length_unpack; i < pack_length_unpack + cii_l->hydro.count; i++){// + cjj_l->hydro.count){
+		  int j = i - pack_length_unpack;
+		  if((parts_send[i].x_p_h.x != cii_l->hydro.parts[j].x[0] - (shift[0] + cii_l->loc[0]))&&
+			 (parts_send[i].x_p_h.x != cjj_l->hydro.parts[j].x[0])){
+			  message("TTid % i tid %i xi %f yi %f zi %f\n                                                    x %f y  %f z  %f", topid, tid,
+					  parts_send[i].x_p_h.x,
+					  parts_send[i].x_p_h.y,
+					  parts_send[i].x_p_h.z,
+					  cii_l->hydro.parts[j].x[0] - (pack_vars->leaf_list[topid].shiftx[tid] + cii_l->loc[0]),
+					  cii_l->hydro.parts[j].x[1] - (pack_vars->leaf_list[topid].shifty[tid] + cii_l->loc[1]),
+					  cii_l->hydro.parts[j].x[2] - (pack_vars->leaf_list[topid].shiftz[tid] + cii_l->loc[2]));
 //			  error("parts not the same");
-//		  }
-//	  }
+		  }
+	  }
 //	  if(cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
 //		  error("Unpacking empty cells");
 //	  message("loc %f %f %f topid %i noffloaded %i tid %i nleaves %i id %i", pack_vars->leaf_list[topid].ci[tid]->loc[0]
@@ -2027,6 +2041,10 @@ void runner_dopair1_unpack_f4(
     pthread_cond_broadcast(&s->sleep_cond);
     pthread_mutex_unlock(&s->sleep_mutex);
   }
+	if(pack_length_unpack != pack_vars->count_parts)
+		error("count unpacked %i != count_packed %i", pack_length_unpack, pack_vars->count_parts);
+
+	message("count unpacked %i count_packed %i", pack_length_unpack, pack_vars->count_parts);
 }
 void runner_dopair1_launch_f4_g_one_memcpy(
     struct runner *r, struct scheduler *s, struct pack_vars_pair *pack_vars,
