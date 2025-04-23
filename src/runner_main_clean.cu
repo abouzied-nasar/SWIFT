@@ -554,8 +554,12 @@ void *runner_main2(void *data) {
 //    l_list[i].n_leaves = 0;
     pack_vars_pair_dens->leaf_list[i].ci = malloc(n_leaves_max * sizeof(struct cell *));
     pack_vars_pair_dens->leaf_list[i].cj = malloc(n_leaves_max * sizeof(struct cell *));
+    pack_vars_pair_dens->leaf_list[i].shiftx = malloc(n_leaves_max * sizeof(double));
+    pack_vars_pair_dens->leaf_list[i].shifty = malloc(n_leaves_max * sizeof(double));
+    pack_vars_pair_dens->leaf_list[i].shiftz = malloc(n_leaves_max * sizeof(double));
     pack_vars_pair_dens->leaf_list[i].n_leaves = 0;
     pack_vars_pair_dens->leaf_list[i].n_packed = 0;
+    pack_vars_pair_dens->leaf_list[i].n_offload = 0;
 //    for (int j = 0; j < n_leaves_max; j++){
 //      pack_vars_pair_dens->leaf_list[i].ci[j] = l_list[i].ci[j];
 //      pack_vars_pair_dens->leaf_list[i].cj[j] = l_list[i].cj[j];
@@ -1005,16 +1009,21 @@ void *runner_main2(void *data) {
             int depth = 0;
 
             pack_vars_pair_dens->leaf_list[top_tasks_packed].n_leaves = 0;
-            pack_vars_pair_dens->leaf_list[top_tasks_packed].n_start = 0;
+            pack_vars_pair_dens->leaf_list[top_tasks_packed].n_offload = 0;
             pack_vars_pair_dens->leaf_list[top_tasks_packed].n_packed = 0;
 
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
                       parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks);
 
+//            for(int i = 0; i < n_leaves_found; i++){
+//            	if(pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[i]->hydro.count == 0 ||
+//            			pack_vars_pair_dens->leaf_list[top_tasks_packed].cj[i]->hydro.count == 0)
+//            		error("Something's not right");
+//            }
             message("Found %i daughter tasks", n_leaves_found);
 
             n_leafs_total += n_leaves_found;
-            int cstart = 0, cid = 0;
+            int cid = 0;
 
             pack_vars_pair_dens->top_task_list[top_tasks_packed] = t;
 
@@ -1030,32 +1039,33 @@ void *runner_main2(void *data) {
             sched->queues[qid].n_packs_pair_left_d--;
             if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
             lock_unlock(&sched->queues[qid].lock);
+
+            int npacked = 0;
             //A. Nasar: Loop through the daughter tasks we found
-            while(cstart < n_leaves_found){
+            while(npacked < n_leaves_found){
               top_tasks_packed = pack_vars_pair_dens->top_tasks_packed;
               tic_cpu_pack = getticks();
               pack_vars_pair_dens->launch = 0;
               int launch = 0;
+              pack_vars_pair_dens->leaf_list[0].n_packed = npacked;
               //A. Nasar: IMPORTANT NOTE
               // n_start is incremented in pack. However, for cases where we have launched
               // but there are still some daughters left unpacked, we need to restart the
               // count from zero for the packed arrays as the daughters we previously worked on are no longer necessary.
-              // Thus, the counter for cii and cjj should remain cstart but counter for packing/unpacking arrays
+              // Thus, the counter for cii and cjj should remain npacked but counter for packing/unpacking arrays
               // should be n_start which is set to zero after launch. count_parts should also be zero ater launch
-              struct cell * cii = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[cstart];
-              struct cell * cjj = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj[cstart];
+              struct cell * cii = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[npacked];
+              struct cell * cjj = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj[npacked];
+
               packing_time_pair += runner_dopair1_pack_f4(
-                  /////////////////////////////Are we sure we should use
-                  /////////////////////////////cells_left/cells right and not
-                  /////////////////////////////pack_vars_pair_dens->leaf_list[top_tasks_packed].ci & cj?
                   r, sched, pack_vars_pair_dens, cii, cjj, t,
-                  /////////////////////////////      HERE        //////////////////////////////////////////
                   parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens);
-              cstart++;
+
+              npacked++;
               if(pack_vars_pair_dens->tasks_packed == target_n_tasks)
             	  pack_vars_pair_dens->launch = 1;
               if(pack_vars_pair_dens->launch){
-            	message("Launching");
+            	message("Launching with %i tasks out of %i", pack_vars_pair_dens->leaf_list[0].n_offload, npacked);
                 runner_dopair1_launch_f4_one_memcpy_no_unpack(
                       r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
                       parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
@@ -1070,36 +1080,34 @@ void *runner_main2(void *data) {
                       d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
                       &packing_time_pair, &time_for_density_gpu_pair,
                       &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-                      pair_end, cstart, n_leaves_found);
-                if(cstart < n_leaves_found){
+                      pair_end, npacked, n_leaves_found);
+                if(npacked < n_leaves_found){
             	  pack_vars_pair_dens->top_tasks_packed = 1;
             	  pack_vars_pair_dens->top_task_list[0] = t;
-                  pack_vars_pair_dens->leaf_list[0].n_start = cstart;
-                  pack_vars_pair_dens->leaf_list[0].n_packed = 0;
+                  pack_vars_pair_dens->leaf_list[0].n_offload = 0;
                 }
                 else{
               	  pack_vars_pair_dens->top_tasks_packed = 0;
-              	  pack_vars_pair_dens->top_task_list[0] = NULL;
+                  pack_vars_pair_dens->leaf_list[0].n_offload = 0;
+//              	  pack_vars_pair_dens->top_task_list[0] = NULL;
                 }
           	    pack_vars_pair_dens->tasks_packed = 0;
                 pack_vars_pair_dens->count_parts = 0;
                 pack_vars_pair_dens->launch = 0;
-                //Set a counter to say that we have launched (Will need to re-set
-                //counters at the end of while loop so that we start from scratch)
                 //This makes sure that we do go back to the start of while loop
                 //will exit if packed all daughters
                 continue;
               }
               if(pack_vars_pair_dens->launch_leftovers){
-                int nleft = n_leaves_found - cstart;
+                int nleft = n_leaves_found - npacked;
                 //Check to see if we have enough tasks left to launch a full pack
-				if(nleft > target_n_tasks && cstart < n_leaves_found){
+				if(nleft > target_n_tasks && npacked < n_leaves_found){
 				  //Don't launch leftovers,
 				  //we can do a normal launch as above keep recursing for now
 				  continue;
 				}
-				else if(nleft <= target_n_tasks && cstart == n_leaves_found){
-				  message("Launching Leftovers");
+				else if(nleft <= target_n_tasks && npacked == n_leaves_found){
+				  error("Launching Leftovers");
 	              runner_dopair1_launch_f4_one_memcpy_no_unpack(
 	                      r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
 	                      parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
@@ -1114,9 +1122,9 @@ void *runner_main2(void *data) {
 	                      d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
 	                      &packing_time_pair, &time_for_density_gpu_pair,
 	                      &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-	                      pair_end, cstart, n_leaves_found);
+	                      pair_end, npacked, n_leaves_found);
               	  pack_vars_pair_dens->top_tasks_packed = 0;
-              	  pack_vars_pair_dens->top_task_list[0] = NULL;
+//              	  pack_vars_pair_dens->top_task_list[0] = NULL;
             	  pack_vars_pair_dens->tasks_packed = 0;
                   pack_vars_pair_dens->count_parts = 0;
                   pack_vars_pair_dens->launch_leftovers = 0;
