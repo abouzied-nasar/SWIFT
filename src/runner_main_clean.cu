@@ -997,7 +997,7 @@ void *runner_main2(void *data) {
 #else //RECURSE
 
             ticks tic_cpu_pack = getticks();
-            message("recursing");
+//            message("recursing");
 
             /////////////////////W.I.P!!!////////////////////////////////////////////////////////
             /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
@@ -1037,7 +1037,7 @@ void *runner_main2(void *data) {
             // If so, set launch_leftovers to 1 and recursively pack and launch daughter tasks on GPU
             lock_lock(&sched->queues[qid].lock);
             sched->queues[qid].n_packs_pair_left_d--;
-            if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
+//            if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
             lock_unlock(&sched->queues[qid].lock);
 
             int npacked = 0;
@@ -1065,7 +1065,7 @@ void *runner_main2(void *data) {
               if(pack_vars_pair_dens->tasks_packed == target_n_tasks)
             	  pack_vars_pair_dens->launch = 1;
               if(pack_vars_pair_dens->launch){
-            	message("Launching with %i tasks out of %i", pack_vars_pair_dens->leaf_list[0].n_offload, npacked);
+//            	message("Launching with %i tasks out of %i", pack_vars_pair_dens->leaf_list[0].n_offload, npacked);
                 runner_dopair1_launch_f4_one_memcpy_no_unpack(
                       r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
                       parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
@@ -1084,58 +1084,58 @@ void *runner_main2(void *data) {
                 if(npacked < n_leaves_found){
             	  pack_vars_pair_dens->top_tasks_packed = 1;
             	  pack_vars_pair_dens->top_task_list[0] = t;
-                  pack_vars_pair_dens->leaf_list[0].n_offload = 0;
                 }
                 else{
               	  pack_vars_pair_dens->top_tasks_packed = 0;
-                  pack_vars_pair_dens->leaf_list[0].n_offload = 0;
 //              	  pack_vars_pair_dens->top_task_list[0] = NULL;
                 }
+                pack_vars_pair_dens->leaf_list[0].n_offload = 0;
           	    pack_vars_pair_dens->tasks_packed = 0;
                 pack_vars_pair_dens->count_parts = 0;
                 pack_vars_pair_dens->launch = 0;
                 //This makes sure that we do go back to the start of while loop
                 //will exit if packed all daughters
-                continue;
+//                continue;
               }
-              if(pack_vars_pair_dens->launch_leftovers){
-                int nleft = n_leaves_found - npacked;
-                //Check to see if we have enough tasks left to launch a full pack
-				if(nleft > target_n_tasks && npacked < n_leaves_found){
-				  //Don't launch leftovers,
-				  //we can do a normal launch as above keep recursing for now
-				  continue;
-				}
-				else if(nleft <= target_n_tasks && npacked == n_leaves_found){
-				  error("Launching Leftovers");
-	              runner_dopair1_launch_f4_one_memcpy_no_unpack(
-	                      r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
-	                      parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
-	                      d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
-	                      &packing_time_pair, &time_for_density_gpu_pair,
-	                      &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-	                      pair_end);
-	              //A. Nasar: Unpack data and zero count_parts counter
-	              runner_dopair1_unpack_f4(
-	                      r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
-	                      parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
-	                      d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
-	                      &packing_time_pair, &time_for_density_gpu_pair,
-	                      &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-	                      pair_end, npacked, n_leaves_found);
-              	  pack_vars_pair_dens->top_tasks_packed = 0;
-//              	  pack_vars_pair_dens->top_task_list[0] = NULL;
-            	  pack_vars_pair_dens->tasks_packed = 0;
-                  pack_vars_pair_dens->count_parts = 0;
-                  pack_vars_pair_dens->launch_leftovers = 0;
-				}
-              }
+//              if(pack_vars_pair_dens->launch_leftovers){
+//                int nleft = n_leaves_found - npacked;
+//                //Check to see if we have enough tasks left to launch a full pack
+//				if(nleft > target_n_tasks && npacked < n_leaves_found){
+//				  //Don't launch leftovers,
+//				  //we can do a normal launch as above keep recursing for now
+//				  continue;
+//				}
+//				else if(nleft <= target_n_tasks && npacked == n_leaves_found){
+//				  error("Launching Leftovers");
+//	              runner_dopair1_launch_f4_one_memcpy_no_unpack(
+//	                      r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
+//	                      parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
+//	                      d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
+//	                      &packing_time_pair, &time_for_density_gpu_pair,
+//	                      &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
+//	                      pair_end);
+//	              //A. Nasar: Unpack data and zero count_parts counter
+//	              runner_dopair1_unpack_f4(
+//	                      r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
+//	                      parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
+//	                      d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
+//	                      &packing_time_pair, &time_for_density_gpu_pair,
+//	                      &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
+//	                      pair_end, npacked, n_leaves_found);
+//              	  pack_vars_pair_dens->top_tasks_packed = 0;
+////              	  pack_vars_pair_dens->top_task_list[0] = NULL;
+//            	  pack_vars_pair_dens->tasks_packed = 0;
+//                  pack_vars_pair_dens->count_parts = 0;
+//                  pack_vars_pair_dens->launch_leftovers = 0;
+//				}
+//              }
               if(pack_vars_pair_dens->count_parts > count_max_parts_tmp)
                 error("Packed more parts than possible");
               t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
             }
             //A. Nasar: Launch-leftovers counter re-set to zero and cells unlocked
             pack_vars_pair_dens->launch_leftovers = 0;
+            pack_vars_pair_dens->launch = 0;
             cell_unlocktree(ci);
             cell_unlocktree(cj);
             /////////////////////W.I.P!!!////////////////////////////////////////////////////////
