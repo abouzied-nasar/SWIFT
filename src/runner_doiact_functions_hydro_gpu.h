@@ -313,7 +313,7 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
                               struct part_aos_f4_send *parts_send,
                               struct engine *e,
                               int4 *fparti_fpartj_lparti_lpartj, int *n_leafs_found,
-							  int depth, int n_expected_tasks) {
+							  int depth, int n_expected_tasks, struct cell **cells_left, struct cell **cells_right) {
 
 	/* Should we even bother? A. Nasar: For GPU code we need to be clever about this */
   if (!CELL_IS_ACTIVE(ci, e) && !CELL_IS_ACTIVE(cj, e)) return;
@@ -335,7 +335,7 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
 	  /*We probably want to record */
 	  if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL){
 		runner_recurse_gpu(r, s, pack_vars, ci->progeny[pid], cj->progeny[pjd], t, parts_send, e, fparti_fpartj_lparti_lpartj,
-				n_leafs_found, depth + 1, n_expected_tasks);
+				n_leafs_found, depth + 1, n_expected_tasks, cells_left, cells_right);
 //	        message("recursing to depth %i", depth + 1);
 	  }
 	}
@@ -346,8 +346,8 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
 	int leafs_found = *n_leafs_found;
 	int tt_packed = pack_vars->top_tasks_packed;
 	/*for all leafs to be sent add to cell list */
-//	cells_left[leafs_found] = ci;
-//	cells_right[leafs_found] = cj;
+	cells_left[leafs_found] = ci;
+	cells_right[leafs_found] = cj;
 	/*Add leaf cells to list for each top_level task*/
 	pack_vars->leaf_list[tt_packed].ci[leafs_found] = ci;
 	pack_vars->leaf_list[tt_packed].cj[leafs_found] = cj;
@@ -1978,7 +1978,7 @@ void runner_dopair1_unpack_f4(
     struct part_aos_f4_recv *d_parts_recv, cudaStream_t *stream, float d_a,
     float d_H, struct engine *e, double *packing_time, double *gpu_time,
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
-    cudaEvent_t *pair_end, int npacked, int n_leaves_found){
+    cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell **cells_left, struct cell **cells_right){
 
   int topid;
   /////////////////////////////////
@@ -2030,7 +2030,7 @@ void runner_dopair1_unpack_f4(
 //                            , topid, npacked, tid, pack_vars->leaf_list[topid].n_offload, r->cpuid);
 //	  if(*cii_l == NULL || *cjj_l == NULL)error("stop");
 	  runner_do_ci_cj_gpu_unpack_neat_aos_f4(
-			r, pack_vars->leaf_list[topid].ci[tid], pack_vars->leaf_list[topid].cj[tid],
+			r, cells_left[tid], cells_right[tid],
 			parts_recv, 0, &pack_length_unpack, tid,
 			2 * pack_vars->count_max_parts, e);
 	}
@@ -2040,9 +2040,9 @@ void runner_dopair1_unpack_f4(
 //	pack_vars->count_parts = 0;
 	/*For some reason the code fails if we get a leaf pair task
 	 *this if->continue statement stops the code from trying to unlock same cells twice*/
-	if(topid == pack_vars->top_tasks_packed -1 && npacked != n_leaves_found){
-		continue;
-	}
+//	if(topid == pack_vars->top_tasks_packed -1 && npacked != n_leaves_found){
+//		continue;
+//	}
 //    enqueue_dependencies(s, pack_vars->top_task_list[topid]);
 //    pthread_mutex_lock(&s->sleep_mutex);
 //    atomic_dec(&s->waiting);

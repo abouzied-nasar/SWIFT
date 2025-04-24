@@ -2126,6 +2126,7 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
   hi = x_pi.w, hig2 = hi * hi * kernel_gamma2;
   //  }
 
+  int interacted = 0;
   //  printf("js %i je %i\n", cj_start, cj_end);
   /*Particles copied in blocks to shared memory*/
   for (int j = cj_start; j < cj_end; j++) {
@@ -2139,6 +2140,7 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
     const float r2 = xij * xij + yij * yij + zij * zij;
     //	printf("r2 %f \n", r2);
     if (r2 < hig2) {
+      interacted ++;
       /* Recover some data */
       const float mj = ux_m_j.w;
       const float r = sqrt(r2);
@@ -2172,6 +2174,9 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
     }
   } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
   //  if (pid >= ci_start && pid < ci_end) {
+
+  if(interacted > 10)
+	  printf("i %i cj_s %i, cj_e %i mi %f rho %f drho_dh%f W%f\n", pid, cj_start, cj_end, ux_pi.w, res_rho.x, res_rho.y, res_rho.z);
   parts_recv[pid].rho_dh_wcount = res_rho;
   parts_recv[pid].rot_ux_div_v = res_rot;
   //  }
@@ -3449,7 +3454,6 @@ __global__ void runner_do_pair_density_GPU_aos_f4(
     const struct part_aos_f4_send pi = parts_send[pid];
     const int cj_start = pi.cjs_cje.x;
     const int cj_end = pi.cjs_cje.y;
-
     /* Start calculations for particles in cell i*/
     DOPAIR2NAIVEGPUAOSF4(pi, parts_send, parts_recv, pid, cj_start, cj_end, d_a,
                          d_H);
