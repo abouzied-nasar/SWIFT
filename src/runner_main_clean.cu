@@ -1029,16 +1029,16 @@ void *runner_main2(void *data) {
 
             pack_vars_pair_dens->top_tasks_packed++;
             //A. Nasar: Remove this from struct as not needed. Was only used for de-bugging
-            pack_vars_pair_dens->task_locked = 1;
+//            pack_vars_pair_dens->task_locked = 1;
             int target_n_tasks = pack_vars_pair_dens->target_n_tasks;
             t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
 
             // A. Nasar: Check to see if this is the last task in the queue.
             // If so, set launch_leftovers to 1 and recursively pack and launch daughter tasks on GPU
-            lock_lock(&sched->queues[qid].lock);
-            sched->queues[qid].n_packs_pair_left_d--;
+//            lock_lock(&sched->queues[qid].lock);
+//            sched->queues[qid].n_packs_pair_left_d--;
 //            if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
-            lock_unlock(&sched->queues[qid].lock);
+//            lock_unlock(&sched->queues[qid].lock);
 
             int npacked = 0;
             //A. Nasar: Loop through the daughter tasks we found
