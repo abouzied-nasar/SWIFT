@@ -400,10 +400,10 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   const int count_cj = cj->hydro.count;
 
   /*Assign an id for this task*/
-  const int tid =  pack_vars->tasks_packed;
+  const int tid =  0;//pack_vars->tasks_packed;
   const int current_tt = 0;//pack_vars->top_tasks_packed - 1;
 
-  int npacked = pack_vars->leaf_list[current_tt].n_packed;
+  int npacked = 0;//pack_vars->leaf_list[current_tt].n_packed;
   float3 shift_tmp;
 
   /* Get the relative distance between the pairs, wrapping. */
@@ -1755,7 +1755,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
   /* Identify the number of GPU bundles to run in ideal case*/
   int nBundles_temp = pack_vars->nBundles;
   /*How many tasks have we packed?*/
-  const int tasks_packed = pack_vars->tasks_packed;
+  const int tasks_packed = 1;//pack_vars->tasks_packed;
 
   /*How many tasks should be in a bundle?*/
   const int bundle_size = pack_vars->bundle_size;
