@@ -1011,9 +1011,12 @@ void *runner_main2(void *data) {
             pack_vars_pair_dens->leaf_list[top_tasks_packed].n_leaves = 0;
             pack_vars_pair_dens->leaf_list[top_tasks_packed].n_offload = 0;
             pack_vars_pair_dens->leaf_list[top_tasks_packed].n_packed = 0;
+            struct cell * cells_left[128];
+            struct cell * cells_right[128];
 
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
-                      parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks);
+                      parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks,
+					  cells_left, cells_right);
 
             for(int i = 0; i < n_leaves_found; i++){
             	if(pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[i]->hydro.count == 0 ||
@@ -1059,8 +1062,8 @@ void *runner_main2(void *data) {
               // count from zero for the packed arrays as the daughters we previously worked on are no longer necessary.
               // Thus, the counter for cii and cjj should remain npacked but counter for packing/unpacking arrays
               // should be n_start which is set to zero after launch. count_parts should also be zero after launch
-              struct cell * cii = pack_vars_pair_dens->leaf_list[0].ci[npacked];
-              struct cell * cjj = pack_vars_pair_dens->leaf_list[0].cj[npacked];
+              struct cell * cii = cells_left[npacked];//pack_vars_pair_dens->leaf_list[0].ci[npacked];
+              struct cell * cjj = cells_right[npacked];//pack_vars_pair_dens->leaf_list[0].cj[npacked];
 
 //              if(cii->hydro.count == 0 || cjj->hydro.count == 0)// != pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[npacked])
 //            	  error("Stopping");
@@ -1088,7 +1091,7 @@ void *runner_main2(void *data) {
                       d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
                       &packing_time_pair, &time_for_density_gpu_pair,
                       &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-                      pair_end, npacked, n_leaves_found);
+                      pair_end, npacked, n_leaves_found, cells_left, cells_right);
                 if(npacked < n_leaves_found){
             	  pack_vars_pair_dens->top_tasks_packed = 1;
             	  pack_vars_pair_dens->top_task_list[0] = t;
@@ -1144,6 +1147,10 @@ void *runner_main2(void *data) {
             //A. Nasar: Launch-leftovers counter re-set to zero and cells unlocked
             pack_vars_pair_dens->launch_leftovers = 0;
             pack_vars_pair_dens->launch = 0;
+            pack_vars_pair_dens->leaf_list[0].n_offload = 0;
+      	    pack_vars_pair_dens->tasks_packed = 0;
+      	    pack_vars_pair_dens->top_tasks_packed = 0;
+            pack_vars_pair_dens->count_parts = 0;
             cell_unlocktree(ci);
             cell_unlocktree(cj);
             enqueue_dependencies(sched, t);
