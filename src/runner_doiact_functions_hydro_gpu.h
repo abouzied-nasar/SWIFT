@@ -375,7 +375,7 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
    * tp0 and tp1 only time packing and unpacking*/
   struct timespec t0, t1;  //
   clock_gettime(CLOCK_REALTIME, &t0);
-  int tasks_packed = pack_vars->tasks_packed;
+//  int tasks_packed = pack_vars->tasks_packed;
   int qid = r->qid;
 
   double x_tmp = 0.0, y_tmp = 0.0, z_tmp = 0.0;
@@ -400,8 +400,8 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   const int count_cj = cj->hydro.count;
 
   /*Assign an id for this task*/
-  const int tid = tasks_packed;
-  const int current_tt = pack_vars->top_tasks_packed - 1;
+  const int tid =  pack_vars->tasks_packed;
+  const int current_tt = 0;//pack_vars->top_tasks_packed - 1;
 
   int npacked = pack_vars->leaf_list[current_tt].n_packed;
   float3 shift_tmp;
@@ -415,17 +415,17 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
       shift[k] = -e->s->dim[k];
   }
 
-  shift_tmp.x = pack_vars->leaf_list[current_tt].shiftx[tid];// shift[0];
-  shift_tmp.y = pack_vars->leaf_list[current_tt].shifty[tid];// shift[1];
-  shift_tmp.z = pack_vars->leaf_list[current_tt].shiftz[tid];// shift[2];
+  shift_tmp.x = pack_vars->leaf_list[current_tt].shiftx[npacked];// shift[0];
+  shift_tmp.y = pack_vars->leaf_list[current_tt].shifty[npacked];// shift[1];
+  shift_tmp.z = pack_vars->leaf_list[current_tt].shiftz[npacked];// shift[2];
 //  shift_tmp.x =
   /* Find first parts in task for ci and cj. Packed_tmp is index for cell i.
    * packed_tmp+1 is index for cell j */
   ////////////////////////
   //THIS IS A PROBLEM!!!
   ////////////////////////
-  fparti_fpartj_lparti_lpartj[tasks_packed].x = pack_vars->count_parts;
-  fparti_fpartj_lparti_lpartj[tasks_packed].y =
+  fparti_fpartj_lparti_lpartj[tid].x = pack_vars->count_parts;
+  fparti_fpartj_lparti_lpartj[tid].y =
       pack_vars->count_parts + count_ci;
 
   int *count_parts = &pack_vars->count_parts;
@@ -439,9 +439,9 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   ////////////////////////
   //THIS IS A PROBLEM!!!
   ////////////////////////
-  fparti_fpartj_lparti_lpartj[tasks_packed].z =
+  fparti_fpartj_lparti_lpartj[tid].z =
       pack_vars->count_parts - count_cj;
-  fparti_fpartj_lparti_lpartj[tasks_packed].w = pack_vars->count_parts;
+  fparti_fpartj_lparti_lpartj[tid].w = pack_vars->count_parts;
 
   /* Tell the cells they have been packed */
   ci->pack_done++;
@@ -449,12 +449,12 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
 
   /* Identify first particle for each bundle of tasks */
   const int bundle_size = pack_vars->bundle_size;
-  if (tasks_packed % bundle_size == 0) {
-    int bid = tasks_packed / bundle_size;
+  if (tid % bundle_size == 0) {
+    int bid = tid / bundle_size;
     pack_vars->bundle_first_part[bid] =
-        fparti_fpartj_lparti_lpartj[tasks_packed].x;
+        fparti_fpartj_lparti_lpartj[tid].x;
 
-    pack_vars->bundle_first_task_list[bid] = tasks_packed;
+    pack_vars->bundle_first_task_list[bid] = tid;
   }
   /* Record that we have now done a packing (self) */
   t->done = 1;
@@ -1987,10 +1987,12 @@ void runner_dopair1_unpack_f4(
   int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0;
   /*Loop over top level tasks*/
-  for (topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
+//  for (topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
+  for (topid = 0; topid < 1; topid++) {
 	const ticks tic = getticks();
 	/* Loop through each daughter task */
-	for(int tid = npacked - pack_vars->leaf_list[topid].n_offload; tid < npacked; tid++){
+//	for(int tid = npacked - pack_vars->leaf_list[topid].n_offload; tid < npacked; tid++){
+	for(int tid = npacked - 1; tid < npacked; tid++){
 	  /*Get pointers to the leaf cells. SEEMS I'm NOT GETTING A CORRECT POINTER
 	   *but likely due to incorrect book keeping*/
 	  struct cell * cii_l = pack_vars->leaf_list[topid].ci[tid];
@@ -2041,11 +2043,11 @@ void runner_dopair1_unpack_f4(
 	if(topid == pack_vars->top_tasks_packed -1 && npacked != n_leaves_found){
 		continue;
 	}
-    enqueue_dependencies(s, pack_vars->top_task_list[topid]);
-    pthread_mutex_lock(&s->sleep_mutex);
-    atomic_dec(&s->waiting);
-    pthread_cond_broadcast(&s->sleep_cond);
-    pthread_mutex_unlock(&s->sleep_mutex);
+//    enqueue_dependencies(s, pack_vars->top_task_list[topid]);
+//    pthread_mutex_lock(&s->sleep_mutex);
+//    atomic_dec(&s->waiting);
+//    pthread_cond_broadcast(&s->sleep_cond);
+//    pthread_mutex_unlock(&s->sleep_mutex);
   }
 	if(pack_length_unpack != pack_vars->count_parts)
 		error("count unpacked %i != count_packed %i", pack_length_unpack, pack_vars->count_parts);

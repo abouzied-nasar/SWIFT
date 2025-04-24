@@ -1032,7 +1032,7 @@ void *runner_main2(void *data) {
 
             pack_vars_pair_dens->top_task_list[top_tasks_packed] = t;
 
-            pack_vars_pair_dens->top_tasks_packed++;
+//            pack_vars_pair_dens->top_tasks_packed++;
             //A. Nasar: Remove this from struct as not needed. Was only used for de-bugging
 //            pack_vars_pair_dens->task_locked = 1;
             int target_n_tasks = pack_vars_pair_dens->target_n_tasks;
@@ -1059,8 +1059,8 @@ void *runner_main2(void *data) {
               // count from zero for the packed arrays as the daughters we previously worked on are no longer necessary.
               // Thus, the counter for cii and cjj should remain npacked but counter for packing/unpacking arrays
               // should be n_start which is set to zero after launch. count_parts should also be zero after launch
-              struct cell * cii = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[npacked];
-              struct cell * cjj = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj[npacked];
+              struct cell * cii = pack_vars_pair_dens->leaf_list[0].ci[npacked];
+              struct cell * cjj = pack_vars_pair_dens->leaf_list[0].cj[npacked];
 
 //              if(cii->hydro.count == 0 || cjj->hydro.count == 0)// != pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[npacked])
 //            	  error("Stopping");
@@ -1070,7 +1070,7 @@ void *runner_main2(void *data) {
                   parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens);
 
               npacked++;
-              if(pack_vars_pair_dens->tasks_packed == target_n_tasks)
+//              if(pack_vars_pair_dens->tasks_packed == target_n_tasks)
             	  pack_vars_pair_dens->launch = 1;
               if(pack_vars_pair_dens->launch){
 //            	message("Launching with %i tasks out of %i", pack_vars_pair_dens->leaf_list[0].n_offload, npacked);
@@ -1146,6 +1146,11 @@ void *runner_main2(void *data) {
             pack_vars_pair_dens->launch = 0;
             cell_unlocktree(ci);
             cell_unlocktree(cj);
+            enqueue_dependencies(sched, t);
+            pthread_mutex_lock(&sched->sleep_mutex);
+            atomic_dec(&sched->waiting);
+            pthread_cond_broadcast(&sched->sleep_cond);
+            pthread_mutex_unlock(&sched->sleep_mutex);
             /////////////////////W.I.P!!!////////////////////////////////////////////////////////
 #endif  //RECURSE
 #endif  // GPUOFFLOAD_DENSITY
