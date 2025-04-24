@@ -355,7 +355,8 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
 	pack_vars->leaf_list[tt_packed].shifty[leafs_found] = shift[1];
 	pack_vars->leaf_list[tt_packed].shiftz[leafs_found] = shift[2];
 	pack_vars->leaf_list[tt_packed].n_leaves++;
-//	error("stop");
+	if(ci != pack_vars->leaf_list[tt_packed].ci[leafs_found])
+		error("stop");
 	(*n_leafs_found)++;//= leafs_found + 1;
 	if(*n_leafs_found >= n_expected_tasks)
 		error("Created %i more than expected leaf cells. depth %i", *n_leafs_found, depth);
@@ -1994,37 +1995,41 @@ void runner_dopair1_unpack_f4(
 	   *but likely due to incorrect book keeping*/
 	  struct cell * cii_l = pack_vars->leaf_list[topid].ci[tid];
 	  struct cell * cjj_l = pack_vars->leaf_list[topid].cj[tid];
+	  if(cii_l->loc[0] != pack_vars->leaf_list[topid].ci[tid]->loc[0])
+		  error("stop");
+//	  error("Stopping");
 	  /* Get the relative distance between the pairs, wrapping. */
-	  double shift[3] = {0.0, 0.0, 0.0};
-	  for (int k = 0; k < 3; k++) {
-	    if (cjj_l->loc[k] - cii_l->loc[k] < -e->s->dim[k] / 2)
-	      shift[k] = e->s->dim[k];
-	    else if (cjj_l->loc[k] - cii_l->loc[k] > e->s->dim[k] / 2)
-	      shift[k] = -e->s->dim[k];
-	  }
-	  for(int i = pack_length_unpack; i < pack_length_unpack + cii_l->hydro.count; i++){// + cjj_l->hydro.count){
-		  int j = i - pack_length_unpack;
-		  if((parts_send[i].x_p_h.x != cii_l->hydro.parts[j].x[0] - (shift[0] + cii_l->loc[0]))&&
-			 (parts_send[i].x_p_h.x != cjj_l->hydro.parts[j].x[0])){
-			  message("TTid % i tid %i xi %f yi %f zi %f\n                                                    x %f y  %f z  %f", topid, tid,
-					  parts_send[i].x_p_h.x,
-					  parts_send[i].x_p_h.y,
-					  parts_send[i].x_p_h.z,
-					  cii_l->hydro.parts[j].x[0] - (pack_vars->leaf_list[topid].shiftx[tid] + cii_l->loc[0]),
-					  cii_l->hydro.parts[j].x[1] - (pack_vars->leaf_list[topid].shifty[tid] + cii_l->loc[1]),
-					  cii_l->hydro.parts[j].x[2] - (pack_vars->leaf_list[topid].shiftz[tid] + cii_l->loc[2]));
-//			  error("parts not the same");
-		  }
-	  }
-//	  if(cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
-//		  error("Unpacking empty cells");
+//	  double shift[3] = {0.0, 0.0, 0.0};
+//	  for (int k = 0; k < 3; k++) {
+//	    if (cjj_l->loc[k] - cii_l->loc[k] < -e->s->dim[k] / 2)
+//	      shift[k] = e->s->dim[k];
+//	    else if (cjj_l->loc[k] - cii_l->loc[k] > e->s->dim[k] / 2)
+//	      shift[k] = -e->s->dim[k];
+//	  }
+//	  for(int i = pack_length_unpack; i < pack_length_unpack + cii_l->hydro.count; i++){// + cjj_l->hydro.count){
+//		  int j = i - pack_length_unpack;
+//		  if((parts_send[i].x_p_h.x != cii_l->hydro.parts[j].x[0] - (shift[0] + cii_l->loc[0]))&&
+//			 (parts_send[i].x_p_h.x != cjj_l->hydro.parts[j].x[0])){
+//			  message("TTid % i tid %i xi %f yi %f zi %f\n                                                    x %f y  %f z  %f", topid, tid,
+//					  parts_send[i].x_p_h.x,
+//					  parts_send[i].x_p_h.y,
+//					  parts_send[i].x_p_h.z,
+//					  cii_l->hydro.parts[j].x[0] - (pack_vars->leaf_list[topid].shiftx[tid] + cii_l->loc[0]),
+//					  cii_l->hydro.parts[j].x[1] - (pack_vars->leaf_list[topid].shifty[tid] + cii_l->loc[1]),
+//					  cii_l->hydro.parts[j].x[2] - (pack_vars->leaf_list[topid].shiftz[tid] + cii_l->loc[2]));
+////			  error("parts not the same");
+//		  }
+//	  }
+	  if(cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
+		  error("Unpacking empty cells");
 //	  message("loc %f %f %f topid %i noffloaded %i tid %i nleaves %i id %i", pack_vars->leaf_list[topid].ci[tid]->loc[0]
 //                            , pack_vars->leaf_list[topid].ci[tid]->loc[1]
 //	                        , pack_vars->leaf_list[topid].ci[tid]->loc[2]
 //                            , topid, npacked, tid, pack_vars->leaf_list[topid].n_offload, r->cpuid);
 //	  if(*cii_l == NULL || *cjj_l == NULL)error("stop");
 	  runner_do_ci_cj_gpu_unpack_neat_aos_f4(
-			r, cii_l, cjj_l, parts_recv, 0, &pack_length_unpack, tid,
+			r, pack_vars->leaf_list[topid].ci[tid], pack_vars->leaf_list[topid].cj[tid],
+			parts_recv, 0, &pack_length_unpack, tid,
 			2 * pack_vars->count_max_parts, e);
 	}
 
@@ -2032,9 +2037,10 @@ void runner_dopair1_unpack_f4(
 	total_cpu_unpack_ticks += toc - tic;
 //	pack_vars->count_parts = 0;
 	/*For some reason the code fails if we get a leaf pair task
-	 *this if statement stops the code from trying to unlock same cells twice*/
-	if(topid == pack_vars->top_tasks_packed -1 && npacked != n_leaves_found)
+	 *this if->continue statement stops the code from trying to unlock same cells twice*/
+	if(topid == pack_vars->top_tasks_packed -1 && npacked != n_leaves_found){
 		continue;
+	}
     enqueue_dependencies(s, pack_vars->top_task_list[topid]);
     pthread_mutex_lock(&s->sleep_mutex);
     atomic_dec(&s->waiting);

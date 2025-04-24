@@ -103,8 +103,8 @@ void runner_doself1_gpu_pack_neat_aos_f4_f(
 }
 
 extern inline void pack_neat_pair_aos_f4(
-    struct cell *__restrict c,
-    struct part_aos_f4_send *__restrict parts_aos_buffer, int tid,
+    struct cell * c,
+    struct part_aos_f4_send * parts_aos_buffer, int tid,
     const int local_pack_position, const int count, const float3 shift,
     const int2 cstarts) {
   /*Data to be copied to GPU*/
@@ -453,8 +453,8 @@ void unpack_neat_aos_f4_f(struct cell *restrict c,
   }
 }
 
-void unpack_neat_pair_aos_f4(struct runner *r, struct cell *restrict c,
-                             struct part_aos_f4_recv *restrict parts_aos_buffer,
+void unpack_neat_pair_aos_f4(struct runner *r, struct cell * c,
+                             struct part_aos_f4_recv * parts_aos_buffer,
                              int tid, int local_pack_position, int count,
                              struct engine *e) {
 
@@ -663,8 +663,8 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
 }
 
 void runner_do_ci_cj_gpu_pack_neat_aos_f4(
-    struct runner *r, struct cell *restrict ci, struct cell *restrict cj,
-    struct part_aos_f4_send *restrict parts_aos_buffer, int timer,
+    struct runner *r, struct cell * ci, struct cell * cj,
+    struct part_aos_f4_send * parts_aos_buffer, int timer,
     int *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
     const int count_cj, float3 shift_tmp) {
 

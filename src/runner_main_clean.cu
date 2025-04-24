@@ -1015,11 +1015,16 @@ void *runner_main2(void *data) {
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
                       parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks);
 
-//            for(int i = 0; i < n_leaves_found; i++){
-//            	if(pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[i]->hydro.count == 0 ||
-//            			pack_vars_pair_dens->leaf_list[top_tasks_packed].cj[i]->hydro.count == 0)
-//            		error("Something's not right");
-//            }
+            for(int i = 0; i < n_leaves_found; i++){
+            	if(pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[i]->hydro.count == 0 ||
+            			pack_vars_pair_dens->leaf_list[top_tasks_packed].cj[i]->hydro.count == 0)
+            		error("Something's not right");
+//            	struct cell * ci_tmp = pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[i];
+//            	struct cell * cj_tmp = pack_vars_pair_dens->leaf_list[top_tasks_packed].cj[i];
+//            	message("Positions xi %f yi %f zi %f counti %i xj %f yj %f zj %f countj %i",
+//            			ci_tmp->loc[0], ci_tmp->loc[1], ci_tmp->loc[2], ci_tmp->hydro.count,
+//            			cj_tmp->loc[0], cj_tmp->loc[1], cj_tmp->loc[2], cj_tmp->hydro.count);
+            }
             message("Found %i daughter tasks", n_leaves_found);
 
             n_leafs_total += n_leaves_found;
@@ -1047,15 +1052,18 @@ void *runner_main2(void *data) {
               tic_cpu_pack = getticks();
               pack_vars_pair_dens->launch = 0;
               int launch = 0;
-              pack_vars_pair_dens->leaf_list[0].n_packed = npacked;
+              pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].n_packed = npacked;
               //A. Nasar: IMPORTANT NOTE
               // n_start is incremented in pack. However, for cases where we have launched
               // but there are still some daughters left unpacked, we need to restart the
               // count from zero for the packed arrays as the daughters we previously worked on are no longer necessary.
               // Thus, the counter for cii and cjj should remain npacked but counter for packing/unpacking arrays
-              // should be n_start which is set to zero after launch. count_parts should also be zero ater launch
+              // should be n_start which is set to zero after launch. count_parts should also be zero after launch
               struct cell * cii = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[npacked];
               struct cell * cjj = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj[npacked];
+
+//              if(cii->hydro.count == 0 || cjj->hydro.count == 0)// != pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[npacked])
+//            	  error("Stopping");
 
               packing_time_pair += runner_dopair1_pack_f4(
                   r, sched, pack_vars_pair_dens, cii, cjj, t,
