@@ -23,7 +23,7 @@
 #define GPUOFFLOAD_GRADIENT 1  // off-load hydro gradient to GPU
 #define GPUOFFLOAD_FORCE 1     // off-load hydro force to GPU
 
-//#define RECURSE 1 //Allow recursion through sub-tasks before offloading
+#define RECURSE 1 //Allow recursion through sub-tasks before offloading
 
 // #define DUMP_TIMINGS 1
 #include "../config.h"
@@ -1715,6 +1715,7 @@ void *runner_main2(void *data) {
     // message("wcount is %f\n", ctemp->hydro.parts[i].density.wcount);
             }
           }
+          fflush(fgpu_steps);
           }
     //  }
     /*Output compute times to separate files. cat later into one file*/
