@@ -1420,7 +1420,7 @@ void *runner_main2(void *data) {
           runner_do_init_grav(r, ci, 1);
           break;
         case task_type_ghost:
-//          runner_do_ghost(r, ci, 1);
+          runner_do_ghost(r, ci, 1);
           break;
 #ifdef EXTRA_HYDRO_LOOP
         case task_type_extra_ghost:
