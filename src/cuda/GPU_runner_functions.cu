@@ -2175,8 +2175,6 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
   } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
   //  if (pid >= ci_start && pid < ci_end) {
 
-  if(interacted > 10)
-	  printf("i %i cj_s %i, cj_e %i mi %f rho %f drho_dh%f W%f\n", pid, cj_start, cj_end, ux_pi.w, res_rho.x, res_rho.y, res_rho.z);
   parts_recv[pid].rho_dh_wcount = res_rho;
   parts_recv[pid].rot_ux_div_v = res_rot;
   //  }
