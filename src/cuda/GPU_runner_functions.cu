@@ -2172,6 +2172,8 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
       res_rot.z += faci * curlvrz;
       res_rot.w -= faci * dvdr;
     }
+//    else if(r2 > 0.1)
+//      printf("Distance is %f\n", sqrt(r2));
   } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
   //  if (pid >= ci_start && pid < ci_end) {
 
