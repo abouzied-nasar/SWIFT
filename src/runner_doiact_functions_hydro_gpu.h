@@ -351,18 +351,24 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
 	/*Add leaf cells to list for each top_level task*/
 	pack_vars->leaf_list[tt_packed].ci[leafs_found] = ci;
 	pack_vars->leaf_list[tt_packed].cj[leafs_found] = cj;
-	pack_vars->leaf_list[tt_packed].shiftx[leafs_found] = shift[0];
-	pack_vars->leaf_list[tt_packed].shifty[leafs_found] = shift[1];
-	pack_vars->leaf_list[tt_packed].shiftz[leafs_found] = shift[2];
+//	pack_vars->leaf_list[tt_packed].shiftx[leafs_found] = shift[0];
+//	pack_vars->leaf_list[tt_packed].shifty[leafs_found] = shift[1];
+//	pack_vars->leaf_list[tt_packed].shiftz[leafs_found] = shift[2];
 	pack_vars->leaf_list[tt_packed].n_leaves++;
 	if(ci != pack_vars->leaf_list[tt_packed].ci[leafs_found])
 		error("stop");
 	(*n_leafs_found)++;//= leafs_found + 1;
+	if(abs(shift[0]) > 0.0 || abs(shift[1]) > 0.0 || abs(shift[2]) > 0.0)
+	  error("Shifted");
 	if(*n_leafs_found >= n_expected_tasks)
 		error("Created %i more than expected leaf cells. depth %i", *n_leafs_found, depth);
+//	double dist = sqrt(pow(ci->loc[0] - cj->loc[0], 2) + pow(ci->loc[1] - cj->loc[1], 2)
+//	        + pow(ci->loc[2] - cj->loc[2], 2));
+//	if(dist > 0.5)
+//	  error("Incorect dists %f shifts %f %f %f", dist, shift[0], shift[1], shift[2]);
   }
 
-};
+}
 
 double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
                               struct pack_vars_pair *restrict pack_vars,
@@ -404,20 +410,32 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   const int current_tt = 0;//pack_vars->top_tasks_packed - 1;
 
   int npacked = 0;//pack_vars->leaf_list[current_tt].n_packed;
-  float3 shift_tmp;
+  double3 shift_tmp;
 
   /* Get the relative distance between the pairs, wrapping. */
   double shift[3] = {0.0, 0.0, 0.0};
   for (int k = 0; k < 3; k++) {
-    if (cj->loc[k] - ci->loc[k] < -e->s->dim[k] / 2)
+    if (cj->loc[k] - ci->loc[k] < -e->s->dim[k] / 2.0){
+//      message("SMALLER dist %f space size %f", cj->loc[k] - ci->loc[k], -e->s->dim[k] / 2);
       shift[k] = e->s->dim[k];
-    else if (cj->loc[k] - ci->loc[k] > e->s->dim[k] / 2)
+    }
+    else if (cj->loc[k] - ci->loc[k] > e->s->dim[k] / 2.0){
+//      message("GREATER dist %f space size %f", cj->loc[k] - ci->loc[k], e->s->dim[k] / 2);
       shift[k] = -e->s->dim[k];
+    }
   }
-
-  shift_tmp.x = pack_vars->leaf_list[current_tt].shiftx[npacked];// shift[0];
-  shift_tmp.y = pack_vars->leaf_list[current_tt].shifty[npacked];// shift[1];
-  shift_tmp.z = pack_vars->leaf_list[current_tt].shiftz[npacked];// shift[2];
+//  double dist = sqrt(pow(ci->loc[0] - cj->loc[0], 2) + pow(ci->loc[1] - cj->loc[1], 2)
+//          + pow(ci->loc[2] - cj->loc[2], 2));
+//  if(dist > 0.5){
+//    message("Dists %f shifts %f %f %f space size %f", dist, shift[0], shift[1], shift[2], e->s->dim[0]);
+//    dist = sqrt(pow(ci->loc[0] - shift[0], 2) + pow(ci->loc[1] - shift[1], 2)
+//        + pow(ci->loc[2] - shift[2], 2));
+//    error("Incorrect dists %f shifts %f %f %f space size %f", dist, shift[0], shift[1], shift[2], e->s->dim[0]);
+//  }
+//          + pow(ci->loc[2] - cj->loc[2], 2));
+  shift_tmp.x = shift[0];
+  shift_tmp.y = shift[1];
+  shift_tmp.z = shift[2];
 //  shift_tmp.x =
   /* Find first parts in task for ci and cj. Packed_tmp is index for cell i.
    * packed_tmp+1 is index for cell j */
@@ -617,7 +635,7 @@ double runner_dopair1_pack_f4_d(struct runner *r, struct scheduler *s,
   pack_vars->ci_list[tasks_packed] = ci;
   pack_vars->cj_list[tasks_packed] = cj;
 
-  float3 shift_tmp = {x_tmp, y_tmp, z_tmp};
+  double3 shift_tmp = {x_tmp, y_tmp, z_tmp};
 
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
@@ -2052,7 +2070,7 @@ void runner_dopair1_unpack_f4(
 	if(pack_length_unpack != pack_vars->count_parts)
 		error("count unpacked %i != count_packed %i", pack_length_unpack, pack_vars->count_parts);
 
-	message("count unpacked %i count_packed %i", pack_length_unpack, pack_vars->count_parts);
+//	message("count unpacked %i count_packed %i", pack_length_unpack, pack_vars->count_parts);
 }
 void runner_dopair1_launch_f4_g_one_memcpy(
     struct runner *r, struct scheduler *s, struct pack_vars_pair *pack_vars,

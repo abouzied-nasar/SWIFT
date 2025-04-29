@@ -105,7 +105,7 @@ void runner_doself1_gpu_pack_neat_aos_f4_f(
 extern inline void pack_neat_pair_aos_f4(
     struct cell * c,
     struct part_aos_f4_send * parts_aos_buffer, int tid,
-    const int local_pack_position, const int count, const float3 shift,
+    const int local_pack_position, const int count, const double3 shift,
     const int2 cstarts) {
   /*Data to be copied to GPU*/
   for (int i = 0; i < count; i++) {
@@ -666,12 +666,12 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4(
     struct runner *r, struct cell * ci, struct cell * cj,
     struct part_aos_f4_send * parts_aos_buffer, int timer,
     int *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
-    const int count_cj, float3 shift_tmp) {
+    const int count_cj, double3 shift_tmp) {
 
   TIMER_TIC;
 
   /* Anything to do here? */
-  if (ci->hydro.count == 0) return;
+  if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
 
   int local_pack_position = (*pack_length);
 
@@ -684,9 +684,25 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4(
     error();
   }
 #endif
-
+  /* Get the relative distance between the pairs, wrapping. */
+  double shift[3] = {0.0, 0.0, 0.0};
+  for (int k = 0; k < 3; k++) {
+    if (cj->loc[k] - ci->loc[k] < -r->e->s->dim[k] / 2){
+//      message("SMALLER dist %f space size %f", cj->loc[k] - ci->loc[k], -e->s->dim[k] / 2);
+      shift[k] = r->e->s->dim[k];
+      error("shift%i %f", k, shift[k]);
+    }
+    else if (cj->loc[k] - ci->loc[k] > r->e->s->dim[k] / 2){
+//      message("GREATER dist %f space size %f", cj->loc[k] - ci->loc[k], e->s->dim[k] / 2);
+      shift[k] = -r->e->s->dim[k];
+      error("shift%i %f", k, shift[k]);
+    }
+  }
+  shift_tmp.x = shift[0];
+  shift_tmp.y = shift[1];
+  shift_tmp.z = shift[2];
   /* Pack the particle data into CPU-side buffers*/
-  const float3 shift_i = {shift_tmp.x + cj->loc[0], shift_tmp.y + cj->loc[1],
+  const double3 shift_i = {shift_tmp.x + cj->loc[0], shift_tmp.y + cj->loc[1],
                           shift_tmp.z + cj->loc[2]};
   const int lpp1 = local_pack_position;
 
@@ -700,7 +716,7 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4(
 
   local_pack_position += count_ci;
   /* Pack the particle data into CPU-side buffers*/
-  const float3 shift_j = {cj->loc[0], cj->loc[1], cj->loc[2]};
+  const double3 shift_j = {cj->loc[0], cj->loc[1], cj->loc[2]};
   const int lpp2 = local_pack_position;
 
   pack_neat_pair_aos_f4(cj, parts_aos_buffer, tid, lpp2, count_cj, shift_j,
