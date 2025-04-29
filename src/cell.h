@@ -1651,7 +1651,7 @@ __attribute__((always_inline)) INLINE void cell_assign_cell_index(
 __attribute__((always_inline)) static INLINE void cell_set_part_h_depth(
     struct part *p, const struct cell *leaf_cell) {
 
-  const float h = p->h;
+  const float h = part_get_h(p);
   const struct cell *c = leaf_cell;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -1660,14 +1660,14 @@ __attribute__((always_inline)) static INLINE void cell_set_part_h_depth(
 
   /* Case where h is much smaller than the leaf cell itself */
   if (h < c->h_min_allowed) {
-    p->depth_h = c->depth;
+    part_set_depth_h(p, c->depth);
     return;
   }
 
   /* Climb the tree to find the correct level */
   while (c != NULL) {
     if (h >= c->h_min_allowed && h < c->h_max_allowed) {
-      p->depth_h = c->depth;
+      part_set_depth_h(p, c->depth);
       return;
     }
     c = c->parent;
