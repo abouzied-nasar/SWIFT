@@ -346,8 +346,8 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
 	int leafs_found = *n_leafs_found;
 	int tt_packed = pack_vars->top_tasks_packed;
 	/*for all leafs to be sent add to cell list */
-	cells_left[leafs_found] = ci;
-	cells_right[leafs_found] = cj;
+//	cells_left[leafs_found] = ci;
+//	cells_right[leafs_found] = cj;
 	/*Add leaf cells to list for each top_level task*/
 	pack_vars->leaf_list[tt_packed].ci[leafs_found] = ci;
 	pack_vars->leaf_list[tt_packed].cj[leafs_found] = cj;
@@ -358,8 +358,6 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
 	if(ci != pack_vars->leaf_list[tt_packed].ci[leafs_found])
 		error("stop");
 	(*n_leafs_found)++;//= leafs_found + 1;
-	if(abs(shift[0]) > 0.0 || abs(shift[1]) > 0.0 || abs(shift[2]) > 0.0)
-	  error("Shifted");
 	if(*n_leafs_found >= n_expected_tasks)
 		error("Created %i more than expected leaf cells. depth %i", *n_leafs_found, depth);
 //	double dist = sqrt(pow(ci->loc[0] - cj->loc[0], 2) + pow(ci->loc[1] - cj->loc[1], 2)
@@ -381,62 +379,34 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
    * tp0 and tp1 only time packing and unpacking*/
   struct timespec t0, t1;  //
   clock_gettime(CLOCK_REALTIME, &t0);
-//  int tasks_packed = pack_vars->tasks_packed;
+
+  int tasks_packed = pack_vars->tasks_packed;
   int qid = r->qid;
-
-  double x_tmp = 0.0, y_tmp = 0.0, z_tmp = 0.0;
-//  struct cell *citmp, *cjtmp;
-//  citmp=ci;
-//  cjtmp=cj;
-
-//  const int sid = space_getsid_and_swap_cells(s, &ci, &cj, shift);
-//  if(citmp != ci) error("I'm flipped");
-  /*Get the shifts in case of periodics*/
-//  space_getsid_GPU(e->s, &ci, &cj, &x_tmp, &y_tmp, &z_tmp);
-
-  /*Get pointers to the list of tasks and cells packed*/
-//  pack_vars->task_list[tasks_packed] = t;
-  //This should not be used anymore
-//  pack_vars->ci_list[tasks_packed] = ci;
-//  pack_vars->cj_list[tasks_packed] = cj;
-
-
 
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
 
-  /*Assign an id for this task*/
-  const int tid =  0;//pack_vars->tasks_packed;
-  const int current_tt = 0;//pack_vars->top_tasks_packed - 1;
+  /*Get the id for the daughter task*/
+  const int tid =  pack_vars->tasks_packed;
+  /*Get the id for the parent task*/
+  const int current_tt = pack_vars->top_tasks_packed - 1;
+  /*How many tasks have we packed so far?*/
+  int npacked = pack_vars->leaf_list[current_tt].n_packed;
 
-  int npacked = 0;//pack_vars->leaf_list[current_tt].n_packed;
-  double3 shift_tmp;
-
-  /* Get the relative distance between the pairs, wrapping. */
+  /* Get the relative distance between the pairs, wrapping (For M. S.: what does we mean by wrapping??). */
   double shift[3] = {0.0, 0.0, 0.0};
   for (int k = 0; k < 3; k++) {
     if (cj->loc[k] - ci->loc[k] < -e->s->dim[k] / 2.0){
-//      message("SMALLER dist %f space size %f", cj->loc[k] - ci->loc[k], -e->s->dim[k] / 2);
       shift[k] = e->s->dim[k];
     }
     else if (cj->loc[k] - ci->loc[k] > e->s->dim[k] / 2.0){
-//      message("GREATER dist %f space size %f", cj->loc[k] - ci->loc[k], e->s->dim[k] / 2);
       shift[k] = -e->s->dim[k];
     }
   }
-//  double dist = sqrt(pow(ci->loc[0] - cj->loc[0], 2) + pow(ci->loc[1] - cj->loc[1], 2)
-//          + pow(ci->loc[2] - cj->loc[2], 2));
-//  if(dist > 0.5){
-//    message("Dists %f shifts %f %f %f space size %f", dist, shift[0], shift[1], shift[2], e->s->dim[0]);
-//    dist = sqrt(pow(ci->loc[0] - shift[0], 2) + pow(ci->loc[1] - shift[1], 2)
-//        + pow(ci->loc[2] - shift[2], 2));
-//    error("Incorrect dists %f shifts %f %f %f space size %f", dist, shift[0], shift[1], shift[2], e->s->dim[0]);
-//  }
-//          + pow(ci->loc[2] - cj->loc[2], 2));
-  shift_tmp.x = shift[0];
-  shift_tmp.y = shift[1];
-  shift_tmp.z = shift[2];
-//  shift_tmp.x =
+
+  /*Pass into packing as double3 (Attempt at making packing more efficient)*/
+  double3 shift_tmp = {shift[0], shift[1], shift[2]};
+
   /* Find first parts in task for ci and cj. Packed_tmp is index for cell i.
    * packed_tmp+1 is index for cell j */
   ////////////////////////
@@ -474,8 +444,7 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
 
     pack_vars->bundle_first_task_list[bid] = tid;
   }
-  /* Record that we have now done a packing (self) */
-  t->done = 1;
+  /* Record that we have now done a pair pack task & increment number of tasks to offload*/
   pack_vars->tasks_packed++;
   pack_vars->leaf_list[current_tt].n_offload++;
 
@@ -1773,28 +1742,26 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
   /* Identify the number of GPU bundles to run in ideal case*/
   int nBundles_temp = pack_vars->nBundles;
   /*How many tasks have we packed?*/
-  const int tasks_packed = 1;//pack_vars->tasks_packed;
+  const int tasks_packed = pack_vars->tasks_packed;
 
   /*How many tasks should be in a bundle?*/
   const int bundle_size = pack_vars->bundle_size;
 
   /* Special case for incomplete bundles (when having leftover tasks not enough
    * to fill a bundle) */
-//  if (pack_vars->launch_leftovers) {
-//    nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
-//    if (tasks_packed == 0)
-//      error("zero pair tasks packed but somehow got into GPU loop");
-//    //	  pack_vars->bundle_first_part[nBundles_temp] =
-//    // pack_vars->task_first_part[packed_tmp - 2];
-//    pack_vars->bundle_first_part[nBundles_temp] =
-//        fparti_fpartj_lparti_lpartj_dens[tasks_packed - 1].x;
-//    message("Incomplete buundle");
-//  }
+  if (pack_vars->launch_leftovers) {
+    nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+    if (tasks_packed == 0)
+      error("zero pair tasks packed but somehow got into GPU loop");
+    pack_vars->bundle_first_part[nBundles_temp] =
+        fparti_fpartj_lparti_lpartj_dens[tasks_packed - 1].x;
+    message("Incomplete buundle");
+  }
   /* Identify the last particle for each bundle of tasks */
   for (int bid = 0; bid < nBundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
-  /* special treatment for the last bundle */
+  /* special treatment for the case of 1 bundle */
   if (nBundles_temp > 1)
     pack_vars->bundle_last_part[nBundles_temp - 1] = pack_vars->count_parts;
   else
@@ -1875,6 +1842,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
                     &d_parts_recv[first_part_tmp_i],
                     bundle_n_parts * sizeof(struct part_aos_f4_recv),
                     cudaMemcpyDeviceToHost, stream[bid]);
+    //Issue event to be recorded by GPU after copy back to CPU
     cudaEventRecord(pair_end[bid], stream[bid]);
 
 #ifdef CUDA_DEBUG
@@ -1889,16 +1857,14 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
 #endif
   } /*End of looping over bundles to launch in streams*/
 
-  /* Make sure all the kernels and copies back are finished */
-  //	cudaDeviceSynchronize();
-
   /*Time end of GPU work*/
   clock_gettime(CLOCK_REALTIME, &t1);
   *gpu_time +=
       (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 
-  /* Now copy the data back from the CPU thread-local buffers to the cells */
-  /* Pack length counter for use in unpacking */
+  /* Issue synchronisation commands for all events recorded by GPU
+   * Should swap with one cuda Device Synchronise really if we decide to go this
+   * way with unpacking done separately */
 
   int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0;
@@ -1906,78 +1872,17 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
   for (int bid = 0; bid < nBundles_temp; bid++) {
     /*Time unpacking*/
     clock_gettime(CLOCK_REALTIME, &t0);
-
     //		cudaStreamSynchronize(stream[bid]);
     cudaEventSynchronize(pair_end[bid]);
 
     clock_gettime(CLOCK_REALTIME, &t1);
     *gpu_time +=
         (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-
-    ////////////
-
-    /*Time unpacking*/
-    //		clock_gettime(CLOCK_REALTIME, &tp0);
-
-//    for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
-//
-//      if (tid < tasks_packed) {
-//        clock_gettime(CLOCK_REALTIME, &tp0);
-//        /*grab cell and task pointers*/
-//        struct cell *cii = pack_vars->ci_list[tid];
-//        struct cell *cjj = pack_vars->cj_list[tid];
-//        struct task *tii = pack_vars->task_list[tid];
-//
-////        if(!pack_vars->task_locked){
-////          /*Let's lock ci*/
-////          while (cell_locktree(cii)) {
-////            ; /* spin until we acquire the lock */
-////          }
-////          /*Let's lock cj*/
-////          while (cell_locktree(cjj)) {
-////            ; /* spin until we acquire the lock */
-////          }
-////          pack_vars->task_locked = 1;
-////        }
-//
-//        const ticks tic = getticks();
-//
-//        /* Do the copy */
-//        runner_do_ci_cj_gpu_unpack_neat_aos_f4(
-//            r, cii, cjj, parts_recv, 0, &pack_length_unpack, tid,
-//            2 * pack_vars->count_max_parts, e);
-//
-//        const ticks toc = getticks();
-//
-//        total_cpu_unpack_ticks += toc - tic;
-//
-//        /* Record things for debugging */
-//        cii->gpu_done_pair++;
-//        cjj->gpu_done_pair++;
-//
-////        if(pack_vars->task_locked){
-////          /* Release the locks */
-////          cell_unlocktree(cii);
-////          /* Release the locks */
-////          cell_unlocktree(cjj);
-//          pack_vars->task_locked = 0;
-////        }
-//
-//        /*Time end of unpacking*/
-//        clock_gettime(CLOCK_REALTIME, &tp1);
-//        *unpack_time += (tp1.tv_sec - tp0.tv_sec) +
-//                        (tp1.tv_nsec - tp0.tv_nsec) / 1000000000.0;
-//        /*Signal sleeping runners*/
-//        // MATTHIEU signal_sleeping_runners(s, tii);
-//
-//        tii->gpu_done = 1;
-//      }
-//    }
   }
 
   /* Zero counters for the next pack operations */
-//  pack_vars->count_parts = 0;
-//  pack_vars->tasks_packed = 0;
+  pack_vars->count_parts = 0;
+  pack_vars->tasks_packed = 0;
 
   //	/*Time end of unpacking*/
   //	clock_gettime(CLOCK_REALTIME, &t1);
@@ -2005,48 +1910,17 @@ void runner_dopair1_unpack_f4(
   int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0;
   /*Loop over top level tasks*/
-//  for (topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
-  for (topid = 0; topid < 1; topid++) {
+  for (topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
 	const ticks tic = getticks();
 	/* Loop through each daughter task */
-//	for(int tid = npacked - pack_vars->leaf_list[topid].n_offload; tid < npacked; tid++){
-	for(int tid = npacked - 1; tid < npacked; tid++){
-	  /*Get pointers to the leaf cells. SEEMS I'm NOT GETTING A CORRECT POINTER
-	   *but likely due to incorrect book keeping*/
+	for(int tid = npacked - pack_vars->leaf_list[topid].n_offload; tid < npacked; tid++){
+	  /*Get pointers to the leaf cells*/
 	  struct cell * cii_l = pack_vars->leaf_list[topid].ci[tid];
 	  struct cell * cjj_l = pack_vars->leaf_list[topid].cj[tid];
 	  if(cii_l->loc[0] != pack_vars->leaf_list[topid].ci[tid]->loc[0])
 		  error("stop");
-//	  error("Stopping");
-	  /* Get the relative distance between the pairs, wrapping. */
-//	  double shift[3] = {0.0, 0.0, 0.0};
-//	  for (int k = 0; k < 3; k++) {
-//	    if (cjj_l->loc[k] - cii_l->loc[k] < -e->s->dim[k] / 2)
-//	      shift[k] = e->s->dim[k];
-//	    else if (cjj_l->loc[k] - cii_l->loc[k] > e->s->dim[k] / 2)
-//	      shift[k] = -e->s->dim[k];
-//	  }
-//	  for(int i = pack_length_unpack; i < pack_length_unpack + cii_l->hydro.count; i++){// + cjj_l->hydro.count){
-//		  int j = i - pack_length_unpack;
-//		  if((parts_send[i].x_p_h.x != cii_l->hydro.parts[j].x[0] - (shift[0] + cii_l->loc[0]))&&
-//			 (parts_send[i].x_p_h.x != cjj_l->hydro.parts[j].x[0])){
-//			  message("TTid % i tid %i xi %f yi %f zi %f\n                                                    x %f y  %f z  %f", topid, tid,
-//					  parts_send[i].x_p_h.x,
-//					  parts_send[i].x_p_h.y,
-//					  parts_send[i].x_p_h.z,
-//					  cii_l->hydro.parts[j].x[0] - (pack_vars->leaf_list[topid].shiftx[tid] + cii_l->loc[0]),
-//					  cii_l->hydro.parts[j].x[1] - (pack_vars->leaf_list[topid].shifty[tid] + cii_l->loc[1]),
-//					  cii_l->hydro.parts[j].x[2] - (pack_vars->leaf_list[topid].shiftz[tid] + cii_l->loc[2]));
-////			  error("parts not the same");
-//		  }
-//	  }
 	  if(cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
 		  error("Unpacking empty cells");
-//	  message("loc %f %f %f topid %i noffloaded %i tid %i nleaves %i id %i", pack_vars->leaf_list[topid].ci[tid]->loc[0]
-//                            , pack_vars->leaf_list[topid].ci[tid]->loc[1]
-//	                        , pack_vars->leaf_list[topid].ci[tid]->loc[2]
-//                            , topid, npacked, tid, pack_vars->leaf_list[topid].n_offload, r->cpuid);
-//	  if(*cii_l == NULL || *cjj_l == NULL)error("stop");
 	  runner_do_ci_cj_gpu_unpack_neat_aos_f4(
 			r, cells_left[tid], cells_right[tid],
 			parts_recv, 0, &pack_length_unpack, tid,
@@ -2055,22 +1929,20 @@ void runner_dopair1_unpack_f4(
 
 	const ticks toc = getticks();
 	total_cpu_unpack_ticks += toc - tic;
-//	pack_vars->count_parts = 0;
+
 	/*For some reason the code fails if we get a leaf pair task
 	 *this if->continue statement stops the code from trying to unlock same cells twice*/
-//	if(topid == pack_vars->top_tasks_packed -1 && npacked != n_leaves_found){
-//		continue;
-//	}
-//    enqueue_dependencies(s, pack_vars->top_task_list[topid]);
-//    pthread_mutex_lock(&s->sleep_mutex);
-//    atomic_dec(&s->waiting);
-//    pthread_cond_broadcast(&s->sleep_cond);
-//    pthread_mutex_unlock(&s->sleep_mutex);
+	if(topid == pack_vars->top_tasks_packed -1 && npacked != n_leaves_found){
+		continue;
+	}
+    enqueue_dependencies(s, pack_vars->top_task_list[topid]);
+    pthread_mutex_lock(&s->sleep_mutex);
+    atomic_dec(&s->waiting);
+    pthread_cond_broadcast(&s->sleep_cond);
+    pthread_mutex_unlock(&s->sleep_mutex);
   }
 	if(pack_length_unpack != pack_vars->count_parts)
 		error("count unpacked %i != count_packed %i", pack_length_unpack, pack_vars->count_parts);
-
-//	message("count unpacked %i count_packed %i", pack_length_unpack, pack_vars->count_parts);
 }
 void runner_dopair1_launch_f4_g_one_memcpy(
     struct runner *r, struct scheduler *s, struct pack_vars_pair *pack_vars,

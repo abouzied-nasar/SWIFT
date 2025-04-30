@@ -2151,6 +2151,8 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
 
       d_kernel_deval(ui, &wi, &wi_dx);
       /*Add to sums of rho, rho_dh, wcount and wcount_dh*/
+//      if(wi == 0)
+//    	  printf("r %f h %f\n", r, sqrt(hig2));
       res_rho.x += mj * wi;
       res_rho.y -= mj * (hydro_dimension * wi + ui * wi_dx);
       res_rho.z += wi;
@@ -2171,9 +2173,11 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
       res_rot.y += faci * curlvry;
       res_rot.z += faci * curlvrz;
       res_rot.w -= faci * dvdr;
+//      if(mj < 0.0000001)
+//      	printf("zero mass");
     }
-//    else if(r2 > 0.1)
-//      printf("Distance is %f\n", sqrt(r2));
+    else if(r2 > 0.5)
+      printf("Distance is %f\n", sqrt(r2));
   } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
   //  if (pid >= ci_start && pid < ci_end) {
 

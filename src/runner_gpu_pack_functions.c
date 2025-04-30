@@ -316,7 +316,7 @@ void runner_doself1_gpu_unpack_neat_aos_f4(
 #endif
 
   /* Copy particle data from CPU buffers to cells */
-  unpack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count, e);
+//  unpack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count, e);
   // Increment pack length accordingly
   (*pack_length) += count;
 }
@@ -673,6 +673,7 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4(
   /* Anything to do here? */
   if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
 
+  /*Get how many particles we've packed until now*/
   int local_pack_position = (*pack_length);
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -684,39 +685,29 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4(
     error();
   }
 #endif
-  /* Get the relative distance between the pairs, wrapping. */
-  double shift[3] = {0.0, 0.0, 0.0};
-  for (int k = 0; k < 3; k++) {
-    if (cj->loc[k] - ci->loc[k] < -r->e->s->dim[k] / 2){
-//      message("SMALLER dist %f space size %f", cj->loc[k] - ci->loc[k], -e->s->dim[k] / 2);
-      shift[k] = r->e->s->dim[k];
-      error("shift%i %f", k, shift[k]);
-    }
-    else if (cj->loc[k] - ci->loc[k] > r->e->s->dim[k] / 2){
-//      message("GREATER dist %f space size %f", cj->loc[k] - ci->loc[k], e->s->dim[k] / 2);
-      shift[k] = -r->e->s->dim[k];
-      error("shift%i %f", k, shift[k]);
-    }
-  }
-  shift_tmp.x = shift[0];
-  shift_tmp.y = shift[1];
-  shift_tmp.z = shift[2];
-  /* Pack the particle data into CPU-side buffers*/
+  /* Pack the particle data into CPU-side buffers. Start by assigning the shifts (if positions shifts are required)*/
   const double3 shift_i = {shift_tmp.x + cj->loc[0], shift_tmp.y + cj->loc[1],
                           shift_tmp.z + cj->loc[2]};
+
   const int lpp1 = local_pack_position;
 
+  /*Get first and last particles of cell i*/
   const int2 cis_cie = {local_pack_position, local_pack_position + count_ci};
 
+  /*Get first and last particles of cell j*/
   const int2 cjs_cje = {local_pack_position + count_ci,
                         local_pack_position + count_ci + count_cj};
 
+  /*Pack cell i*/
   pack_neat_pair_aos_f4(ci, parts_aos_buffer, tid, lpp1, count_ci, shift_i,
                         cjs_cje);
 
+  /*Update the particles packed counter*/
   local_pack_position += count_ci;
-  /* Pack the particle data into CPU-side buffers*/
+
+  /* Do the same for cj*/
   const double3 shift_j = {cj->loc[0], cj->loc[1], cj->loc[2]};
+
   const int lpp2 = local_pack_position;
 
   pack_neat_pair_aos_f4(cj, parts_aos_buffer, tid, lpp2, count_cj, shift_j,
