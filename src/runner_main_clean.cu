@@ -1048,6 +1048,7 @@ void *runner_main2(void *data) {
             pack_vars_pair_dens->leaf_list[top_tasks_packed].n_leaves = 0;
             pack_vars_pair_dens->leaf_list[top_tasks_packed].n_offload = 0;
             pack_vars_pair_dens->leaf_list[top_tasks_packed].n_packed = 0;
+
             struct cell * cells_left[128];
             struct cell * cells_right[128];
 
@@ -1095,8 +1096,8 @@ void *runner_main2(void *data) {
               // count from zero for the packed arrays as the daughters we previously worked on are no longer necessary.
               // Thus, the counter for cii and cjj should remain npacked but counter for packing/unpacking arrays
               // should be noffload which is set to zero after launch. count_parts should also be zero after launch
-              struct cell * cii = pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[npacked];
-              struct cell * cjj = pack_vars_pair_dens->leaf_list[top_tasks_packed].cj[npacked];
+              struct cell * cii = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[npacked];
+              struct cell * cjj = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj[npacked];
 
               packing_time_pair += runner_dopair1_pack_f4(
                   r, sched, pack_vars_pair_dens, cii, cjj, t,
@@ -1122,7 +1123,7 @@ void *runner_main2(void *data) {
                       d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
                       &packing_time_pair, &time_for_density_gpu_pair,
                       &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-                      pair_end, npacked, n_leaves_found, cells_left, cells_right);
+                      pair_end, npacked, n_leaves_found);
 
                 if(npacked < n_leaves_found){
                 	//If we launch but still have daughters left re-set this task to be the first in the list
@@ -1182,17 +1183,13 @@ void *runner_main2(void *data) {
             //A. Nasar: Launch-leftovers counter re-set to zero and cells unlocked
             pack_vars_pair_dens->launch_leftovers = 0;
             pack_vars_pair_dens->launch = 0;
-//            pack_vars_pair_dens->leaf_list[0].n_offload = 0;
-//      	    pack_vars_pair_dens->tasks_packed = 0;
-//      	    pack_vars_pair_dens->top_tasks_packed = 0;
-            pack_vars_pair_dens->count_parts = 0;
             cell_unlocktree(ci);
             cell_unlocktree(cj);
-            enqueue_dependencies(sched, t);
-            pthread_mutex_lock(&sched->sleep_mutex);
-            atomic_dec(&sched->waiting);
-            pthread_cond_broadcast(&sched->sleep_cond);
-            pthread_mutex_unlock(&sched->sleep_mutex);
+//            enqueue_dependencies(sched, t);
+//            pthread_mutex_lock(&sched->sleep_mutex);
+//            atomic_dec(&sched->waiting);
+//            pthread_cond_broadcast(&sched->sleep_cond);
+//            pthread_mutex_unlock(&sched->sleep_mutex);
             /////////////////////W.I.P!!!////////////////////////////////////////////////////////
 #endif  //RECURSE
 #endif  // GPUOFFLOAD_DENSITY
