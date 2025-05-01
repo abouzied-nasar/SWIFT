@@ -575,7 +575,7 @@ double runner_dopair1_pack_f4_d(struct runner *r, struct scheduler *s,
                                 struct pack_vars_pair *restrict pack_vars,
                                 struct cell *ci, struct cell *cj,
                                 struct task *t,
-                                struct part_aos_f4_d_send *parts_send,
+                                struct part_aos_f4_send *parts_send,
                                 struct engine *e,
                                 int4 *fparti_fpartj_lparti_lpartj) {
 
