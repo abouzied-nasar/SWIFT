@@ -1460,7 +1460,7 @@ void *runner_main2(void *data) {
           runner_do_init_grav(r, ci, 1);
           break;
         case task_type_ghost:
-//          runner_do_ghost(r, ci, 1);
+          runner_do_ghost(r, ci, 1);
           break;
 #ifdef EXTRA_HYDRO_LOOP
         case task_type_extra_ghost:
@@ -1721,32 +1721,32 @@ void *runner_main2(void *data) {
     //    message("Worked on %i supers w more than 100 parts", g100);
     // Stuff for writing debug data to file for validation
     //        if (step % 10 == 0 || step == 1) {
-          if(r->cpuid == 0 && engine_rank == 0){
-          fprintf(fgpu_steps, "x, y, z, "
-        		  "rho, rhodh, v_sig, lap_u, a_visc_max, ax, ay, az\n");
-          for (int tid = 0; tid < space->nr_local_cells; tid++) { /* This should indeed be tasks_done_gpu as they are
-               the only
-    //                     tasks which have been done*/
-            struct cell *ctemp = &(space->cells_top[tid]);
-            for (int i = 0; i < ctemp->hydro.count; i++) {
-              fprintf(fgpu_steps, "%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-                      ctemp->hydro.parts[i].x[0],
-                      ctemp->hydro.parts[i].x[1],
-                      ctemp->hydro.parts[i].x[2], ctemp->hydro.parts[i].rho,
-                      ctemp->hydro.parts[i].density.rho_dh,
-                      ctemp->hydro.parts[i].viscosity.v_sig,
-                      ctemp->hydro.parts[i].diffusion.laplace_u,
-                      ctemp->hydro.parts[i].force.alpha_visc_max_ngb,
-                      ctemp->hydro.parts[i].a_hydro[0],
-    				  ctemp->hydro.parts[i].a_hydro[1],
-    				  ctemp->hydro.parts[i].a_hydro[2]);
-    //          message("wcount %f density %f",
-    // ctemp->hydro.parts[i].density.wcount, ctemp->hydro.parts[i].rho); /
-    // message("wcount is %f\n", ctemp->hydro.parts[i].density.wcount);
-            }
-          }
-          fflush(fgpu_steps);
-          }
+//          if(r->cpuid == 0 && engine_rank == 0){
+//          fprintf(fgpu_steps, "x, y, z, "
+//        		  "rho, rhodh, v_sig, lap_u, a_visc_max, ax, ay, az\n");
+//          for (int tid = 0; tid < space->nr_local_cells; tid++) { /* This should indeed be tasks_done_gpu as they are
+//               the only
+//    //                     tasks which have been done*/
+//            struct cell *ctemp = &(space->cells_top[tid]);
+//            for (int i = 0; i < ctemp->hydro.count; i++) {
+//              fprintf(fgpu_steps, "%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f\n",
+//                      ctemp->hydro.parts[i].x[0],
+//                      ctemp->hydro.parts[i].x[1],
+//                      ctemp->hydro.parts[i].x[2], ctemp->hydro.parts[i].rho,
+//                      ctemp->hydro.parts[i].density.rho_dh,
+//                      ctemp->hydro.parts[i].viscosity.v_sig,
+//                      ctemp->hydro.parts[i].diffusion.laplace_u,
+//                      ctemp->hydro.parts[i].force.alpha_visc_max_ngb,
+//                      ctemp->hydro.parts[i].a_hydro[0],
+//    				  ctemp->hydro.parts[i].a_hydro[1],
+//    				  ctemp->hydro.parts[i].a_hydro[2]);
+//    //          message("wcount %f density %f",
+//    // ctemp->hydro.parts[i].density.wcount, ctemp->hydro.parts[i].rho); /
+//    // message("wcount is %f\n", ctemp->hydro.parts[i].density.wcount);
+//            }
+//          }
+//          fflush(fgpu_steps);
+//          }
     //  }
     /*Output compute times to separate files. cat later into one file*/
 //    if (step % 11 == 0 || step == 1) {
