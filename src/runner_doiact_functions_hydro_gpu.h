@@ -448,7 +448,6 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   pack_vars->tasks_packed++;
   pack_vars->leaf_list[current_tt].n_offload++;
 
-
   /*Add time to packing_time. Timer for end of GPU work after the if(launch ||
    * launch_leftovers statement)*/
   clock_gettime(CLOCK_REALTIME, &t1);
@@ -1881,8 +1880,8 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
   }
 
   /* Zero counters for the next pack operations */
-  pack_vars->count_parts = 0;
-  pack_vars->tasks_packed = 0;
+//  pack_vars->count_parts = 0;
+//  pack_vars->tasks_packed = 0;
 
   //	/*Time end of unpacking*/
   //	clock_gettime(CLOCK_REALTIME, &t1);
@@ -1901,7 +1900,7 @@ void runner_dopair1_unpack_f4(
     struct part_aos_f4_recv *d_parts_recv, cudaStream_t *stream, float d_a,
     float d_H, struct engine *e, double *packing_time, double *gpu_time,
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
-    cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell **cells_left, struct cell **cells_right){
+    cudaEvent_t *pair_end, int npacked, int n_leaves_found){
 
   int topid;
   /////////////////////////////////
@@ -1917,12 +1916,13 @@ void runner_dopair1_unpack_f4(
 	  /*Get pointers to the leaf cells*/
 	  struct cell * cii_l = pack_vars->leaf_list[topid].ci[tid];
 	  struct cell * cjj_l = pack_vars->leaf_list[topid].cj[tid];
+	  message("unpacking % i % i %i", cii_l->hydro.count, cjj_l->hydro.count, pack_vars->count_parts);
 	  if(cii_l->loc[0] != pack_vars->leaf_list[topid].ci[tid]->loc[0])
 		  error("stop");
 	  if(cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
 		  error("Unpacking empty cells");
 	  runner_do_ci_cj_gpu_unpack_neat_aos_f4(
-			r, cells_left[tid], cells_right[tid],
+			r, cii_l, cjj_l,
 			parts_recv, 0, &pack_length_unpack, tid,
 			2 * pack_vars->count_max_parts, e);
 	}
