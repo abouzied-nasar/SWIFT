@@ -368,7 +368,6 @@ enum cell_flags {
 struct cell {
 
   /*Marks a cell for GPU execution A. Nasar */
-  bool is_gpu_cell;
 
   int unpacker_cell;
 
