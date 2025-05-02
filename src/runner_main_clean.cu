@@ -1108,6 +1108,7 @@ void *runner_main2(void *data) {
             	  pack_vars_pair_dens->launch = 1;
               if(pack_vars_pair_dens->launch){
             	//Here we only launch the tasks. No unpacking! This is done in next function ;)
+            	message("Launch");
                 runner_dopair1_launch_f4_one_memcpy_no_unpack(
                       r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
                       parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
