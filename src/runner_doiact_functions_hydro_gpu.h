@@ -313,7 +313,7 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
                               struct part_aos_f4_send *parts_send,
                               struct engine *e,
                               int4 *fparti_fpartj_lparti_lpartj, int *n_leafs_found,
-							  int depth, int n_expected_tasks, struct cell **cells_left, struct cell **cells_right) {
+							  int depth, int n_expected_tasks) {
 
 	/* Should we even bother? A. Nasar: For GPU code we need to be clever about this */
   if (!CELL_IS_ACTIVE(ci, e) && !CELL_IS_ACTIVE(cj, e)) return;
@@ -335,7 +335,7 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
 	  /*We probably want to record */
 	  if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL){
 		runner_recurse_gpu(r, s, pack_vars, ci->progeny[pid], cj->progeny[pjd], t, parts_send, e, fparti_fpartj_lparti_lpartj,
-				n_leafs_found, depth + 1, n_expected_tasks, cells_left, cells_right);
+				n_leafs_found, depth + 1, n_expected_tasks);
 //	        message("recursing to depth %i", depth + 1);
 	  }
 	}
@@ -1754,7 +1754,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
       error("zero pair tasks packed but somehow got into GPU loop");
     pack_vars->bundle_first_part[nBundles_temp] =
         fparti_fpartj_lparti_lpartj_dens[tasks_packed - 1].x;
-    message("Incomplete buundle");
+//    message("Incomplete buundle");
   }
   /* Identify the last particle for each bundle of tasks */
   for (int bid = 0; bid < nBundles_temp - 1; bid++) {
@@ -1899,7 +1899,7 @@ void runner_dopair1_unpack_f4(
     struct part_aos_f4_recv *parts_recv, struct part_aos_f4_send *d_parts_send,
     struct part_aos_f4_recv *d_parts_recv, cudaStream_t *stream, float d_a,
     float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
+	double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
     cudaEvent_t *pair_end, int npacked, int n_leaves_found){
 
   int topid;

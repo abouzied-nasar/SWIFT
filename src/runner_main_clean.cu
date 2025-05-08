@@ -1053,8 +1053,7 @@ void *runner_main2(void *data) {
             struct cell * cells_right[128];
 
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
-                      parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks,
-					  cells_left, cells_right);
+                      parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks);
 
             message("Found %i daughter tasks", n_leaves_found);
 
