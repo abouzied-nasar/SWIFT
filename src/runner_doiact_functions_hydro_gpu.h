@@ -1751,6 +1751,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
     nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+    message("tasks packed %i nbundles % i", tasks_packed, nBundles_temp);
     if (tasks_packed == 0)
       error("zero pair tasks packed but somehow got into GPU loop");
     pack_vars->bundle_first_part[nBundles_temp] =
@@ -1816,7 +1817,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
     /* LAUNCH THE GPU KERNELS for ci & cj */
     // Setup 2d grid of GPU thread blocks for ci (number of tasks is
     // the y dimension and max_parts is the x dimension
-    int numBlocks_y = 0;  // tasks_left;
+    int numBlocks_y = 0;  // tasks_left; //Changed this to 1D grid of blocks so this is no longer necessary
     int numBlocks_x = (bundle_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int bundle_part_0 = pack_vars->bundle_first_part[bid];
     /* Launch the kernel for ci using data for ci and cj */
