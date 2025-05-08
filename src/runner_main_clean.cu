@@ -1097,6 +1097,7 @@ void *runner_main2(void *data) {
               // should be noffload which is set to zero after launch. count_parts should also be zero after launch
               struct cell * cii = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[npacked];
               struct cell * cjj = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj[npacked];
+              message("Packing ttid %i t_packed %i npacked %i", top_tasks_packed - 1, pack_vars_pair_dens->tasks_packed, npacked);
 
               packing_time_pair += runner_dopair1_pack_f4(
                   r, sched, pack_vars_pair_dens, cii, cjj, t,
@@ -1128,6 +1129,15 @@ void *runner_main2(void *data) {
                 if(npacked < n_leaves_found){
                 	//If we launch but still have daughters left re-set this task to be the first in the list
                 	//so that we can continue packing correctly
+
+              	  pack_vars_pair_dens->leaf_list[0] = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1];
+              	  int noffload = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].n_offload;
+              	  for(int cc = 0; cc < npacked; cc++){
+                		pack_vars_pair_dens->leaf_list[0]->ci[cc] =
+                				pack_vars_pair_dens->leaf_list[0]->ci[cc + noffload];
+                		pack_vars_pair_dens->leaf_list[0]->cj[cc] =
+                				pack_vars_pair_dens->leaf_list[0]->cj[cc + noffload];
+              	  }
             	  pack_vars_pair_dens->top_tasks_packed = 1;
             	  pack_vars_pair_dens->top_task_list[0] = t;
                 }
