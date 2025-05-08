@@ -442,6 +442,7 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
     pack_vars->bundle_first_part[bid] =
         fparti_fpartj_lparti_lpartj[tid].x;
 
+    //A. Nasar: This is possibly a problem!
     pack_vars->bundle_first_task_list[bid] = tid;
   }
   /* Record that we have now done a pair pack task & increment number of tasks to offload*/
