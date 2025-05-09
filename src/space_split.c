@@ -74,14 +74,19 @@ void space_split_recursive(struct space *s, struct cell *c,
   float black_holes_h_max_active = 0.f;
   float sinks_h_max = 0.f;
   float sinks_h_max_active = 0.f;
-  integertime_t ti_hydro_end_min = max_nr_timesteps, ti_hydro_beg_max = 0;
-  integertime_t ti_rt_end_min = max_nr_timesteps, ti_rt_beg_max = 0;
+  integertime_t ti_hydro_end_min = max_nr_timesteps;
+  integertime_t ti_hydro_beg_max = 0;
+  integertime_t ti_rt_end_min = max_nr_timesteps;
+  integertime_t ti_rt_beg_max = 0;
   integertime_t ti_rt_min_step_size = max_nr_timesteps;
-  integertime_t ti_gravity_end_min = max_nr_timesteps, ti_gravity_beg_max = 0;
-  integertime_t ti_stars_end_min = max_nr_timesteps, ti_stars_beg_max = 0;
-  integertime_t ti_sinks_end_min = max_nr_timesteps, ti_sinks_beg_max = 0;
-  integertime_t ti_black_holes_end_min = max_nr_timesteps,
-                ti_black_holes_beg_max = 0;
+  integertime_t ti_gravity_end_min = max_nr_timesteps;
+  integertime_t ti_gravity_beg_max = 0;
+  integertime_t ti_stars_end_min = max_nr_timesteps;
+  integertime_t ti_stars_beg_max = 0;
+  integertime_t ti_sinks_end_min = max_nr_timesteps;
+  integertime_t ti_sinks_beg_max = 0;
+  integertime_t ti_black_holes_end_min = max_nr_timesteps;
+  integertime_t ti_black_holes_beg_max = 0;
   struct part *parts = c->hydro.parts;
   struct gpart *gparts = c->grav.parts;
   struct spart *sparts = c->stars.parts;
@@ -106,14 +111,15 @@ void space_split_recursive(struct space *s, struct cell *c,
         error("Failed to allocate temporary indices.");
       for (int k = 0; k < count; k++) {
 #ifdef SWIFT_DEBUG_CHECKS
-        if (parts[k].time_bin == time_bin_inhibited)
+        if (part_get_time_bin(&parts[k]) == time_bin_inhibited)
           error("Inhibited particle present in space_split()");
-        if (parts[k].time_bin == time_bin_not_created)
+        if (part_get_time_bin(&parts[k]) == time_bin_not_created)
           error("Extra particle present in space_split()");
 #endif
-        buff[k].x[0] = parts[k].x[0];
-        buff[k].x[1] = parts[k].x[1];
-        buff[k].x[2] = parts[k].x[2];
+        const double* px = part_get_const_x(&parts[k]);
+        buff[k].x[0] = px[0];
+        buff[k].x[1] = px[1];
+        buff[k].x[2] = px[2];
       }
     }
     if (gcount > 0) {
@@ -202,7 +208,7 @@ void space_split_recursive(struct space *s, struct cell *c,
 
     /* Create the cell's progeny. */
     space_getcells(s, 8, c->progeny, tpid);
-    for (int k = 0; k < 8; k++) {
+    for (size_t k = 0; k < 8; k++) {
       struct cell *cp = c->progeny[k];
       cp->hydro.count = 0;
       cp->grav.count = 0;
@@ -469,15 +475,16 @@ void space_split_recursive(struct space *s, struct cell *c,
     /* parts: Get dt_min/dt_max and h_max. */
     for (int k = 0; k < count; k++) {
 #ifdef SWIFT_DEBUG_CHECKS
-      if (parts[k].time_bin == time_bin_not_created)
+      if (part_get_time_bin(&parts[k]) == time_bin_not_created)
         error("Extra particle present in space_split()");
-      if (parts[k].time_bin == time_bin_inhibited)
+      if (part_get_time_bin(&parts[k]) == time_bin_inhibited)
         error("Inhibited particle present in space_split()");
 #endif
 
       /* When does this particle's time-step start and end? */
-      const timebin_t time_bin = parts[k].time_bin;
-      const timebin_t time_bin_rt = parts[k].rt_time_data.time_bin;
+      const timebin_t time_bin = part_get_time_bin(&parts[k]);
+      const struct rt_timestepping_data* rt_time_data = part_get_const_rt_time_data(&parts[k]);
+      const timebin_t time_bin_rt = rt_time_data->time_bin;
       const integertime_t ti_end = get_integer_time_end(ti_current, time_bin);
       const integertime_t ti_beg = get_integer_time_begin(ti_current, time_bin);
 
@@ -500,10 +507,10 @@ void space_split_recursive(struct space *s, struct cell *c,
         ti_rt_min_step_size = min(ti_rt_min_step_size, ti_rt_step);
       }
 
-      h_max = max(h_max, parts[k].h);
+      h_max = max(h_max, part_get_h(&parts[k]));
 
       if (part_is_active(&parts[k], e))
-        h_max_active = max(h_max_active, parts[k].h);
+        h_max_active = max(h_max_active, part_get_h(&parts[k]));
 
       cell_set_part_h_depth(&parts[k], c);
 
