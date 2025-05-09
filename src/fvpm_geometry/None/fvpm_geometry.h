@@ -8,6 +8,11 @@
  * for gradients. Empty definitions for when FVPM are unused.
  */
 
+#include "swift_intrinsics.h"
+
+struct part;
+
+
 /**
  * @brief Reset the variables used to store the centroid; used for the velocity
  * correction.
