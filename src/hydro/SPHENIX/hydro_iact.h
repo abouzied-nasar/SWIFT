@@ -30,6 +30,7 @@
 #include "adiabatic_index.h"
 #include "fvpm_geometry.h"
 #include "hydro_parameters.h"
+#include "hydro_part.h"
 #include "minmax.h"
 #include "signal_velocity.h"
 
@@ -56,8 +57,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   const float r = sqrtf(r2);
 
   /* Get the masses. */
-  const float mi = pi->mass;
-  const float mj = pj->mass;
+  const float mi = part_get_mass(pi);
+  const float mj = part_get_mass(pj);
 
   /* Compute density of pi. */
   const float hi_inv = 1.f / hi;
@@ -65,10 +66,18 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
 
   kernel_deval(ui, &wi, &wi_dx);
 
-  pi->rho += mj * wi;
-  pi->density.rho_dh -= mj * (hydro_dimension * wi + ui * wi_dx);
-  pi->density.wcount += wi;
-  pi->density.wcount_dh -= (hydro_dimension * wi + ui * wi_dx);
+  const float rho_i = part_get_rho(pi);
+  part_set_rho(pi, rho_i + mj * wi);
+
+  const float rho_dh_i = part_get_rho_dh(pi);
+  part_set_rho_dh(pi, rho_dh_i - mj * (hydro_dimension * wi + ui * wi_dx));
+
+  const float wcount_i = part_get_wcount(pi);
+  part_set_wcount(pi, wcount_i + wi);
+
+  const float wcount_dh_i = part_get_wcount_dh(pi);
+  part_set_wcount_dh(pi, wcount_dh_i - (hydro_dimension * wi + ui * wi_dx));
+
   adaptive_softening_add_correction_term(pi, ui, hi_inv, mj);
 
   /* Collect data for FVPM matrix construction */
@@ -80,10 +89,19 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   const float uj = r * hj_inv;
   kernel_deval(uj, &wj, &wj_dx);
 
-  pj->rho += mi * wj;
-  pj->density.rho_dh -= mi * (hydro_dimension * wj + uj * wj_dx);
-  pj->density.wcount += wj;
-  pj->density.wcount_dh -= (hydro_dimension * wj + uj * wj_dx);
+
+  const float rho_j = part_get_rho(pj);
+  part_set_rho(pj, rho_j + mi * wj);
+
+  const float rho_dh_j = part_get_rho_dh(pj);
+  part_set_rho_dh(pj, rho_dh_j - mi * (hydro_dimension * wj + uj * wj_dx));
+
+  const float wcount_j = part_get_wcount(pj);
+  part_set_wcount(pj, wcount_j + wj);
+
+  const float wcount_dh_j = part_get_wcount_dh(pj);
+  part_set_wcount_dh(pj, wcount_dh_j - (hydro_dimension * wj + uj * wj_dx));
+
   adaptive_softening_add_correction_term(pj, uj, hj_inv, mi);
 
   /* Collect data for FVPM matrix construction */
@@ -96,27 +114,29 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   const float facj = mi * wj_dx * r_inv;
 
   /* Compute dv dot r */
-  dv[0] = pi->v[0] - pj->v[0];
-  dv[1] = pi->v[1] - pj->v[1];
-  dv[2] = pi->v[2] - pj->v[2];
+  dv[0] = part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0);
+  dv[1] = part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1);
+  dv[2] = part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2);
   const float dvdr = dv[0] * dx[0] + dv[1] * dx[1] + dv[2] * dx[2];
 
-  pi->viscosity.div_v -= faci * dvdr;
-  pj->viscosity.div_v -= facj * dvdr;
+  part_set_div_v(pi, part_get_div_v(pi) - faci * dvdr);
+  part_set_div_v(pj, part_get_div_v(pj) - facj * dvdr);
 
   /* Compute dv cross r */
   curlvr[0] = dv[1] * dx[2] - dv[2] * dx[1];
   curlvr[1] = dv[2] * dx[0] - dv[0] * dx[2];
   curlvr[2] = dv[0] * dx[1] - dv[1] * dx[0];
 
-  pi->density.rot_v[0] += faci * curlvr[0];
-  pi->density.rot_v[1] += faci * curlvr[1];
-  pi->density.rot_v[2] += faci * curlvr[2];
+  float* rot_v_i = part_get_rot_v(pi);
+  part_set_rot_v_ind(pi, 0, rot_v_i[0] + faci * curlvr[0]);
+  part_set_rot_v_ind(pi, 1, rot_v_i[0] + faci * curlvr[1]);
+  part_set_rot_v_ind(pi, 2, rot_v_i[0] + faci * curlvr[2]);
 
   /* Negative because of the change in sign of dx & dv. */
-  pj->density.rot_v[0] += facj * curlvr[0];
-  pj->density.rot_v[1] += facj * curlvr[1];
-  pj->density.rot_v[2] += facj * curlvr[2];
+  float* rot_v_j = part_get_rot_v(pi);
+  part_set_rot_v_ind(pj, 0, rot_v_j[0] + facj * curlvr[0]);
+  part_set_rot_v_ind(pj, 1, rot_v_j[0] + facj * curlvr[1]);
+  part_set_rot_v_ind(pj, 2, rot_v_j[0] + facj * curlvr[2]);
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_density += wi;
@@ -147,19 +167,28 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   float dv[3], curlvr[3];
 
   /* Get the masses. */
-  const float mj = pj->mass;
+  const float mj = part_get_mass(pj);
 
   /* Get r and r inverse. */
   const float r = sqrtf(r2);
 
   const float h_inv = 1.f / hi;
   const float ui = r * h_inv;
+
   kernel_deval(ui, &wi, &wi_dx);
 
-  pi->rho += mj * wi;
-  pi->density.rho_dh -= mj * (hydro_dimension * wi + ui * wi_dx);
-  pi->density.wcount += wi;
-  pi->density.wcount_dh -= (hydro_dimension * wi + ui * wi_dx);
+  const float rho_i = part_get_rho(pi);
+  part_set_rho(pi, rho_i + mj * wi);
+
+  const float rho_dh_i = part_get_rho_dh(pi);
+  part_set_rho_dh(pi, rho_dh_i - mj * (hydro_dimension * wi + ui * wi_dx));
+
+  const float wcount_i = part_get_wcount(pi);
+  part_set_wcount(pi, wcount_i + wi);
+
+  const float wcount_dh_i = part_get_wcount_dh(pi);
+  part_set_wcount_dh(pi, wcount_dh_i - (hydro_dimension * wi + ui * wi_dx));
+
   adaptive_softening_add_correction_term(pi, ui, h_inv, mj);
 
   /* Collect data for FVPM matrix construction */
@@ -170,21 +199,22 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   const float faci = mj * wi_dx * r_inv;
 
   /* Compute dv dot r */
-  dv[0] = pi->v[0] - pj->v[0];
-  dv[1] = pi->v[1] - pj->v[1];
-  dv[2] = pi->v[2] - pj->v[2];
+  dv[0] = part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0);
+  dv[1] = part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1);
+  dv[2] = part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2);
   const float dvdr = dv[0] * dx[0] + dv[1] * dx[1] + dv[2] * dx[2];
 
-  pi->viscosity.div_v -= faci * dvdr;
+  part_set_div_v(pi, part_get_div_v(pi) - faci * dvdr);
 
   /* Compute dv cross r */
   curlvr[0] = dv[1] * dx[2] - dv[2] * dx[1];
   curlvr[1] = dv[2] * dx[0] - dv[0] * dx[2];
   curlvr[2] = dv[0] * dx[1] - dv[1] * dx[0];
 
-  pi->density.rot_v[0] += faci * curlvr[0];
-  pi->density.rot_v[1] += faci * curlvr[1];
-  pi->density.rot_v[2] += faci * curlvr[2];
+  float* rot_v_i = part_get_rot_v(pi);
+  part_set_rot_v_ind(pi, 0, rot_v_i[0] + faci * curlvr[0]);
+  part_set_rot_v_ind(pi, 1, rot_v_i[0] + faci * curlvr[1]);
+  part_set_rot_v_ind(pi, 2, rot_v_i[0] + faci * curlvr[2]);
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_density += wi;
@@ -223,9 +253,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
   const float a2_Hubble = a * a * H;
 
-  const float dvdr = (pi->v[0] - pj->v[0]) * dx[0] +
-                     (pi->v[1] - pj->v[1]) * dx[1] +
-                     (pi->v[2] - pj->v[2]) * dx[2];
+  const float dvdr =
+    (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
+    (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
+    (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
 
   /* Add Hubble flow */
 
@@ -239,8 +270,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
       signal_velocity(dx, pi, pj, mu_ij, const_viscosity_beta);
 
   /* Update if we need to */
-  pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
-  pj->viscosity.v_sig = max(pj->viscosity.v_sig, new_v_sig);
+  part_set_v_sig(pi, max(part_get_v_sig(pi), new_v_sig));
+  part_set_v_sig(pj, max(part_get_v_sig(pj), new_v_sig));
 
   /* Calculate Del^2 u for the thermal diffusion coefficient. */
   /* Need to get some kernel values F_ij = wi_dx */
@@ -252,16 +283,24 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   kernel_deval(ui, &wi, &wi_dx);
   kernel_deval(uj, &wj, &wj_dx);
 
-  const float delta_u_factor = (pi->u - pj->u) * r_inv;
-  pi->diffusion.laplace_u += pj->mass * delta_u_factor * wi_dx / pj->rho;
-  pj->diffusion.laplace_u -= pi->mass * delta_u_factor * wj_dx / pi->rho;
+  const float delta_u_factor = (part_get_u(pi) - part_get_u(pj)) * r_inv;
+
+  const float laplace_i = part_get_laplace_u(pi);
+  const float m_j = part_get_mass(pj) ;
+  const float rho_j = part_get_rho(pj);
+  part_set_laplace_u(pi, laplace_i +m_j * delta_u_factor * wi_dx / rho_j);
+
+  const float laplace_j = part_get_laplace_u(pj);
+  const float m_i = part_get_mass(pi) ;
+  const float rho_i = part_get_rho(pi);
+  part_set_laplace_u(pj, laplace_j - m_i * delta_u_factor * wj_dx / rho_i);
 
   /* Set the maximal alpha from the previous step over the neighbours
    * (this is used to limit the diffusion in hydro_prepare_force) */
-  const float alpha_i = pi->viscosity.alpha;
-  const float alpha_j = pj->viscosity.alpha;
-  pi->force.alpha_visc_max_ngb = max(pi->force.alpha_visc_max_ngb, alpha_j);
-  pj->force.alpha_visc_max_ngb = max(pj->force.alpha_visc_max_ngb, alpha_i);
+  const float alpha_i = part_get_alpha_av(pi);
+  const float alpha_j = part_get_alpha_av(pj);
+  part_set_alpha_visc_max_ngb(pi, max(part_get_alpha_visc_max_ngb(pi), alpha_j));
+  part_set_alpha_visc_max_ngb(pj, max(part_get_alpha_visc_max_ngb(pi), alpha_i));
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_gradient += wi;
@@ -303,9 +342,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
   const float a2_Hubble = a * a * H;
 
-  const float dvdr = (pi->v[0] - pj->v[0]) * dx[0] +
-                     (pi->v[1] - pj->v[1]) * dx[1] +
-                     (pi->v[2] - pj->v[2]) * dx[2];
+  const float dvdr =
+    (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
+    (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
+    (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
+
 
   /* Add Hubble flow */
 
@@ -319,7 +360,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
       signal_velocity(dx, pi, pj, mu_ij, const_viscosity_beta);
 
   /* Update if we need to */
-  pi->viscosity.v_sig = max(pi->viscosity.v_sig, new_v_sig);
+  part_set_v_sig(pi, max(part_get_v_sig(pi), new_v_sig));
 
   /* Calculate Del^2 u for the thermal diffusion coefficient. */
   /* Need to get some kernel values F_ij = wi_dx */
@@ -329,13 +370,16 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
 
   kernel_deval(ui, &wi, &wi_dx);
 
-  const float delta_u_factor = (pi->u - pj->u) * r_inv;
-  pi->diffusion.laplace_u += pj->mass * delta_u_factor * wi_dx / pj->rho;
+  const float delta_u_factor = (part_get_u(pi) - part_get_u(pj)) * r_inv;
+  const float laplace_i = part_get_laplace_u(pi);
+  const float m_j = part_get_mass(pj) ;
+  const float rho_j = part_get_rho(pj);
+  part_set_laplace_u(pi, laplace_i +m_j * delta_u_factor * wi_dx / rho_j);
 
   /* Set the maximal alpha from the previous step over the neighbours
    * (this is used to limit the diffusion in hydro_prepare_force) */
-  const float alpha_j = pj->viscosity.alpha;
-  pi->force.alpha_visc_max_ngb = max(pi->force.alpha_visc_max_ngb, alpha_j);
+  const float alpha_j = part_get_alpha_av(pj);
+  part_set_alpha_visc_max_ngb(pi, max(part_get_alpha_visc_max_ngb(pi), alpha_j));
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_gradient += wi;
@@ -368,14 +412,14 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float r_inv = r ? 1.0f / r : 0.0f;
 
   /* Recover some data */
-  const float mj = pj->mass;
-  const float mi = pi->mass;
+  const float mi = part_get_mass(pi);
+  const float mj = part_get_mass(pj);
 
-  const float rhoi = pi->rho;
-  const float rhoj = pj->rho;
+  const float rhoi = part_get_rho(pi);
+  const float rhoj = part_get_rho(pj);
 
-  const float pressurei = pi->force.pressure;
-  const float pressurej = pj->force.pressure;
+  const float pressurei = part_get_pressure(pi);
+  const float pressurej = part_get_pressure(pj);
 
   /* Get the kernel for hi. */
   const float hi_inv = 1.0f / hi;
@@ -394,9 +438,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute dv dot r. */
-  const float dvdr = (pi->v[0] - pj->v[0]) * dx[0] +
-                     (pi->v[1] - pj->v[1]) * dx[1] +
-                     (pi->v[2] - pj->v[2]) * dx[2];
+  const float dvdr =
+    (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
+    (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
+    (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
 
   /* Includes the hubble flow term; not used for du/dt */
   const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -409,16 +454,16 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float v_sig = signal_velocity(dx, pi, pj, mu_ij, const_viscosity_beta);
 
   /* Variable smoothing length term */
-  const float f_ij = 1.f - pi->force.f / mj;
-  const float f_ji = 1.f - pj->force.f / mi;
+  const float f_ij = 1.f - part_get_f_gradh(pi) / mj;
+  const float f_ji = 1.f - part_get_f_gradh(pj) / mi;
 
   /* Balsara term */
-  const float balsara_i = pi->force.balsara;
-  const float balsara_j = pj->force.balsara;
+  const float balsara_i = part_get_balsara(pi);
+  const float balsara_j = part_get_balsara(pj);
 
   /* Construct the full viscosity term */
   const float rho_ij = rhoi + rhoj;
-  const float alpha = pi->viscosity.alpha + pj->viscosity.alpha;
+  const float alpha = part_get_alpha_av(pi) + part_get_alpha_av(pj);
   const float visc =
       -0.25f * alpha * v_sig * mu_ij * (balsara_i + balsara_j) / rho_ij;
 
@@ -442,13 +487,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float acc = sph_acc_term + visc_acc_term + adapt_soft_acc_term;
 
   /* Use the force Luke ! */
-  pi->a_hydro[0] -= mj * acc * dx[0];
-  pi->a_hydro[1] -= mj * acc * dx[1];
-  pi->a_hydro[2] -= mj * acc * dx[2];
+  part_set_a_hydro_ind(pi, 0, part_get_a_hydro_ind(pi, 0) - mj * acc * dx[0]);
+  part_set_a_hydro_ind(pi, 1, part_get_a_hydro_ind(pi, 1) - mj * acc * dx[1]);
+  part_set_a_hydro_ind(pi, 2, part_get_a_hydro_ind(pi, 2) - mj * acc * dx[2]);
 
-  pj->a_hydro[0] += mi * acc * dx[0];
-  pj->a_hydro[1] += mi * acc * dx[1];
-  pj->a_hydro[2] += mi * acc * dx[2];
+  part_set_a_hydro_ind(pj, 0, part_get_a_hydro_ind(pj, 0) + mi * acc * dx[0]);
+  part_set_a_hydro_ind(pj, 1, part_get_a_hydro_ind(pj, 1) + mi * acc * dx[1]);
+  part_set_a_hydro_ind(pj, 2, part_get_a_hydro_ind(pj, 2) + mi * acc * dx[2]);
 
   /* Get the time derivative for u. */
   const float sph_du_term_i = P_over_rho2_i * dvdr * r_inv * wi_dr;
@@ -463,26 +508,28 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
    * diffusion limited particles always take precedence - another trick to
    * allow the scheme to work with thermal feedback. */
   const float alpha_diff =
-      (pressurei * pi->diffusion.alpha + pressurej * pj->diffusion.alpha) /
+      (pressurei * part_get_alpha_diff(pi) +
+       pressurej * part_get_alpha_diff(pj)) /
       (pressurei + pressurej);
   const float v_diff = alpha_diff * 0.5f *
                        (sqrtf(2.f * fabsf(pressurei - pressurej) / rho_ij) +
                         fabsf(fac_mu * r_inv * dvdr_Hubble));
   /* wi_dx + wj_dx / 2 is F_ij */
   const float diff_du_term =
-      v_diff * (pi->u - pj->u) * (f_ij * wi_dr / rhoi + f_ji * wj_dr / rhoj);
+      v_diff * (part_get_u(pi) - part_get_u(pj)) *
+      (f_ij * wi_dr / rhoi + f_ji * wj_dr / rhoj);
 
   /* Assemble the energy equation term */
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
   const float du_dt_j = sph_du_term_j + visc_du_term - diff_du_term;
 
   /* Internal energy time derivative */
-  pi->u_dt += du_dt_i * mj;
-  pj->u_dt += du_dt_j * mi;
+  part_set_u_dt(pi, part_get_u_dt(pi) + du_dt_i * mj);
+  part_set_u_dt(pj, part_get_u_dt(pj) + du_dt_j * mi);
 
   /* Get the time derivative for h. */
-  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
-  pj->force.h_dt -= mi * dvdr * r_inv / rhoi * wj_dr;
+  part_set_h_dt(pi, part_get_h_dt(pi) - mj * dvdr * r_inv / rhoj * wi_dr);
+  part_set_h_dt(pj, part_get_h_dt(pj) - mi * dvdr * r_inv / rhoi * wj_dr);
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_force += wi + wj;
@@ -517,14 +564,14 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float r_inv = r ? 1.0f / r : 0.0f;
 
   /* Recover some data */
-  const float mi = pi->mass;
-  const float mj = pj->mass;
+  const float mi = part_get_mass(pi);
+  const float mj = part_get_mass(pj);
 
-  const float rhoi = pi->rho;
-  const float rhoj = pj->rho;
+  const float rhoi = part_get_rho(pi);
+  const float rhoj = part_get_rho(pj);
 
-  const float pressurei = pi->force.pressure;
-  const float pressurej = pj->force.pressure;
+  const float pressurei = part_get_pressure(pi);
+  const float pressurej = part_get_pressure(pj);
 
   /* Get the kernel for hi. */
   const float hi_inv = 1.0f / hi;
@@ -543,9 +590,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute dv dot r. */
-  const float dvdr = (pi->v[0] - pj->v[0]) * dx[0] +
-                     (pi->v[1] - pj->v[1]) * dx[1] +
-                     (pi->v[2] - pj->v[2]) * dx[2];
+  const float dvdr =
+    (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
+    (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
+    (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
 
   /* Includes the hubble flow term; not used for du/dt */
   const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -558,16 +606,16 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float v_sig = signal_velocity(dx, pi, pj, mu_ij, const_viscosity_beta);
 
   /* Variable smoothing length term */
-  const float f_ij = 1.f - pi->force.f / mj;
-  const float f_ji = 1.f - pj->force.f / mi;
+  const float f_ij = 1.f - part_get_f_gradh(pi) / mj;
+  const float f_ji = 1.f - part_get_f_gradh(pj) / mi;
 
   /* Balsara term */
-  const float balsara_i = pi->force.balsara;
-  const float balsara_j = pj->force.balsara;
+  const float balsara_i = part_get_balsara(pi);
+  const float balsara_j = part_get_balsara(pj);
 
   /* Construct the full viscosity term */
   const float rho_ij = rhoi + rhoj;
-  const float alpha = pi->viscosity.alpha + pj->viscosity.alpha;
+  const float alpha = part_get_alpha_av(pi) + part_get_alpha_av(pj);
   const float visc =
       -0.25f * alpha * v_sig * mu_ij * (balsara_i + balsara_j) / rho_ij;
 
@@ -591,9 +639,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float acc = sph_acc_term + visc_acc_term + adapt_soft_acc_term;
 
   /* Use the force Luke ! */
-  pi->a_hydro[0] -= mj * acc * dx[0];
-  pi->a_hydro[1] -= mj * acc * dx[1];
-  pi->a_hydro[2] -= mj * acc * dx[2];
+  part_set_a_hydro_ind(pi, 0, part_get_a_hydro_ind(pi, 0) - mj * acc * dx[0]);
+  part_set_a_hydro_ind(pi, 1, part_get_a_hydro_ind(pi, 1) - mj * acc * dx[1]);
+  part_set_a_hydro_ind(pi, 2, part_get_a_hydro_ind(pi, 2) - mj * acc * dx[2]);
 
   /* Get the time derivative for u. */
   const float sph_du_term_i = P_over_rho2_i * dvdr * r_inv * wi_dr;
@@ -607,23 +655,25 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
    * diffusion limited particles always take precedence - another trick to
    * allow the scheme to work with thermal feedback. */
   const float alpha_diff =
-      (pressurei * pi->diffusion.alpha + pressurej * pj->diffusion.alpha) /
+      (pressurei * part_get_alpha_diff(pi) +
+       pressurej * part_get_alpha_diff(pj)) /
       (pressurei + pressurej);
   const float v_diff = alpha_diff * 0.5f *
                        (sqrtf(2.f * fabsf(pressurei - pressurej) / rho_ij) +
                         fabsf(fac_mu * r_inv * dvdr_Hubble));
   /* wi_dx + wj_dx / 2 is F_ij */
   const float diff_du_term =
-      v_diff * (pi->u - pj->u) * (f_ij * wi_dr / rhoi + f_ji * wj_dr / rhoj);
+      v_diff * (part_get_u(pi) - part_get_u(pj)) *
+      (f_ij * wi_dr / rhoi + f_ji * wj_dr / rhoj);
 
   /* Assemble the energy equation term */
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
 
   /* Internal energy time derivative */
-  pi->u_dt += du_dt_i * mj;
+  part_set_u_dt(pi, part_get_u_dt(pi) + du_dt_i * mj);
 
   /* Get the time derivative for h. */
-  pi->force.h_dt -= mj * dvdr * r_inv / rhoj * wi_dr;
+  part_set_h_dt(pi, part_get_h_dt(pi) - mj * dvdr * r_inv / rhoj * wi_dr);
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_force += wi + wj;
