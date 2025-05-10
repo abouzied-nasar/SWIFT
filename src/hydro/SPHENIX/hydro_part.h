@@ -786,12 +786,12 @@ part_get_const_adaptive_softening_data(const struct part *restrict p){
   return &p->_adaptive_softening_data;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_adaptive_softening_data( */
-/*     struct part *restrict p, */
-/*     const struct adaptive_softening_part_data adaptive_softening_data){ */
-/*   p->_adaptive_softening_data = adaptive_softening_data; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_adaptive_softening_data(
+    struct part *restrict p,
+    const struct adaptive_softening_part_data adaptive_softening_data){
+  p->_adaptive_softening_data = adaptive_softening_data;
+}
 
 
 /**
@@ -810,12 +810,12 @@ part_get_const_mhd_data(const struct part *restrict p){
   return &p->_mhd_data;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_mhd_data( */
-/*     struct part *restrict p, */
-/*     const struct mhd_part_data mhd_data){ */
-/*   p->_mhd_data = mhd_data; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_mhd_data(
+    struct part *restrict p,
+    const struct mhd_part_data mhd_data){
+  p->_mhd_data = mhd_data;
+}
 
 
 /**
@@ -834,12 +834,12 @@ part_get_const_chemistry_data(const struct part *restrict p){
   return &p->_chemistry_data;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_chemistry_data( */
-/*     struct part *restrict p, */
-/*     const struct chemistry_part_data chemistry_data){ */
-/*   p->_chemistry_data = chemistry_data; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_chemistry_data(
+    struct part *restrict p,
+    const struct chemistry_part_data chemistry_data){
+  p->_chemistry_data = chemistry_data;
+}
 
 
 /**
@@ -858,12 +858,12 @@ part_get_const_cooling_data(const struct part *restrict p){
   return &p->_cooling_data;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_cooling_data( */
-/*     struct part *restrict p, */
-/*     const struct cooling_part_data cooling_data){ */
-/*   p->_cooling_data = cooling_data; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_cooling_data(
+    struct part *restrict p,
+    const struct cooling_part_data cooling_data){
+  p->_cooling_data = cooling_data;
+}
 
 
 
@@ -883,12 +883,12 @@ part_get_const_feedback_data(const struct part *restrict p){
   return &p->_feedback_data;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_feedback_data( */
-/*     struct part *restrict p, */
-/*     const struct feedback_part_data feedback_data){ */
-/*   p->_feedback_data = feedback_data; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_feedback_data(
+    struct part *restrict p,
+    const struct feedback_part_data feedback_data){
+  p->_feedback_data = feedback_data;
+}
 
 
 
@@ -908,12 +908,12 @@ part_get_const_black_holes_data(const struct part *restrict p){
   return &p->_black_holes_data;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_black_holes_data( */
-/*     struct part *restrict p, */
-/*     const struct black_holes_part_data black_holes_data){ */
-/*   p->_black_holes_data = black_holes_data; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_black_holes_data(
+    struct part *restrict p,
+    const struct black_holes_part_data black_holes_data){
+  p->_black_holes_data = black_holes_data;
+}
 
 
 /**
@@ -933,12 +933,12 @@ part_get_const_sink_data(const struct part *restrict p){
   return &p->_sink_data;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_sink_data( */
-/*     struct part *restrict p, */
-/*     const struct sink_part_data sink_data){ */
-/*   p->_sink_data = sink_data; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_sink_data(
+    struct part *restrict p,
+    const struct sink_part_data sink_data){
+  p->_sink_data = sink_data;
+}
 
 
 
@@ -958,12 +958,12 @@ part_get_const_pressure_floor_data(const struct part *restrict p){
   return &p->_pressure_floor_data;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_pressure_floor_data( */
-/*     struct part *restrict p, */
-/*     const struct pressure_floor_part_data pressure_floor_data){ */
-/*   p->_pressure_floor_data = pressure_floor_data; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_pressure_floor_data(
+    struct part *restrict p,
+    const struct pressure_floor_part_data pressure_floor_data){
+  p->_pressure_floor_data = pressure_floor_data;
+}
 
 
 
@@ -984,12 +984,12 @@ part_get_const_rt_data(const struct part *restrict p){
   return &p->_rt_data;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_rt_data( */
-/*     struct part *restrict p, */
-/*     const struct rt_part_data rt_data){ */
-/*   p->_rt_data = rt_data; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_rt_data(
+    struct part *restrict p,
+    const struct rt_part_data rt_data){
+  p->_rt_data = rt_data;
+}
 
 
 /**
@@ -1008,12 +1008,12 @@ part_get_const_rt_time_data(const struct part *restrict p){
   return &p->_rt_time_data;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_rt_time_data( */
-/*     struct part *restrict p, */
-/*     const struct rt_timestepping_data rt_time_data){ */
-/*   p->_rt_time_data = rt_time_data; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_rt_time_data(
+    struct part *restrict p,
+    const struct rt_timestepping_data rt_time_data){
+  p->_rt_time_data = rt_time_data;
+}
 
 
 __attribute__((always_inline)) INLINE static char
@@ -1055,12 +1055,12 @@ part_get_const_limiter_data(const struct part *restrict p){
   return &p->_limiter_data;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_limiter_data( */
-/*     struct part *restrict p, */
-/*     const struct timestep_limiter_data limiter_data){ */
-/*   p->_limiter_data = limiter_data; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_limiter_data(
+    struct part *restrict p,
+    const struct timestep_limiter_data limiter_data){
+  p->_limiter_data = limiter_data;
+}
 
 
 
@@ -1109,12 +1109,12 @@ part_get_fvpm_geometry(struct part *restrict p){
   return &p->_geometry;
 }
 
-/* __attribute__((always_inline)) INLINE static void */
-/* part_set_fvpm_geometry( */
-/*     struct part *restrict p, */
-/*     const struct fvpm_geometry_struct geometry){ */
-/*   p->_geometry = geometry; */
-/* } */
+__attribute__((always_inline)) INLINE static void
+part_set_fvpm_geometry(
+    struct part *restrict p,
+    const struct fvpm_geometry_struct geometry){
+  p->_geometry = geometry;
+}
 
 
 
