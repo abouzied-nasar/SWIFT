@@ -48,11 +48,12 @@ INLINE static void timestep_process_sync_part(struct part *p, struct xpart *xp,
   const timebin_t max_active_bin = e->max_active_bin;
   const timebin_t min_active_bin = e->min_active_bin;
   const double time_base = e->time_base;
+  struct timestep_limiter_data* limiter_data = part_get_limiter_data(p);
 
-  p->limiter_data.to_be_synchronized = 0;
+  limiter_data->to_be_synchronized = 0;
 
   /* This particle is already active. Nothing to do here... */
-  if (p->time_bin <= max_active_bin) {
+  if (part_get_time_bin(p) <= max_active_bin) {
     return;
   }
 
@@ -60,9 +61,9 @@ INLINE static void timestep_process_sync_part(struct part *p, struct xpart *xp,
 
   /* Start by recovering the start and end point of the particle's time-step. */
   const integertime_t old_ti_beg =
-      get_integer_time_begin(ti_current, p->time_bin);
+      get_integer_time_begin(ti_current, part_get_time_bin(p));
   const integertime_t old_ti_end =
-      get_integer_time_end(ti_current, p->time_bin);
+      get_integer_time_end(ti_current, part_get_time_bin(p));
 
   /* Old time-step length on the time-line */
   const integertime_t old_dti = old_ti_end - old_ti_beg;
@@ -93,8 +94,10 @@ INLINE static void timestep_process_sync_part(struct part *p, struct xpart *xp,
   if (new_dti > old_dti) error("New time-step larger than old one");
 #endif
 
-  double dt_kick_grav = 0., dt_kick_hydro = 0., dt_kick_therm = 0.,
-         dt_kick_corr = 0.;
+  double dt_kick_grav = 0.;
+  double dt_kick_hydro = 0.;
+  double dt_kick_therm = 0.;
+  double dt_kick_corr = 0.;
 
   /* Now we need to reverse the kick1...
    * Note the minus sign! (the dt are negative here) */
@@ -133,7 +136,7 @@ INLINE static void timestep_process_sync_part(struct part *p, struct xpart *xp,
 
   /* The particle is now ready to compute its new time-step size and for the
    * next kick */
-  p->time_bin = -min_active_bin;
+  part_set_time_bin(p, -min_active_bin);
   /* do not touch the limiter flag, as we might still need to limit the time
      step of this particle (if the new time step is still too large) */
 }

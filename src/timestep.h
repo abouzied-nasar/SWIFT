@@ -23,11 +23,15 @@
 #include <config.h>
 
 /* Local headers. */
+#include "black_holes.h"
 #include "cooling.h"
 #include "debug.h"
+#include "engine.h"
 #include "forcing.h"
+#include "mhd.h"
 #include "potential.h"
 #include "rt.h"
+#include "sink.h"
 #include "timeline.h"
 
 /**
@@ -98,7 +102,8 @@ __attribute__((always_inline)) INLINE static integertime_t get_gpart_timestep(
   }
 #endif
 
-  float new_dt_self = FLT_MAX, new_dt_ext = FLT_MAX;
+  float new_dt_self = FLT_MAX;
+  float new_dt_ext = FLT_MAX;
 
   if (e->policy & engine_policy_external_gravity)
     new_dt_ext = external_gravity_timestep(e->time, e->external_potential,
@@ -159,17 +164,19 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
                          e->internal_units, e->hydro_properties, p, xp);
 
   /* Compute the next timestep (gravity condition) */
-  float new_dt_grav = FLT_MAX, new_dt_self_grav = FLT_MAX,
-        new_dt_ext_grav = FLT_MAX;
-  if (p->gpart != NULL) {
+  float new_dt_grav = FLT_MAX;
+  float new_dt_self_grav = FLT_MAX;
+  float new_dt_ext_grav = FLT_MAX;
+  const struct gpart* const gp = part_get_gpart(p);
+  if (gp != NULL) {
 
     if (e->policy & engine_policy_external_gravity)
       new_dt_ext_grav = external_gravity_timestep(
-          e->time, e->external_potential, e->physical_constants, p->gpart);
+          e->time, e->external_potential, e->physical_constants, gp);
 
     if (e->policy & engine_policy_self_gravity)
       new_dt_self_grav = gravity_compute_timestep_self(
-          p->gpart, p->a_hydro, e->gravity_properties, e->cosmology);
+          gp, part_get_const_a_hydro(p), e->gravity_properties, e->cosmology);
 
     new_dt_grav = min(new_dt_self_grav, new_dt_ext_grav);
   }
@@ -189,8 +196,8 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
 
   /* Limit change in smoothing length */
   const float dt_h_change =
-      (p->force.h_dt != 0.0f)
-          ? fabsf(e->hydro_properties->log_max_h_change * p->h / p->force.h_dt)
+      (part_get_h_dt(p) != 0.0f)
+          ? fabsf(e->hydro_properties->log_max_h_change * part_get_h(p) / part_get_h_dt(p))
           : FLT_MAX;
 
   new_dt = min(new_dt, dt_h_change);
@@ -205,12 +212,13 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   new_dt = min(new_dt, e->dt_max);
 
   if (new_dt < e->dt_min)
-    error("part (id=%lld) wants a time-step (%e) below dt_min (%e)", p->id,
+    error("part (id=%lld) wants a time-step (%e) below dt_min (%e)", part_get_id(p),
           new_dt, e->dt_min);
 
   /* Convert to integer time */
+  const struct timestep_limiter_data* const limiter_data = part_get_const_limiter_data(p);
   integertime_t new_dti = make_integer_timestep(
-      new_dt, p->time_bin, p->limiter_data.min_ngb_time_bin, e->ti_current,
+      new_dt, part_get_time_bin(p), limiter_data->min_ngb_time_bin, e->ti_current,
       e->time_base_inv);
 
   if (e->policy & engine_policy_rt) {
@@ -279,8 +287,9 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_rt_timestep(
         p->id, new_dt, e->dt_min / f);
 #endif
 
+  const struct rt_timestepping_data* const rt_time_data = part_get_const_rt_time_data(p);
   const integertime_t new_dti = make_integer_timestep(
-      new_dt, p->rt_time_data.time_bin, p->rt_time_data.min_ngb_time_bin,
+      new_dt, rt_time_data->time_bin, rt_time_data->min_ngb_time_bin,
       e->ti_current, e->time_base_inv);
 
   return new_dti;
@@ -301,7 +310,8 @@ __attribute__((always_inline)) INLINE static integertime_t get_spart_timestep(
       e->cosmology, e->time);
 
   /* Gravity time-step */
-  float new_dt_self = FLT_MAX, new_dt_ext = FLT_MAX;
+  float new_dt_self = FLT_MAX;
+  float new_dt_ext = FLT_MAX;
 
   if (e->policy & engine_policy_external_gravity)
     new_dt_ext = external_gravity_timestep(e->time, e->external_potential,
@@ -353,7 +363,8 @@ __attribute__((always_inline)) INLINE static integertime_t get_bpart_timestep(
       bp, e->black_holes_properties, e->physical_constants, e->cosmology);
 
   /* Gravity time-step */
-  float new_dt_self = FLT_MAX, new_dt_ext = FLT_MAX;
+  float new_dt_self = FLT_MAX;
+  float new_dt_ext = FLT_MAX;
 
   if (e->policy & engine_policy_external_gravity)
     new_dt_ext = external_gravity_timestep(e->time, e->external_potential,
@@ -402,7 +413,8 @@ __attribute__((always_inline)) INLINE static integertime_t get_sink_timestep(
       e->cosmology, e->gravity_properties, e->time, e->time_base);
 
   /* Gravity time-step */
-  float new_dt_self = FLT_MAX, new_dt_ext = FLT_MAX;
+  float new_dt_self = FLT_MAX;
+  float new_dt_ext = FLT_MAX;
 
   if (e->policy & engine_policy_external_gravity)
     new_dt_ext = external_gravity_timestep(e->time, e->external_potential,
