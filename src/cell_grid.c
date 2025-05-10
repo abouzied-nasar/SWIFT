@@ -119,9 +119,10 @@ void cell_grid_update_self_completeness(struct cell *c, int force) {
   int flags = 0;
   for (int i = 0; flags != criterion && i < c->hydro.count; i++) {
     struct part *p = &c->hydro.parts[i];
-    int x_bin = (int)(3. * (p->x[0] - c->loc[0]) / c->width[0]);
-    int y_bin = (int)(3. * (p->x[1] - c->loc[1]) / c->width[1]);
-    int z_bin = (int)(3. * (p->x[2] - c->loc[2]) / c->width[2]);
+    const double* const x = part_get_const_x(p);
+    int x_bin = (int)(3. * (x[0] - c->loc[0]) / c->width[0]);
+    int y_bin = (int)(3. * (x[1] - c->loc[1]) / c->width[1]);
+    int z_bin = (int)(3. * (x[2] - c->loc[2]) / c->width[2]);
     if (x_bin >= 0 && x_bin < 3 && y_bin >= 0 && y_bin < 3 && z_bin >= 0 &&
         z_bin < 3) {
       flags |= 1 << (x_bin + 3 * y_bin + 9 * z_bin);

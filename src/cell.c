@@ -365,9 +365,8 @@ int cell_link_foreign_parts(struct cell *c, struct part *parts) {
       }
     }
     return count;
-  } else {
-    return 0;
   }
+  return 0;
 
 #else
   error("Calling linking of foregin particles in non-MPI mode.");
@@ -560,8 +559,8 @@ void cell_sanitize(struct cell *c, int treated) {
 
     /* Apply it */
     for (int i = 0; i < count; ++i) {
-      if (parts[i].h == 0.f || parts[i].h > upper_h_max)
-        parts[i].h = upper_h_max;
+      if (part_get_h(&parts[i]) == 0.f || part_get_h(&parts[i]) > upper_h_max)
+        part_set_h(&parts[i], upper_h_max);
     }
     for (int i = 0; i < scount; ++i) {
       if (sparts[i].h == 0.f || sparts[i].h > upper_h_max)
@@ -586,9 +585,9 @@ void cell_sanitize(struct cell *c, int treated) {
     }
   } else {
     /* Get the new value of h_max (note all particles are active) */
-    for (int i = 0; i < count; ++i) h_max = max(h_max, parts[i].h);
+    for (int i = 0; i < count; ++i) h_max = max(h_max, part_get_h(&parts[i]));
     for (int i = 0; i < count; ++i)
-      h_max_active = max(h_max_active, parts[i].h);
+      h_max_active = max(h_max_active, part_get_h(&parts[i]));
     for (int i = 0; i < scount; ++i)
       stars_h_max = max(stars_h_max, sparts[i].h);
     for (int i = 0; i < scount; ++i)
@@ -656,20 +655,24 @@ void cell_check_part_drift_point(struct cell *c, void *data) {
     error("Cell in an incorrect time-zone! c->hydro.ti_old=%lld ti_drift=%lld",
           c->hydro.ti_old_part, ti_drift);
 
-  for (int i = 0; i < c->hydro.count; ++i)
-    if (c->hydro.parts[i].ti_drift != ti_drift &&
-        c->hydro.parts[i].time_bin != time_bin_inhibited)
+  for (int i = 0; i < c->hydro.count; ++i){
+    const struct part *p = &c->hydro.parts[i];
+    if (part_get_ti_drift(p) != ti_drift &&
+        part_get_time_bin(p) != time_bin_inhibited)
       error("part in an incorrect time-zone! p->ti_drift=%lld ti_drift=%lld",
-            c->hydro.parts[i].ti_drift, ti_drift);
+            part_get_ti_drift(p), ti_drift);
+  }
 
   for (int i = 0; i < c->hydro.count; ++i) {
     const struct part *p = &c->hydro.parts[i];
-    if (p->depth_h == c->depth) {
-      if (!(p->h >= c->h_min_allowed && p->h < c->h_max_allowed) && c->split) {
+    const float h = part_get_h(p);
+    const char depth_h = part_get_depth_h(p);
+    if (part_get_depth_h(p) == c->depth) {
+      if (!(h >= c->h_min_allowed && h < c->h_max_allowed) && c->split) {
         error(
             "depth_h set incorrectly! c->depth=%d p->depth_h=%d h=%e h_min=%e "
             "h_max=%e",
-            c->depth, p->depth_h, p->h, c->h_min_allowed, c->h_max_allowed);
+            c->depth, depth_h, h, c->h_min_allowed, c->h_max_allowed);
       }
     }
   }
@@ -1385,14 +1388,19 @@ void cell_check_timesteps(const struct cell *c, const integertime_t ti_current,
     error("Cell without assigned time-step");
 
   if (c->split) {
-    for (int k = 0; k < 8; ++k)
-      if (c->progeny[k] != NULL)
+    for (int k = 0; k < 8; ++k){
+      if (c->progeny[k] != NULL){
         cell_check_timesteps(c->progeny[k], ti_current, max_bin);
+      }
+    }
   } else {
-    if (c->nodeID == engine_rank)
-      for (int i = 0; i < c->hydro.count; ++i)
-        if (c->hydro.parts[i].time_bin == 0)
+    if (c->nodeID == engine_rank){
+      for (int i = 0; i < c->hydro.count; ++i){
+        if (part_get_time_bin(&c->hydro.parts[i]) == 0){
           error("Particle without assigned time-bin");
+        }
+      }
+    }
   }
 
   /* Other checks not relevent when starting-up */
@@ -1406,20 +1414,22 @@ void cell_check_timesteps(const struct cell *c, const integertime_t ti_current,
   for (int i = 0; i < c->hydro.count; ++i) {
 
     const struct part *p = &c->hydro.parts[i];
-    if (p->time_bin == time_bin_inhibited) continue;
-    if (p->time_bin == time_bin_not_created) continue;
+    const timebin_t time_bin = part_get_time_bin(p);
+    if (time_bin == time_bin_inhibited) continue;
+    if (time_bin == time_bin_not_created) continue;
 
     ++count;
 
-    integertime_t ti_end, ti_beg;
+    integertime_t ti_end;
+    integertime_t ti_beg;
 
-    if (p->time_bin <= max_bin) {
-      integertime_t time_step = get_integer_timestep(p->time_bin);
-      ti_end = get_integer_time_end(ti_current, p->time_bin) + time_step;
-      ti_beg = get_integer_time_begin(ti_current + 1, p->time_bin);
+    if (time_bin <= max_bin) {
+      integertime_t time_step = get_integer_timestep(time_bin);
+      ti_end = get_integer_time_end(ti_current, time_bin) + time_step;
+      ti_beg = get_integer_time_begin(ti_current + 1, time_bin);
     } else {
-      ti_end = get_integer_time_end(ti_current, p->time_bin);
-      ti_beg = get_integer_time_begin(ti_current + 1, p->time_bin);
+      ti_end = get_integer_time_end(ti_current, time_bin);
+      ti_beg = get_integer_time_begin(ti_current + 1, time_bin);
     }
 
     ti_end_min = min(ti_end, ti_end_min);
@@ -1562,7 +1572,9 @@ int cell_can_use_pair_mm(const struct cell *restrict ci,
   const struct gravity_tensors *restrict multi_i = ci->grav.multipole;
   const struct gravity_tensors *restrict multi_j = cj->grav.multipole;
 
-  double dx, dy, dz;
+  double dx;
+  double dy;
+  double dz;
 
   /* Get the distance between the CoMs */
   if (use_rebuild_data) {

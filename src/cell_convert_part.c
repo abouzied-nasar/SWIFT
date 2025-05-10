@@ -507,7 +507,9 @@ struct gpart *cell_add_gpart(struct engine *e, struct cell *c) {
       if (gpart_is_inhibited(&c->grav.parts[i + 1], e)) continue;
 
       if (gparts[i + 1].type == swift_type_gas) {
-        s->parts[-gparts[i + 1].id_or_neg_offset].gpart++;
+        struct part* p = &s->parts[-gparts[i + 1].id_or_neg_offset];
+        struct gpart *gp = part_get_gpart(p);
+        part_set_gpart(p, gp+1);
       } else if (gparts[i + 1].type == swift_type_stars) {
         s->sparts[-gparts[i + 1].id_or_neg_offset].gpart++;
       } else if (gparts[i + 1].type == swift_type_sink) {
@@ -578,30 +580,32 @@ void cell_remove_part(const struct engine *e, struct cell *c, struct part *p,
     error("Can't remove a particle in a foreign cell.");
 
   /* Don't remove a particle twice */
-  if (p->time_bin == time_bin_inhibited) return;
+  if (part_get_time_bin(p) == time_bin_inhibited) return;
 
   /* Mark the particle as inhibited */
-  p->time_bin = time_bin_inhibited;
+  part_set_time_bin(p, time_bin_inhibited);
   /* Mark the RT time bin as inhibited as well,
    * so part_is_rt_active() checks work as intended */
-  p->rt_time_data.time_bin = time_bin_inhibited;
+  struct rt_timestepping_data* rt_time_data = part_get_rt_time_data(p);
+  rt_time_data->time_bin = time_bin_inhibited;
 
   /* Mark the gpart as inhibited and stand-alone */
-  if (p->gpart) {
-    p->gpart->time_bin = time_bin_inhibited;
-    p->gpart->id_or_neg_offset = 1;
-    p->gpart->type = swift_type_dark_matter;
+  struct gpart* gp = part_get_gpart(p);
+  if (gp) {
+    gp->time_bin = time_bin_inhibited;
+    gp->id_or_neg_offset = 1;
+    gp->type = swift_type_dark_matter;
   }
 
   /* Update the space-wide counters */
   const size_t one = 1;
   atomic_add(&e->s->nr_inhibited_parts, one);
-  if (p->gpart) {
+  if (gp) {
     atomic_add(&e->s->nr_inhibited_gparts, one);
   }
 
   /* Un-link the part */
-  p->gpart = NULL;
+  part_set_gpart(p, NULL);
 }
 
 /**
@@ -778,24 +782,24 @@ struct gpart *cell_convert_part_to_gpart(const struct engine *e, struct cell *c,
   if (c->nodeID != e->nodeID)
     error("Can't remove a particle in a foreign cell.");
 
-  if (p->gpart == NULL)
+  /* Get a handle */
+  struct gpart *gp = part_get_gpart(p);
+
+  if (gp == NULL)
     error("Trying to convert part without gpart friend to dark matter!");
 
-  /* Get a handle */
-  struct gpart *gp = p->gpart;
-
   /* Mark the particle as inhibited */
-  p->time_bin = time_bin_inhibited;
+  part_set_time_bin(p, time_bin_inhibited);
 
   /* Un-link the part */
-  p->gpart = NULL;
+  part_set_gpart(p, NULL);
 
   /* Mark the gpart as dark matter */
   gp->type = swift_type_dark_matter;
-  gp->id_or_neg_offset = p->id;
+  gp->id_or_neg_offset = part_get_id(p);
 
 #ifdef SWIFT_DEBUG_CHECKS
-  gp->ti_kick = p->ti_kick;
+  gp->ti_kick = part_get_ti_kick(p);
 #endif
 
   /* Update the space-wide counters */
@@ -877,7 +881,7 @@ struct spart *cell_convert_part_to_spart(struct engine *e, struct cell *c,
   if (c->nodeID != e->nodeID)
     error("Can't remove a particle in a foreign cell.");
 
-  if (p->gpart == NULL)
+  if (part_get_gpart(p) == NULL)
     error("Trying to convert part without gpart friend to star!");
 
   /* Create a fresh (empty) spart */
@@ -920,7 +924,7 @@ struct spart *cell_convert_part_to_spart(struct engine *e, struct cell *c,
 #endif
 
   /* Set a smoothing length */
-  sp->h = p->h;
+  sp->h = part_get_h(p);
 
   /* Give the new particle the correct depth */
   cell_set_spart_h_depth(sp, c);
@@ -948,7 +952,7 @@ struct spart *cell_spawn_new_spart_from_part(struct engine *e, struct cell *c,
   if (c->nodeID != e->nodeID)
     error("Can't spawn a particle in a foreign cell.");
 
-  if (p->gpart == NULL)
+  if (part_get_gpart(p) == NULL)
     error("Trying to create a new spart from a part without gpart friend!");
 
   /* Create a fresh (empty) spart */
@@ -973,7 +977,7 @@ struct spart *cell_spawn_new_spart_from_part(struct engine *e, struct cell *c,
   }
 
   /* Copy the gpart */
-  *gp = *p->gpart;
+  *gp = *part_get_gpart(p);
 
   /* Assign the ID. */
   sp->id = space_get_new_unique_id(e->s);
@@ -988,20 +992,21 @@ struct spart *cell_spawn_new_spart_from_part(struct engine *e, struct cell *c,
 
   /* Synchronize masses, positions and velocities */
   sp->mass = hydro_get_mass(p);
-  sp->x[0] = p->x[0];
-  sp->x[1] = p->x[1];
-  sp->x[2] = p->x[2];
+  const double* const px = part_get_const_x(p);
+  sp->x[0] = px[0];
+  sp->x[1] = px[1];
+  sp->x[2] = px[2];
   sp->v[0] = xp->v_full[0];
   sp->v[1] = xp->v_full[1];
   sp->v[2] = xp->v_full[2];
 
 #ifdef SWIFT_DEBUG_CHECKS
-  sp->ti_kick = p->ti_kick;
-  sp->ti_drift = p->ti_drift;
+  sp->ti_kick = part_get_ti_kick(p);
+  sp->ti_drift = part_get_ti_drift(p);
 #endif
 
   /* Set a smoothing length */
-  sp->h = p->h;
+  sp->h = part_get_h(p);
 
   /* Give the new particle the correct depth */
   cell_set_spart_h_depth(sp, c);
@@ -1034,7 +1039,7 @@ struct sink *cell_convert_part_to_sink(struct engine *e, struct cell *c,
   if (c->nodeID != e->nodeID)
     error("Can't remove a particle in a foreign cell.");
 
-  if (p->gpart == NULL)
+  if (part_get_gpart(p) == NULL)
     error("Trying to convert part without gpart friend to sink!");
 
   /* Create a fresh (empty) sink */
@@ -1052,7 +1057,7 @@ struct sink *cell_convert_part_to_sink(struct engine *e, struct cell *c,
   struct gpart *gp = cell_convert_part_to_gpart(e, c, p, xp);
 
   /* Assign the ID back */
-  sp->id = p->id;
+  sp->id = part_get_id(p);
   gp->type = swift_type_sink;
 
   /* Re-link things */
