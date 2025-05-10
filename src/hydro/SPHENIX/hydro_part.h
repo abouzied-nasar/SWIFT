@@ -438,12 +438,22 @@ part_set_v_ind(struct part *restrict p, const size_t i, const float v){
 
 
 /**
- * @brief get particle hydrodynamical acceleration.
- * Note: Avoid when you have access to const particle pointer. Use
+ * @brief get particle hydrodynamical acceleration. This is for read-write
+ * access. Avoid when you have access to const particle pointer. Use
  * access by index instead via part_get_a_hydro_ind()
  */
 __attribute__((always_inline)) INLINE static float*
 part_get_a_hydro(struct part *restrict p){
+  return p->_a_hydro;
+}
+
+/**
+ * @brief get particle hydrodynamical acceleration.
+ * Note: Avoid when you have access to const particle pointer. Use
+ * access by index instead via part_get_a_hydro_ind()
+ */
+__attribute__((always_inline)) INLINE const static float*
+part_get_const_a_hydro(const struct part *restrict p){
   return p->_a_hydro;
 }
 
