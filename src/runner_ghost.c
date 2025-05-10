@@ -95,7 +95,8 @@ void runner_do_stars_ghost(struct runner *r, struct cell *c, int timer) {
   const float stars_eta_dim =
       pow_dimension(e->stars_properties->eta_neighbours);
   const int max_smoothing_iter = e->stars_properties->max_smoothing_iterations;
-  int redo = 0, scount = 0;
+  int redo = 0;
+  int scount = 0;
 
   /* Running value of the maximal smoothing length */
   float h_max = c->stars.h_max;
@@ -595,7 +596,8 @@ void runner_do_black_holes_density_ghost(struct runner *r, struct cell *c,
   const float black_holes_eta_dim =
       pow_dimension(e->black_holes_properties->eta_neighbours);
   const int max_smoothing_iter = e->hydro_properties->max_smoothing_iterations;
-  int redo = 0, bcount = 0;
+  int redo = 0;
+  int bcount = 0;
 
   /* Running value of the maximal smoothing length */
   float h_max = c->black_holes.h_max;
@@ -1037,20 +1039,21 @@ void runner_do_extra_ghost(struct runner *r, struct cell *c, int timer) {
         /* Calculate the time-step for passing to hydro_prepare_force.
          * This is the physical time between the start and end of the time-step
          * without any scale-factor powers. */
-        double dt_alpha, dt_therm;
+        double dt_alpha;
+        double dt_therm;
 
         if (with_cosmology) {
-          const integertime_t ti_step = get_integer_timestep(p->time_bin);
+          const integertime_t ti_step = get_integer_timestep(part_get_time_bin(p));
           const integertime_t ti_begin =
-              get_integer_time_begin(ti_current - 1, p->time_bin);
+              get_integer_time_begin(ti_current - 1, part_get_time_bin(p));
 
           dt_alpha =
               cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
           dt_therm = cosmology_get_therm_kick_factor(cosmo, ti_begin,
                                                      ti_begin + ti_step);
         } else {
-          dt_alpha = get_timestep(p->time_bin, time_base);
-          dt_therm = get_timestep(p->time_bin, time_base);
+          dt_alpha = get_timestep(part_get_time_bin(p), time_base);
+          dt_therm = get_timestep(part_get_time_bin(p), time_base);
         }
 
         /* Compute variables required for the force loop */
@@ -1152,7 +1155,7 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
     for (int k = 0; k < c->hydro.count; k++)
       if (part_is_active(&parts[k], e)) {
         pid[count] = k;
-        h_0[count] = parts[k].h;
+        h_0[count] = part_get_h(&parts[k]);
         left[count] = 0.f;
         right[count] = hydro_h_max;
         ++count;
@@ -1182,14 +1185,14 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
 
         /* Get some useful values */
         const float h_init = h_0[i];
-        const float h_old = p->h;
+        const float h_old = part_get_h(p);
         const float h_old_dim = pow_dimension(h_old);
         const float h_old_dim_minus_one = pow_dimension_minus_one(h_old);
 
         float h_new;
         int has_no_neighbours = 0;
 
-        if (p->density.wcount < 1.e-5 * kernel_root) { /* No neighbours case */
+        if (part_get_wcount(p) < 1.e-5 * kernel_root) { /* No neighbours case */
 
           ghost_stats_no_ngb_hydro_iteration(&c->ghost_statistics, num_reruns);
 
@@ -1216,18 +1219,18 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
                 "Can't use alternative neighbour definition with this scheme!");
 #else
             const float inv_mass = 1.f / hydro_get_mass(p);
-            p->density.wcount = p->rho * inv_mass;
-            p->density.wcount_dh = p->density.rho_dh * inv_mass;
+            part_set_wcount(p, part_get_rho(p) * inv_mass);
+            part_set_wcount_dh(p, part_get_rho_dh(p) * inv_mass);
 #endif
           }
 
           /* Compute one step of the Newton-Raphson scheme */
-          const float n_sum = p->density.wcount * h_old_dim;
+          const float n_sum = part_get_wcount(p) * h_old_dim;
           const float n_target = hydro_eta_dim;
           const float f = n_sum - n_target;
           const float f_prime =
-              p->density.wcount_dh * h_old_dim +
-              hydro_dimension * p->density.wcount * h_old_dim_minus_one;
+              part_get_wcount_dh(p) * h_old_dim +
+              hydro_dimension * part_get_wcount(p) * h_old_dim_minus_one;
 
           /* Improve the bisection bounds */
           if (n_sum < n_target)
@@ -1243,8 +1246,8 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
 
           /* Skip if h is already h_max and we don't have enough neighbours */
           /* Same if we are below h_min */
-          if (((p->h >= hydro_h_max) && (f < 0.f)) ||
-              ((p->h <= hydro_h_min) && (f > 0.f))) {
+          if (((part_get_h(p) >= hydro_h_max) && (f < 0.f)) ||
+              ((part_get_h(p) <= hydro_h_min) && (f > 0.f))) {
 
             /* We have a particle whose smoothing length is already set (wants
              * to be larger but has already hit the maximum OR wants to be
@@ -1317,8 +1320,8 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
             }
 
             /* Check if h_max has increased */
-            h_max = max(h_max, p->h);
-            h_max_active = max(h_max_active, p->h);
+            h_max = max(h_max, part_get_h(p));
+            h_max_active = max(h_max_active, part_get_h(p));
 
             /* Ok, we are done with this particle */
             continue;
@@ -1336,7 +1339,7 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
                 "Smoothing length convergence problem: iter=%d p->id=%lld "
                 "h_init=%12.8e h_old=%12.8e h_new=%12.8e f=%f f_prime=%f "
                 "n_sum=%12.8e n_target=%12.8e left=%12.8e right=%12.8e",
-                num_reruns, p->id, h_init, h_old, h_new, f, f_prime, n_sum,
+                num_reruns, part_get_id(p), h_init, h_old, h_new, f, f_prime, n_sum,
                 n_target, left[i], right[i]);
           }
 
@@ -1367,17 +1370,18 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
               (h_old == left[i] && h_new == right[i])) {
 
             /* Bisect the remaining interval */
-            p->h = pow_inv_dimension(
-                0.5f * (pow_dimension(left[i]) + pow_dimension(right[i])));
+            part_set_h(p, pow_inv_dimension(
+                0.5f * (pow_dimension(left[i]) + pow_dimension(right[i])))
+                );
 
           } else {
 
             /* Normal case */
-            p->h = h_new;
+            part_set_h(p, h_new);
           }
 
           /* If within the allowed range, try again */
-          if (p->h < hydro_h_max && p->h > hydro_h_min) {
+          if (part_get_h(p) < hydro_h_max && part_get_h(p) > hydro_h_min) {
 
             /* Flag for another round of fun */
             pid[redo] = pid[i];
@@ -1400,15 +1404,15 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
             /* Off we go ! */
             continue;
 
-          } else if (p->h <= hydro_h_min) {
+          } else if (part_get_h(p) <= hydro_h_min) {
 
             /* Ok, this particle is a lost cause... */
-            p->h = hydro_h_min;
+            part_set_h(p, hydro_h_min);
 
-          } else if (p->h >= hydro_h_max) {
+          } else if (part_get_h(p) >= hydro_h_max) {
 
             /* Ok, this particle is a lost cause... */
-            p->h = hydro_h_max;
+            part_set_h(p, hydro_h_max);
 
             /* Do some damage control if no neighbours at all were found */
             if (has_no_neighbours) {
@@ -1434,14 +1438,15 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
         cell_set_part_h_depth(p, c);
 
         /* Check if h_max has increased */
-        h_max = max(h_max, p->h);
-        h_max_active = max(h_max_active, p->h);
+        h_max = max(h_max, part_get_h(p));
+        h_max_active = max(h_max_active, part_get_h(p));
 
         ghost_stats_converged_hydro(&c->ghost_statistics, p);
 
         /* Update gravitational softening (in adaptive softening case) */
-        if (p->gpart)
-          gravity_update_softening(p->gpart, p, e->gravity_properties);
+        struct gpart* gp = part_get_gpart(p);
+        if (gp)
+          gravity_update_softening(gp, p, e->gravity_properties);
 
 #ifdef EXTRA_HYDRO_LOOP
 
@@ -1558,7 +1563,7 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
           "particles:");
       for (int i = 0; i < count; i++) {
         struct part *p = &parts[pid[i]];
-        warning("ID: %lld, h: %g, wcount: %g", p->id, p->h, p->density.wcount);
+        warning("ID: %lld, h: %g, wcount: %g", part_get_id(p), part_get_h(p), part_get_wcount(p));
       }
 
       error("Smoothing length failed to converge on %i particles.", count);
@@ -1578,13 +1583,13 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
 #ifdef SWIFT_DEBUG_CHECKS
   for (int i = 0; i < c->hydro.count; ++i) {
     const struct part *p = &c->hydro.parts[i];
-    const float h = c->hydro.parts[i].h;
+    const float h = part_get_h(p);
     if (part_is_inhibited(p, e)) continue;
 
     if (h > c->hydro.h_max)
-      error("Particle has h larger than h_max (id=%lld)", p->id);
+      error("Particle has h larger than h_max (id=%lld)", part_get_id(p));
     if (part_is_active(p, e) && h > c->hydro.h_max_active)
-      error("Active particle has h larger than h_max_active (id=%lld)", p->id);
+      error("Active particle has h larger than h_max_active (id=%lld)", part_get_id(p));
   }
 #endif
 
@@ -1641,11 +1646,12 @@ void runner_do_rt_ghost1(struct runner *r, struct cell *c, int timer) {
 
       /* First reset everything that needs to be reset for the following
        * subcycle */
+      const struct rt_timestepping_data* rt_time_data = part_get_rt_time_data(p);
       const integertime_t ti_current_subcycle = e->ti_current_subcycle;
       const integertime_t ti_step =
-          get_integer_timestep(p->rt_time_data.time_bin);
+          get_integer_timestep(rt_time_data->time_bin);
       const integertime_t ti_begin = get_integer_time_begin(
-          ti_current_subcycle + 1, p->rt_time_data.time_bin);
+          ti_current_subcycle + 1, rt_time_data->time_bin);
       const integertime_t ti_end = ti_begin + ti_step;
 
       const float dt =
@@ -1727,7 +1733,8 @@ void runner_do_sinks_density_ghost(struct runner *r, struct cell *c,
   const float eps = e->sink_properties->h_tolerance;
   const float sinks_eta_dim = pow_dimension(e->sink_properties->eta_neighbours);
   const int max_smoothing_iter = e->hydro_properties->max_smoothing_iterations;
-  int redo = 0, scount = 0;
+  int redo = 0;
+  int scount = 0;
 
   /* Running value of the maximal smoothing length */
   float h_max = c->sinks.h_max;

@@ -133,7 +133,7 @@ void DOSELF1_STARS(struct runner *r, const struct cell *c,
       if (part_is_inhibited(pj, e)) continue;
 
       /* Compute the pairwise distance. */
-      const double* xj = part_get_const_x(pj);
+      const double* const xj = part_get_const_x(pj);
       const float pjx[3] = {(float)(xj[0] - c->loc[0]),
                             (float)(xj[1] - c->loc[1]),
                             (float)(xj[2] - c->loc[2])};
@@ -298,7 +298,7 @@ void DO_NONSYM_PAIR1_STARS_NAIVE(struct runner *r,
       if (part_is_inhibited(pj, e)) continue;
 
       /* Compute the pairwise distance. */
-      const double* xj = part_get_const_x(pj);
+      const double* const xj = part_get_const_x(pj);
       const float pjx[3] = {(float)(xj[0] - cj->loc[0]),
                             (float)(xj[1] - cj->loc[1]),
                             (float)(xj[2] - cj->loc[2])};
@@ -493,7 +493,7 @@ void DO_SYM_PAIR1_STARS(struct runner *r, const struct cell *restrict ci,
         if (part_is_inhibited(pj, e)) continue;
 
         const float hj = part_get_h(pj);
-        const double* xj = part_get_const_x(pj);
+        const double* const xj = part_get_const_x(pj);
         const float pjx = xj[0] - cj->loc[0];
         const float pjy = xj[1] - cj->loc[1];
         const float pjz = xj[2] - cj->loc[2];
@@ -658,7 +658,7 @@ void DO_SYM_PAIR1_STARS(struct runner *r, const struct cell *restrict ci,
         if (part_is_inhibited(pi, e)) continue;
 
         const float hi = part_get_h(pi);
-        const double* xi = part_get_const_x(pi);
+        const double* const xi = part_get_const_x(pi);
         const float pix = xi[0] - (cj->loc[0] + shift[0]);
         const float piy = xi[1] - (cj->loc[1] + shift[1]);
         const float piz = xi[2] - (cj->loc[2] + shift[2]);
@@ -831,7 +831,7 @@ void DOPAIR1_SUBSET_STARS(struct runner *r, const struct cell *restrict ci,
         /* Skip inhibited particles. */
         if (part_is_inhibited(pj, e)) continue;
 
-        const double* xj = part_get_const_x(pj);
+        const double* const xj = part_get_const_x(pj);
         const float hj = part_get_h(pj);
 
         /* Compute the pairwise distance. */
@@ -892,7 +892,7 @@ void DOPAIR1_SUBSET_STARS(struct runner *r, const struct cell *restrict ci,
         /* Skip inhibited particles. */
         if (part_is_inhibited(pj, e)) continue;
 
-        const double* pjx = part_get_const_x(pj);
+        const double* const pjx = part_get_const_x(pj);
         const float hj = part_get_h(pj);
 
         /* Compute the pairwise distance. */
@@ -992,7 +992,7 @@ void DOPAIR1_SUBSET_STARS_NAIVE(struct runner *r,
       /* Skip inhibited particles */
       if (part_is_inhibited(pj, e)) continue;
 
-      const double* pjx = part_get_const_x(pj);
+      const double* const pjx = part_get_const_x(pj);
       const float hj = part_get_h(pj);
 
       /* Compute the pairwise distance. */
@@ -1081,7 +1081,7 @@ void DOSELF1_SUBSET_STARS(struct runner *r, const struct cell *ci,
       if (part_is_inhibited(pj, e)) continue;
 
       /* Compute the pairwise distance. */
-      const double* xj = part_get_const_x(pj);
+      const double* const xj = part_get_const_x(pj);
       const float pjx[3] = {(float)(xj[0] - ci->loc[0]),
                             (float)(xj[1] - ci->loc[1]),
                             (float)(xj[2] - ci->loc[2])};

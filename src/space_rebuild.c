@@ -583,7 +583,7 @@ void space_rebuild(struct space *s, int repartitioned, int verbose) {
   /* Assign each received part to its cell. */
   for (size_t k = nr_parts; k < s->nr_parts; k++) {
     const struct part *const p = &s->parts[k];
-    const double* px = part_get_const_x(p);
+    const double* const px = part_get_const_x(p);
     h_index[k] =
         cell_getid(cdim, px[0] * ih[0], px[1] * ih[1], px[2] * ih[2]);
     cell_part_counts[h_index[k]]++;
@@ -661,7 +661,7 @@ void space_rebuild(struct space *s, int repartitioned, int verbose) {
       error("Inhibited particle sorted into a cell!");
 
     /* New cell index */
-    const double* px = part_get_const_x(p);
+    const double* const px = part_get_const_x(p);
     const int new_ind =
         cell_getid(s->cdim, px[0] * s->iwidth[0], px[1] * s->iwidth[1],
                    px[2] * s->iwidth[2]);

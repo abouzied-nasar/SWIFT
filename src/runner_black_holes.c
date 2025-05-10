@@ -105,19 +105,20 @@ void runner_do_gas_swallow(struct runner *r, struct cell *c, int timer) {
       /* Update mass of associated gpart, to reflect potential changes from
        * nibbling. In this case, we are already done. */
       if (use_nibbling) {
-        p->gpart->mass = hydro_get_mass(p);
+        struct gpart* gp = part_get_gpart(p);
+        gp->mass = hydro_get_mass(p);
         continue;
       }
 
       /* Get the ID of the black holes that will swallow this part */
       const long long swallow_id =
-          black_holes_get_part_swallow_id(&p->black_holes_data);
+          black_holes_get_part_swallow_id(part_get_black_holes_data(p));
 
       /* Has this particle been flagged for swallowing? */
       if (swallow_id >= 0) {
 
 #ifdef SWIFT_DEBUG_CHECKS
-        if (p->ti_drift != e->ti_current)
+        if (part_get_ti_drift(p) != e->ti_current)
           error("Trying to swallow an un-drifted particle.");
 #endif
 
@@ -149,7 +150,7 @@ void runner_do_gas_swallow(struct runner *r, struct cell *c, int timer) {
             /* If the gas particle is local, remove it */
             if (c->nodeID == e->nodeID) {
 
-              message("BH %lld removing gas particle %lld", bp->id, p->id);
+              message("BH %lld removing gas particle %lld", bp->id, part_get_id(p));
 
               lock_lock(&e->s->lock);
 
@@ -168,7 +169,7 @@ void runner_do_gas_swallow(struct runner *r, struct cell *c, int timer) {
             }
 
             /* In any case, prevent the particle from being re-swallowed */
-            black_holes_mark_part_as_swallowed(&p->black_holes_data);
+            black_holes_mark_part_as_swallowed(part_get_black_holes_data(p));
 
             found = 1;
             break;
@@ -192,7 +193,7 @@ void runner_do_gas_swallow(struct runner *r, struct cell *c, int timer) {
             if (bp->id == BH_id) {
 
               message("BH %lld removing gas particle %lld (foreign BH case)",
-                      bp->id, p->id);
+                      bp->id, part_get_id(p));
 
               lock_lock(&e->s->lock);
 
@@ -218,7 +219,7 @@ void runner_do_gas_swallow(struct runner *r, struct cell *c, int timer) {
          * of our list of black holes. */
         if (c->nodeID == e->nodeID && !found) {
           error("Gas particle %lld could not find BH %lld to be swallowed",
-                p->id, swallow_id);
+                part_get_id(p), swallow_id);
         }
       } /* Part was flagged for swallowing */
     } /* Loop over the parts */

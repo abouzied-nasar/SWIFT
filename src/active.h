@@ -384,7 +384,7 @@ __attribute__((always_inline)) INLINE static int part_is_rt_active(
     const struct part *p, const struct engine *e) {
 
   const timebin_t max_active_bin = e->max_active_bin_subcycle;
-  const struct rt_timestepping_data* rt_time_data = part_get_const_rt_time_data(p);
+  const struct rt_timestepping_data* const rt_time_data = part_get_const_rt_time_data(p);
   const timebin_t part_bin = rt_time_data->time_bin;
 
 #ifdef SWIFT_DEBUG_CHECKS
