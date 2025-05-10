@@ -25,6 +25,10 @@
    runner_iact_FUNCTION. */
 
 #include "runner_doiact_limiter.h"
+#include "runner.h"
+#include "timers.h"
+#include "engine.h"
+#include "active.h"
 
 /**
  * @brief Compute the interactions between a cell pair (non-symmetric case).
@@ -89,39 +93,41 @@ void DOPAIR1_NAIVE(struct runner *r, struct cell *restrict ci,
     if (part_is_inhibited(pi, e)) continue;
 
     const int pi_active = part_is_starting(pi, e);
-    const char depth_i = pi->depth_h;
-    const float hi = pi->h;
+    const char depth_i = part_get_depth_h(pi);
+    const float hi = part_get_h(pi);
     const float hig2 = hi * hi * kernel_gamma2;
-    const float pix[3] = {(float)(pi->x[0] - (cj->loc[0] + shift[0])),
-                          (float)(pi->x[1] - (cj->loc[1] + shift[1])),
-                          (float)(pi->x[2] - (cj->loc[2] + shift[2]))};
+    const double* xi = part_get_const_x(pi);
+    const float pix[3] = {(float)(xi[0] - (cj->loc[0] + shift[0])),
+                          (float)(xi[1] - (cj->loc[1] + shift[1])),
+                          (float)(xi[2] - (cj->loc[2] + shift[2]))};
 
     /* Loop over the parts in cj. */
     for (int pjd = 0; pjd < count_j; pjd++) {
 
       /* Get a pointer to the jth particle. */
       struct part *restrict pj = &parts_j[pjd];
-      const char depth_j = pj->depth_h;
+      const char depth_j = part_get_depth_h(pj);
 
       /* Skip inhibited particles. */
       if (part_is_inhibited(pj, e)) continue;
 
-      const float hj = pj->h;
+      const float hj = part_get_h(pj);
       const float hjg2 = hj * hj * kernel_gamma2;
       const int pj_active = part_is_starting(pj, e);
 
       /* Compute the pairwise distance. */
-      const float pjx[3] = {(float)(pj->x[0] - cj->loc[0]),
-                            (float)(pj->x[1] - cj->loc[1]),
-                            (float)(pj->x[2] - cj->loc[2])};
+      const double* xj = part_get_const_x(pj);
+      const float pjx[3] = {(float)(xj[0] - cj->loc[0]),
+                            (float)(xj[1] - cj->loc[1]),
+                            (float)(xj[2] - cj->loc[2])};
       float dx[3] = {pix[0] - pjx[0], pix[1] - pjx[1], pix[2] - pjx[2]};
       const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Check that particles have been drifted to the current time */
-      if (pi->ti_drift != e->ti_current)
+      if (part_get_ti_drift(pi) != e->ti_current)
         error("Particle pi not drifted to current time");
-      if (pj->ti_drift != e->ti_current)
+      if (part_get_ti_drift(pj) != e->ti_current)
         error("Particle pj not drifted to current time");
 #endif
 
@@ -204,12 +210,13 @@ void DOSELF1_NAIVE(struct runner *r, const struct cell *c,
     if (part_is_inhibited(pi, e)) continue;
 
     const int pi_active = part_is_starting(pi, e);
-    const char depth_i = pi->depth_h;
-    const float hi = pi->h;
+    const char depth_i = part_get_depth_h(pi);
+    const float hi = part_get_h(pi);
     const float hig2 = hi * hi * kernel_gamma2;
-    const float pix[3] = {(float)(pi->x[0] - c->loc[0]),
-                          (float)(pi->x[1] - c->loc[1]),
-                          (float)(pi->x[2] - c->loc[2])};
+    const double* xi = part_get_const_x(pi);
+    const float pix[3] = {(float)(xi[0] - c->loc[0]),
+                          (float)(xi[1] - c->loc[1]),
+                          (float)(xi[2] - c->loc[2])};
 
     /* Loop over the parts in cj. */
     for (int pjd = pid + 1; pjd < count; pjd++) {
@@ -220,15 +227,16 @@ void DOSELF1_NAIVE(struct runner *r, const struct cell *c,
       /* Skip inhibited particles. */
       if (part_is_inhibited(pj, e)) continue;
 
-      const float hj = pj->h;
+      const float hj = part_get_h(pj);
       const float hjg2 = hj * hj * kernel_gamma2;
       const int pj_active = part_is_starting(pj, e);
-      const char depth_j = pj->depth_h;
+      const char depth_j = part_get_depth_h(pj);
 
       /* Compute the pairwise distance. */
-      const float pjx[3] = {(float)(pj->x[0] - c->loc[0]),
-                            (float)(pj->x[1] - c->loc[1]),
-                            (float)(pj->x[2] - c->loc[2])};
+      const double* xj = part_get_const_x(pj);
+      const float pjx[3] = {(float)(xj[0] - c->loc[0]),
+                            (float)(xj[1] - c->loc[1]),
+                            (float)(xj[2] - c->loc[2])};
       float dx[3] = {pix[0] - pjx[0], pix[1] - pjx[1], pix[2] - pjx[2]};
       const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
@@ -239,9 +247,9 @@ void DOSELF1_NAIVE(struct runner *r, const struct cell *c,
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Check that particles have been drifted to the current time */
-      if (pi->ti_drift != e->ti_current)
+      if (part_get_ti_drift(pi) != e->ti_current)
         error("Particle pi not drifted to current time");
-      if (pj->ti_drift != e->ti_current)
+      if (part_get_ti_drift(pj) != e->ti_current)
         error("Particle pj not drifted to current time");
 #endif
 
@@ -353,8 +361,8 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
 
       /* Get a hold of the ith part in ci. */
       struct part *restrict pi = &parts_i[sort_i[pid].i];
-      const char depth_i = pi->depth_h;
-      const float hi = pi->h;
+      const char depth_i = part_get_depth_h(pi);
+      const float hi = part_get_h(pi);
 
       /* Skip inactive particles */
       if (!part_is_starting(pi, e)) continue;
@@ -374,9 +382,10 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
 
       /* Get some additional information about pi */
       const float hig2 = hi * hi * kernel_gamma2;
-      const float pix = pi->x[0] - (cj->loc[0] + shift[0]);
-      const float piy = pi->x[1] - (cj->loc[1] + shift[1]);
-      const float piz = pi->x[2] - (cj->loc[2] + shift[2]);
+      const double* xi = part_get_const_x(pi);
+      const float pix = xi[0] - (cj->loc[0] + shift[0]);
+      const float piy = xi[1] - (cj->loc[1] + shift[1]);
+      const float piz = xi[2] - (cj->loc[2] + shift[2]);
 
       /* Loop over the parts in cj. */
       for (int pjd = 0; pjd < count_j && sort_j[pjd].d < di; pjd++) {
@@ -387,10 +396,11 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
         /* Skip inhibited particles. */
         if (part_is_inhibited(pj, e)) continue;
 
-        const float hj = pj->h;
-        const float pjx = pj->x[0] - cj->loc[0];
-        const float pjy = pj->x[1] - cj->loc[1];
-        const float pjz = pj->x[2] - cj->loc[2];
+        const float hj = part_get_h(pj);
+        const double* xj = part_get_const_x(pi);
+        const float pjx = xj[0] - cj->loc[0];
+        const float pjy = xj[1] - cj->loc[1];
+        const float pjz = xj[2] - cj->loc[2];
 
         /* Compute the pairwise distance. */
         const float dx[3] = {pix - pjx, piy - pjy, piz - pjz};
@@ -424,9 +434,9 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
               pjz, ci->width[2]);
 
         /* Check that particles have been drifted to the current time */
-        if (pi->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pi) != e->ti_current)
           error("Particle pi not drifted to current time");
-        if (pj->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pj) != e->ti_current)
           error("Particle pj not drifted to current time");
 #endif
 
@@ -452,8 +462,8 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
 
       /* Get a hold of the jth part in cj. */
       struct part *pj = &parts_j[sort_j[pjd].i];
-      const char depth_j = pj->depth_h;
-      const float hj = pj->h;
+      const char depth_j = part_get_depth_h(pj);
+      const float hj = part_get_h(pj);
 
       /* Skip inactive particles */
       if (!part_is_starting(pj, e)) continue;
@@ -473,9 +483,10 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
 
       /* Get some additional information about pj */
       const float hjg2 = hj * hj * kernel_gamma2;
-      const float pjx = pj->x[0] - cj->loc[0];
-      const float pjy = pj->x[1] - cj->loc[1];
-      const float pjz = pj->x[2] - cj->loc[2];
+      const double* xj = part_get_const_x(pj);
+      const float pjx = xj[0] - cj->loc[0];
+      const float pjy = xj[1] - cj->loc[1];
+      const float pjz = xj[2] - cj->loc[2];
 
       /* Loop over the parts in ci. */
       for (int pid = count_i - 1; pid >= 0 && sort_i[pid].d > dj; pid--) {
@@ -486,10 +497,11 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
         /* Skip inhibited particles. */
         if (part_is_inhibited(pi, e)) continue;
 
-        const float hi = pi->h;
-        const float pix = pi->x[0] - (cj->loc[0] + shift[0]);
-        const float piy = pi->x[1] - (cj->loc[1] + shift[1]);
-        const float piz = pi->x[2] - (cj->loc[2] + shift[2]);
+        const float hi = part_get_h(pi);
+        const double* xi = part_get_const_x(pi);
+        const float pix = xi[0] - (cj->loc[0] + shift[0]);
+        const float piy = xi[1] - (cj->loc[1] + shift[1]);
+        const float piz = xi[2] - (cj->loc[2] + shift[2]);
 
         /* Compute the pairwise distance. */
         const float dx[3] = {pjx - pix, pjy - piy, pjz - piz};
@@ -523,9 +535,9 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
               pjz, ci->width[2]);
 
         /* Check that particles have been drifted to the current time */
-        if (pi->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pi) != e->ti_current)
           error("Particle pi not drifted to current time");
-        if (pj->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pj) != e->ti_current)
           error("Particle pj not drifted to current time");
 #endif
 
@@ -626,7 +638,7 @@ void DOSELF1(struct runner *r, const struct cell *c, const int limit_min_h,
     error("Failed to allocate indt.");
   for (int k = 0; k < count; k++) {
     const struct part *p = &parts[k];
-    const char depth = p->depth_h;
+    const char depth = part_get_depth_h(p);
     if (part_is_starting(&parts[k], e) && (depth >= min_depth) &&
         (depth <= max_depth)) {
       indt[countdt] = k;
@@ -646,14 +658,14 @@ void DOSELF1(struct runner *r, const struct cell *c, const int limit_min_h,
 
     /* Get a pointer to the ith particle. */
     struct part *restrict pi = &parts[pid];
-    const char depth_i = pi->depth_h;
+    const char depth_i = part_get_depth_h(pi);
 
     /* Skip inhibited particles. */
     if (part_is_inhibited(pi, e)) continue;
 
     /* Get the particle position and (square of) search radius. */
-    const double pix[3] = {pi->x[0], pi->x[1], pi->x[2]};
-    const float hi = pi->h;
+    const double* pix = part_get_const_x(pi);
+    const float hi = part_get_h(pi);
     const float hig2 = hi * hi * kernel_gamma2;
 
     /* Is the ith particle active and in the range of h we care about? */
@@ -670,19 +682,19 @@ void DOSELF1(struct runner *r, const struct cell *c, const int limit_min_h,
         struct part *restrict pj = &parts[indt[pjd]];
 
         /* This particle's (square of) search radius. */
-        const float hj = pj->h;
+        const float hj = part_get_h(pj);
         const float hjg2 = hj * hj * kernel_gamma2;
 
 #ifdef SWIFT_DEBUG_CHECKS
         /* Check that particles have been drifted to the current time */
-        if (pi->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pi) != e->ti_current)
           error("Particle pi not drifted to current time");
-        if (pj->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pj) != e->ti_current)
           error("Particle pj not drifted to current time");
 #endif
 
         /* Compute the (square of) pairwise distance. */
-        const double pjx[3] = {pj->x[0], pj->x[1], pj->x[2]};
+        const double* pjx = part_get_const_x(pj);
         const float dx[3] = {(float)(pjx[0] - pix[0]), (float)(pjx[1] - pix[1]),
                              (float)(pjx[2] - pix[2])};
         const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
@@ -715,25 +727,25 @@ void DOSELF1(struct runner *r, const struct cell *c, const int limit_min_h,
 
         /* Get a pointer to the jth particle (by construction pi != pj). */
         struct part *restrict pj = &parts[pjd];
-        const char depth_j = pj->depth_h;
+        const char depth_j = part_get_depth_h(pj);
 
         /* Skip inhibited particles. */
         if (part_is_inhibited(pj, e)) continue;
 
         /* This particle's (square of) search radius. */
-        const float hj = pj->h;
+        const float hj = part_get_h(pj);
         const float hjg2 = hj * hj * kernel_gamma2;
 
 #ifdef SWIFT_DEBUG_CHECKS
         /* Check that particles have been drifted to the current time */
-        if (pi->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pi) != e->ti_current)
           error("Particle pi not drifted to current time");
-        if (pj->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pj) != e->ti_current)
           error("Particle pj not drifted to current time");
 #endif
 
         /* Compute the (square of) pairwise distance. */
-        const double pjx[3] = {pj->x[0], pj->x[1], pj->x[2]};
+        const double* pjx = part_get_const_x(pj);
         float dx[3] = {(float)(pix[0] - pjx[0]), (float)(pix[1] - pjx[1]),
                        (float)(pix[2] - pjx[2])};
         const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];

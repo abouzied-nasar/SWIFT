@@ -276,7 +276,7 @@ INLINE static void sink_copy_properties(
     const struct cooling_function_data* restrict cooling) {
 
   /* Set a smoothing length */
-  sink->h = p->h;
+  sink->h = part_get_h(p);
 }
 
 /**

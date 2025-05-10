@@ -18,6 +18,10 @@
  ******************************************************************************/
 
 #include "runner_doiact_sinks.h"
+#include "active.h"
+#include "engine.h"
+#include "runner.h"
+#include "timers.h"
 
 /**
  * @brief Calculate gas and sink interaction around #sink
@@ -70,15 +74,16 @@ void DOSELF1_SINKS(struct runner *r, struct cell *c, int timer) {
 
         /* Get a pointer to the jth particle. */
         struct part *restrict pj = &parts[pjd];
-        const float hj = pj->h;
+        const float hj =part_get_h(pj);
 
         /* Early abort? */
         if (part_is_inhibited(pj, e)) continue;
 
         /* Compute the pairwise distance. */
-        const float pjx[3] = {(float)(pj->x[0] - c->loc[0]),
-                              (float)(pj->x[1] - c->loc[1]),
-                              (float)(pj->x[2] - c->loc[2])};
+        const double* xj = part_get_const_x(pj);
+        const float pjx[3] = {(float)(xj[0] - c->loc[0]),
+                              (float)(xj[1] - c->loc[1]),
+                              (float)(xj[2] - c->loc[2])};
         const float dx[3] = {six[0] - pjx[0], six[1] - pjx[1], six[2] - pjx[2]};
         const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
@@ -86,7 +91,7 @@ void DOSELF1_SINKS(struct runner *r, struct cell *c, int timer) {
         /* Check that particles have been drifted to the current time */
         if (si->ti_drift != e->ti_current)
           error("Particle si not drifted to current time");
-        if (pj->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pj) != e->ti_current)
           error("Particle pj not drifted to current time");
 #endif
 
@@ -221,15 +226,16 @@ void DO_NONSYM_PAIR1_SINKS_NAIVE(struct runner *r, struct cell *restrict ci,
 
         /* Get a pointer to the jth particle. */
         struct part *restrict pj = &parts_j[pjd];
-        const float hj = pj->h;
+        const float hj =part_get_h(pj);
 
         /* Skip inhibited particles. */
         if (part_is_inhibited(pj, e)) continue;
 
         /* Compute the pairwise distance. */
-        const float pjx[3] = {(float)(pj->x[0] - cj->loc[0]),
-                              (float)(pj->x[1] - cj->loc[1]),
-                              (float)(pj->x[2] - cj->loc[2])};
+        const double* xj = part_get_const_x(pj);
+        const float pjx[3] = {(float)(xj[0] - cj->loc[0]),
+                              (float)(xj[1] - cj->loc[1]),
+                              (float)(xj[2] - cj->loc[2])};
         const float dx[3] = {six[0] - pjx[0], six[1] - pjx[1], six[2] - pjx[2]};
         const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
@@ -237,7 +243,7 @@ void DO_NONSYM_PAIR1_SINKS_NAIVE(struct runner *r, struct cell *restrict ci,
         /* Check that particles have been drifted to the current time */
         if (si->ti_drift != e->ti_current)
           error("Particle si not drifted to current time");
-        if (pj->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pj) != e->ti_current)
           error("Particle pj not drifted to current time");
 #endif
 
@@ -395,19 +401,17 @@ void DOPAIR1_SUBSET_SINKS_NAIVE(struct runner *r, struct cell *restrict ci,
       /* Skip inhibited particles */
       if (part_is_inhibited(pj, e)) continue;
 
-      const double pjx = pj->x[0];
-      const double pjy = pj->x[1];
-      const double pjz = pj->x[2];
-      const float hj = pj->h;
+      const double* pjx = part_get_const_x(pj);
+      const float hj =part_get_h(pj);
 
       /* Compute the pairwise distance. */
-      const float dx[3] = {(float)(six - pjx), (float)(siy - pjy),
-                           (float)(siz - pjz)};
+      const float dx[3] = {(float)(six - pjx[0]), (float)(siy - pjx[1]),
+                           (float)(siz - pjx[2])};
       const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Check that particles have been drifted to the current time */
-      if (pj->ti_drift != e->ti_current)
+      if (part_get_ti_drift(pj) != e->ti_current)
         error("Particle pj not drifted to current time");
 #endif
       /* Hit or miss? */
@@ -472,21 +476,22 @@ void DOSELF1_SUBSET_SINKS(struct runner *r, struct cell *restrict ci,
       if (part_is_inhibited(pj, e)) continue;
 
       /* Compute the pairwise distance. */
-      const float pjx[3] = {(float)(pj->x[0] - ci->loc[0]),
-                            (float)(pj->x[1] - ci->loc[1]),
-                            (float)(pj->x[2] - ci->loc[2])};
+      const double* xj = part_get_const_x(pj);
+      const float pjx[3] = {(float)(xj[0] - ci->loc[0]),
+                            (float)(xj[1] - ci->loc[1]),
+                            (float)(xj[2] - ci->loc[2])};
       const float dx[3] = {six[0] - pjx[0], six[1] - pjx[1], six[2] - pjx[2]};
       const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Check that particles have been drifted to the current time */
-      if (pj->ti_drift != e->ti_current)
+      if (part_get_ti_drift(pj) != e->ti_current)
         error("Particle pj not drifted to current time");
 #endif
 
       /* Hit or miss? */
       if (r2 < hig2) {
-        IACT_SINKS_GAS(r2, dx, hi, pj->h, si, pj, with_cosmology, cosmo,
+        IACT_SINKS_GAS(r2, dx, hi,part_get_h(pj), si, pj, with_cosmology, cosmo,
                        e->gravity_properties, e->sink_properties, e->ti_current,
                        e->time);
       }

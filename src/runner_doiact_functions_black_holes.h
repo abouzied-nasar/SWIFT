@@ -25,6 +25,10 @@
    runner_iact_FUNCTION. */
 
 #include "runner_doiact_black_holes.h"
+#include "active.h"
+#include "engine.h"
+#include "runner.h"
+#include "timers.h"
 
 /**
  * @brief Calculate the number density of #part around the #bpart
@@ -81,15 +85,16 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
         /* Get a pointer to the jth particle. */
         struct part *restrict pj = &parts[pjd];
         struct xpart *restrict xpj = &xparts[pjd];
-        const float hj = pj->h;
+        const float hj =part_get_h(pj);
 
         /* Early abort? */
         if (part_is_inhibited(pj, e)) continue;
 
         /* Compute the pairwise distance. */
-        const float pjx[3] = {(float)(pj->x[0] - c->loc[0]),
-                              (float)(pj->x[1] - c->loc[1]),
-                              (float)(pj->x[2] - c->loc[2])};
+        const double* xj = part_get_const_x(pj);
+        const float pjx[3] = {(float)(xj[0] - c->loc[0]),
+                              (float)(xj[1] - c->loc[1]),
+                              (float)(xj[2] - c->loc[2])};
         const float dx[3] = {bix[0] - pjx[0], bix[1] - pjx[1], bix[2] - pjx[2]};
         const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
@@ -97,7 +102,7 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
         /* Check that particles have been drifted to the current time */
         if (bi->ti_drift != e->ti_current)
           error("Particle bi not drifted to current time");
-        if (pj->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pj) != e->ti_current)
           error("Particle pj not drifted to current time");
 #endif
 
@@ -109,7 +114,7 @@ void DOSELF1_BH(struct runner *r, struct cell *c, int timer) {
           if (bi_is_local) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_SWALLOW)
             runner_iact_nonsym_bh_gas_repos(
-                r2, dx, hi, pj->h, bi, pj, xpj, with_cosmology, cosmo,
+                r2, dx, hi,part_get_h(pj), bi, pj, xpj, with_cosmology, cosmo,
                 e->gravity_properties, e->black_holes_properties,
                 e->entropy_floor, ti_current, e->time);
 #endif
@@ -251,15 +256,16 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
         /* Get a pointer to the jth particle. */
         struct part *restrict pj = &parts_j[pjd];
         struct xpart *restrict xpj = &xparts_j[pjd];
-        const float hj = pj->h;
+        const float hj =part_get_h(pj);
 
         /* Skip inhibited particles. */
         if (part_is_inhibited(pj, e)) continue;
 
         /* Compute the pairwise distance. */
-        const float pjx[3] = {(float)(pj->x[0] - cj->loc[0]),
-                              (float)(pj->x[1] - cj->loc[1]),
-                              (float)(pj->x[2] - cj->loc[2])};
+        const double* xj = part_get_const_x(pj);
+        const float pjx[3] = {(float)(xj[0] - cj->loc[0]),
+                              (float)(xj[1] - cj->loc[1]),
+                              (float)(xj[2] - cj->loc[2])};
         const float dx[3] = {bix[0] - pjx[0], bix[1] - pjx[1], bix[2] - pjx[2]};
         const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
@@ -267,7 +273,7 @@ void DO_NONSYM_PAIR1_BH_NAIVE(struct runner *r, struct cell *restrict ci,
         /* Check that particles have been drifted to the current time */
         if (bi->ti_drift != e->ti_current)
           error("Particle bi not drifted to current time");
-        if (pj->ti_drift != e->ti_current)
+        if (part_get_ti_drift(pj) != e->ti_current)
           error("Particle pj not drifted to current time");
 #endif
 
@@ -439,19 +445,17 @@ void DOPAIR1_SUBSET_BH_NAIVE(struct runner *r, struct cell *restrict ci,
       /* Skip inhibited particles */
       if (part_is_inhibited(pj, e)) continue;
 
-      const double pjx = pj->x[0];
-      const double pjy = pj->x[1];
-      const double pjz = pj->x[2];
-      const float hj = pj->h;
+      const double* pjx = part_get_const_x(pj);
+      const float hj =part_get_h(pj);
 
       /* Compute the pairwise distance. */
-      const float dx[3] = {(float)(bix - pjx), (float)(biy - pjy),
-                           (float)(biz - pjz)};
+      const float dx[3] = {(float)(bix - pjx[0]), (float)(biy - pjx[1]),
+                           (float)(biz - pjx[2])};
       const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Check that particles have been drifted to the current time */
-      if (pj->ti_drift != e->ti_current)
+      if (part_get_ti_drift(pj) != e->ti_current)
         error("Particle pj not drifted to current time");
 #endif
       /* Hit or miss? */
@@ -529,28 +533,29 @@ void DOSELF1_SUBSET_BH(struct runner *r, struct cell *restrict ci,
       if (part_is_inhibited(pj, e)) continue;
 
       /* Compute the pairwise distance. */
-      const float pjx[3] = {(float)(pj->x[0] - ci->loc[0]),
-                            (float)(pj->x[1] - ci->loc[1]),
-                            (float)(pj->x[2] - ci->loc[2])};
+      const double* xj = part_get_const_x(pj);
+      const float pjx[3] = {(float)(xj[0] - ci->loc[0]),
+                            (float)(xj[1] - ci->loc[1]),
+                            (float)(xj[2] - ci->loc[2])};
       const float dx[3] = {bix[0] - pjx[0], bix[1] - pjx[1], bix[2] - pjx[2]};
       const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Check that particles have been drifted to the current time */
-      if (pj->ti_drift != e->ti_current)
+      if (part_get_ti_drift(pj) != e->ti_current)
         error("Particle pj not drifted to current time");
 #endif
 
       /* Hit or miss? */
       if (r2 < hig2) {
-        IACT_BH_GAS(r2, dx, hi, pj->h, bi, pj, xpj, with_cosmology, cosmo,
+        IACT_BH_GAS(r2, dx, hi,part_get_h(pj), bi, pj, xpj, with_cosmology, cosmo,
                     e->gravity_properties, e->black_holes_properties,
                     e->entropy_floor, ti_current, e->time);
 
         if (bi_is_local) {
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_SWALLOW)
           runner_iact_nonsym_bh_gas_repos(
-              r2, dx, hi, pj->h, bi, pj, xpj, with_cosmology, cosmo,
+              r2, dx, hi,part_get_h(pj), bi, pj, xpj, with_cosmology, cosmo,
               e->gravity_properties, e->black_holes_properties,
               e->entropy_floor, ti_current, e->time);
 #endif
