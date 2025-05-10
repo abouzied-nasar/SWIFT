@@ -335,6 +335,11 @@ part_get_id_p(struct part *restrict p){
   return &p->_id;
 }
 
+__attribute__((always_inline)) INLINE const static long long*
+part_get_const_id_p(const struct part *restrict p){
+  return &p->_id;
+}
+
 
 __attribute__((always_inline)) INLINE static void
 part_set_id(struct part *restrict p, const long long id){
@@ -345,6 +350,11 @@ part_set_id(struct part *restrict p, const long long id){
 __attribute__((always_inline)) INLINE static struct gpart*
 part_get_gpart(const struct part *restrict p){
   return p->_gpart;
+}
+
+__attribute__((always_inline)) INLINE static struct gpart**
+part_get_gpart_p(struct part *restrict p){
+  return &p->_gpart;
 }
 
 __attribute__((always_inline)) INLINE const static struct gpart*
@@ -367,11 +377,19 @@ part_get_x(struct part *restrict p){
 }
 
 /**
- * @brief get particle position
+ * @brief get particle position for read-only access
  */
 __attribute__((always_inline)) INLINE const static double*
 part_get_const_x(const struct part *restrict p){
   return p->_x;
+}
+
+/**
+ * @brief get pointer to particle position.
+ */
+__attribute__((always_inline)) INLINE static double
+(*part_get_x_p(struct part *restrict p))[3]{
+  return &(p->_x);
 }
 
 /**
@@ -423,6 +441,12 @@ part_get_const_v(const struct part *restrict p){
   return p->_v;
 }
 
+__attribute__((always_inline)) INLINE static float
+(*part_get_v_p(struct part *restrict p))[3]{
+  return &(p->_v);
+}
+
+
 
 /**
  * @brief get particle velocity by index
@@ -472,6 +496,11 @@ part_get_const_a_hydro(const struct part *restrict p){
   return p->_a_hydro;
 }
 
+__attribute__((always_inline)) INLINE static float
+(*part_get_a_hydro_p(struct part *restrict p))[3]{
+  return &(p->_a_hydro);
+}
+
 /**
  * @brief get particle hydrodynamical acceleration by index.
  */
@@ -505,6 +534,16 @@ part_get_mass(const struct part *restrict p){
   return p->_mass;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_mass_p(struct part *restrict p){
+  return &p->_mass;
+}
+__attribute__((always_inline)) INLINE const static float*
+part_get_const_mass_p(const struct part *restrict p){
+  return &p->_mass;
+}
+
+
 __attribute__((always_inline)) INLINE static void
 part_set_mass(struct part *restrict p, const float mass){
   p->_mass = mass;
@@ -519,6 +558,16 @@ part_get_h(const struct part *restrict p){
   return p->_h;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_h_p(struct part *restrict p){
+  return &p->_h;
+}
+
+__attribute__((always_inline)) INLINE const static float*
+part_get_const_h_p(const struct part *restrict p){
+  return &p->_h;
+}
+
 __attribute__((always_inline)) INLINE static void
 part_set_h(struct part *restrict p, const float h){
   p->_h = h;
@@ -528,6 +577,16 @@ part_set_h(struct part *restrict p, const float h){
 __attribute__((always_inline)) INLINE static float
 part_get_u(const struct part *restrict p){
   return p->_u;
+}
+
+__attribute__((always_inline)) INLINE static float*
+part_get_u_p(struct part *restrict p){
+  return &p->_u;
+}
+
+__attribute__((always_inline)) INLINE const static float*
+part_get_const_u_p(const struct part *restrict p){
+  return &p->_u;
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -541,6 +600,16 @@ part_get_rho(const struct part *restrict p){
   return p->_rho;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_rho_p(struct part *restrict p){
+  return &p->_rho;
+}
+
+__attribute__((always_inline)) INLINE const static float*
+part_get_const_rho_p(const struct part *restrict p){
+  return &p->_rho;
+}
+
 __attribute__((always_inline)) INLINE static void
 part_set_rho(struct part *restrict p, const float u_dt){
   p->_rho = u_dt;
@@ -549,11 +618,15 @@ part_set_rho(struct part *restrict p, const float u_dt){
 
 /**
  * @brief get du/dt
- * @TODO: change name to co-moving/physical?
  */
 __attribute__((always_inline)) INLINE static float
 part_get_u_dt(const struct part *restrict p){
   return p->_u_dt;
+}
+
+__attribute__((always_inline)) INLINE static float*
+part_get_u_dt_p(struct part *restrict p){
+  return &p->_u_dt;
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -568,6 +641,16 @@ part_get_div_v(const struct part *restrict p){
   return p->viscosity._div_v;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_div_v_p(struct part *restrict p){
+  return &p->viscosity._div_v;
+}
+
+__attribute__((always_inline)) INLINE const static float*
+part_get_const_div_v_p(const struct part *restrict p){
+  return &p->viscosity._div_v;
+}
+
 __attribute__((always_inline)) INLINE static void
 part_set_div_v(struct part *restrict p, const float div_v){
   p->viscosity._div_v = div_v;
@@ -579,6 +662,16 @@ part_get_div_v_dt(const struct part *restrict p){
   return p->viscosity._div_v_dt;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_div_v_dt_p(struct part *restrict p){
+  return &p->viscosity._div_v_dt;
+}
+
+__attribute__((always_inline)) INLINE const static float*
+part_get_const_div_v_dt_p(const struct part *restrict p){
+  return &p->viscosity._div_v_dt;
+}
+
 __attribute__((always_inline)) INLINE static void
 part_set_div_v_dt(struct part *restrict p, const float div_v_dt){
   p->viscosity._div_v_dt = div_v_dt;
@@ -588,6 +681,11 @@ part_set_div_v_dt(struct part *restrict p, const float div_v_dt){
 __attribute__((always_inline)) INLINE static float
 part_get_div_v_previous_step(const struct part *restrict p){
   return p->viscosity._div_v_previous_step;
+}
+
+__attribute__((always_inline)) INLINE static float*
+part_get_div_v_previous_step_p(struct part *restrict p){
+  return &p->viscosity._div_v_previous_step;
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -604,6 +702,11 @@ part_get_alpha_av(const struct part *restrict p){
   return p->viscosity._alpha;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_alpha_av_p(struct part *restrict p){
+  return &p->viscosity._alpha;
+}
+
 /**
  * @brief set the artificial viscosity parameter alpha
  */
@@ -618,6 +721,11 @@ part_get_v_sig(const struct part *restrict p){
   return p->viscosity._v_sig;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_v_sig_p(struct part *restrict p){
+  return &p->viscosity._v_sig;
+}
+
 __attribute__((always_inline)) INLINE static void
 part_set_v_sig(struct part *restrict p, const float v_sig){
   p->viscosity._v_sig = v_sig;
@@ -628,6 +736,16 @@ part_set_v_sig(struct part *restrict p, const float v_sig){
 __attribute__((always_inline)) INLINE static float
 part_get_laplace_u(const struct part *restrict p){
   return p->diffusion._laplace_u;
+}
+
+__attribute__((always_inline)) INLINE static float*
+part_get_laplace_u_p(struct part *restrict p){
+  return &p->diffusion._laplace_u;
+}
+
+__attribute__((always_inline)) INLINE const static float*
+part_get_const_laplace_u_p(const struct part *restrict p){
+  return &p->diffusion._laplace_u;
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -644,6 +762,11 @@ part_get_alpha_diff(const struct part *restrict p){
   return p->diffusion._alpha;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_alpha_diff_p(struct part *restrict p){
+  return &p->diffusion._alpha;
+}
+
 /**
  * @brief set the thermal diffusion coefficient alpha
  */
@@ -658,6 +781,11 @@ part_get_wcount(const struct part *restrict p){
   return p->density._wcount;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_wcount_p(struct part *restrict p){
+  return &p->density._wcount;
+}
+
 __attribute__((always_inline)) INLINE static void
 part_set_wcount(struct part *restrict p, const float wcount){
   p->density._wcount = wcount;
@@ -669,6 +797,11 @@ part_get_wcount_dh(const struct part *restrict p){
   return p->density._wcount_dh;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_wcount_dh_p(struct part *restrict p){
+  return &p->density._wcount_dh;
+}
+
 __attribute__((always_inline)) INLINE static void
 part_set_wcount_dh(struct part *restrict p, const float wcount_dh){
   p->density._wcount_dh = wcount_dh;
@@ -678,6 +811,11 @@ part_set_wcount_dh(struct part *restrict p, const float wcount_dh){
 __attribute__((always_inline)) INLINE static float
 part_get_rho_dh(const struct part *restrict p){
   return p->density._rho_dh;
+}
+
+__attribute__((always_inline)) INLINE static float*
+part_get_rho_dh_p(struct part *restrict p){
+  return &p->density._rho_dh;
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -693,6 +831,13 @@ __attribute__((always_inline)) INLINE static float*
 part_get_rot_v(struct part *restrict p){
   return p->density._rot_v;
 }
+
+__attribute__((always_inline)) INLINE static float
+(*part_get_rot_v_p(struct part *restrict p))[3]{
+  return &(p->density._rot_v);
+}
+
+
 
 /**
  * @brief set all rot_v-values of part p from an array.
@@ -718,6 +863,11 @@ part_get_f_gradh(const struct part *restrict p){
   return p->force._f_gradh;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_f_gradh_p(struct part *restrict p){
+  return &p->force._f_gradh;
+}
+
 __attribute__((always_inline)) INLINE static void
 part_set_f_gradh(struct part *restrict p, const float f_gradh){
   p->force._f_gradh = f_gradh;
@@ -727,6 +877,11 @@ part_set_f_gradh(struct part *restrict p, const float f_gradh){
 __attribute__((always_inline)) INLINE static float
 part_get_pressure(const struct part *restrict p){
   return p->force._pressure;
+}
+
+__attribute__((always_inline)) INLINE static float*
+part_get_pressure_p(struct part *restrict p){
+  return &p->force._pressure;
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -740,6 +895,11 @@ part_get_soundspeed(const struct part *restrict p){
   return p->force._soundspeed;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_soundspeed_p(struct part *restrict p){
+  return &p->force._soundspeed;
+}
+
 __attribute__((always_inline)) INLINE static void
 part_set_soundspeed(struct part *restrict p, const float soundspeed){
   p->force._soundspeed = soundspeed;
@@ -751,6 +911,11 @@ part_get_h_dt(const struct part *restrict p){
   return p->force._h_dt;
 }
 
+__attribute__((always_inline)) INLINE static float*
+part_get_h_dt_p(struct part *restrict p){
+  return &p->force._h_dt;
+}
+
 __attribute__((always_inline)) INLINE static void
 part_set_h_dt(struct part *restrict p, const float h_dt){
   p->force._h_dt = h_dt;
@@ -760,6 +925,11 @@ part_set_h_dt(struct part *restrict p, const float h_dt){
 __attribute__((always_inline)) INLINE static float
 part_get_balsara(const struct part *restrict p){
   return p->force._balsara;
+}
+
+__attribute__((always_inline)) INLINE static float*
+part_get_balsara_p(struct part *restrict p){
+  return &p->force._balsara;
 }
 
 __attribute__((always_inline)) INLINE static void
@@ -774,6 +944,11 @@ part_set_balsara(struct part *restrict p, const float balsara){
 __attribute__((always_inline)) INLINE static float
 part_get_alpha_visc_max_ngb(const struct part *restrict p){
   return p->force._alpha_visc_max_ngb;
+}
+
+__attribute__((always_inline)) INLINE static float*
+part_get_alpha_visc_max_ngb_p(struct part *restrict p){
+  return &p->force._alpha_visc_max_ngb;
 }
 
 /**

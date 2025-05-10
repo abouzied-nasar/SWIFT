@@ -27,6 +27,7 @@
  */
 
 #include "adiabatic_index.h"
+#include "engine.h"
 #include "hydro.h"
 #include "hydro_parameters.h"
 #include "io_properties.h"
@@ -46,22 +47,22 @@ INLINE static void hydro_read_particles(struct part* parts,
   *num_fields = 8;
 
   /* List what we want to read */
-  list[0] = io_make_input_field("Coordinates", DOUBLE, 3, COMPULSORY,
-                                UNIT_CONV_LENGTH, parts, x);
-  list[1] = io_make_input_field("Velocities", FLOAT, 3, COMPULSORY,
-                                UNIT_CONV_SPEED, parts, v);
-  list[2] = io_make_input_field("Masses", FLOAT, 1, COMPULSORY, UNIT_CONV_MASS,
-                                parts, mass);
-  list[3] = io_make_input_field("SmoothingLength", FLOAT, 1, COMPULSORY,
-                                UNIT_CONV_LENGTH, parts, h);
-  list[4] = io_make_input_field("InternalEnergy", FLOAT, 1, COMPULSORY,
-                                UNIT_CONV_ENERGY_PER_UNIT_MASS, parts, u);
-  list[5] = io_make_input_field("ParticleIDs", ULONGLONG, 1, COMPULSORY,
-                                UNIT_CONV_NO_UNITS, parts, id);
-  list[6] = io_make_input_field("Accelerations", FLOAT, 3, OPTIONAL,
-                                UNIT_CONV_ACCELERATION, parts, a_hydro);
-  list[7] = io_make_input_field("Density", FLOAT, 1, OPTIONAL,
-                                UNIT_CONV_DENSITY, parts, rho);
+  list[0] = io_make_getter_input_field("Coordinates", DOUBLE, 3,
+      COMPULSORY, UNIT_CONV_LENGTH, parts, part_get_x_p);
+  list[1] = io_make_getter_input_field("Velocities", FLOAT, 3,
+      COMPULSORY, UNIT_CONV_SPEED, parts, part_get_v_p);
+  list[2] = io_make_getter_input_field("Masses", FLOAT, 1,
+      COMPULSORY, UNIT_CONV_MASS, parts, part_get_mass_p);
+  list[3] = io_make_getter_input_field("SmoothingLength", FLOAT, 1,
+      COMPULSORY, UNIT_CONV_LENGTH, parts, part_get_h_p);
+  list[4] = io_make_getter_input_field("InternalEnergy", FLOAT, 1,
+      COMPULSORY, UNIT_CONV_ENERGY_PER_UNIT_MASS, parts, part_get_u_p);
+  list[5] = io_make_getter_input_field("ParticleIDs", ULONGLONG, 1,
+      COMPULSORY, UNIT_CONV_NO_UNITS, parts, part_get_id_p);
+  list[6] = io_make_getter_input_field("Accelerations", FLOAT, 3,
+      OPTIONAL, UNIT_CONV_ACCELERATION, parts, part_get_a_hydro_p);
+  list[7] = io_make_getter_input_field("Density", FLOAT, 1,
+      OPTIONAL, UNIT_CONV_DENSITY, parts, part_get_rho_p);
 }
 
 INLINE static void convert_S(const struct engine* e, const struct part* p,
@@ -81,14 +82,15 @@ INLINE static void convert_part_pos(const struct engine* e,
                                     const struct xpart* xp, double* ret) {
 
   const struct space* s = e->s;
+  const double* const x = part_get_const_x(p);
   if (s->periodic) {
-    ret[0] = box_wrap(p->x[0], 0.0, s->dim[0]);
-    ret[1] = box_wrap(p->x[1], 0.0, s->dim[1]);
-    ret[2] = box_wrap(p->x[2], 0.0, s->dim[2]);
+    ret[0] = box_wrap(x[0], 0.0, s->dim[0]);
+    ret[1] = box_wrap(x[1], 0.0, s->dim[1]);
+    ret[2] = box_wrap(x[2], 0.0, s->dim[2]);
   } else {
-    ret[0] = p->x[0];
-    ret[1] = p->x[1];
-    ret[2] = p->x[2];
+    ret[0] = x[0];
+    ret[1] = x[1];
+    ret[2] = x[2];
   }
   if (e->snapshot_use_delta_from_edge) {
     ret[0] = min(ret[0], s->dim[0] - e->snapshot_delta_from_edge);
@@ -107,11 +109,12 @@ INLINE static void convert_part_vel(const struct engine* e,
   const double time_base = e->time_base;
   const float dt_kick_grav_mesh = e->dt_kick_grav_mesh_for_io;
 
-  const integertime_t ti_beg = get_integer_time_begin(ti_current, p->time_bin);
-  const integertime_t ti_end = get_integer_time_end(ti_current, p->time_bin);
+  const integertime_t ti_beg = get_integer_time_begin(ti_current, part_get_time_bin(p));
+  const integertime_t ti_end = get_integer_time_end(ti_current, part_get_time_bin(p));
 
   /* Get time-step since the last kick */
-  float dt_kick_grav, dt_kick_hydro;
+  float dt_kick_grav;
+  float dt_kick_hydro;
   if (with_cosmology) {
     dt_kick_grav = cosmology_get_grav_kick_factor(cosmo, ti_beg, ti_current);
     dt_kick_grav -=
@@ -125,22 +128,24 @@ INLINE static void convert_part_vel(const struct engine* e,
   }
 
   /* Extrapolate the velocites to the current time (hydro term)*/
-  ret[0] = xp->v_full[0] + p->a_hydro[0] * dt_kick_hydro;
-  ret[1] = xp->v_full[1] + p->a_hydro[1] * dt_kick_hydro;
-  ret[2] = xp->v_full[2] + p->a_hydro[2] * dt_kick_hydro;
+  const float* const a_hydro = part_get_const_a_hydro(p);
+  ret[0] = xp->v_full[0] + a_hydro[0] * dt_kick_hydro;
+  ret[1] = xp->v_full[1] + a_hydro[1] * dt_kick_hydro;
+  ret[2] = xp->v_full[2] + a_hydro[2] * dt_kick_hydro;
 
   /* Add the gravity term */
-  if (p->gpart != NULL) {
-    ret[0] += p->gpart->a_grav[0] * dt_kick_grav;
-    ret[1] += p->gpart->a_grav[1] * dt_kick_grav;
-    ret[2] += p->gpart->a_grav[2] * dt_kick_grav;
+  const struct gpart* gp = part_get_gpart(p);
+  if (gp != NULL) {
+    ret[0] += gp->a_grav[0] * dt_kick_grav;
+    ret[1] += gp->a_grav[1] * dt_kick_grav;
+    ret[2] += gp->a_grav[2] * dt_kick_grav;
   }
 
   /* And the mesh gravity term */
-  if (p->gpart != NULL) {
-    ret[0] += p->gpart->a_grav_mesh[0] * dt_kick_grav_mesh;
-    ret[1] += p->gpart->a_grav_mesh[1] * dt_kick_grav_mesh;
-    ret[2] += p->gpart->a_grav_mesh[2] * dt_kick_grav_mesh;
+  if (gp != NULL) {
+    ret[0] += gp->a_grav_mesh[0] * dt_kick_grav_mesh;
+    ret[1] += gp->a_grav_mesh[1] * dt_kick_grav_mesh;
+    ret[2] += gp->a_grav_mesh[2] * dt_kick_grav_mesh;
   }
 
   /* Conversion from internal units to peculiar velocities */
@@ -152,8 +157,8 @@ INLINE static void convert_part_vel(const struct engine* e,
 INLINE static void convert_part_potential(const struct engine* e,
                                           const struct part* p,
                                           const struct xpart* xp, float* ret) {
-  if (p->gpart != NULL)
-    ret[0] = gravity_get_comoving_potential(p->gpart);
+  if (part_get_gpart(p) != NULL)
+    ret[0] = gravity_get_comoving_potential(part_get_gpart(p));
   else
     ret[0] = 0.f;
 }
@@ -161,9 +166,9 @@ INLINE static void convert_part_potential(const struct engine* e,
 INLINE static void convert_part_softening(const struct engine* e,
                                           const struct part* p,
                                           const struct xpart* xp, float* ret) {
-  if (p->gpart != NULL)
+  if (part_get_gpart(p) != NULL)
     ret[0] = kernel_gravity_softening_plummer_equivalent_inv *
-             gravity_get_softening(p->gpart, e->gravity_properties);
+             gravity_get_softening(part_get_gpart(p), e->gravity_properties);
   else
     ret[0] = 0.f;
 }
@@ -171,13 +176,13 @@ INLINE static void convert_part_softening(const struct engine* e,
 INLINE static void convert_viscosity(const struct engine* e,
                                      const struct part* p,
                                      const struct xpart* xp, float* ret) {
-  ret[0] = p->viscosity.alpha * p->force.balsara;
+  ret[0] = part_get_alpha_av(p) * part_get_balsara(p);
 }
 
 INLINE static void convert_diffusion(const struct engine* e,
                                      const struct part* p,
                                      const struct xpart* xp, float* ret) {
-  ret[0] = p->diffusion.alpha;
+  ret[0] = part_get_alpha_diff(p);
 }
 
 /**
@@ -205,24 +210,24 @@ INLINE static void hydro_write_particles(const struct part* parts,
       "Peculiar velocities of the stars. This is (a * dx/dt) where x is the "
       "co-moving positions of the particles");
 
-  list[2] = io_make_output_field("Masses", FLOAT, 1, UNIT_CONV_MASS, 0.f, parts,
-                                 mass, "Masses of the particles");
+  list[2] = io_make_getter_output_field("Masses", FLOAT, 1,
+      UNIT_CONV_MASS, 0.f, parts, part_get_const_mass_p, "Masses of the particles");
 
-  list[3] = io_make_output_field(
-      "SmoothingLengths", FLOAT, 1, UNIT_CONV_LENGTH, 1.f, parts, h,
+  list[3] = io_make_getter_output_field(
+      "SmoothingLengths", FLOAT, 1, UNIT_CONV_LENGTH, 1.f, parts, part_get_const_h_p,
       "Co-moving smoothing lengths (FWHM of the kernel) of the particles");
 
-  list[4] = io_make_output_field(
+  list[4] = io_make_getter_output_field(
       "InternalEnergies", FLOAT, 1, UNIT_CONV_ENERGY_PER_UNIT_MASS,
-      -3.f * hydro_gamma_minus_one, parts, u,
+      -3.f * hydro_gamma_minus_one, parts, part_get_const_u_p,
       "Co-moving thermal energies per unit mass of the particles");
 
-  list[5] = io_make_physical_output_field(
-      "ParticleIDs", ULONGLONG, 1, UNIT_CONV_NO_UNITS, 0.f, parts, id,
+  list[5] = io_make_physical_getter_output_field(
+      "ParticleIDs", ULONGLONG, 1, UNIT_CONV_NO_UNITS, 0.f, parts, part_get_const_id_p,
       /*can convert to comoving=*/0, "Unique IDs of the particles");
 
-  list[6] = io_make_output_field("Densities", FLOAT, 1, UNIT_CONV_DENSITY, -3.f,
-                                 parts, rho,
+  list[6] = io_make_getter_output_field("Densities", FLOAT, 1, UNIT_CONV_DENSITY, -3.f,
+                                 parts, part_get_const_rho_p,
                                  "Co-moving mass densities of the particles");
 
   list[7] = io_make_output_field_convert_part(
@@ -243,22 +248,22 @@ INLINE static void hydro_write_particles(const struct part* parts,
       "DiffusionParameters", FLOAT, 1, UNIT_CONV_NO_UNITS, 0.f, parts, xparts,
       convert_diffusion, "Diffusion coefficient (alpha_diff) of the particles");
 
-  list[11] = io_make_output_field(
+  list[11] = io_make_getter_output_field(
       "LaplacianInternalEnergies", FLOAT, 1, UNIT_CONV_FREQUENCY_SQUARED,
-      1.f - 3.f * hydro_gamma, parts, diffusion.laplace_u,
+      1.f - 3.f * hydro_gamma, parts, part_get_const_laplace_u_p,
       "Laplacian (del squared) of the Internal Energy per "
       "unit mass of the particles");
 
-  list[12] = io_make_output_field(
+  list[12] = io_make_getter_output_field(
       "VelocityDivergences", FLOAT, 1, UNIT_CONV_FREQUENCY, 0.f, parts,
-      viscosity.div_v,
+      part_get_const_div_v_p,
       "Local velocity divergence field around the particles. Provided without "
       "cosmology, as this includes the Hubble flow. To return to a peculiar "
       "velocity divergence, div . v_pec = a^2 (div . v - n_D H)");
 
-  list[13] = io_make_output_field(
+  list[13] = io_make_getter_output_field(
       "VelocityDivergenceTimeDifferentials", FLOAT, 1,
-      UNIT_CONV_FREQUENCY_SQUARED, 0.f, parts, viscosity.div_v_dt,
+      UNIT_CONV_FREQUENCY_SQUARED, 0.f, parts, part_get_const_div_v_dt_p,
       "Time differential (over the previous step) of the "
       "velocity divergence field around the particles. Again, provided without "
       "cosmology as this includes a Hubble flow term. To get back to a "
