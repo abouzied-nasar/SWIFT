@@ -19,6 +19,10 @@
 #ifndef SWIFT_TIMESTEP_LIMITER_IACT_H
 #define SWIFT_TIMESTEP_LIMITER_IACT_H
 
+#include "accumulate.h"
+#include "minmax.h"
+#include "part.h"
+
 /**
  * @brief Force interaction between two particles.
  *
@@ -36,14 +40,21 @@ __attribute__((always_inline)) INLINE static void runner_iact_timebin(
     struct part *restrict pi, struct part *restrict pj, const float a,
     const float H) {
 
-  /* Update the minimal time-bin */
-  if (pj->time_bin > 0)
-    pi->limiter_data.min_ngb_time_bin =
-        min(pi->limiter_data.min_ngb_time_bin, pj->time_bin);
+  const timebin_t ti = part_get_time_bin(pi);
+  const timebin_t tj = part_get_time_bin(pj);
 
-  if (pi->time_bin > 0)
-    pj->limiter_data.min_ngb_time_bin =
-        min(pj->limiter_data.min_ngb_time_bin, pi->time_bin);
+  /* Update the minimal time-bin */
+  if (tj > 0){
+    struct timestep_limiter_data* limiter_data_i = part_get_limiter_data(pi);
+    limiter_data_i->min_ngb_time_bin =
+        min(limiter_data_i->min_ngb_time_bin, tj);
+  }
+
+  if (ti > 0){
+    struct timestep_limiter_data* limiter_data_j = part_get_limiter_data(pj);
+    limiter_data_j->min_ngb_time_bin =
+        min(limiter_data_j->min_ngb_time_bin, ti);
+  }
 }
 
 /**
@@ -63,10 +74,14 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_timebin(
     struct part *restrict pi, const struct part *restrict pj, const float a,
     const float H) {
 
+  const timebin_t tj = part_get_time_bin(pj);
+
   /* Update the minimal time-bin */
-  if (pj->time_bin > 0)
-    pi->limiter_data.min_ngb_time_bin =
-        min(pi->limiter_data.min_ngb_time_bin, pj->time_bin);
+  if (tj > 0){
+    struct timestep_limiter_data* limiter_data_i = part_get_limiter_data(pi);
+    limiter_data_i->min_ngb_time_bin =
+        min(limiter_data_i->min_ngb_time_bin, tj);
+  }
 }
 
 /**
@@ -107,11 +122,15 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_limiter(
     struct part *restrict pi, struct part *restrict pj, const float a,
     const float H) {
 
+  const timebin_t ti = part_get_time_bin(pi);
+  const timebin_t tj = part_get_time_bin(pj);
+
   /* Wake up the neighbour? */
-  if (pj->time_bin > pi->time_bin + time_bin_neighbour_max_delta_bin) {
+  if (tj > ti + time_bin_neighbour_max_delta_bin) {
 
     /* Store the smallest time bin that woke up this particle */
-    accumulate_max_c(&pj->limiter_data.wakeup, -pi->time_bin);
+    struct timestep_limiter_data* limiter_data_j = part_get_limiter_data(pj);
+    accumulate_max_c(&limiter_data_j->wakeup, -ti);
   }
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
