@@ -374,6 +374,15 @@ part_get_const_x(const struct part *restrict p){
   return p->_x;
 }
 
+/**
+ * @brief get particle position
+ */
+__attribute__((always_inline)) INLINE static double
+part_get_x_ind(const struct part *restrict p, const size_t ind){
+  return p->_x[ind];
+}
+
+
 
 /**
  * @brief set all x-values of part p from an array.

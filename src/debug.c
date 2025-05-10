@@ -121,10 +121,10 @@ void printParticle(const struct part *parts, const struct xpart *xparts,
   int found = 0;
 
   /* Look for the particle. */
-  for (size_t i = 0; i < N; i++)
-    if (parts[i].id == id) {
-      warning("[PID%lld] ## Particle[%zu]:\n id=%lld ", parts[i].id, i,
-              parts[i].id);
+  for (size_t i = 0; i < N; i++){
+    if (part_get_id(&parts[i]) == id) {
+      warning("[PID%lld] ## Particle[%zu]:\n id=%lld ", part_get_id(&parts[i]), i,
+              part_get_id(&parts[i]));
       hydro_debug_particle(&parts[i], &xparts[i]);
       mhd_debug_particle(&parts[i], &xparts[i]);
       chemistry_debug_particle(&parts[i], &xparts[i]);
@@ -139,6 +139,7 @@ void printParticle(const struct part *parts, const struct xpart *xparts,
       found = 1;
       break;
     }
+  }
 
   if (!found) printf("## Particles[???] id=%lld not found\n", id);
 }
@@ -161,19 +162,20 @@ void printgParticle(const struct gpart *gparts, const struct part *parts,
   int found = 0;
 
   /* Look for the particle. */
-  for (size_t i = 0; i < N; i++)
+  for (size_t i = 0; i < N; i++){
     if (gparts[i].id_or_neg_offset == id) {
       printf("## gParticle[%zu] (DM) :\n id=%lld", i, id);
       gravity_debug_particle(&gparts[i]);
       found = 1;
       break;
     } else if (gparts[i].id_or_neg_offset < 0 &&
-               parts[-gparts[i].id_or_neg_offset].id == id) {
+               part_get_id(&parts[-gparts[i].id_or_neg_offset]) == id) {
       printf("## gParticle[%zu] (hydro) :\n id=%lld", i, id);
       gravity_debug_particle(&gparts[i]);
       found = 1;
       break;
     }
+  }
 
   if (!found) printf("## Particles[???] id=%lld not found\n", id);
 }
@@ -186,7 +188,7 @@ void printgParticle(const struct gpart *gparts, const struct part *parts,
  */
 void printParticle_single(const struct part *p, const struct xpart *xp) {
 
-  warning("[PID%lld] ## Particle: id=%lld ", p->id, p->id);
+  warning("[PID%lld] ## Particle: id=%lld ", part_get_id(p), part_get_id(p));
   hydro_debug_particle(p, xp);
   mhd_debug_particle(p, xp);
   chemistry_debug_particle(p, xp);
@@ -199,7 +201,7 @@ void printParticle_single(const struct part *p, const struct xpart *xp) {
   sink_debug_particle(p, xp);
   pressure_floor_debug_particle(p, xp);
   if (xp == NULL) {
-    warning("[PID%lld] No xpart data available.", p->id);
+    warning("[PID%lld] No xpart data available.", part_get_id(p));
   }
 }
 
@@ -252,8 +254,8 @@ int checkSpacehmax(struct space *s) {
   /* Now all particles. */
   float part_h_max = 0.0f;
   for (size_t k = 0; k < s->nr_parts; k++) {
-    if (s->parts[k].h > part_h_max) {
-      part_h_max = s->parts[k].h;
+    if (part_get_h(&s->parts[k]) > part_h_max) {
+      part_h_max = part_get_h(&s->parts[k]);
     }
   }
 
@@ -291,9 +293,9 @@ int checkSpacehmax(struct space *s) {
   }
 
   for (size_t k = 0; k < s->nr_parts; k++) {
-    if (s->parts[k].h > cell_h_max) {
-      message("part %lld is inconsistent (%f > %f)", s->parts[k].id,
-              s->parts[k].h, cell_h_max);
+    if (part_get_h(&s->parts[k]) > cell_h_max) {
+      message("part %lld is inconsistent (%f > %f)", part_get_id(&s->parts[k]),
+              part_get_h(&s->parts[k]), cell_h_max);
     }
   }
 
@@ -366,15 +368,15 @@ int checkCellhdxmax(const struct cell *c, int *depth) {
 
     struct part *const p = &parts[k];
     struct xpart *const xp = &xparts[k];
+    const double* const x = part_get_const_x(p);
 
-    if (p->x[0] < loc_min[0] || p->x[0] >= loc_max[0] || p->x[1] < loc_min[1] ||
-        p->x[1] >= loc_max[1] || p->x[2] < loc_min[2] ||
-        p->x[2] >= loc_max[2]) {
+    if (x[0] < loc_min[0] || x[0] >= loc_max[0] || x[1] < loc_min[1] ||
+        x[1] >= loc_max[1] || x[2] < loc_min[2] || x[2] >= loc_max[2]) {
 
       message(
           "Inconsistent part position p->x=[%e %e %e], c->loc=[%e %e %e] "
           "c->width=[%e %e %e]",
-          p->x[0], p->x[1], p->x[2], c->loc[0], c->loc[1], c->loc[2],
+          x[0], x[1], x[2], c->loc[0], c->loc[1], c->loc[2],
           c->width[0], c->width[1], c->width[2]);
 
       result = 0;
@@ -384,7 +386,7 @@ int checkCellhdxmax(const struct cell *c, int *depth) {
                       xp->x_diff[1] * xp->x_diff[1] +
                       xp->x_diff[2] * xp->x_diff[2];
 
-    h_max = max(h_max, p->h);
+    h_max = max(h_max, part_get_h(p));
     dx_max = max(dx_max, sqrtf(dx2));
   }
 
@@ -665,7 +667,7 @@ void dumpCells(const char *prefix, int super, int active, int mpiactive,
  * @param edgeweights weights of edges
  */
 void dumpMETISGraph(const char *prefix, idx_t nvertices, idx_t nvertexweights,
-                    idx_t *cellconruns, idx_t *cellcon, idx_t *vertexweights,
+                    const idx_t *cellconruns, idx_t *cellcon, idx_t *vertexweights,
                     idx_t *vertexsizes, idx_t *edgeweights) {
   FILE *stdfile = NULL;
   FILE *simplefile = NULL;

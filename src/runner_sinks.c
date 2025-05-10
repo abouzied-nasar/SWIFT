@@ -102,13 +102,13 @@ void runner_do_sinks_gas_swallow(struct runner *r, struct cell *c, int timer) {
       if (part_is_inhibited(p, e)) continue;
 
       /* Get the ID of the sink that will swallow this part */
-      const long long swallow_id = sink_get_part_swallow_id(&p->sink_data);
+      const long long swallow_id = sink_get_part_swallow_id(part_get_const_sink_data(p));
 
       /* Has this particle been flagged for swallowing? */
       if (swallow_id >= 0) {
 
 #ifdef SWIFT_DEBUG_CHECKS
-        if (p->ti_drift != e->ti_current)
+        if (part_get_ti_drift(p) != e->ti_current)
           error("Trying to swallow an un-drifted particle.");
 #endif
 
@@ -157,7 +157,7 @@ void runner_do_sinks_gas_swallow(struct runner *r, struct cell *c, int timer) {
             }
 
             /* In any case, prevent the particle from being re-swallowed */
-            sink_mark_part_as_swallowed(&p->sink_data);
+            sink_mark_part_as_swallowed(part_get_sink_data(p));
 
             found = 1;
             break;
@@ -173,7 +173,7 @@ void runner_do_sinks_gas_swallow(struct runner *r, struct cell *c, int timer) {
          * of our list of sinks. */
         if (c->nodeID == e->nodeID && !found) {
           error("Gas particle %lld could not find sink %lld to be swallowed",
-                p->id, swallow_id);
+                part_get_id(p), swallow_id);
         }
       } /* Part was flagged for swallowing */
 
@@ -190,7 +190,7 @@ void runner_do_sinks_gas_swallow(struct runner *r, struct cell *c, int timer) {
       if (part_is_inhibited(p, e)) continue;
 
       integertime_t ti_beg =
-          get_integer_time_begin(ti_current + 1, p->time_bin);
+          get_integer_time_begin(ti_current + 1, part_get_time_bin(p));
       ti_beg_max = max(ti_beg, ti_beg_max);
     } /* Loop over the parts */
   } /* Cell is not split */

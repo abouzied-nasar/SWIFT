@@ -194,7 +194,7 @@ void engine_repartition(struct engine *e) {
   fflush(stdout);
 
   /* Check that all cells have been drifted to the current time */
-  space_check_drift_point(e->s, e->ti_current, /*check_multipoles=*/0);
+  space_check_drift_point(e->s, e->ti_current, /*multipole=*/0);
 #endif
 
   /* Clear the repartition flag. */
@@ -207,7 +207,7 @@ void engine_repartition(struct engine *e) {
   /* Generate the fixed costs include file. */
   if (e->step > 3 && e->reparttype->trigger <= 1.f) {
     task_dump_stats("partition_fixed_costs.h", e,
-                    /* task_dump_threshold = */ 0.f,
+                    /* dump_tasks_threshold = */ 0.f,
                     /* header = */ 1, /* allranks = */ 1);
   }
 
@@ -315,7 +315,13 @@ void engine_repartition_trigger(struct engine *e) {
       }
 
       /* Get the resident size of the process for the memory logs. */
-      long size, resident, shared, text, library, data, dirty;
+      long size;
+      long resident;
+      long shared;
+      long text;
+      long library;
+      long data;
+      long dirty;
       memuse_use(&size, &resident, &shared, &text, &data, &library, &dirty);
 
       /* Gather it together with the CPU times used by the tasks in the last
@@ -787,8 +793,11 @@ void engine_allocate_foreign_particles(struct engine *e, const int fof) {
 
   /* Count the number of particles we need to import and re-allocate
      the buffer if needed. */
-  size_t count_parts_in = 0, count_gparts_in = 0, count_sparts_in = 0,
-         count_bparts_in = 0, count_sinks_in = 0;
+  size_t count_parts_in = 0;
+  size_t count_gparts_in = 0;
+  size_t count_sparts_in = 0;
+  size_t count_bparts_in = 0;
+  size_t count_sinks_in = 0;
   for (int k = 0; k < nr_proxies; k++) {
     for (int j = 0; j < e->proxies[k].nr_cells_in; j++) {
 
@@ -1349,24 +1358,26 @@ void engine_rebuild(struct engine *e, const int repartitioned,
   space_rebuild(e->s, repartitioned, e->verbose);
 
   /* Report the number of cells and memory */
-  if (e->verbose)
+  if (e->verbose){
     message(
         "Nr. of top-level cells: %d Nr. of local cells: %d memory use: %zd MB.",
         e->s->nr_cells, e->s->tot_cells,
         (e->s->nr_cells + e->s->tot_cells) * sizeof(struct cell) /
             (1024 * 1024));
+  }
 
   /* Report the number of multipoles and memory */
-  if (e->verbose && (e->policy & engine_policy_self_gravity))
+  if (e->verbose && (e->policy & engine_policy_self_gravity)){
     message(
         "Nr. of top-level mpoles: %d Nr. of local mpoles: %d memory use: %zd "
         "MB.",
         e->s->nr_cells, e->s->tot_cells,
         (e->s->nr_cells + e->s->tot_cells) * sizeof(struct gravity_tensors) /
             (1024 * 1024));
+  }
 
   /* Report the number of particles and memory */
-  if (e->verbose)
+  if (e->verbose) {
     message(
         "Space has memory for %zd/%zd/%zd/%zd/%zd part/gpart/spart/sink/bpart "
         "(%zd/%zd/%zd/%zd/%zd MB)",
@@ -1377,8 +1388,9 @@ void engine_rebuild(struct engine *e, const int repartitioned,
         e->s->size_sparts * sizeof(struct spart) / (1024 * 1024),
         e->s->size_sinks * sizeof(struct sink) / (1024 * 1024),
         e->s->size_bparts * sizeof(struct bpart) / (1024 * 1024));
+  }
 
-  if (e->verbose)
+  if (e->verbose){
     message(
         "Space holds %zd/%zd/%zd/%zd/%zd part/gpart/spart/sink/bpart (fracs: "
         "%f/%f/%f/%f/%f)",
@@ -1389,6 +1401,7 @@ void engine_rebuild(struct engine *e, const int repartitioned,
         e->s->nr_sparts ? e->s->nr_sparts / ((double)e->s->size_sparts) : 0.,
         e->s->nr_sinks ? e->s->nr_sinks / ((double)e->s->size_sinks) : 0.,
         e->s->nr_bparts ? e->s->nr_bparts / ((double)e->s->size_bparts) : 0.);
+  }
 
   const ticks tic2 = getticks();
 
@@ -1577,10 +1590,10 @@ int engine_prepare(struct engine *e) {
       e->run_fof && e->fof_properties->seed_black_holes_enabled) {
 
     /* Let's start by drifting everybody to the current time */
-    engine_drift_all(e, /*drift_mpole=*/0);
+    engine_drift_all(e, /*drift_mpoles=*/0);
     drifted_all = 1;
 
-    engine_fof(e, e->dump_catalogue_when_seeding, /*dump_debug=*/0,
+    engine_fof(e, e->dump_catalogue_when_seeding, /*dump_debug_results=*/0,
                /*seed_black_holes=*/1, /*foreign buffers allocated=*/1);
 
     if (e->dump_catalogue_when_seeding) e->snapshot_output_count++;
@@ -2421,22 +2434,22 @@ void engine_init_particles(struct engine *e, int flag_entropy_ICs,
 
     /* Sorting should put the same positions next to each other... */
     int failed = 0;
-    double *prev_x = s->parts[0].x;
-    long long *prev_id = &s->parts[0].id;
+    double *prev_x = part_get_x(&s->parts[0]);
+    long long *prev_id = part_get_id_p(&s->parts[0]);
     for (size_t k = 1; k < s->nr_parts; k++) {
 
       /* Ignore fake buffer particles for on-the-fly creation */
-      if (s->parts[k].time_bin == time_bin_not_created) continue;
+      if (part_get_time_bin(&s->parts[k]) == time_bin_not_created) continue;
 
-      if (prev_x[0] == s->parts[k].x[0] && prev_x[1] == s->parts[k].x[1] &&
-          prev_x[2] == s->parts[k].x[2]) {
+      double* x = part_get_x(&s->parts[k]);
+      if (prev_x[0] == x[0] && prev_x[1] == x[1] && prev_x[2] == x[2]) {
         if (e->verbose)
           message("Two particles occupy location: %f %f %f id=%lld id=%lld",
-                  prev_x[0], prev_x[1], prev_x[2], *prev_id, s->parts[k].id);
+                  prev_x[0], prev_x[1], prev_x[2], *prev_id, part_get_id(&s->parts[k]));
         failed++;
       }
-      prev_x = s->parts[k].x;
-      prev_id = &s->parts[k].id;
+      prev_x = x;
+      prev_id = part_get_id_p(&s->parts[k]);
     }
     if (failed > 0)
       error(
@@ -2479,10 +2492,10 @@ void engine_init_particles(struct engine *e, int flag_entropy_ICs,
     for (int i = 0; i < s->nr_cells; i++) {
       struct cell *c = &s->cells_top[i];
       if (c->nodeID == engine_rank && c->hydro.count > 0) {
-        float part_h_max = c->hydro.parts[0].h;
+        float part_h_max = part_get_h(&c->hydro.parts[0]);
         for (int k = 1; k < c->hydro.count; k++) {
-          if (c->hydro.parts[k].h > part_h_max)
-            part_h_max = c->hydro.parts[k].h;
+          if (part_get_h(&c->hydro.parts[k]) > part_h_max)
+            part_h_max = part_get_h(&c->hydro.parts[k]);
         }
         c->hydro.h_max = max(part_h_max, c->hydro.h_max);
       }
@@ -3755,7 +3768,7 @@ void engine_recompute_displacement_constraint(struct engine *e) {
     /* Check that the minimal mass collection worked */
     float min_part_mass_check = FLT_MAX;
     for (size_t i = 0; i < e->s->nr_parts; ++i) {
-      if (e->s->parts[i].time_bin >= num_time_bins) continue;
+      if (part_get_time_bin(&e->s->parts[i]) >= num_time_bins) continue;
       min_part_mass_check =
           min(min_part_mass_check, hydro_get_mass(&e->s->parts[i]));
     }

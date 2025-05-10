@@ -68,14 +68,14 @@ void engine_finalize_trigger_recordings(struct engine *e) {
       struct part *p = &s->parts[k];
       struct xpart *xp = &s->xparts[k];
       const integertime_t ti_begin =
-          get_integer_time_begin(e->ti_current, p->time_bin);
+          get_integer_time_begin(e->ti_current, part_get_time_bin(p));
 
       /* Escape inhibited particles */
       if (part_is_inhibited(p, e)) continue;
 
       /* We need to escape the special case of a particle that
        * actually ended its time-step on this very step */
-      if (e->ti_current - ti_begin == get_integer_timestep(p->time_bin))
+      if (e->ti_current - ti_begin == get_integer_timestep(part_get_time_bin(p)))
         continue;
 
       /* Time from the start of the particle's step to the snapshot (aka.
@@ -213,7 +213,7 @@ int engine_dump_restarts(struct engine *e, const int drifted_all,
       restart_remove_previous(e->restart_file);
 
       /* Drift all particles first (may have just been done). */
-      if (!drifted_all) engine_drift_all(e, /*drift_mpole=*/1);
+      if (!drifted_all) engine_drift_all(e, /*drift_mpoles=*/1);
 
         /* Free the foreign particles to get more breathing space. */
 #ifdef WITH_MPI
@@ -272,14 +272,15 @@ int engine_dump_restarts(struct engine *e, const int drifted_all,
  */
 void engine_dump_snapshot(struct engine *e, const int fof) {
 
-  struct clocks_time time1, time2;
+  struct clocks_time time1;
+  struct clocks_time time2;
   clocks_gettime(&time1);
 
 #ifdef SWIFT_DEBUG_CHECKS
   /* Check that all cells have been drifted to the current time.
    * That can include cells that have not
    * previously been active on this rank. */
-  space_check_drift_point(e->s, e->ti_current, /* check_mpole=*/0);
+  space_check_drift_point(e->s, e->ti_current, /* multipole=*/0);
 
   /* Be verbose about this */
   if (e->nodeID == 0) {
@@ -499,7 +500,7 @@ void engine_io(struct engine *e) {
     }
 
     /* Drift everyone */
-    engine_drift_all(e, /*drift_mpole=*/0);
+    engine_drift_all(e, /*drift_mpoles=*/0);
 
     /* Write some form of output */
     switch (type) {
@@ -523,7 +524,7 @@ void engine_io(struct engine *e) {
 
         /* Do we want FoF group IDs in the snapshot? */
         if (with_fof && e->snapshot_invoke_fof) {
-          engine_fof(e, /*dump_results=*/1, /*dump_debug=*/0,
+          engine_fof(e, /*dump_results=*/1, /*dump_debug_results=*/0,
                      /*seed_black_holes=*/0, /*buffers allocated=*/0);
         }
 
@@ -1320,7 +1321,7 @@ void engine_io_check_snapshot_triggers(struct engine *e) {
         struct part *p = &s->parts[k];
         struct xpart *xp = &s->xparts[k];
         const integertime_t ti_begin =
-            get_integer_time_begin(e->ti_current, p->time_bin);
+            get_integer_time_begin(e->ti_current, part_get_time_bin(p));
 
         /* Escape inhibited particles */
         if (part_is_inhibited(p, e)) continue;
