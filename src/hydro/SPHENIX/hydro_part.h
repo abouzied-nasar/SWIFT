@@ -330,6 +330,12 @@ part_get_id(const struct part *restrict p){
   return p->_id;
 }
 
+__attribute__((always_inline)) INLINE static long long*
+part_get_id_p(struct part *restrict p){
+  return &p->_id;
+}
+
+
 __attribute__((always_inline)) INLINE static void
 part_set_id(struct part *restrict p, const long long id){
   p->_id = id;
