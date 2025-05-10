@@ -653,7 +653,6 @@ __attribute__((always_inline)) INLINE static void hydro_end_density(
   rot_v[0] *= h_inv_dim_plus_one * a_inv2 * rho_inv;
   rot_v[1] *= h_inv_dim_plus_one * a_inv2 * rho_inv;
   rot_v[2] *= h_inv_dim_plus_one * a_inv2 * rho_inv;
-  part_set_rot_v(p, rot_v); // TODO MLADEN: Shouldn't be needed
 
   /* Finish calculation of the velocity divergence */
   float div_v = part_get_div_v(p);

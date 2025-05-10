@@ -336,8 +336,13 @@ part_set_id(struct part *restrict p, const long long id){
 }
 
 
-__attribute__((always_inline)) INLINE const static struct gpart*
+__attribute__((always_inline)) INLINE static struct gpart*
 part_get_gpart(const struct part *restrict p){
+  return p->_gpart;
+}
+
+__attribute__((always_inline)) INLINE const static struct gpart*
+part_get_const_gpart(const struct part *restrict p){
   return p->_gpart;
 }
 
@@ -354,6 +359,15 @@ __attribute__((always_inline)) INLINE static double*
 part_get_x(struct part *restrict p){
   return p->_x;
 }
+
+/**
+ * @brief get particle position
+ */
+__attribute__((always_inline)) INLINE const static double*
+part_get_const_x(const struct part *restrict p){
+  return p->_x;
+}
+
 
 /**
  * @brief set all x-values of part p from an array.
@@ -379,10 +393,21 @@ part_set_x_ind(struct part *restrict p, const size_t i, const double x){
  * Note: Avoid when you have access to const particle pointer. Use
  * access by index instead via part_get_v_ind()
  */
-__attribute__((always_inline)) INLINE const static float*
+__attribute__((always_inline)) INLINE static float*
 part_get_v(struct part *restrict p){
   return p->_v;
 }
+
+/**
+ * @brief get particle velocity for read-only access.
+ * Note: Avoid when you have access to const particle pointer. Use
+ * access by index instead via part_get_v_ind()
+ */
+__attribute__((always_inline)) INLINE const static float*
+part_get_const_v(const struct part *restrict p){
+  return p->_v;
+}
+
 
 /**
  * @brief get particle velocity by index
@@ -860,8 +885,8 @@ part_get_const_feedback_data(const struct part *restrict p){
 /**
  * Use this for read-write access.
  */
-__attribute__((always_inline)) INLINE const static struct black_holes_part_data*
-part_get_black_holes_data(const struct part *restrict p){
+__attribute__((always_inline)) INLINE static struct black_holes_part_data*
+part_get_black_holes_data(struct part *restrict p){
   return &p->_black_holes_data;
 }
 
