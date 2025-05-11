@@ -70,13 +70,13 @@ int main(int argc, char *argv[]) {
   bzero(xparts, sizeof(struct xpart));
 
   /* Put the particle on the orbit */
-  parts[0].x[0] = r_max;
-  parts[0].x[1] = 0.;
-  parts[0].x[2] = 0.;
+  part_set_x_ind(&parts[0], 0, r_max);
+  part_set_x_ind(&parts[0], 1, 0.);
+  part_set_x_ind(&parts[0], 2, 0.);
 
-  parts[0].v[0] = 0.;
-  parts[0].v[1] = v_max;
-  parts[0].v[2] = 0.;
+  part_set_v_ind(&parts[0], 0, 0.);
+  part_set_v_ind(&parts[0], 1, v_max);
+  part_set_v_ind(&parts[0], 2, 0.);
 
   xparts[0].v_full[0] = 0.;
   xparts[0].v_full[1] = v_max;
@@ -108,13 +108,12 @@ int main(int argc, char *argv[]) {
     eng.time += dt;
 
     /* Compute gravitational acceleration */
-    float r2 = c.hydro.parts[0].x[0] * c.hydro.parts[0].x[0] +
-               c.hydro.parts[0].x[1] * c.hydro.parts[0].x[1];
+    const double* const x = part_get_const_x(&c.hydro.parts[0]);
+    float r2 = x[0] * x[0] + x[1] * x[1];
     float r = sqrtf(r2);
-    c.hydro.parts[0].a_hydro[0] =
-        -(G * M_sun * c.hydro.parts[0].x[0] / r * r * r);
-    c.hydro.parts[0].a_hydro[1] =
-        -(G * M_sun * c.hydro.parts[0].x[1] / r * r * r);
+    float* a_hydro = part_get_a_hydro(&c.hydro.parts[0]);
+    a_hydro[0] = -(G * M_sun * x[0] / (r * r * r));
+    a_hydro[1] = -(G * M_sun * x[1] / (r * r * r));
 
     /* Kick... */
     runner_do_kick2(&run, &c, 0);

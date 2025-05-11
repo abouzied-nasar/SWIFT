@@ -340,7 +340,6 @@ part_get_const_id_p(const struct part *restrict p){
   return &p->_id;
 }
 
-
 __attribute__((always_inline)) INLINE static void
 part_set_id(struct part *restrict p, const long long id){
   p->_id = id;
@@ -543,7 +542,6 @@ part_get_const_mass_p(const struct part *restrict p){
   return &p->_mass;
 }
 
-
 __attribute__((always_inline)) INLINE static void
 part_set_mass(struct part *restrict p, const float mass){
   p->_mass = mass;
@@ -611,8 +609,8 @@ part_get_const_rho_p(const struct part *restrict p){
 }
 
 __attribute__((always_inline)) INLINE static void
-part_set_rho(struct part *restrict p, const float u_dt){
-  p->_rho = u_dt;
+part_set_rho(struct part *restrict p, const float rho){
+  p->_rho = rho;
 }
 
 
@@ -831,6 +829,12 @@ __attribute__((always_inline)) INLINE static float*
 part_get_rot_v(struct part *restrict p){
   return p->density._rot_v;
 }
+
+__attribute__((always_inline)) INLINE static float
+part_get_rot_v_ind(const struct part *restrict p, size_t ind){
+  return p->density._rot_v[ind];
+}
+
 
 __attribute__((always_inline)) INLINE static float
 (*part_get_rot_v_p(struct part *restrict p))[3]{

@@ -54,59 +54,59 @@ void test(void) {
   }
 
   /* Make the particle smoothing length and position reasonable */
-  for (size_t i = 0; i < 3; ++i) pi.x[i] = random_uniform(-1., 1.);
-  for (size_t i = 0; i < 3; ++i) pj.x[i] = random_uniform(-1., 1.);
-  pi.h = 2.f;
-  pj.h = 2.f;
-  pi.id = 1ll;
-  pj.id = 2ll;
-  pi.time_bin = 1;
-  pj.time_bin = 1;
+  for (size_t i = 0; i < 3; ++i) part_set_x_ind(&pi, i, random_uniform(-1., 1.));
+  for (size_t i = 0; i < 3; ++i) part_set_x_ind(&pj, i, random_uniform(-1., 1.));
+  part_set_h(&pi, 2.f);
+  part_set_h(&pj, 2.f);
+  part_set_id(&pi, 1ll);
+  part_set_id(&pj, 2ll);
+  part_set_time_bin(&pi, 1);
+  part_set_time_bin(&pj, 1);
 
 #if defined(GIZMO_MFV_SPH)
   /* Give the primitive variables sensible values, since the Riemann solver does
      not like negative densities and pressures */
-  pi.rho = random_uniform(0.1f, 1.0f);
-  pi.v[0] = random_uniform(-10.0f, 10.0f);
-  pi.v[1] = random_uniform(-10.0f, 10.0f);
-  pi.v[2] = random_uniform(-10.0f, 10.0f);
-  pi.P = random_uniform(0.1f, 1.0f);
-  pj.rho = random_uniform(0.1f, 1.0f);
-  pj.v[0] = random_uniform(-10.0f, 10.0f);
-  pj.v[1] = random_uniform(-10.0f, 10.0f);
-  pj.v[2] = random_uniform(-10.0f, 10.0f);
-  pj.P = random_uniform(0.1f, 1.0f);
+  part_set_rho(&pi, random_uniform(0.1f, 1.0f));
+  part_set_v_ind(&pi, 0, random_uniform(-10.0f, 10.0f));
+  part_set_v_ind(&pi, 1, random_uniform(-10.0f, 10.0f));
+  part_set_v_ind(&pi, 2, random_uniform(-10.0f, 10.0f));
+  part_set_pressure(&pi, random_uniform(0.1f, 1.0f));
+  part_set_rho(&pj, random_uniform(0.1f, 1.0f));
+  part_set_v_ind(&pj, 0, random_uniform(-10.0f, 10.0f));
+  part_set_v_ind(&pj, 1, random_uniform(-10.0f, 10.0f));
+  part_set_v_ind(&pj, 2, random_uniform(-10.0f, 10.0f));
+  part_set_pressure(&pj, random_uniform(0.1f, 1.0f));
   /* make gradients zero */
-  pi.gradients.rho[0] = 0.0f;
-  pi.gradients.rho[1] = 0.0f;
-  pi.gradients.rho[2] = 0.0f;
-  pi.gradients.v[0][0] = 0.0f;
-  pi.gradients.v[0][1] = 0.0f;
-  pi.gradients.v[0][2] = 0.0f;
-  pi.gradients.v[1][0] = 0.0f;
-  pi.gradients.v[1][1] = 0.0f;
-  pi.gradients.v[1][2] = 0.0f;
-  pi.gradients.v[2][0] = 0.0f;
-  pi.gradients.v[2][1] = 0.0f;
-  pi.gradients.v[2][2] = 0.0f;
-  pi.gradients.P[0] = 0.0f;
-  pi.gradients.P[1] = 0.0f;
-  pi.gradients.P[2] = 0.0f;
-  pj.gradients.rho[0] = 0.0f;
-  pj.gradients.rho[1] = 0.0f;
-  pj.gradients.rho[2] = 0.0f;
-  pj.gradients.v[0][0] = 0.0f;
-  pj.gradients.v[0][1] = 0.0f;
-  pj.gradients.v[0][2] = 0.0f;
-  pj.gradients.v[1][0] = 0.0f;
-  pj.gradients.v[1][1] = 0.0f;
-  pj.gradients.v[1][2] = 0.0f;
-  pj.gradients.v[2][0] = 0.0f;
-  pj.gradients.v[2][1] = 0.0f;
-  pj.gradients.v[2][2] = 0.0f;
-  pj.gradients.P[0] = 0.0f;
-  pj.gradients.P[1] = 0.0f;
-  pj.gradients.P[2] = 0.0f;
+  part_set_grad_rho_ind(&pi, 0, 0.f);
+  part_set_grad_rho_ind(&pi, 1, 0.f);
+  part_set_grad_rho_ind(&pi, 2, 0.f);
+  part_set_grad_v_ind(&pi, 0, 0, 0.f);
+  part_set_grad_v_ind(&pi, 1, 0, 0.f);
+  part_set_grad_v_ind(&pi, 2, 0, 0.f);
+  part_set_grad_v_ind(&pi, 0, 1, 0.f);
+  part_set_grad_v_ind(&pi, 1, 1, 0.f);
+  part_set_grad_v_ind(&pi, 2, 1, 0.f);
+  part_set_grad_v_ind(&pi, 0, 2, 0.f);
+  part_set_grad_v_ind(&pi, 1, 2, 0.f);
+  part_set_grad_v_ind(&pi, 2, 2, 0.f);
+  part_set_grad_pressure_ind(&pi, 0, 0.f);
+  part_set_grad_pressure_ind(&pi, 1, 0.f);
+  part_set_grad_pressure_ind(&pi, 2, 0.f);
+  part_set_grad_rho_ind(&pj, 0, 0.f);
+  part_set_grad_rho_ind(&pj, 1, 0.f);
+  part_set_grad_rho_ind(&pj, 2, 0.f);
+  part_set_grad_v_ind(&pj, 0, 0, 0.f);
+  part_set_grad_v_ind(&pj, 1, 0, 0.f);
+  part_set_grad_v_ind(&pj, 2, 0, 0.f);
+  part_set_grad_v_ind(&pj, 0, 1, 0.f);
+  part_set_grad_v_ind(&pj, 1, 1, 0.f);
+  part_set_grad_v_ind(&pj, 2, 1, 0.f);
+  part_set_grad_v_ind(&pj, 0, 2, 0.f);
+  part_set_grad_v_ind(&pj, 1, 2, 0.f);
+  part_set_grad_v_ind(&pj, 2, 2, 0.f);
+  part_set_grad_pressure_ind(&pj, 0, 0.f);
+  part_set_grad_pressure_ind(&pj, 1, 0.f);
+  part_set_grad_pressure_ind(&pj, 2, 0.f);
 #endif
 
   /* Make an xpart companion */
@@ -127,37 +127,41 @@ void test(void) {
 
   /* Compute distance vector */
   float dx[3];
-  dx[0] = pi.x[0] - pj.x[0];
-  dx[1] = pi.x[1] - pj.x[1];
-  dx[2] = pi.x[2] - pj.x[2];
+  dx[0] = part_get_x_ind(&pi, 0) - part_get_x_ind(&pj, 0);
+  dx[1] = part_get_x_ind(&pi, 1) - part_get_x_ind(&pj, 1);
+  dx[2] = part_get_x_ind(&pi, 2) - part_get_x_ind(&pj, 2);
   float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+  const float hi = part_get_h(&pi);
+  const float hj = part_get_h(&pj);
+  const float hi2 = part_get_h(&pi2);
+  const float hj2 = part_get_h(&pj2);
 
   /* --- Test the density loop --- */
 
   /* Call the symmetric version */
-  runner_iact_density(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
-  runner_iact_mhd_density(r2, dx, pi.h, pj.h, &pi, &pj, mu_0, a, H);
-  runner_iact_chemistry(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
-  runner_iact_pressure_floor(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
-  runner_iact_star_formation(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
-  runner_iact_sink(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
+  runner_iact_density(r2, dx, hi, hj, &pi, &pj, a, H);
+  runner_iact_mhd_density(r2, dx, hi, hj, &pi, &pj, mu_0, a, H);
+  runner_iact_chemistry(r2, dx, hi, hj, &pi, &pj, a, H);
+  runner_iact_pressure_floor(r2, dx, hi, hj, &pi, &pj, a, H);
+  runner_iact_star_formation(r2, dx, hi, hj, &pi, &pj, a, H);
+  runner_iact_sink(r2, dx, hi, hj, &pi, &pj, a, H);
 
   /* Call the non-symmetric version */
-  runner_iact_nonsym_density(r2, dx, pi2.h, pj2.h, &pi2, &pj2, a, H);
-  runner_iact_nonsym_mhd_density(r2, dx, pi2.h, pj2.h, &pi2, &pj2, mu_0, a, H);
-  runner_iact_nonsym_chemistry(r2, dx, pi2.h, pj2.h, &pi2, &pj2, a, H);
-  runner_iact_nonsym_pressure_floor(r2, dx, pi2.h, pj2.h, &pi2, &pj2, a, H);
-  runner_iact_nonsym_star_formation(r2, dx, pi2.h, pj2.h, &pi2, &pj2, a, H);
-  runner_iact_nonsym_sink(r2, dx, pi2.h, pj2.h, &pi2, &pj2, a, H);
+  runner_iact_nonsym_density(r2, dx, hi2, hj2, &pi2, &pj2, a, H);
+  runner_iact_nonsym_mhd_density(r2, dx, hi2, hj2, &pi2, &pj2, mu_0, a, H);
+  runner_iact_nonsym_chemistry(r2, dx, hi2, hj2, &pi2, &pj2, a, H);
+  runner_iact_nonsym_pressure_floor(r2, dx, hi2, hj2, &pi2, &pj2, a, H);
+  runner_iact_nonsym_star_formation(r2, dx, hi2, hj2, &pi2, &pj2, a, H);
+  runner_iact_nonsym_sink(r2, dx, hi2, hj2, &pi2, &pj2, a, H);
   dx[0] = -dx[0];
   dx[1] = -dx[1];
   dx[2] = -dx[2];
-  runner_iact_nonsym_density(r2, dx, pj2.h, pi2.h, &pj2, &pi2, a, H);
-  runner_iact_nonsym_mhd_density(r2, dx, pj2.h, pi2.h, &pj2, &pi2, mu_0, a, H);
-  runner_iact_nonsym_chemistry(r2, dx, pj2.h, pi2.h, &pj2, &pi2, a, H);
-  runner_iact_nonsym_pressure_floor(r2, dx, pj2.h, pi2.h, &pj2, &pi2, a, H);
-  runner_iact_nonsym_star_formation(r2, dx, pj2.h, pi2.h, &pj2, &pi2, a, H);
-  runner_iact_nonsym_sink(r2, dx, pj2.h, pi2.h, &pj2, &pi2, a, H);
+  runner_iact_nonsym_density(r2, dx, hj2, hi2, &pj2, &pi2, a, H);
+  runner_iact_nonsym_mhd_density(r2, dx, hj2, hi2, &pj2, &pi2, mu_0, a, H);
+  runner_iact_nonsym_chemistry(r2, dx, hj2, hi2, &pj2, &pi2, a, H);
+  runner_iact_nonsym_pressure_floor(r2, dx, hj2, hi2, &pj2, &pi2, a, H);
+  runner_iact_nonsym_star_formation(r2, dx, hj2, hi2, &pj2, &pi2, a, H);
+  runner_iact_nonsym_sink(r2, dx, hj2, hi2, &pj2, &pi2, a, H);
 
   /* Check that the particles are the same */
   i_not_ok = memcmp(&pi, &pi2, sizeof(struct part));
@@ -182,17 +186,17 @@ void test(void) {
 #ifdef EXTRA_HYDRO_LOOP
 
   /* Call the symmetric version */
-  runner_iact_gradient(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
-  runner_iact_mhd_gradient(r2, dx, pi.h, pj.h, &pi, &pj, mu_0, a, H);
+  runner_iact_gradient(r2, dx, hi, hj, &pi, &pj, a, H);
+  runner_iact_mhd_gradient(r2, dx, hi, hj, &pi, &pj, mu_0, a, H);
 
   /* Call the non-symmetric version */
-  runner_iact_nonsym_gradient(r2, dx, pi2.h, pj2.h, &pi2, &pj2, a, H);
-  runner_iact_nonsym_mhd_gradient(r2, dx, pi2.h, pj2.h, &pi2, &pj2, mu_0, a, H);
+  runner_iact_nonsym_gradient(r2, dx, hi2, hj2, &pi2, &pj2, a, H);
+  runner_iact_nonsym_mhd_gradient(r2, dx, hi2, hj2, &pi2, &pj2, mu_0, a, H);
   dx[0] = -dx[0];
   dx[1] = -dx[1];
   dx[2] = -dx[2];
-  runner_iact_nonsym_gradient(r2, dx, pj2.h, pi2.h, &pj2, &pi2, a, H);
-  runner_iact_nonsym_mhd_gradient(r2, dx, pj2.h, pi2.h, &pj2, &pi2, mu_0, a, H);
+  runner_iact_nonsym_gradient(r2, dx, hj2, hi2, &pj2, &pi2, a, H);
+  runner_iact_nonsym_mhd_gradient(r2, dx, hj2, hi2, &pj2, &pi2, mu_0, a, H);
 
   i_not_ok = memcmp((char *)&pi, (char *)&pi2, sizeof(struct part));
   j_not_ok = memcmp((char *)&pj, (char *)&pj2, sizeof(struct part));
@@ -216,28 +220,28 @@ void test(void) {
   /* --- Test the force loop --- */
 
   /* Call the symmetric version */
-  runner_iact_force(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
-  runner_iact_mhd_force(r2, dx, pi.h, pj.h, &pi, &pj, mu_0, a, H);
-  runner_iact_diffusion(r2, dx, pi.h, pj.h, &pi, &pj, a, H, time_base,
+  runner_iact_force(r2, dx, hi, hj, &pi, &pj, a, H);
+  runner_iact_mhd_force(r2, dx, hi, hj, &pi, &pj, mu_0, a, H);
+  runner_iact_diffusion(r2, dx, hi, hj, &pi, &pj, a, H, time_base,
                         ti_current, NULL, /*with_cosmology=*/0);
-  runner_iact_timebin(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
+  runner_iact_timebin(r2, dx, hi, hj, &pi, &pj, a, H);
 
   /* Call the non-symmetric version */
-  runner_iact_nonsym_force(r2, dx, pi2.h, pj2.h, &pi2, &pj2, a, H);
-  runner_iact_nonsym_mhd_force(r2, dx, pi2.h, pj2.h, &pi2, &pj2, mu_0, a, H);
-  runner_iact_nonsym_diffusion(r2, dx, pi2.h, pj2.h, &pi2, &pj2, a, H,
+  runner_iact_nonsym_force(r2, dx, hi2, hj2, &pi2, &pj2, a, H);
+  runner_iact_nonsym_mhd_force(r2, dx, hi2, hj2, &pi2, &pj2, mu_0, a, H);
+  runner_iact_nonsym_diffusion(r2, dx, hi2, hj2, &pi2, &pj2, a, H,
                                time_base, ti_current, NULL,
                                /*with_cosmology=*/0);
-  runner_iact_nonsym_timebin(r2, dx, pi2.h, pj2.h, &pi2, &pj2, a, H);
+  runner_iact_nonsym_timebin(r2, dx, hi2, hj2, &pi2, &pj2, a, H);
   dx[0] = -dx[0];
   dx[1] = -dx[1];
   dx[2] = -dx[2];
-  runner_iact_nonsym_force(r2, dx, pj2.h, pi2.h, &pj2, &pi2, a, H);
-  runner_iact_nonsym_mhd_force(r2, dx, pj2.h, pi2.h, &pj2, &pi2, mu_0, a, H);
-  runner_iact_nonsym_diffusion(r2, dx, pj2.h, pi2.h, &pj2, &pi2, a, H,
+  runner_iact_nonsym_force(r2, dx, hj2, hi2, &pj2, &pi2, a, H);
+  runner_iact_nonsym_mhd_force(r2, dx, hj2, hi2, &pj2, &pi2, mu_0, a, H);
+  runner_iact_nonsym_diffusion(r2, dx, hj2, hi2, &pj2, &pi2, a, H,
                                time_base, ti_current, NULL,
                                /*with_cosmology=*/0);
-  runner_iact_nonsym_timebin(r2, dx, pj2.h, pi2.h, &pj2, &pi2, a, H);
+  runner_iact_nonsym_timebin(r2, dx, hj2, hi2, &pj2, &pi2, a, H);
 
 /* Check that the particles are the same */
 #if defined(GIZMO_MFV_SPH)

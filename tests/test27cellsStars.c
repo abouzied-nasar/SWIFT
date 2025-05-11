@@ -88,31 +88,36 @@ struct cell *make_cell(size_t n, size_t n_stars, double *offset, double size,
   for (size_t x = 0; x < n; ++x) {
     for (size_t y = 0; y < n; ++y) {
       for (size_t z = 0; z < n; ++z) {
-        part->x[0] =
+        part_set_x_ind(part, 0,
             offset[0] +
-            size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
-        part->x[1] =
+            size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
+            );
+        part_set_x_ind(part, 1,
             offset[1] +
-            size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
-        part->x[2] =
+            size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
+            );
+        part_set_x_ind(part, 2,
             offset[2] +
-            size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
+            size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
+            );
 
-        part->v[0] = 0;
-        part->v[1] = 0;
-        part->v[2] = 0;
-        if (h_pert)
-          part->h = size * h * random_uniform(1.f, h_pert) / (float)n;
-        else
-          part->h = size * h / (float)n;
-        h_max = fmaxf(h_max, part->h);
-        part->id = ++(*partId);
+        part_set_v_ind(part, 0, 0.f);
+        part_set_v_ind(part, 1, 0.f);
+        part_set_v_ind(part, 2, 0.f);
+        if (h_pert){
+          part_set_h(part, size * h * random_uniform(1.f, h_pert) / (float)n);
+        }else{
+          part_set_h(part, size * h / (float)n);
+        }
+        h_max = fmaxf(h_max, part_get_h(part));
+        part_set_id(part, ++(*partId));
+        part_set_depth_h(part, 0);
 
-        part->time_bin = 1;
+        part_set_time_bin(part, 1);
 
 #ifdef SWIFT_DEBUG_CHECKS
-        part->ti_drift = 8;
-        part->ti_kick = 8;
+        part_set_ti_drift(part, 8);
+        part_set_ti_kick(part, 8);
 #endif
         ++part;
       }

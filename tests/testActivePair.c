@@ -88,32 +88,35 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
   for (size_t x = 0; x < n; ++x) {
     for (size_t y = 0; y < n; ++y) {
       for (size_t z = 0; z < n; ++z) {
-        part->x[0] =
+        part_set_x_ind(part, 0,
             offset[0] +
-            size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
-        part->x[1] =
+            size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
+            );
+        part_set_x_ind(part, 1,
             offset[1] +
-            size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
-        part->x[2] =
+            size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
+            );
+        part_set_x_ind(part, 1,
             offset[2] +
-            size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
-        part->v[0] = random_uniform(-0.05, 0.05);
-        part->v[1] = random_uniform(-0.05, 0.05);
-        part->v[2] = random_uniform(-0.05, 0.05);
+            size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
+            );
+        part_set_v_ind(part, 0, random_uniform(-0.05, 0.05));
+        part_set_v_ind(part, 1, random_uniform(-0.05, 0.05));
+        part_set_v_ind(part, 2, random_uniform(-0.05, 0.05));
 
         if (h_pert)
-          part->h = size * h * random_uniform(1.f, h_pert) / (float)n;
+          part_set_h(part, size * h * random_uniform(1.f, h_pert) / (float)n);
         else
-          part->h = size * h / (float)n;
-        h_max = fmaxf(h_max, part->h);
-        part->id = ++(*partId);
-        part->depth_h = 0;
+          part_set_h(part, size * h / (float)n);
+        h_max = fmaxf(h_max, part_get_h(part));
+        part_set_id(part, ++(*partId));
+        part_set_depth_h(part, 0);
 
 /* Set the mass */
 #if defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
         part->conserved.mass = density * volume / count;
 #else
-        part->mass = density * volume / count;
+        part_set_mass(part, density * volume / count);
 #endif
 
 /* Set the thermodynamic variable */
@@ -122,21 +125,21 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
 #elif defined(MINIMAL_SPH) || defined(HOPKINS_PU_SPH) ||           \
     defined(HOPKINS_PU_SPH_MONAGHAN) || defined(ANARCHY_PU_SPH) || \
     defined(SPHENIX_SPH) || defined(PHANTOM_SPH) || defined(GASOLINE_SPH)
-        part->u = 1.f;
+        part_set_u(part, 1.f);
 #elif defined(HOPKINS_PE_SPH)
-        part->entropy = 1.f;
-        part->entropy_one_over_gamma = 1.f;
+        part_set_entropy(part, 1.f);
+        part_set_entropy_one_over_gamma(part, 1.f);
 #elif defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
-        part->conserved.energy = 1.f;
+        part_set_conserved_energy(part, 1.f);
 #elif defined(PLANETARY_SPH)
         set_idg_def(&eos.idg_def, 0);
-        part->mat_id = 0;
-        part->u = 1.f;
+        part_set_mat_id(part,0);
+        part_set_u(part, 1.f);
 #elif defined(REMIX_SPH)
         set_idg_def(&eos.idg_def, 0);
-        part->mat_id = 0;
-        part->u = 1.f;
-        part->rho_evol = 1.f;
+        part_set_mat_id(part,0);
+        part_set_u(part, 1.f);
+        part_set_rho_evol(part, 1.f);
 #endif
 
 #if defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
@@ -146,15 +149,15 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
 
         /* Set the time-bin */
         if (random_uniform(0, 1.f) < fraction_active) {
-          part->time_bin = 1;
-          h_max_active = fmaxf(h_max_active, part->h);
+          part_set_time_bin(part, 1);
+          h_max_active = fmaxf(h_max_active, part_get_h(part));
         } else {
-          part->time_bin = num_time_bins + 1;
+          part_set_time_bin(part, num_time_bins + 1);
         }
 
 #ifdef SWIFT_DEBUG_CHECKS
-        part->ti_drift = 8;
-        part->ti_kick = 8;
+        part_set_ti_drift(part, 8);
+        part_set_ti_kick(part, 8);
 #endif
 
         ++part;
@@ -233,53 +236,53 @@ void zero_particle_fields_force(
 
 /* Mimic the result of a density calculation */
 #ifdef GADGET2_SPH
-    p->rho = 1.f;
-    p->density.rho_dh = 0.f;
-    p->density.wcount = 48.f / (kernel_norm * pow_dimension(p->h));
-    p->density.wcount_dh = 0.f;
-    p->density.rot_v[0] = 0.f;
-    p->density.rot_v[1] = 0.f;
-    p->density.rot_v[2] = 0.f;
-    p->density.div_v = 0.f;
+    part_set_rho(p, 1.f);
+    part_set_rho_dh(p, 0.f);
+    part_set_wcount(p, 48.f / (kernel_norm * pow_dimension(part_get_h(p))));
+    part_set_wcount_dh(p, 0.f);
+    part_set_rot_v_ind(p, 0, 0.f);
+    part_set_rot_v_ind(p, 1, 0.f);
+    part_set_rot_v_ind(p, 2, 0.f);
+    part_set_div_v(p, 0.f);
 #endif /* GADGET-2 */
 #if defined(MINIMAL_SPH) || defined(SPHENIX_SPH) || defined(PHANTOM_SPH) || \
     defined(GASOLINE_SPH)
-    p->rho = 1.f;
-    p->density.rho_dh = 0.f;
-    p->density.wcount = 48.f / (kernel_norm * pow_dimension(p->h));
-    p->density.wcount_dh = 0.f;
+    part_set_rho(p, 1.f);
+    part_set_rho_dh(p, 0.f);
+    part_set_wcount(p, 48.f / (kernel_norm * pow_dimension(part_get_h(p))));
+    part_set_wcount_dh(p, 0.f);
 #if defined(MINIMAL_SPH)
-    p->force.v_sig = hydro_get_comoving_soundspeed(p);
+    part_set_v_sig(p,  hydro_get_comoving_soundspeed(p));
 #else
-    p->viscosity.v_sig = hydro_get_comoving_soundspeed(p);
+    part_set_v_sig(p,  hydro_get_comoving_soundspeed(p));
 #endif /* MINIMAL */
 #endif /* MINIMAL, SPHENIX, PHANTOM, GASOLINE */
 #ifdef HOPKINS_PE_SPH
-    p->rho = 1.f;
-    p->rho_bar = 1.f;
-    p->density.rho_dh = 0.f;
-    p->density.pressure_dh = 0.f;
-    p->density.wcount = 48.f / (kernel_norm * pow_dimension(p->h));
-    p->density.wcount_dh = 0.f;
+    part_set_rho(p, 1.f);
+    part_set_rho_bar(p, 1.f);
+    part_set_rho_dh(p, 0.f);
+    part_set_pressure_dh(p, 0.f);
+    part_set_wcount(p, 48.f / (kernel_norm * pow_dimension(part_get_h(p))));
+    part_set_wcount_dh(p, 0.f);
 #endif /* PRESSURE-ENTROPY */
 #if defined(HOPKINS_PU_SPH) || defined(HOPKINS_PU_SPH_MONAGHAN) || \
     defined(ANARCHY_PU_SPH)
-    p->rho = 1.f;
-    p->pressure_bar = 0.6666666;
-    p->density.rho_dh = 0.f;
-    p->density.pressure_bar_dh = 0.f;
-    p->density.wcount = 48.f / (kernel_norm * pow_dimension(p->h));
-    p->density.wcount_dh = 0.f;
+    part_set_rho(p, 1.f);
+    part_set_pressure_bar(p, 0.6666666f);
+    part_set_rho_dh(p, 0.f);
+    part_set_pressure_bar_dh(p, 0.f);
+    part_set_wcount(p, 48.f / (kernel_norm * pow_dimension(part_get_h(p))));
+    part_set_wcount_dh(p, 0.f);
 #endif /* PRESSURE-ENERGY */
 #if defined(ANARCHY_PU_SPH) || defined(SPHENIX_SPH)
     /* Initialise viscosity variables */
 #if defined(SPHENIX_SPH)
-    p->force.pressure = hydro_get_comoving_pressure(p);
+    part_set_pressure(p, hydro_get_comoving_pressure(p));
 #endif
-    p->viscosity.alpha = 0.8;
-    p->viscosity.div_v = 0.f;
-    p->viscosity.div_v_previous_step = 0.f;
-    p->viscosity.v_sig = hydro_get_comoving_soundspeed(p);
+    part_set_alpha_av(p, 0.8f);
+    part_set_div_v(p, 0.f);
+    part_set_div_v_previous_step(p, 0.f);
+    part_set_v_sig(p, hydro_get_comoving_soundspeed(p));
 #endif /* ANARCHY_PU_SPH viscosity variables */
 #if defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
     const float E[3][3] = {
@@ -354,8 +357,10 @@ void end_calculation_density(struct cell *c, const struct cosmology *cosmo,
 #endif
 
     /* Recover the common "Neighbour number" definition */
-    c->hydro.parts[pid].density.wcount *= pow_dimension(c->hydro.parts[pid].h);
-    c->hydro.parts[pid].density.wcount *= kernel_norm;
+    float wcount = part_get_wcount(&c->hydro.parts[pid]);
+    wcount *= pow_dimension(part_get_h(&c->hydro.parts[pid]));
+    wcount *= kernel_norm;
+    part_set_wcount(&c->hydro.parts[pid], wcount);
   }
 }
 
@@ -382,17 +387,17 @@ void dump_particle_fields(char *fileName, struct cell *ci, struct cell *cj) {
   fprintf(file, "# ci --------------------------------------------\n");
 
   for (int pid = 0; pid < ci->hydro.count; pid++) {
-    fprintf(file, "%6llu %13e %13e\n", ci->hydro.parts[pid].id,
-            ci->hydro.parts[pid].density.wcount,
-            ci->hydro.parts[pid].force.h_dt);
+    fprintf(file, "%6llu %13e %13e\n", part_get_id(&ci->hydro.parts[pid]),
+            part_get_wcount(&ci->hydro.parts[pid]),
+            part_get_h_dt(&ci->hydro.parts[pid]));
   }
 
   fprintf(file, "# cj --------------------------------------------\n");
 
   for (int pjd = 0; pjd < cj->hydro.count; pjd++) {
-    fprintf(file, "%6llu %13e %13e\n", cj->hydro.parts[pjd].id,
-            cj->hydro.parts[pjd].density.wcount,
-            cj->hydro.parts[pjd].force.h_dt);
+    fprintf(file, "%6llu %13e %13e\n", part_get_id(&cj->hydro.parts[pjd]),
+            part_get_wcount(&cj->hydro.parts[pjd]),
+            part_get_h_dt(&cj->hydro.parts[pjd]));
   }
 
   fclose(file);

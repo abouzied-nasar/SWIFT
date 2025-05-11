@@ -31,29 +31,33 @@ void compute_interaction(struct part *pi, struct part *pj, float mu_0, float a,
                          float H) {
 
   /* Compute the distance between the two particles */
-  const float dx[3] = {pi->x[0] - pj->x[0], pi->x[1] - pj->x[1],
-                       pi->x[2] - pj->x[2]};
-  const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+  const float dx[3] = {  part_get_x_ind(pi, 0) - part_get_x_ind(pj, 0),
+            part_get_x_ind(pi, 1) - part_get_x_ind(pj, 1),
+            part_get_x_ind(pi, 2) - part_get_x_ind(pj, 2)};
 
-  if (r2 < pi->h * pi->h * kernel_gamma2) {
+  const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+  const float hi = part_get_h(pi);
+  const float hj = part_get_h(pj);
+
+  if (r2 < hi * hi * kernel_gamma2) {
 
     /* And interact them (density) */
-    runner_iact_density(r2, dx, pi->h, pj->h, pi, pj, a, H);
-    runner_iact_mhd_density(r2, dx, pi->h, pj->h, pi, pj, mu_0, a, H);
-    runner_iact_chemistry(r2, dx, pi->h, pj->h, pi, pj, a, H);
-    runner_iact_pressure_floor(r2, dx, pi->h, pj->h, pi, pj, a, H);
-    runner_iact_star_formation(r2, dx, pi->h, pj->h, pi, pj, a, H);
+    runner_iact_density(r2, dx, hi, hj, pi, pj, a, H);
+    runner_iact_mhd_density(r2, dx, hi, hj, pi, pj, mu_0, a, H);
+    runner_iact_chemistry(r2, dx, hi, hj, pi, pj, a, H);
+    runner_iact_pressure_floor(r2, dx, hi, hj, pi, pj, a, H);
+    runner_iact_star_formation(r2, dx, hi, hj, pi, pj, a, H);
 
 #ifdef EXTRA_HYDRO_LOOP
 
     /* And interact them (gradient) */
-    runner_iact_gradient(r2, dx, pi->h, pj->h, pi, pj, a, H);
-    runner_iact_mhd_gradient(r2, dx, pi->h, pj->h, pi, pj, mu_0, a, H);
+    runner_iact_gradient(r2, dx, hi, hj, pi, pj, a, H);
+    runner_iact_mhd_gradient(r2, dx, hi, hj, pi, pj, mu_0, a, H);
 #endif
 
     /* And interact them (force) */
-    runner_iact_force(r2, dx, pi->h, pj->h, pi, pj, a, H);
-    runner_iact_mhd_force(r2, dx, pi->h, pj->h, pi, pj, mu_0, a, H);
+    runner_iact_force(r2, dx, hi, hj, pi, pj, a, H);
+    runner_iact_mhd_force(r2, dx, hi, hj, pi, pj, mu_0, a, H);
   }
 }
 
@@ -72,32 +76,32 @@ void test(void) {
   }
 
   /* Make the particle smoothing length, id and time-bin reasonable */
-  pi.h = 1.f;
-  pj.h = 1.f;
-  pi.id = 1ll;
-  pj.id = 2ll;
-  pi.time_bin = 1;
-  pj.time_bin = 1;
+  part_set_h(&pi, 1.f);
+  part_set_h(&pj, 1.f);
+  part_set_id(&pi, 1ll);
+  part_set_id(&pj, 2ll);
+  part_set_time_bin(&pi, 1);
+  part_set_time_bin(&pj, 1);
 
   /* Place the first particle at (1, 1, 1) */
-  pi.x[0] = 1.;
-  pi.x[1] = 1.;
-  pi.x[2] = 1.;
+  part_set_x_ind(&pi, 0, 1.);
+  part_set_x_ind(&pi, 1, 1.);
+  part_set_x_ind(&pi, 2, 1.);
 
   /* Move the second particle at various distances from the first */
   for (double dist = 1.0f; 1.0 + dist > 1.0; dist /= 2.) {
 
-    pj.x[0] = pi.x[0] + random_uniform(0., dist * pi.h);
-    pj.x[1] = pi.x[1] + random_uniform(0., dist * pi.h);
-    pj.x[2] = pi.x[2] + random_uniform(0., dist * pi.h);
+    part_set_x_ind(&pj, 0, part_get_x_ind(&pi, 0) + random_uniform(0., dist * part_get_h(&pi)));
+    part_set_x_ind(&pj, 1, part_get_x_ind(&pi, 1) + random_uniform(0., dist * part_get_h(&pi)));
+    part_set_x_ind(&pj, 2, part_get_x_ind(&pi, 2) + random_uniform(0., dist * part_get_h(&pi)));
 
     compute_interaction(&pi, &pj, mu_0, a, H);
   }
 
   /* Also test 0 distance */
-  pj.x[0] = pi.x[0];
-  pj.x[1] = pi.x[1];
-  pj.x[2] = pi.x[2];
+  part_set_x_ind(&pj, 0, part_get_x_ind(&pi, 0));
+  part_set_x_ind(&pj, 1, part_get_x_ind(&pi, 1));
+  part_set_x_ind(&pj, 2, part_get_x_ind(&pi, 2));
 
   compute_interaction(&pi, &pj, mu_0, a, H);
 }
