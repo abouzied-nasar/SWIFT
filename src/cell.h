@@ -568,8 +568,10 @@ int cell_pack_end_step(const struct cell *c, struct pcell_step *pcell);
 int cell_unpack_end_step(struct cell *c, const struct pcell_step *pcell);
 void cell_pack_timebin(const struct cell *const c, timebin_t *const t);
 void cell_unpack_timebin(struct cell *const c, timebin_t *const t);
-int cell_pack_multipoles(struct cell *restrict c, struct gravity_tensors *restrict pcells);
-int cell_unpack_multipoles(struct cell *restrict c, struct gravity_tensors *restrict pcells);
+int cell_pack_multipoles(struct cell *restrict c,
+                         struct gravity_tensors *restrict pcells);
+int cell_unpack_multipoles(struct cell *restrict c,
+                           struct gravity_tensors *restrict pcells);
 int cell_pack_sf_counts(struct cell *c, struct pcell_sf_stars *pcell);
 int cell_unpack_sf_counts(struct cell *c, struct pcell_sf_stars *pcell);
 int cell_pack_grav_counts(struct cell *c, struct pcell_sf_grav *pcell);

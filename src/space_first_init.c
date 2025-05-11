@@ -73,7 +73,7 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
   for (int k = 0; k < count; k++) {
     if (part_get_h(&p[k]) <= 0.)
       error("Invalid value of smoothing length for part %lld h=%e",
-          part_get_id(&p[k]), part_get_h(&p[k]));
+            part_get_id(&p[k]), part_get_h(&p[k]));
 
     if (with_gravity) {
       const struct gpart *gp = part_get_gpart(&p[k]);
@@ -84,20 +84,18 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
 
   /* Convert velocities to internal units */
   for (int k = 0; k < count; k++) {
-    float* v = part_get_v(&p[k]);
+    float *v = part_get_v(&p[k]);
     v[0] *= a_factor_vel;
     v[1] *= a_factor_vel;
     v[2] *= a_factor_vel;
 
 #ifdef HYDRO_DIMENSION_2D
-    double* x = part_get_x(&p[k])
-    x[2] = 0.f;
+    double *x = part_get_x(&p[k]) x[2] = 0.f;
     v[2] = 0.f;
 #endif
 
 #ifdef HYDRO_DIMENSION_1D
-    double* x = part_get_x(&p[k])
-    x[1] = x[2] = 0.;
+    double *x = part_get_x(&p[k]) x[1] = x[2] = 0.;
     v[1] = v[2] = 0.f;
 #endif
   }
@@ -114,7 +112,7 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
 
     hydro_first_init_part(&p[k], &xp[k]);
     mhd_first_init_part(&p[k], &xp[k], &hydro_props->mhd, s->dim[0]);
-    struct timestep_limiter_data* limiter_data = part_get_limiter_data(&p[k]);
+    struct timestep_limiter_data *limiter_data = part_get_limiter_data(&p[k]);
     limiter_data->min_ngb_time_bin = num_time_bins + 1;
     limiter_data->wakeup = time_bin_not_awake;
     limiter_data->to_be_synchronized = 0;
@@ -145,7 +143,8 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
     sink_mark_part_as_not_swallowed(part_get_sink_data(&p[k]));
 
     /* Also initialise the splitting data */
-    particle_splitting_mark_part_as_not_split(&xp[k].split_data, part_get_id(&p[k]));
+    particle_splitting_mark_part_as_not_split(&xp[k].split_data,
+                                              part_get_id(&p[k]));
 
     /* And the radiative transfer */
     rt_first_init_timestep_data(&p[k]);
@@ -153,7 +152,7 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
 
 #ifdef SWIFT_DEBUG_CHECKS
     /* Check part->gpart->part linkeage. */
-    const struct gpart* gp = part_get_gpart(&p[k]);
+    const struct gpart *gp = part_get_gpart(&p[k]);
     if (gp && gp->id_or_neg_offset != -(k + delta))
       error("Invalid gpart -> part link");
 

@@ -331,7 +331,7 @@ int cell_unpack(struct pcell *restrict pc, struct cell *restrict c,
       c->split = 1;
       count += cell_unpack(&pc[pc->progeny[k]], temp, s, with_gravity);
     }
-}
+  }
 
   /* Return the total number of unpacked cells. */
   c->mpi.pcell_size = count;
@@ -564,8 +564,8 @@ void cell_unpack_timebin(struct cell *const c, timebin_t *const t) {
 
   swift_declare_aligned_ptr(timebin_t, t_align, t, SWIFT_CACHE_ALIGNMENT);
 
-  for (int i = 0; i < c->hydro.count; ++i){
-    part_set_time_bin(&c->hydro.parts[i],  t_align[i]);
+  for (int i = 0; i < c->hydro.count; ++i) {
+    part_set_time_bin(&c->hydro.parts[i], t_align[i]);
   }
 
 #else

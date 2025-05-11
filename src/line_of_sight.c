@@ -633,7 +633,7 @@ void los_first_loop_mapper(void *restrict map_data, int count,
     /* Don't consider inhibited parts. */
     if (part_get_time_bin(&parts[i]) == time_bin_inhibited) continue;
 
-    const double* const x = part_get_const_x(&parts[i]);
+    const double *const x = part_get_const_x(&parts[i]);
 
     /* Don't consider part if outwith allowed z-range. */
     if (x[LOS_list->zaxis] < LOS_list->range_when_shooting_down_axis[0] ||
@@ -950,8 +950,9 @@ void do_line_of_sight(struct engine *e) {
         if (part_get_time_bin(&cell_parts[i]) == time_bin_not_created) continue;
 
         /* Don't consider part if outwith allowed z-range. */
-        const double* const x = part_get_const_x(&cell_parts[i]);
-        if (x[LOS_list[j].zaxis] < LOS_list[j].range_when_shooting_down_axis[0] ||
+        const double *const x = part_get_const_x(&cell_parts[i]);
+        if (x[LOS_list[j].zaxis] <
+                LOS_list[j].range_when_shooting_down_axis[0] ||
             x[LOS_list[j].zaxis] > LOS_list[j].range_when_shooting_down_axis[1])
           continue;
 
@@ -1058,7 +1059,8 @@ void do_line_of_sight(struct engine *e) {
 
 #ifdef SWIFT_DEBUG_CHECKS
       for (int i = 0; i < LOS_list[j].particles_in_los_total; ++i) {
-        if (part_get_gpart(&LOS_parts[i]) != &LOS_gparts[i]) error("Incorrect pointers!");
+        if (part_get_gpart(&LOS_parts[i]) != &LOS_gparts[i])
+          error("Incorrect pointers!");
       }
 #endif
 

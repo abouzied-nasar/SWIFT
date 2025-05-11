@@ -1043,7 +1043,8 @@ void runner_do_extra_ghost(struct runner *r, struct cell *c, int timer) {
         double dt_therm;
 
         if (with_cosmology) {
-          const integertime_t ti_step = get_integer_timestep(part_get_time_bin(p));
+          const integertime_t ti_step =
+              get_integer_timestep(part_get_time_bin(p));
           const integertime_t ti_begin =
               get_integer_time_begin(ti_current - 1, part_get_time_bin(p));
 
@@ -1339,8 +1340,8 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
                 "Smoothing length convergence problem: iter=%d p->id=%lld "
                 "h_init=%12.8e h_old=%12.8e h_new=%12.8e f=%f f_prime=%f "
                 "n_sum=%12.8e n_target=%12.8e left=%12.8e right=%12.8e",
-                num_reruns, part_get_id(p), h_init, h_old, h_new, f, f_prime, n_sum,
-                n_target, left[i], right[i]);
+                num_reruns, part_get_id(p), h_init, h_old, h_new, f, f_prime,
+                n_sum, n_target, left[i], right[i]);
           }
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -1370,9 +1371,8 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
               (h_old == left[i] && h_new == right[i])) {
 
             /* Bisect the remaining interval */
-            part_set_h(p, pow_inv_dimension(
-                0.5f * (pow_dimension(left[i]) + pow_dimension(right[i])))
-                );
+            part_set_h(p, pow_inv_dimension(0.5f * (pow_dimension(left[i]) +
+                                                    pow_dimension(right[i]))));
 
           } else {
 
@@ -1444,9 +1444,8 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
         ghost_stats_converged_hydro(&c->ghost_statistics, p);
 
         /* Update gravitational softening (in adaptive softening case) */
-        struct gpart* gp = part_get_gpart(p);
-        if (gp)
-          gravity_update_softening(gp, p, e->gravity_properties);
+        struct gpart *gp = part_get_gpart(p);
+        if (gp) gravity_update_softening(gp, p, e->gravity_properties);
 
 #ifdef EXTRA_HYDRO_LOOP
 
@@ -1563,7 +1562,8 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
           "particles:");
       for (int i = 0; i < count; i++) {
         struct part *p = &parts[pid[i]];
-        warning("ID: %lld, h: %g, wcount: %g", part_get_id(p), part_get_h(p), part_get_wcount(p));
+        warning("ID: %lld, h: %g, wcount: %g", part_get_id(p), part_get_h(p),
+                part_get_wcount(p));
       }
 
       error("Smoothing length failed to converge on %i particles.", count);
@@ -1589,7 +1589,8 @@ void runner_do_ghost(struct runner *r, struct cell *c, int timer) {
     if (h > c->hydro.h_max)
       error("Particle has h larger than h_max (id=%lld)", part_get_id(p));
     if (part_is_active(p, e) && h > c->hydro.h_max_active)
-      error("Active particle has h larger than h_max_active (id=%lld)", part_get_id(p));
+      error("Active particle has h larger than h_max_active (id=%lld)",
+            part_get_id(p));
   }
 #endif
 
@@ -1646,7 +1647,8 @@ void runner_do_rt_ghost1(struct runner *r, struct cell *c, int timer) {
 
       /* First reset everything that needs to be reset for the following
        * subcycle */
-      const struct rt_timestepping_data* rt_time_data = part_get_rt_time_data(p);
+      const struct rt_timestepping_data *rt_time_data =
+          part_get_rt_time_data(p);
       const integertime_t ti_current_subcycle = e->ti_current_subcycle;
       const integertime_t ti_step =
           get_integer_timestep(rt_time_data->time_bin);

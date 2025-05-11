@@ -115,18 +115,18 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
   for (size_t x = 0; x < n; ++x) {
     for (size_t y = 0; y < n; ++y) {
       for (size_t z = 0; z < n; ++z) {
-        part_set_x_ind(part, 0,
+        part_set_x_ind(
+            part, 0,
             offset[0] +
-            size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
-        part_set_x_ind(part, 1,
+                size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 1,
             offset[1] +
-            size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
-        part_set_x_ind(part, 2,
+                size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 2,
             offset[2] +
-            size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
+                size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
         switch (vel) {
           case velocity_zero:
             part_set_v_ind(part, 0, 0.f);
@@ -149,9 +149,9 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
             part_set_v_ind(part, 2, 0.f);
             break;
         }
-        if (h_pert){
+        if (h_pert) {
           part_set_h(part, size * h * random_uniform(1.f, h_pert) / (float)n);
-        } else{
+        } else {
           part_set_h(part, size * h / (float)n);
         }
         h_max = fmaxf(h_max, part_get_h(part));
@@ -169,8 +169,8 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
 #endif
 
 #if defined(HOPKINS_PE_SPH)
-        part-set_entropy(part, 1.f);
-        part-set_entropy_one_over_gamma(part, 1.f);
+        part - set_entropy(part, 1.f);
+        part - set_entropy_one_over_gamma(part, 1.f);
 #endif
 
         part_set_time_bin(part, 1);
@@ -248,7 +248,7 @@ void end_calculation(struct cell *c, const struct cosmology *cosmo,
 
     /* Recover the common "Neighbour number" definition */
     float wcount = part_get_wcount(&c->hydro.parts[pid]);
-    wcount  *= pow_dimension(part_get_h(&c->hydro.parts[pid]));
+    wcount *= pow_dimension(part_get_h(&c->hydro.parts[pid]));
     wcount *= kernel_norm;
     part_set_wcount(&c->hydro.parts[pid], wcount);
   }
@@ -272,14 +272,13 @@ void dump_particle_fields(char *fileName, struct cell *main_cell,
 
   /* Write main cell */
   for (int pid = 0; pid < main_cell->hydro.count; pid++) {
-    const struct part* pi = &main_cell->hydro.parts[pid];
+    const struct part *pi = &main_cell->hydro.parts[pid];
     fprintf(file,
             "%6llu %10f %10f %10f %10f %10f %10f %13e %13e %13e %13e %13e "
             "%13e %13e %13e\n",
-            part_get_id(pi),
-            part_get_x_ind(pi, 0), part_get_x_ind(pi, 1), part_get_x_ind(pi, 2),
-            part_get_v_ind(pi, 0), part_get_v_ind(pi, 1), part_get_v_ind(pi, 2),
-            hydro_get_comoving_density(pi),
+            part_get_id(pi), part_get_x_ind(pi, 0), part_get_x_ind(pi, 1),
+            part_get_x_ind(pi, 2), part_get_v_ind(pi, 0), part_get_v_ind(pi, 1),
+            part_get_v_ind(pi, 2), hydro_get_comoving_density(pi),
 #if defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
             0.f,
 #elif defined(HOPKINS_PU_SPH) || defined(HOPKINS_PU_SPH_MONAGHAN) || \
@@ -288,20 +287,15 @@ void dump_particle_fields(char *fileName, struct cell *main_cell,
 #else
             part_get_rho_dh(pi),
 #endif
-            part_get_wcount(pi),
-            part_get_wcount_dh(pi),
+            part_get_wcount(pi), part_get_wcount_dh(pi),
 #if defined(GADGET2_SPH) || defined(HOPKINS_PE_SPH) || \
     defined(HOPKINS_PU_SPH) || defined(HOPKINS_PU_SPH_MONAGHAN)
-            part_get_div_v(pi),
-            part_get_rot_v_ind(pi, 0),
-            part_get_rot_v_ind(pi, 1),
-            part_get_rot_v_ind(pi, 2)
+            part_get_div_v(pi), part_get_rot_v_ind(pi, 0),
+            part_get_rot_v_ind(pi, 1), part_get_rot_v_ind(pi, 2)
 #elif defined(ANARCHY_PU_SPH) || defined(SPHENIX_SPH) || defined(PHANTOM_SPH)
             /* this is required because of the variable AV scheme */
-            part_get_div_v(pi),
-            part_get_rot_v_ind(pi, 0),
-            part_get_rot_v_ind(pi, 1),
-            part_get_rot_v_ind(pi, 2)
+            part_get_div_v(pi), part_get_rot_v_ind(pi, 0),
+            part_get_rot_v_ind(pi, 1), part_get_rot_v_ind(pi, 2)
 #else
             0., 0., 0., 0.
 #endif
@@ -320,36 +314,31 @@ void dump_particle_fields(char *fileName, struct cell *main_cell,
                 i - 1, j - 1, k - 1);
 
         for (int pjd = 0; pjd < cj->hydro.count; pjd++) {
-          const struct part* pj = &cj->hydro.parts[pjd];
+          const struct part *pj = &cj->hydro.parts[pjd];
           fprintf(
               file,
               "%6llu %10f %10f %10f %10f %10f %10f %13e %13e %13e %13e %13e "
               "%13e %13e %13e\n",
-              part_get_id(pj),
-              part_get_x_ind(pj, 0), part_get_x_ind(pj, 1), part_get_x_ind(pj, 2),
-              part_get_v_ind(pj, 0), part_get_v_ind(pj, 1), part_get_v_ind(pj, 2),
+              part_get_id(pj), part_get_x_ind(pj, 0), part_get_x_ind(pj, 1),
+              part_get_x_ind(pj, 2), part_get_v_ind(pj, 0),
+              part_get_v_ind(pj, 1), part_get_v_ind(pj, 2),
               hydro_get_comoving_density(pj),
 #if defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
               0.f,
 #else
-              // TODO: This was main_cell-> pointer, all the others were cj-> pointers.
-              // Is this intentional?
+              // TODO: This was main_cell-> pointer, all the others were cj->
+              // pointers. Is this intentional?
               /* main_cell->hydro.parts[pjd].density.rho_dh, */
               part_get_rho_dh(pj),
 #endif
-              part_get_wcount(pj),
-              part_get_wcount_dh(pj),
+              part_get_wcount(pj), part_get_wcount_dh(pj),
 #if defined(GADGET2_SPH) || defined(HOPKINS_PE_SPH)
-              part_get_div_v(pj),
-              part_get_rot_v_ind(pj, 0),
-              part_get_rot_v_ind(pj, 1),
-              part_get_rot_v_ind(pj, 2)
+              part_get_div_v(pj), part_get_rot_v_ind(pj, 0),
+              part_get_rot_v_ind(pj, 1), part_get_rot_v_ind(pj, 2)
 #elif defined(ANARCHY_PU_SPH) || defined(SPHENIX_SPH) || defined(PHANTOM_SPH)
               /* this is required because of the variable AV scheme */
-              part_get_div_v(pj),
-              part_get_rot_v_ind(pj, 0),
-              part_get_rot_v_ind(pj, 1),
-              part_get_rot_v_ind(pj, 2)
+              part_get_div_v(pj), part_get_rot_v_ind(pj, 0),
+              part_get_rot_v_ind(pj, 1), part_get_rot_v_ind(pj, 2)
 #else
               0., 0., 0., 0.
 #endif

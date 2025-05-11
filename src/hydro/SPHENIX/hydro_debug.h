@@ -39,29 +39,14 @@ __attribute__((always_inline)) INLINE static void hydro_debug_particle(
       "h=%.3e, dh/dt=%.3e wcount=%d, m=%.3e, dh_drho=%.3e, rho=%.3e, "
       "alpha=%.3e, "
       "time_bin=%d",
-      part_get_id(p),
-      part_get_x_ind(p, 0),
-      part_get_x_ind(p, 1),
-      part_get_x_ind(p, 2),
-      part_get_v_ind(p, 0),
-      part_get_v_ind(p, 1),
-      part_get_v_ind(p, 2),
-      part_get_a_hydro_ind(p, 0),
-      part_get_a_hydro_ind(p, 1),
-      part_get_a_hydro_ind(p, 2),
-      part_get_u(p),
-      part_get_u_dt(p),
-      part_get_v_sig(p),
-      hydro_get_comoving_pressure(p),
-      part_get_h(p),
-      part_get_h_dt(p),
-      (int)part_get_wcount(p),
-      part_get_mass(p),
-      part_get_rho_dh(p),
-      part_get_rho(p),
-      part_get_alpha_av(p),
-      part_get_time_bin(p)
-        );
+      part_get_id(p), part_get_x_ind(p, 0), part_get_x_ind(p, 1),
+      part_get_x_ind(p, 2), part_get_v_ind(p, 0), part_get_v_ind(p, 1),
+      part_get_v_ind(p, 2), part_get_a_hydro_ind(p, 0),
+      part_get_a_hydro_ind(p, 1), part_get_a_hydro_ind(p, 2), part_get_u(p),
+      part_get_u_dt(p), part_get_v_sig(p), hydro_get_comoving_pressure(p),
+      part_get_h(p), part_get_h_dt(p), (int)part_get_wcount(p),
+      part_get_mass(p), part_get_rho_dh(p), part_get_rho(p),
+      part_get_alpha_av(p), part_get_time_bin(p));
   if (xp != NULL) {
     warning("[PID%lld] xpart:", part_get_id(p));
     warning("[PID%lld] v_full=[%.3e,%.3e,%.3e]", part_get_id(p), xp->v_full[0],

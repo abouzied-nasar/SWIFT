@@ -96,7 +96,7 @@ void space_parts_get_cell_index_mapper(void *map_data, int nr_parts,
     /* Get the particle */
     struct part *restrict p = &parts[k];
 
-    double* x = part_get_x(p);
+    double *x = part_get_x(p);
     double old_pos_x = x[0];
     double old_pos_y = x[1];
     double old_pos_z = x[2];
@@ -158,7 +158,7 @@ void space_parts_get_cell_index_mapper(void *map_data, int nr_parts,
       min_mass = min(min_mass, hydro_get_mass(p));
 
       /* Compute sum of velocity norm */
-      float* v = part_get_v(p);
+      float *v = part_get_v(p);
       sum_vel_norm += v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 
       /* Update the position */

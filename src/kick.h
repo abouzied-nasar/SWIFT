@@ -222,8 +222,8 @@ __attribute__((always_inline)) INLINE static void kick_part(
 
 #ifdef SWIFT_DEBUG_CHECKS
   integertime_t ti_kick = part_get_ti_kick(p);
-  if (ti_kick != ti_start){
-    struct timestep_limiter_data * limiter_data = part_get_limiter_data(p);
+  if (ti_kick != ti_start) {
+    struct timestep_limiter_data *limiter_data = part_get_limiter_data(p);
     error(
         "particle has not been kicked to the current time p->ti_kick=%lld, "
         "ti_start=%lld, ti_end=%lld id=%lld time_bin=%d wakeup=%d",
@@ -248,7 +248,7 @@ __attribute__((always_inline)) INLINE static void kick_part(
   xp->v_full[2] += part_get_a_hydro_ind(p, 2) * dt_kick_hydro;
 
   /* Kick particles in momentum space (grav acc.) */
-  struct gpart* gp = part_get_gpart(p);
+  struct gpart *gp = part_get_gpart(p);
   if (gp != NULL) {
     xp->v_full[0] += gp->a_grav[0] * dt_kick_grav;
     xp->v_full[1] += gp->a_grav[1] * dt_kick_grav;

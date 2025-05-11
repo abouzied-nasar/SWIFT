@@ -256,40 +256,38 @@ struct redist_mapper_data {
  * loop.
  * This version uses getter/setter functions instead of direct access.
  * */
-#define ENGINE_REDISTRIBUTE_DEST_GETTERS_MAPPER(TYPE)                      \
-  engine_redistribute_dest_mapper_##TYPE(void *map_data, int num_elements, \
-                                         void *extra_data) {               \
-    struct TYPE *parts = (struct TYPE *)map_data;                          \
-    struct redist_mapper_data *mydata =                                    \
-        (struct redist_mapper_data *)extra_data;                           \
-    struct space *s = mydata->s;                                           \
-    int *dest =                                                            \
-        mydata->dest + (ptrdiff_t)(parts - (struct TYPE *)mydata->base);   \
-    int *lcounts = NULL;                                                   \
-    if ((lcounts = (int *)calloc(mydata->nr_nodes * mydata->nr_nodes,      \
-                                 sizeof(int))) == NULL)                    \
-      error("Failed to allocate counts thread-specific buffer");           \
-    for (int k = 0; k < num_elements; k++) {                               \
-      double* xk = TYPE##_get_x(&parts[k]);                                  \
-      for (int j = 0; j < 3; j++) {                                        \
-        if (xk[j] < 0.0)                                                   \
-          xk[j] += s->dim[j];                                              \
-        else if (xk[j] >= s->dim[j])                                       \
-          xk[j] -= s->dim[j];                                              \
-        if (xk[j] == s->dim[j]) xk[j] = 0.0;                               \
-      }                                                                    \
-      const int cid = cell_getid(s->cdim, xk[0] * s->iwidth[0],            \
-                                 xk[1] * s->iwidth[1],                     \
-                                 xk[2] * s->iwidth[2]);                    \
-      dest[k] = s->cells_top[cid].nodeID;                                  \
-      size_t ind = mydata->nodeID * mydata->nr_nodes + dest[k];            \
-      lcounts[ind] += 1;                                                   \
-    }                                                                      \
-    for (int k = 0; k < (mydata->nr_nodes * mydata->nr_nodes); k++)        \
-      atomic_add(&mydata->counts[k], lcounts[k]);                          \
-    free(lcounts);                                                         \
+#define ENGINE_REDISTRIBUTE_DEST_GETTERS_MAPPER(TYPE)                         \
+  engine_redistribute_dest_mapper_##TYPE(void *map_data, int num_elements,    \
+                                         void *extra_data) {                  \
+    struct TYPE *parts = (struct TYPE *)map_data;                             \
+    struct redist_mapper_data *mydata =                                       \
+        (struct redist_mapper_data *)extra_data;                              \
+    struct space *s = mydata->s;                                              \
+    int *dest =                                                               \
+        mydata->dest + (ptrdiff_t)(parts - (struct TYPE *)mydata->base);      \
+    int *lcounts = NULL;                                                      \
+    if ((lcounts = (int *)calloc(mydata->nr_nodes * mydata->nr_nodes,         \
+                                 sizeof(int))) == NULL)                       \
+      error("Failed to allocate counts thread-specific buffer");              \
+    for (int k = 0; k < num_elements; k++) {                                  \
+      double *xk = TYPE##_get_x(&parts[k]);                                   \
+      for (int j = 0; j < 3; j++) {                                           \
+        if (xk[j] < 0.0)                                                      \
+          xk[j] += s->dim[j];                                                 \
+        else if (xk[j] >= s->dim[j])                                          \
+          xk[j] -= s->dim[j];                                                 \
+        if (xk[j] == s->dim[j]) xk[j] = 0.0;                                  \
+      }                                                                       \
+      const int cid = cell_getid(s->cdim, xk[0] * s->iwidth[0],               \
+                                 xk[1] * s->iwidth[1], xk[2] * s->iwidth[2]); \
+      dest[k] = s->cells_top[cid].nodeID;                                     \
+      size_t ind = mydata->nodeID * mydata->nr_nodes + dest[k];               \
+      lcounts[ind] += 1;                                                      \
+    }                                                                         \
+    for (int k = 0; k < (mydata->nr_nodes * mydata->nr_nodes); k++)           \
+      atomic_add(&mydata->counts[k], lcounts[k]);                             \
+    free(lcounts);                                                            \
   }
-
 
 /* Generic function for accumulating counts for TYPE parts. Note
  * we use a local counts array to avoid the atomic_add in the parts
@@ -379,7 +377,6 @@ struct savelink_mapper_data {
   int nodeID;
 };
 
-
 /**
  * @brief Save the offset of each gravity partner of a part or spart.
  *
@@ -391,7 +388,7 @@ struct savelink_mapper_data {
  *
  * This version uses getter/setter functions instead of direct access.
  */
-#define ENGINE_REDISTRIBUTE_SAVELINK_GETTERS_MAPPER(TYPE, CHECKS)                      \
+#define ENGINE_REDISTRIBUTE_SAVELINK_GETTERS_MAPPER(TYPE, CHECKS)              \
   engine_redistribute_savelink_mapper_##TYPE(void *map_data, int num_elements, \
                                              void *extra_data) {               \
     int *nodes = (int *)map_data;                                              \
@@ -409,7 +406,7 @@ struct savelink_mapper_data {
       for (int i = 0; i < node; i++) offset += counts[nodeID * nr_nodes + i];  \
                                                                                \
       for (int k = 0; k < counts[nodeID * nr_nodes + node]; k++) {             \
-        struct gpart* gp = TYPE##_get_gpart(&parts[k + offset]);               \
+        struct gpart *gp = TYPE##_get_gpart(&parts[k + offset]);               \
         if (gp != NULL) {                                                      \
           if (CHECKS) {                                                        \
             if (gp->id_or_neg_offset > 0) {                                    \
@@ -422,7 +419,6 @@ struct savelink_mapper_data {
       }                                                                        \
     }                                                                          \
   }
-
 
 /**
  * @brief Save the offset of each gravity partner of a part or spart.
@@ -669,11 +665,11 @@ void engine_redistribute(struct engine *e) {
       memswap(&xparts[k], &xparts[nr_parts], sizeof(struct xpart));
 
       /* Swap the link with the gpart */
-      struct gpart* gp = part_get_gpart(&parts[k]);
+      struct gpart *gp = part_get_gpart(&parts[k]);
       if (gp != NULL) {
         gp->id_or_neg_offset = -k;
       }
-      struct gpart* gp_nr_parts = part_get_gpart(&parts[nr_parts]);
+      struct gpart *gp_nr_parts = part_get_gpart(&parts[nr_parts]);
       if (gp_nr_parts != NULL) {
         gp_nr_parts->id_or_neg_offset = -nr_parts;
       }
@@ -757,7 +753,7 @@ void engine_redistribute(struct engine *e) {
 
       /* Swap the link with part/spart */
       if (s->gparts[k].type == swift_type_gas) {
-        struct part* p = &s->parts[-s->gparts[k].id_or_neg_offset];
+        struct part *p = &s->parts[-s->gparts[k].id_or_neg_offset];
         part_set_gpart(p, &s->gparts[k]);
       } else if (s->gparts[k].type == swift_type_stars) {
         s->sparts[-s->gparts[k].id_or_neg_offset].gpart = &s->gparts[k];
@@ -768,7 +764,7 @@ void engine_redistribute(struct engine *e) {
       }
 
       if (s->gparts[nr_gparts].type == swift_type_gas) {
-        struct part* p = &s->parts[-s->gparts[nr_gparts].id_or_neg_offset];
+        struct part *p = &s->parts[-s->gparts[nr_gparts].id_or_neg_offset];
         part_set_gpart(p, &s->gparts[nr_gparts]);
       } else if (s->gparts[nr_gparts].type == swift_type_stars) {
         s->sparts[-s->gparts[nr_gparts].id_or_neg_offset].gpart =
@@ -834,9 +830,9 @@ void engine_redistribute(struct engine *e) {
       error("Inhibited particle found after sorting!");
 
     /* New cell index */
-    const double* const x = part_get_const_x(p);
-    const int new_cid =
-        cell_getid(s->cdim, x[0] * s->iwidth[0], x[1] * s->iwidth[1], x[2] * s->iwidth[2]);
+    const double *const x = part_get_const_x(p);
+    const int new_cid = cell_getid(s->cdim, x[0] * s->iwidth[0],
+                                   x[1] * s->iwidth[1], x[2] * s->iwidth[2]);
 
     /* New cell of this part */
     const struct cell *c = &s->cells_top[new_cid];
@@ -1406,8 +1402,10 @@ void engine_redistribute(struct engine *e) {
 #ifdef SWIFT_DEBUG_CHECKS
   /* Verify that all parts are in the right place. */
   for (size_t k = 0; k < nr_parts_new; k++) {
-    const struct part* p = &s->parts[k];
-    const int cid = cell_getid(s->cdim, part_get_x_ind(p, 0) * s->iwidth[0], part_get_x_ind(p,1) * s->iwidth[1], part_get_x_ind(p,2) * s->iwidth[2]);
+    const struct part *p = &s->parts[k];
+    const int cid = cell_getid(s->cdim, part_get_x_ind(p, 0) * s->iwidth[0],
+                               part_get_x_ind(p, 1) * s->iwidth[1],
+                               part_get_x_ind(p, 2) * s->iwidth[2]);
     if (cells[cid].nodeID != nodeID)
       error("Received particle (%zu) that does not belong here (nodeID=%i).", k,
             cells[cid].nodeID);

@@ -1358,7 +1358,7 @@ void engine_rebuild(struct engine *e, const int repartitioned,
   space_rebuild(e->s, repartitioned, e->verbose);
 
   /* Report the number of cells and memory */
-  if (e->verbose){
+  if (e->verbose) {
     message(
         "Nr. of top-level cells: %d Nr. of local cells: %d memory use: %zd MB.",
         e->s->nr_cells, e->s->tot_cells,
@@ -1367,7 +1367,7 @@ void engine_rebuild(struct engine *e, const int repartitioned,
   }
 
   /* Report the number of multipoles and memory */
-  if (e->verbose && (e->policy & engine_policy_self_gravity)){
+  if (e->verbose && (e->policy & engine_policy_self_gravity)) {
     message(
         "Nr. of top-level mpoles: %d Nr. of local mpoles: %d memory use: %zd "
         "MB.",
@@ -1390,7 +1390,7 @@ void engine_rebuild(struct engine *e, const int repartitioned,
         e->s->size_bparts * sizeof(struct bpart) / (1024 * 1024));
   }
 
-  if (e->verbose){
+  if (e->verbose) {
     message(
         "Space holds %zd/%zd/%zd/%zd/%zd part/gpart/spart/sink/bpart (fracs: "
         "%f/%f/%f/%f/%f)",
@@ -2441,11 +2441,12 @@ void engine_init_particles(struct engine *e, int flag_entropy_ICs,
       /* Ignore fake buffer particles for on-the-fly creation */
       if (part_get_time_bin(&s->parts[k]) == time_bin_not_created) continue;
 
-      double* x = part_get_x(&s->parts[k]);
+      double *x = part_get_x(&s->parts[k]);
       if (prev_x[0] == x[0] && prev_x[1] == x[1] && prev_x[2] == x[2]) {
         if (e->verbose)
           message("Two particles occupy location: %f %f %f id=%lld id=%lld",
-                  prev_x[0], prev_x[1], prev_x[2], *prev_id, part_get_id(&s->parts[k]));
+                  prev_x[0], prev_x[1], prev_x[2], *prev_id,
+                  part_get_id(&s->parts[k]));
         failed++;
       }
       prev_x = x;

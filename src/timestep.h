@@ -167,7 +167,7 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   float new_dt_grav = FLT_MAX;
   float new_dt_self_grav = FLT_MAX;
   float new_dt_ext_grav = FLT_MAX;
-  const struct gpart* const gp = part_get_gpart(p);
+  const struct gpart *const gp = part_get_gpart(p);
   if (gp != NULL) {
 
     if (e->policy & engine_policy_external_gravity)
@@ -195,10 +195,10 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   new_dt = min4(new_dt, new_dt_mhd, new_dt_chemistry, new_dt_forcing);
 
   /* Limit change in smoothing length */
-  const float dt_h_change =
-      (part_get_h_dt(p) != 0.0f)
-          ? fabsf(e->hydro_properties->log_max_h_change * part_get_h(p) / part_get_h_dt(p))
-          : FLT_MAX;
+  const float dt_h_change = (part_get_h_dt(p) != 0.0f)
+                                ? fabsf(e->hydro_properties->log_max_h_change *
+                                        part_get_h(p) / part_get_h_dt(p))
+                                : FLT_MAX;
 
   new_dt = min(new_dt, dt_h_change);
 
@@ -212,14 +212,15 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
   new_dt = min(new_dt, e->dt_max);
 
   if (new_dt < e->dt_min)
-    error("part (id=%lld) wants a time-step (%e) below dt_min (%e)", part_get_id(p),
-          new_dt, e->dt_min);
+    error("part (id=%lld) wants a time-step (%e) below dt_min (%e)",
+          part_get_id(p), new_dt, e->dt_min);
 
   /* Convert to integer time */
-  const struct timestep_limiter_data* const limiter_data = part_get_const_limiter_data(p);
+  const struct timestep_limiter_data *const limiter_data =
+      part_get_const_limiter_data(p);
   integertime_t new_dti = make_integer_timestep(
-      new_dt, part_get_time_bin(p), limiter_data->min_ngb_time_bin, e->ti_current,
-      e->time_base_inv);
+      new_dt, part_get_time_bin(p), limiter_data->min_ngb_time_bin,
+      e->ti_current, e->time_base_inv);
 
   if (e->policy & engine_policy_rt) {
     if (new_dti_rt <= new_dti) {
@@ -287,7 +288,8 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_rt_timestep(
         p->id, new_dt, e->dt_min / f);
 #endif
 
-  const struct rt_timestepping_data* const rt_time_data = part_get_const_rt_time_data(p);
+  const struct rt_timestepping_data *const rt_time_data =
+      part_get_const_rt_time_data(p);
   const integertime_t new_dti = make_integer_timestep(
       new_dt, rt_time_data->time_bin, rt_time_data->min_ngb_time_bin,
       e->ti_current, e->time_base_inv);

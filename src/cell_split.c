@@ -80,7 +80,7 @@ void cell_split(struct cell *c, const ptrdiff_t parts_offset,
 #ifdef SWIFT_DEBUG_CHECKS
   /* Check that the buffs are OK. */
   for (int k = 0; k < count; k++) {
-    const double* const x = part_get_const_x(&parts[k]);
+    const double *const x = part_get_const_x(&parts[k]);
     if (buff[k].x[0] != x[0] || buff[k].x[1] != x[1] || buff[k].x[2] != x[2])
       error("Inconsistent buff contents.");
   }
@@ -139,17 +139,15 @@ void cell_split(struct cell *c, const ptrdiff_t parts_offset,
           memswap(&parts[j], &part, sizeof(struct part));
           memswap(&xparts[j], &xpart, sizeof(struct xpart));
           memswap(&buff[j], &temp_buff, sizeof(struct cell_buff));
-          struct gpart* gp = part_get_gpart(&parts[j]);
-          if (gp)
-            gp->id_or_neg_offset = -(j + parts_offset);
+          struct gpart *gp = part_get_gpart(&parts[j]);
+          if (gp) gp->id_or_neg_offset = -(j + parts_offset);
           bid = temp_buff.ind;
         }
         parts[k] = part;
         xparts[k] = xpart;
         buff[k] = temp_buff;
-        struct gpart* gp = part_get_gpart(&parts[k]);
-        if (gp)
-          gp->id_or_neg_offset = -(k + parts_offset);
+        struct gpart *gp = part_get_gpart(&parts[k]);
+        if (gp) gp->id_or_neg_offset = -(k + parts_offset);
       }
       bucket_count[bid]++;
     }
@@ -169,8 +167,8 @@ void cell_split(struct cell *c, const ptrdiff_t parts_offset,
     if (buff[k].ind < buff[k - 1].ind) {
       error("Buff not sorted.");
     }
-    const double* const x = part_get_const_x(&parts[k]);
-    if (buff[k].x[0] != x[0] || buff[k].x[1] != x[1] || buff[k].x[2] != x[2]){
+    const double *const x = part_get_const_x(&parts[k]);
+    if (buff[k].x[0] != x[0] || buff[k].x[1] != x[1] || buff[k].x[2] != x[2]) {
       error("Inconsistent buff contents (k=%i).", k);
     }
   }
@@ -187,59 +185,59 @@ void cell_split(struct cell *c, const ptrdiff_t parts_offset,
     error("Particle sorting failed (right edge).");
 
   /* Verify a few sub-cells. */
-  for (int k = 0; k < c->progeny[0]->hydro.count; k++){
-    const struct part* const p = &c->progeny[0]->hydro.parts[k];
-    const double* const x = part_get_const_x(p);
-    if (x[0] >= pivot[0] || x[1] >= pivot[1] || x[2] >= pivot[2]){
+  for (int k = 0; k < c->progeny[0]->hydro.count; k++) {
+    const struct part *const p = &c->progeny[0]->hydro.parts[k];
+    const double *const x = part_get_const_x(p);
+    if (x[0] >= pivot[0] || x[1] >= pivot[1] || x[2] >= pivot[2]) {
       error("Sorting failed (progeny=0).");
     }
   }
-  for (int k = 0; k < c->progeny[1]->hydro.count; k++){
-    const struct part* const p = &c->progeny[1]->hydro.parts[k];
-    const double* const x = part_get_const_x(p);
-    if (x[0] >= pivot[0] || x[1] >= pivot[1] || x[2] < pivot[2]){
+  for (int k = 0; k < c->progeny[1]->hydro.count; k++) {
+    const struct part *const p = &c->progeny[1]->hydro.parts[k];
+    const double *const x = part_get_const_x(p);
+    if (x[0] >= pivot[0] || x[1] >= pivot[1] || x[2] < pivot[2]) {
       error("Sorting failed (progeny=1).");
     }
   }
-  for (int k = 0; k < c->progeny[2]->hydro.count; k++){
-    const struct part* const p = &c->progeny[2]->hydro.parts[k];
-    const double* const x = part_get_const_x(p);
-    if (x[0] >= pivot[0] || x[1] < pivot[1] || x[2] >= pivot[2]){
+  for (int k = 0; k < c->progeny[2]->hydro.count; k++) {
+    const struct part *const p = &c->progeny[2]->hydro.parts[k];
+    const double *const x = part_get_const_x(p);
+    if (x[0] >= pivot[0] || x[1] < pivot[1] || x[2] >= pivot[2]) {
       error("Sorting failed (progeny=2).");
     }
   }
-  for (int k = 0; k < c->progeny[3]->hydro.count; k++){
-    const struct part* const p = &c->progeny[3]->hydro.parts[k];
-    const double* const x = part_get_const_x(p);
-    if (x[0] >= pivot[0] || x[1] < pivot[1] || x[2] < pivot[2]){
+  for (int k = 0; k < c->progeny[3]->hydro.count; k++) {
+    const struct part *const p = &c->progeny[3]->hydro.parts[k];
+    const double *const x = part_get_const_x(p);
+    if (x[0] >= pivot[0] || x[1] < pivot[1] || x[2] < pivot[2]) {
       error("Sorting failed (progeny=3).");
     }
   }
-  for (int k = 0; k < c->progeny[4]->hydro.count; k++){
-    const struct part* const p = &c->progeny[4]->hydro.parts[k];
-    const double* const x = part_get_const_x(p);
-    if (x[0] < pivot[0] || x[1] >= pivot[1] || x[2] >= pivot[2]){
+  for (int k = 0; k < c->progeny[4]->hydro.count; k++) {
+    const struct part *const p = &c->progeny[4]->hydro.parts[k];
+    const double *const x = part_get_const_x(p);
+    if (x[0] < pivot[0] || x[1] >= pivot[1] || x[2] >= pivot[2]) {
       error("Sorting failed (progeny=4).");
     }
   }
-  for (int k = 0; k < c->progeny[5]->hydro.count; k++){
-    const struct part* const p = &c->progeny[5]->hydro.parts[k];
-    const double* const x = part_get_const_x(p);
-    if (x[0] < pivot[0] || x[1] >= pivot[1] || x[2] < pivot[2]){
+  for (int k = 0; k < c->progeny[5]->hydro.count; k++) {
+    const struct part *const p = &c->progeny[5]->hydro.parts[k];
+    const double *const x = part_get_const_x(p);
+    if (x[0] < pivot[0] || x[1] >= pivot[1] || x[2] < pivot[2]) {
       error("Sorting failed (progeny=5).");
     }
   }
-  for (int k = 0; k < c->progeny[6]->hydro.count; k++){
-    const struct part* const p = &c->progeny[6]->hydro.parts[k];
-    const double* const x = part_get_const_x(p);
-    if (x[0] < pivot[0] || x[1] < pivot[1] || x[2] >= pivot[2]){
+  for (int k = 0; k < c->progeny[6]->hydro.count; k++) {
+    const struct part *const p = &c->progeny[6]->hydro.parts[k];
+    const double *const x = part_get_const_x(p);
+    if (x[0] < pivot[0] || x[1] < pivot[1] || x[2] >= pivot[2]) {
       error("Sorting failed (progeny=6).");
     }
   }
-  for (int k = 0; k < c->progeny[7]->hydro.count; k++){
-    const struct part* const p = &c->progeny[7]->hydro.parts[k];
-    const double* const x = part_get_const_x(p);
-    if (x[0] < pivot[0] || x[1] < pivot[1] || x[2] < pivot[2]){
+  for (int k = 0; k < c->progeny[7]->hydro.count; k++) {
+    const struct part *const p = &c->progeny[7]->hydro.parts[k];
+    const double *const x = part_get_const_x(p);
+    if (x[0] < pivot[0] || x[1] < pivot[1] || x[2] < pivot[2]) {
       error("Sorting failed (progeny=7).");
     }
   }
@@ -445,7 +443,8 @@ void cell_split(struct cell *c, const ptrdiff_t parts_offset,
           memswap_unaligned(&gparts[j], &gpart, sizeof(struct gpart));
           memswap(&gbuff[j], &temp_buff, sizeof(struct cell_buff));
           if (gparts[j].type == swift_type_gas) {
-            part_set_gpart( &parts[-gparts[j].id_or_neg_offset - parts_offset], &gparts[j]);
+            part_set_gpart(&parts[-gparts[j].id_or_neg_offset - parts_offset],
+                           &gparts[j]);
           } else if (gparts[j].type == swift_type_stars) {
             sparts[-gparts[j].id_or_neg_offset - sparts_offset].gpart =
                 &gparts[j];
@@ -461,7 +460,8 @@ void cell_split(struct cell *c, const ptrdiff_t parts_offset,
         gparts[k] = gpart;
         gbuff[k] = temp_buff;
         if (gparts[k].type == swift_type_gas) {
-          part_set_gpart( &parts[-gparts[k].id_or_neg_offset - parts_offset], &gparts[k]);
+          part_set_gpart(&parts[-gparts[k].id_or_neg_offset - parts_offset],
+                         &gparts[k]);
         } else if (gparts[k].type == swift_type_stars) {
           sparts[-gparts[k].id_or_neg_offset - sparts_offset].gpart =
               &gparts[k];
@@ -508,7 +508,8 @@ void cell_reorder_extra_parts(struct cell *c, const ptrdiff_t parts_offset) {
     if (part_get_time_bin(&parts[i]) == time_bin_not_created) {
       /* Find the first non-extra particle after the end of the
          real particles */
-      while (part_get_time_bin(&parts[first_not_extra]) == time_bin_not_created) {
+      while (part_get_time_bin(&parts[first_not_extra]) ==
+             time_bin_not_created) {
         ++first_not_extra;
       }
 
@@ -520,18 +521,19 @@ void cell_reorder_extra_parts(struct cell *c, const ptrdiff_t parts_offset) {
       /* Swap everything, including g-part pointer */
       memswap(&parts[i], &parts[first_not_extra], sizeof(struct part));
       memswap(&xparts[i], &xparts[first_not_extra], sizeof(struct xpart));
-      struct gpart* gp = part_get_gpart(&parts[i]);
-      if (gp)
-        gp->id_or_neg_offset = -(i + parts_offset);
+      struct gpart *gp = part_get_gpart(&parts[i]);
+      if (gp) gp->id_or_neg_offset = -(i + parts_offset);
     }
   }
 
 #ifdef SWIFT_DEBUG_CHECKS
   for (int i = 0; i < c->hydro.count_total; ++i) {
-    if (part_get_time_bin(&parts[i]) == time_bin_not_created && i < c->hydro.count) {
+    if (part_get_time_bin(&parts[i]) == time_bin_not_created &&
+        i < c->hydro.count) {
       error("Extra particle before the end of the regular array");
     }
-    if (part_get_time_bin(&parts[i]) != time_bin_not_created && i >= c->hydro.count) {
+    if (part_get_time_bin(&parts[i]) != time_bin_not_created &&
+        i >= c->hydro.count) {
       error("Regular particle after the end of the regular array");
     }
   }

@@ -17,10 +17,10 @@
  *
  ******************************************************************************/
 
-#include "runner_doiact_sinks.h"
 #include "active.h"
 #include "engine.h"
 #include "runner.h"
+#include "runner_doiact_sinks.h"
 #include "timers.h"
 
 /**
@@ -74,13 +74,13 @@ void DOSELF1_SINKS(struct runner *r, struct cell *c, int timer) {
 
         /* Get a pointer to the jth particle. */
         struct part *restrict pj = &parts[pjd];
-        const float hj =part_get_h(pj);
+        const float hj = part_get_h(pj);
 
         /* Early abort? */
         if (part_is_inhibited(pj, e)) continue;
 
         /* Compute the pairwise distance. */
-        const double* const xj = part_get_const_x(pj);
+        const double *const xj = part_get_const_x(pj);
         const float pjx[3] = {(float)(xj[0] - c->loc[0]),
                               (float)(xj[1] - c->loc[1]),
                               (float)(xj[2] - c->loc[2])};
@@ -226,13 +226,13 @@ void DO_NONSYM_PAIR1_SINKS_NAIVE(struct runner *r, struct cell *restrict ci,
 
         /* Get a pointer to the jth particle. */
         struct part *restrict pj = &parts_j[pjd];
-        const float hj =part_get_h(pj);
+        const float hj = part_get_h(pj);
 
         /* Skip inhibited particles. */
         if (part_is_inhibited(pj, e)) continue;
 
         /* Compute the pairwise distance. */
-        const double* const xj = part_get_const_x(pj);
+        const double *const xj = part_get_const_x(pj);
         const float pjx[3] = {(float)(xj[0] - cj->loc[0]),
                               (float)(xj[1] - cj->loc[1]),
                               (float)(xj[2] - cj->loc[2])};
@@ -401,8 +401,8 @@ void DOPAIR1_SUBSET_SINKS_NAIVE(struct runner *r, struct cell *restrict ci,
       /* Skip inhibited particles */
       if (part_is_inhibited(pj, e)) continue;
 
-      const double* const pjx = part_get_const_x(pj);
-      const float hj =part_get_h(pj);
+      const double *const pjx = part_get_const_x(pj);
+      const float hj = part_get_h(pj);
 
       /* Compute the pairwise distance. */
       const float dx[3] = {(float)(six - pjx[0]), (float)(siy - pjx[1]),
@@ -476,7 +476,7 @@ void DOSELF1_SUBSET_SINKS(struct runner *r, struct cell *restrict ci,
       if (part_is_inhibited(pj, e)) continue;
 
       /* Compute the pairwise distance. */
-      const double* const xj = part_get_const_x(pj);
+      const double *const xj = part_get_const_x(pj);
       const float pjx[3] = {(float)(xj[0] - ci->loc[0]),
                             (float)(xj[1] - ci->loc[1]),
                             (float)(xj[2] - ci->loc[2])};
@@ -491,9 +491,9 @@ void DOSELF1_SUBSET_SINKS(struct runner *r, struct cell *restrict ci,
 
       /* Hit or miss? */
       if (r2 < hig2) {
-        IACT_SINKS_GAS(r2, dx, hi,part_get_h(pj), si, pj, with_cosmology, cosmo,
-                       e->gravity_properties, e->sink_properties, e->ti_current,
-                       e->time);
+        IACT_SINKS_GAS(r2, dx, hi, part_get_h(pj), si, pj, with_cosmology,
+                       cosmo, e->gravity_properties, e->sink_properties,
+                       e->ti_current, e->time);
       }
     } /* loop over the parts in cj. */
   } /* loop over the parts in ci. */

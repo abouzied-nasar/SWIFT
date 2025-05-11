@@ -31,9 +31,9 @@ void compute_interaction(struct part *pi, struct part *pj, float mu_0, float a,
                          float H) {
 
   /* Compute the distance between the two particles */
-  const float dx[3] = {  part_get_x_ind(pi, 0) - part_get_x_ind(pj, 0),
-            part_get_x_ind(pi, 1) - part_get_x_ind(pj, 1),
-            part_get_x_ind(pi, 2) - part_get_x_ind(pj, 2)};
+  const float dx[3] = {part_get_x_ind(pi, 0) - part_get_x_ind(pj, 0),
+                       part_get_x_ind(pi, 1) - part_get_x_ind(pj, 1),
+                       part_get_x_ind(pi, 2) - part_get_x_ind(pj, 2)};
 
   const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
   const float hi = part_get_h(pi);
@@ -91,9 +91,15 @@ void test(void) {
   /* Move the second particle at various distances from the first */
   for (double dist = 1.0f; 1.0 + dist > 1.0; dist /= 2.) {
 
-    part_set_x_ind(&pj, 0, part_get_x_ind(&pi, 0) + random_uniform(0., dist * part_get_h(&pi)));
-    part_set_x_ind(&pj, 1, part_get_x_ind(&pi, 1) + random_uniform(0., dist * part_get_h(&pi)));
-    part_set_x_ind(&pj, 2, part_get_x_ind(&pi, 2) + random_uniform(0., dist * part_get_h(&pi)));
+    part_set_x_ind(
+        &pj, 0,
+        part_get_x_ind(&pi, 0) + random_uniform(0., dist * part_get_h(&pi)));
+    part_set_x_ind(
+        &pj, 1,
+        part_get_x_ind(&pi, 1) + random_uniform(0., dist * part_get_h(&pi)));
+    part_set_x_ind(
+        &pj, 2,
+        part_get_x_ind(&pi, 2) + random_uniform(0., dist * part_get_h(&pi)));
 
     compute_interaction(&pi, &pj, mu_0, a, H);
   }

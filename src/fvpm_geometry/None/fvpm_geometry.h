@@ -12,7 +12,6 @@
 
 struct part;
 
-
 /**
  * @brief Reset the variables used to store the centroid; used for the velocity
  * correction.

@@ -75,7 +75,8 @@ void engine_finalize_trigger_recordings(struct engine *e) {
 
       /* We need to escape the special case of a particle that
        * actually ended its time-step on this very step */
-      if (e->ti_current - ti_begin == get_integer_timestep(part_get_time_bin(p)))
+      if (e->ti_current - ti_begin ==
+          get_integer_timestep(part_get_time_bin(p)))
         continue;
 
       /* Time from the start of the particle's step to the snapshot (aka.

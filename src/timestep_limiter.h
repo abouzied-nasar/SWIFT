@@ -37,7 +37,7 @@ __attribute__((always_inline)) INLINE static void
 timestep_limiter_prepare_force(struct part *restrict p,
                                struct xpart *restrict xp) {
 
-  struct timestep_limiter_data* limiter_data = part_get_limiter_data(p);
+  struct timestep_limiter_data *limiter_data = part_get_limiter_data(p);
   limiter_data->min_ngb_time_bin = num_time_bins + 1;
 }
 
@@ -49,7 +49,7 @@ timestep_limiter_prepare_force(struct part *restrict p,
 __attribute__((always_inline)) INLINE static void timestep_limiter_end_force(
     struct part *restrict p) {
 #ifdef SWIFT_DEBUG_CHECKS
-  struct timestep_limiter_data* limiter_data = part_get_limiter_data(p);
+  struct timestep_limiter_data *limiter_data = part_get_limiter_data(p);
   if (limiter_data->min_ngb_time_bin == 0)
     error("Minimal time-bin of neighbours is 0");
 #endif
@@ -74,7 +74,7 @@ __attribute__((always_inline)) INLINE static integertime_t timestep_limit_part(
   const double time_base = e->time_base;
   const integertime_t ti_current = e->ti_current;
 
-  struct timestep_limiter_data* limiter_data = part_get_limiter_data(p);
+  struct timestep_limiter_data *limiter_data = part_get_limiter_data(p);
 
   if (part_is_active(p, e)) {
     /* First case, the particle was active so we only need to update the length

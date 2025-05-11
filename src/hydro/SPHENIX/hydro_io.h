@@ -47,22 +47,25 @@ INLINE static void hydro_read_particles(struct part* parts,
   *num_fields = 8;
 
   /* List what we want to read */
-  list[0] = io_make_getter_input_field("Coordinates", DOUBLE, 3,
-      COMPULSORY, UNIT_CONV_LENGTH, parts, part_get_x_p);
-  list[1] = io_make_getter_input_field("Velocities", FLOAT, 3,
-      COMPULSORY, UNIT_CONV_SPEED, parts, part_get_v_p);
-  list[2] = io_make_getter_input_field("Masses", FLOAT, 1,
-      COMPULSORY, UNIT_CONV_MASS, parts, part_get_mass_p);
-  list[3] = io_make_getter_input_field("SmoothingLength", FLOAT, 1,
-      COMPULSORY, UNIT_CONV_LENGTH, parts, part_get_h_p);
-  list[4] = io_make_getter_input_field("InternalEnergy", FLOAT, 1,
-      COMPULSORY, UNIT_CONV_ENERGY_PER_UNIT_MASS, parts, part_get_u_p);
-  list[5] = io_make_getter_input_field("ParticleIDs", ULONGLONG, 1,
-      COMPULSORY, UNIT_CONV_NO_UNITS, parts, part_get_id_p);
-  list[6] = io_make_getter_input_field("Accelerations", FLOAT, 3,
-      OPTIONAL, UNIT_CONV_ACCELERATION, parts, part_get_a_hydro_p);
-  list[7] = io_make_getter_input_field("Density", FLOAT, 1,
-      OPTIONAL, UNIT_CONV_DENSITY, parts, part_get_rho_p);
+  list[0] = io_make_getter_input_field("Coordinates", DOUBLE, 3, COMPULSORY,
+                                       UNIT_CONV_LENGTH, parts, part_get_x_p);
+  list[1] = io_make_getter_input_field("Velocities", FLOAT, 3, COMPULSORY,
+                                       UNIT_CONV_SPEED, parts, part_get_v_p);
+  list[2] = io_make_getter_input_field("Masses", FLOAT, 1, COMPULSORY,
+                                       UNIT_CONV_MASS, parts, part_get_mass_p);
+  list[3] = io_make_getter_input_field("SmoothingLength", FLOAT, 1, COMPULSORY,
+                                       UNIT_CONV_LENGTH, parts, part_get_h_p);
+  list[4] = io_make_getter_input_field("InternalEnergy", FLOAT, 1, COMPULSORY,
+                                       UNIT_CONV_ENERGY_PER_UNIT_MASS, parts,
+                                       part_get_u_p);
+  list[5] =
+      io_make_getter_input_field("ParticleIDs", ULONGLONG, 1, COMPULSORY,
+                                 UNIT_CONV_NO_UNITS, parts, part_get_id_p);
+  list[6] = io_make_getter_input_field("Accelerations", FLOAT, 3, OPTIONAL,
+                                       UNIT_CONV_ACCELERATION, parts,
+                                       part_get_a_hydro_p);
+  list[7] = io_make_getter_input_field(
+      "Density", FLOAT, 1, OPTIONAL, UNIT_CONV_DENSITY, parts, part_get_rho_p);
 }
 
 INLINE static void convert_S(const struct engine* e, const struct part* p,
@@ -109,8 +112,10 @@ INLINE static void convert_part_vel(const struct engine* e,
   const double time_base = e->time_base;
   const float dt_kick_grav_mesh = e->dt_kick_grav_mesh_for_io;
 
-  const integertime_t ti_beg = get_integer_time_begin(ti_current, part_get_time_bin(p));
-  const integertime_t ti_end = get_integer_time_end(ti_current, part_get_time_bin(p));
+  const integertime_t ti_beg =
+      get_integer_time_begin(ti_current, part_get_time_bin(p));
+  const integertime_t ti_end =
+      get_integer_time_end(ti_current, part_get_time_bin(p));
 
   /* Get time-step since the last kick */
   float dt_kick_grav;
@@ -210,11 +215,13 @@ INLINE static void hydro_write_particles(const struct part* parts,
       "Peculiar velocities of the stars. This is (a * dx/dt) where x is the "
       "co-moving positions of the particles");
 
-  list[2] = io_make_getter_output_field("Masses", FLOAT, 1,
-      UNIT_CONV_MASS, 0.f, parts, part_get_const_mass_p, "Masses of the particles");
+  list[2] = io_make_getter_output_field("Masses", FLOAT, 1, UNIT_CONV_MASS, 0.f,
+                                        parts, part_get_const_mass_p,
+                                        "Masses of the particles");
 
   list[3] = io_make_getter_output_field(
-      "SmoothingLengths", FLOAT, 1, UNIT_CONV_LENGTH, 1.f, parts, part_get_const_h_p,
+      "SmoothingLengths", FLOAT, 1, UNIT_CONV_LENGTH, 1.f, parts,
+      part_get_const_h_p,
       "Co-moving smoothing lengths (FWHM of the kernel) of the particles");
 
   list[4] = io_make_getter_output_field(
@@ -223,12 +230,13 @@ INLINE static void hydro_write_particles(const struct part* parts,
       "Co-moving thermal energies per unit mass of the particles");
 
   list[5] = io_make_physical_getter_output_field(
-      "ParticleIDs", ULONGLONG, 1, UNIT_CONV_NO_UNITS, 0.f, parts, part_get_const_id_p,
+      "ParticleIDs", ULONGLONG, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
+      part_get_const_id_p,
       /*can convert to comoving=*/0, "Unique IDs of the particles");
 
-  list[6] = io_make_getter_output_field("Densities", FLOAT, 1, UNIT_CONV_DENSITY, -3.f,
-                                 parts, part_get_const_rho_p,
-                                 "Co-moving mass densities of the particles");
+  list[6] = io_make_getter_output_field(
+      "Densities", FLOAT, 1, UNIT_CONV_DENSITY, -3.f, parts,
+      part_get_const_rho_p, "Co-moving mass densities of the particles");
 
   list[7] = io_make_output_field_convert_part(
       "Entropies", FLOAT, 1, UNIT_CONV_ENTROPY_PER_UNIT_MASS, 0.f, parts,

@@ -243,8 +243,8 @@ void io_duplicate_sinks_gparts(struct threadpool* tp, struct sink* const sinks,
                                size_t Ndm);
 void io_duplicate_black_holes_gparts(struct threadpool* tp,
                                      struct bpart* const bparts,
-                                     struct gpart* const gparts, size_t Nblackholes,
-                                     size_t Ndm);
+                                     struct gpart* const gparts,
+                                     size_t Nblackholes, size_t Ndm);
 
 void io_prepare_output_fields(struct output_options* output_options,
                               const int with_cosmology, const int with_fof,

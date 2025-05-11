@@ -102,7 +102,8 @@ void runner_do_sinks_gas_swallow(struct runner *r, struct cell *c, int timer) {
       if (part_is_inhibited(p, e)) continue;
 
       /* Get the ID of the sink that will swallow this part */
-      const long long swallow_id = sink_get_part_swallow_id(part_get_const_sink_data(p));
+      const long long swallow_id =
+          sink_get_part_swallow_id(part_get_const_sink_data(p));
 
       /* Has this particle been flagged for swallowing? */
       if (swallow_id >= 0) {

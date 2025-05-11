@@ -347,7 +347,8 @@ __attribute__((always_inline)) INLINE static void hydro_set_physical_entropy(
 
   /* Note there is no conversion from physical to comoving entropy */
   const float comoving_entropy = entropy;
-  xp->u_full = gas_internal_energy_from_entropy(part_get_rho(p), comoving_entropy);
+  xp->u_full =
+      gas_internal_energy_from_entropy(part_get_rho(p), comoving_entropy);
 }
 
 /**
@@ -398,7 +399,8 @@ hydro_set_drifted_physical_internal_energy(
   /* Now recompute the extra quantities */
 
   /* Compute the sound speed */
-  const float pressure = gas_pressure_from_internal_energy(part_get_rho(p), part_get_u(p));
+  const float pressure =
+      gas_pressure_from_internal_energy(part_get_rho(p), part_get_u(p));
   const float pressure_including_floor =
       pressure_floor_get_comoving_pressure(p, pressure_floor, pressure, cosmo);
   const float soundspeed =
@@ -432,7 +434,8 @@ hydro_set_v_sig_based_on_velocity_kick(struct part *p,
   const float soundspeed = hydro_get_comoving_soundspeed(p);
 
   /* Update the signal velocity */
-  part_set_v_sig(p, max(2.f * soundspeed, part_get_v_sig(p) + const_viscosity_beta * dv));
+  part_set_v_sig(
+      p, max(2.f * soundspeed, part_get_v_sig(p) + const_viscosity_beta * dv));
 }
 
 /**
@@ -455,7 +458,8 @@ __attribute__((always_inline)) INLINE static void hydro_set_viscosity_alpha(
 __attribute__((always_inline)) INLINE static void
 hydro_diffusive_feedback_reset(struct part *restrict p) {
   /* Set the viscosity to the max, and the diffusion to the min */
-  hydro_set_viscosity_alpha(p, hydro_props_default_viscosity_alpha_feedback_reset);
+  hydro_set_viscosity_alpha(p,
+                            hydro_props_default_viscosity_alpha_feedback_reset);
   part_set_alpha_diff(p, hydro_props_default_diffusion_alpha_feedback_reset);
 }
 
@@ -649,7 +653,7 @@ __attribute__((always_inline)) INLINE static void hydro_end_density(
   const float a_inv2 = cosmo->a2_inv;
 
   /* Finish calculation of the velocity curl components */
-  float* rot_v = part_get_rot_v(p);
+  float *rot_v = part_get_rot_v(p);
   rot_v[0] *= h_inv_dim_plus_one * a_inv2 * rho_inv;
   rot_v[1] *= h_inv_dim_plus_one * a_inv2 * rho_inv;
   rot_v[2] *= h_inv_dim_plus_one * a_inv2 * rho_inv;
@@ -693,8 +697,9 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_gradient(
   const float fac_B = cosmo->a_factor_Balsara_eps;
 
   /* Compute the norm of the curl */
-  const float* rot_v = part_get_rot_v(p);
-  const float curl_v = sqrtf(rot_v[0] * rot_v[0] + rot_v[1] * rot_v[1] + rot_v[2] * rot_v[2]);
+  const float *rot_v = part_get_rot_v(p);
+  const float curl_v =
+      sqrtf(rot_v[0] * rot_v[0] + rot_v[1] * rot_v[1] + rot_v[2] * rot_v[2]);
 
   /* Compute the norm of div v */
   const float abs_div_v = fabsf(part_get_div_v(p));
@@ -890,7 +895,10 @@ __attribute__((always_inline)) INLINE static void hydro_prepare_force(
    * as div_v_dt should be _negative_ before the shock hits */
   /* Source term is only activated if flow is converging (i.e. in the pre-
    * shock region) */
-  const float S = div_v < 0.f ? kernel_support_physical * kernel_support_physical * max(0.f, -1.f * div_v_dt) : 0.f;
+  const float S = div_v < 0.f
+                      ? kernel_support_physical * kernel_support_physical *
+                            max(0.f, -1.f * div_v_dt)
+                      : 0.f;
 
   /* We want the decay to occur based on the thermodynamic properties
    * of the gas - hence use the soundspeed instead of the signal velocity */
@@ -1012,7 +1020,8 @@ __attribute__((always_inline)) INLINE static void hydro_reset_predicted_values(
   part_set_u(p, xp->u_full);
 
   /* Compute the sound speed */
-  const float pressure = gas_pressure_from_internal_energy(part_get_rho(p), part_get_u(p));
+  const float pressure =
+      gas_pressure_from_internal_energy(part_get_rho(p), part_get_u(p));
   const float pressure_including_floor =
       pressure_floor_get_comoving_pressure(p, pressure_floor, pressure, cosmo);
   const float soundspeed =
@@ -1061,10 +1070,9 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
 
   /* Predict smoothing length */
   const float w1 = part_get_h_dt(p) * h_inv * dt_drift;
-  if (fabsf(w1) < 0.2f){
+  if (fabsf(w1) < 0.2f) {
     h *= approx_expf(w1); /* 4th order expansion of exp(w) */
-  }
-  else{
+  } else {
     h *= expf(w1);
   }
   part_set_h(p, h);
@@ -1084,7 +1092,8 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
   /* Check against entropy floor - explicitly do this after drifting the
    * density as this has a density dependence. */
   const float floor_A = entropy_floor(p, cosmo, floor_props);
-  const float floor_u = gas_internal_energy_from_entropy(part_get_rho(p), floor_A);
+  const float floor_u =
+      gas_internal_energy_from_entropy(part_get_rho(p), floor_A);
 
   /* Check against absolute minimum */
   const float min_u =
@@ -1095,7 +1104,8 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
   part_set_u(p, u);
 
   /* Compute the new sound speed */
-  const float pressure = gas_pressure_from_internal_energy(part_get_rho(p), part_get_u(p));
+  const float pressure =
+      gas_pressure_from_internal_energy(part_get_rho(p), part_get_u(p));
   const float pressure_including_floor =
       pressure_floor_get_comoving_pressure(p, pressure_floor, pressure, cosmo);
   const float soundspeed =
@@ -1159,7 +1169,8 @@ __attribute__((always_inline)) INLINE static void hydro_kick_extra(
 
   /* Check against entropy floor */
   const float floor_A = entropy_floor(p, cosmo, floor_props);
-  const float floor_u = gas_internal_energy_from_entropy(part_get_rho(p), floor_A);
+  const float floor_u =
+      gas_internal_energy_from_entropy(part_get_rho(p), floor_A);
 
   /* Check against absolute minimum */
   const float min_u =
@@ -1221,7 +1232,8 @@ __attribute__((always_inline)) INLINE static void hydro_convert_quantities(
   /* Set the initial values for the thermal diffusion */
   part_set_alpha_diff(p, hydro_props->diffusion.alpha);
 
-  const float pressure = gas_pressure_from_internal_energy(part_get_rho(p), part_get_u(p));
+  const float pressure =
+      gas_pressure_from_internal_energy(part_get_rho(p), part_get_u(p));
   const float pressure_including_floor =
       pressure_floor_get_comoving_pressure(p, pressure_floor, pressure, cosmo);
   const float soundspeed =

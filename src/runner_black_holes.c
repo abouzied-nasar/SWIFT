@@ -105,7 +105,7 @@ void runner_do_gas_swallow(struct runner *r, struct cell *c, int timer) {
       /* Update mass of associated gpart, to reflect potential changes from
        * nibbling. In this case, we are already done. */
       if (use_nibbling) {
-        struct gpart* gp = part_get_gpart(p);
+        struct gpart *gp = part_get_gpart(p);
         gp->mass = hydro_get_mass(p);
         continue;
       }
@@ -150,7 +150,8 @@ void runner_do_gas_swallow(struct runner *r, struct cell *c, int timer) {
             /* If the gas particle is local, remove it */
             if (c->nodeID == e->nodeID) {
 
-              message("BH %lld removing gas particle %lld", bp->id, part_get_id(p));
+              message("BH %lld removing gas particle %lld", bp->id,
+                      part_get_id(p));
 
               lock_lock(&e->s->lock);
 

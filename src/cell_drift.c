@@ -301,7 +301,7 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
       if (!periodic) {
 
         /* Did the particle leave the box?  */
-        const double* const x = part_get_x(p);
+        const double *const x = part_get_x(p);
         if ((x[0] > dim[0]) || (x[0] < 0.) ||  // x
             (x[1] > dim[1]) || (x[1] < 0.) ||  // y
             (x[2] > dim[2]) || (x[2] < 0.)) {  // z

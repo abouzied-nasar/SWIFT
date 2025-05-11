@@ -42,8 +42,9 @@ void dumpCells(const char *prefix, int super, int active, int mpiactive,
 #if defined(WITH_MPI) && (defined(HAVE_METIS) || defined(HAVE_PARMETIS))
 #include "metis.h"
 void dumpMETISGraph(const char *prefix, idx_t nvertices, idx_t nvertexweights,
-                    const idx_t *cellconruns, idx_t *cellcon, idx_t *vertexweights,
-                    idx_t *vertexsizes, idx_t *edgeweights);
+                    const idx_t *cellconruns, idx_t *cellcon,
+                    idx_t *vertexweights, idx_t *vertexsizes,
+                    idx_t *edgeweights);
 #endif
 
 #ifdef HAVE_MPI

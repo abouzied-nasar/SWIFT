@@ -352,7 +352,7 @@ struct counts_mapper_data {
     int lcid = mydata->s->nr_cells;                                            \
     int ucid = 0;                                                              \
     for (int k = 0; k < num_elements; k++) {                                   \
-      double* x = TYPE##_get_x(&parts[k]);                                     \
+      double *x = TYPE##_get_x(&parts[k]);                                     \
       for (int j = 0; j < 3; j++) {                                            \
         if (x[j] < 0.0) {                                                      \
           x[j] += dim[j];                                                      \
@@ -360,9 +360,8 @@ struct counts_mapper_data {
           x[j] -= dim[j];                                                      \
         }                                                                      \
       }                                                                        \
-      const int cid =                                                          \
-          cell_getid(cdim, x[0] * iwidth[0],                                   \
-                     x[1] * iwidth[1], x[2] * iwidth[2]);                      \
+      const int cid = cell_getid(cdim, x[0] * iwidth[0], x[1] * iwidth[1],     \
+                                 x[2] * iwidth[2]);                            \
       if (cid > ucid) ucid = cid;                                              \
       if (cid < lcid) lcid = cid;                                              \
     }                                                                          \
@@ -370,17 +369,15 @@ struct counts_mapper_data {
     if ((lcounts = (double *)calloc(nused, sizeof(double))) == NULL)           \
       error("Failed to allocate counts thread-specific buffer");               \
     for (int k = 0; k < num_elements; k++) {                                   \
-      const double* const x = TYPE##_get_const_x(&parts[k]);                   \
-      const int cid =                                                          \
-          cell_getid(cdim, x[0] * iwidth[0],                                   \
-                     x[1] * iwidth[1], x[2] * iwidth[2]);                      \
+      const double *const x = TYPE##_get_const_x(&parts[k]);                   \
+      const int cid = cell_getid(cdim, x[0] * iwidth[0], x[1] * iwidth[1],     \
+                                 x[2] * iwidth[2]);                            \
       lcounts[cid - lcid] += size;                                             \
     }                                                                          \
     for (int k = 0; k < nused; k++)                                            \
       atomic_add_d(&mydata->counts[k + lcid], lcounts[k]);                     \
     free(lcounts);                                                             \
   }
-
 
 /* Generic function for accumulating sized counts for TYPE parts. Note uses
  * local memory to reduce contention, the amount of memory required is

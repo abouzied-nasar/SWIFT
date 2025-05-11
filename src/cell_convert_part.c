@@ -507,9 +507,9 @@ struct gpart *cell_add_gpart(struct engine *e, struct cell *c) {
       if (gpart_is_inhibited(&c->grav.parts[i + 1], e)) continue;
 
       if (gparts[i + 1].type == swift_type_gas) {
-        struct part* p = &s->parts[-gparts[i + 1].id_or_neg_offset];
+        struct part *p = &s->parts[-gparts[i + 1].id_or_neg_offset];
         struct gpart *gp = part_get_gpart(p);
-        part_set_gpart(p, gp+1);
+        part_set_gpart(p, gp + 1);
       } else if (gparts[i + 1].type == swift_type_stars) {
         s->sparts[-gparts[i + 1].id_or_neg_offset].gpart++;
       } else if (gparts[i + 1].type == swift_type_sink) {
@@ -586,11 +586,11 @@ void cell_remove_part(const struct engine *e, struct cell *c, struct part *p,
   part_set_time_bin(p, time_bin_inhibited);
   /* Mark the RT time bin as inhibited as well,
    * so part_is_rt_active() checks work as intended */
-  struct rt_timestepping_data* rt_time_data = part_get_rt_time_data(p);
+  struct rt_timestepping_data *rt_time_data = part_get_rt_time_data(p);
   rt_time_data->time_bin = time_bin_inhibited;
 
   /* Mark the gpart as inhibited and stand-alone */
-  struct gpart* gp = part_get_gpart(p);
+  struct gpart *gp = part_get_gpart(p);
   if (gp) {
     gp->time_bin = time_bin_inhibited;
     gp->id_or_neg_offset = 1;
@@ -992,7 +992,7 @@ struct spart *cell_spawn_new_spart_from_part(struct engine *e, struct cell *c,
 
   /* Synchronize masses, positions and velocities */
   sp->mass = hydro_get_mass(p);
-  const double* const px = part_get_const_x(p);
+  const double *const px = part_get_const_x(p);
   sp->x[0] = px[0];
   sp->x[1] = px[1];
   sp->x[2] = px[2];

@@ -89,7 +89,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   const float uj = r * hj_inv;
   kernel_deval(uj, &wj, &wj_dx);
 
-
   const float rho_j = part_get_rho(pj);
   part_set_rho(pj, rho_j + mi * wj);
 
@@ -253,10 +252,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
   const float a2_Hubble = a * a * H;
 
-  const float dvdr =
-    (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
-    (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
-    (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
+  const float dvdr = (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
+                     (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
+                     (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
 
   /* Add Hubble flow */
 
@@ -286,12 +284,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
   const float delta_u_factor = (part_get_u(pi) - part_get_u(pj)) * r_inv;
 
   const float laplace_i = part_get_laplace_u(pi);
-  const float m_j = part_get_mass(pj) ;
+  const float m_j = part_get_mass(pj);
   const float rho_j = part_get_rho(pj);
-  part_set_laplace_u(pi, laplace_i +m_j * delta_u_factor * wi_dx / rho_j);
+  part_set_laplace_u(pi, laplace_i + m_j * delta_u_factor * wi_dx / rho_j);
 
   const float laplace_j = part_get_laplace_u(pj);
-  const float m_i = part_get_mass(pi) ;
+  const float m_i = part_get_mass(pi);
   const float rho_i = part_get_rho(pi);
   part_set_laplace_u(pj, laplace_j - m_i * delta_u_factor * wj_dx / rho_i);
 
@@ -299,8 +297,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
    * (this is used to limit the diffusion in hydro_prepare_force) */
   const float alpha_i = part_get_alpha_av(pi);
   const float alpha_j = part_get_alpha_av(pj);
-  part_set_alpha_visc_max_ngb(pi, max(part_get_alpha_visc_max_ngb(pi), alpha_j));
-  part_set_alpha_visc_max_ngb(pj, max(part_get_alpha_visc_max_ngb(pi), alpha_i));
+  part_set_alpha_visc_max_ngb(pi,
+                              max(part_get_alpha_visc_max_ngb(pi), alpha_j));
+  part_set_alpha_visc_max_ngb(pj,
+                              max(part_get_alpha_visc_max_ngb(pi), alpha_i));
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_gradient += wi;
@@ -342,11 +342,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
   const float fac_mu = pow_three_gamma_minus_five_over_two(a);
   const float a2_Hubble = a * a * H;
 
-  const float dvdr =
-    (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
-    (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
-    (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
-
+  const float dvdr = (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
+                     (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
+                     (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
 
   /* Add Hubble flow */
 
@@ -372,14 +370,15 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
 
   const float delta_u_factor = (part_get_u(pi) - part_get_u(pj)) * r_inv;
   const float laplace_i = part_get_laplace_u(pi);
-  const float m_j = part_get_mass(pj) ;
+  const float m_j = part_get_mass(pj);
   const float rho_j = part_get_rho(pj);
-  part_set_laplace_u(pi, laplace_i +m_j * delta_u_factor * wi_dx / rho_j);
+  part_set_laplace_u(pi, laplace_i + m_j * delta_u_factor * wi_dx / rho_j);
 
   /* Set the maximal alpha from the previous step over the neighbours
    * (this is used to limit the diffusion in hydro_prepare_force) */
   const float alpha_j = part_get_alpha_av(pj);
-  part_set_alpha_visc_max_ngb(pi, max(part_get_alpha_visc_max_ngb(pi), alpha_j));
+  part_set_alpha_visc_max_ngb(pi,
+                              max(part_get_alpha_visc_max_ngb(pi), alpha_j));
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_gradient += wi;
@@ -438,10 +437,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute dv dot r. */
-  const float dvdr =
-    (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
-    (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
-    (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
+  const float dvdr = (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
+                     (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
+                     (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
 
   /* Includes the hubble flow term; not used for du/dt */
   const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -507,17 +505,15 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
    * alpha from the highest pressure particle to dominate, so that the
    * diffusion limited particles always take precedence - another trick to
    * allow the scheme to work with thermal feedback. */
-  const float alpha_diff =
-      (pressurei * part_get_alpha_diff(pi) +
-       pressurej * part_get_alpha_diff(pj)) /
-      (pressurei + pressurej);
+  const float alpha_diff = (pressurei * part_get_alpha_diff(pi) +
+                            pressurej * part_get_alpha_diff(pj)) /
+                           (pressurei + pressurej);
   const float v_diff = alpha_diff * 0.5f *
                        (sqrtf(2.f * fabsf(pressurei - pressurej) / rho_ij) +
                         fabsf(fac_mu * r_inv * dvdr_Hubble));
   /* wi_dx + wj_dx / 2 is F_ij */
-  const float diff_du_term =
-      v_diff * (part_get_u(pi) - part_get_u(pj)) *
-      (f_ij * wi_dr / rhoi + f_ji * wj_dr / rhoj);
+  const float diff_du_term = v_diff * (part_get_u(pi) - part_get_u(pj)) *
+                             (f_ij * wi_dr / rhoi + f_ji * wj_dr / rhoj);
 
   /* Assemble the energy equation term */
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
@@ -590,10 +586,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float wj_dr = hjd_inv * wj_dx;
 
   /* Compute dv dot r. */
-  const float dvdr =
-    (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
-    (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
-    (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
+  const float dvdr = (part_get_v_ind(pi, 0) - part_get_v_ind(pj, 0)) * dx[0] +
+                     (part_get_v_ind(pi, 1) - part_get_v_ind(pj, 1)) * dx[1] +
+                     (part_get_v_ind(pi, 2) - part_get_v_ind(pj, 2)) * dx[2];
 
   /* Includes the hubble flow term; not used for du/dt */
   const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -654,17 +649,15 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
    * alpha from the highest pressure particle to dominate, so that the
    * diffusion limited particles always take precedence - another trick to
    * allow the scheme to work with thermal feedback. */
-  const float alpha_diff =
-      (pressurei * part_get_alpha_diff(pi) +
-       pressurej * part_get_alpha_diff(pj)) /
-      (pressurei + pressurej);
+  const float alpha_diff = (pressurei * part_get_alpha_diff(pi) +
+                            pressurej * part_get_alpha_diff(pj)) /
+                           (pressurei + pressurej);
   const float v_diff = alpha_diff * 0.5f *
                        (sqrtf(2.f * fabsf(pressurei - pressurej) / rho_ij) +
                         fabsf(fac_mu * r_inv * dvdr_Hubble));
   /* wi_dx + wj_dx / 2 is F_ij */
-  const float diff_du_term =
-      v_diff * (part_get_u(pi) - part_get_u(pj)) *
-      (f_ij * wi_dr / rhoi + f_ji * wj_dr / rhoj);
+  const float diff_du_term = v_diff * (part_get_u(pi) - part_get_u(pj)) *
+                             (f_ij * wi_dr / rhoi + f_ji * wj_dr / rhoj);
 
   /* Assemble the energy equation term */
   const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;

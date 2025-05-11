@@ -151,7 +151,7 @@ void get_solution(const struct cell *main_cell, struct solution_part *solution,
 
   for (int i = 0; i < main_cell->hydro.count; ++i) {
 
-    const struct part* pi = &main_cell->hydro.parts[i];
+    const struct part *pi = &main_cell->hydro.parts[i];
 
     solution[i].id = part_get_id(pi);
     solution[i].x[0] = part_get_x_ind(pi, 0);
@@ -278,18 +278,18 @@ struct cell *make_cell(size_t n, const double offset[3], double size, double h,
   for (size_t x = 0; x < n; ++x) {
     for (size_t y = 0; y < n; ++y) {
       for (size_t z = 0; z < n; ++z) {
-        part_set_x_ind(part, 0,
+        part_set_x_ind(
+            part, 0,
             offset[0] +
-            size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
-        part_set_x_ind(part, 1,
+                size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 1,
             offset[1] +
-            size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
-        part_set_x_ind(part, 2,
+                size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 2,
             offset[2] +
-            size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
+                size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
         part_set_h(part, size * h / (float)n);
         h_max = fmaxf(h_max, part_get_h(part));
         part_set_depth_h(part, 0);
@@ -380,15 +380,14 @@ void dump_particle_fields(char *fileName, struct cell *main_cell,
 
   /* Write main cell */
   for (int pid = 0; pid < main_cell->hydro.count; pid++) {
-    const struct part* pi = &main_cell->hydro.parts[pid];
+    const struct part *pi = &main_cell->hydro.parts[pid];
     fprintf(file,
             "%6llu %8.5f %8.5f %8.5f %8.5f %8.5f %8.5f %8.5f %8.5f %8.5f %8.5f "
             "%8.5f "
             "%8.5f %8.5f %13e %13e %13e %13e %13e %8.5f %8.5f\n",
-            part_get_id(pi),
-            part_get_x_ind(pi, 0), part_get_x_ind(pi, 1), part_get_x_ind(pi, 2),
-            part_get_v_ind(pi, 0), part_get_v_ind(pi, 1), part_get_v_ind(pi, 2),
-            part_get_h(pi),
+            part_get_id(pi), part_get_x_ind(pi, 0), part_get_x_ind(pi, 1),
+            part_get_x_ind(pi, 2), part_get_v_ind(pi, 0), part_get_v_ind(pi, 1),
+            part_get_v_ind(pi, 2), part_get_h(pi),
             hydro_get_comoving_density(pi),
 #if defined(MINIMAL_SPH) || defined(PLANETARY_SPH) ||              \
     defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH) ||            \
@@ -402,24 +401,17 @@ void dump_particle_fields(char *fileName, struct cell *main_cell,
 #endif
             hydro_get_drifted_comoving_entropy(pi),
             hydro_get_drifted_comoving_internal_energy(pi),
-            hydro_get_comoving_pressure(pi),
-            hydro_get_comoving_soundspeed(pi),
-            part_get_a_hydro_ind(pi, 0),
-            part_get_a_hydro_ind(pi, 1),
-            part_get_a_hydro_ind(pi, 2),
-            part_get_h_dt(pi),
+            hydro_get_comoving_pressure(pi), hydro_get_comoving_soundspeed(pi),
+            part_get_a_hydro_ind(pi, 0), part_get_a_hydro_ind(pi, 1),
+            part_get_a_hydro_ind(pi, 2), part_get_h_dt(pi),
 #if defined(GADGET2_SPH)
-            part_get_v_sig(pi),
-            part_get_entropy_dt(pi),
-            0.f
+            part_get_v_sig(pi), part_get_entropy_dt(pi), 0.f
 #elif defined(MINIMAL_SPH) || defined(HOPKINS_PU_SPH) || \
     defined(HOPKINS_PU_SPH_MONAGHAN)
-            part_get_v_sig(pi), 0.f,
-            part_get_u_dt(pi)
+            part_get_v_sig(pi), 0.f, part_get_u_dt(pi)
 #elif defined(ANARCHY_PU_SPH) || defined(SPHENIX_SPH) || \
     defined(PHANTOM_SPH) || defined(GASOLINE_SPH)
-            part_get_v_sig(pi), 0.f,
-            part_get_u_dt(pi)
+            part_get_v_sig(pi), 0.f, part_get_u_dt(pi)
 #else
             0.f, 0.f, 0.f
 #endif

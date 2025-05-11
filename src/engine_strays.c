@@ -105,19 +105,17 @@ void engine_exchange_strays(
     if (node_id < 0 || node_id >= e->nr_nodes)
       error("Bad node ID %i.", node_id);
     const int pid = e->proxy_ind[node_id];
-    struct part* p = &s->parts[offset_parts + k];
+    struct part *p = &s->parts[offset_parts + k];
     if (pid < 0) {
       error(
           "Do not have a proxy for the requested nodeID %i for part with "
           "id=%lld, x=[%e,%e,%e].",
-          node_id, part_get_id(p),
-          part_get_x_ind(p, 0),
-          part_get_x_ind(p, 1),
+          node_id, part_get_id(p), part_get_x_ind(p, 0), part_get_x_ind(p, 1),
           part_get_x_ind(p, 2));
     }
 
     /* Re-link the associated gpart with the buffer offset of the part. */
-    struct gpart* gp = part_get_gpart(p);
+    struct gpart *gp = part_get_gpart(p);
     if (gp != NULL) {
       gp->id_or_neg_offset = -e->proxies[pid].nr_parts_out;
     }
@@ -371,7 +369,7 @@ void engine_exchange_strays(
 
     /* Reset the links */
     for (size_t k = 0; k < offset_parts; k++) {
-      struct gpart* gp = part_get_gpart(&s->parts[k]);
+      struct gpart *gp = part_get_gpart(&s->parts[k]);
       if (gp != NULL) {
         gp->id_or_neg_offset = -k;
       }
@@ -445,7 +443,7 @@ void engine_exchange_strays(
     /* Reset the links */
     for (size_t k = 0; k < offset_gparts; k++) {
       if (s->gparts[k].type == swift_type_gas) {
-        struct part* p = &s->parts[-s->gparts[k].id_or_neg_offset];
+        struct part *p = &s->parts[-s->gparts[k].id_or_neg_offset];
         part_set_gpart(p, &s->gparts[k]);
       } else if (s->gparts[k].type == swift_type_stars) {
         s->sparts[-s->gparts[k].id_or_neg_offset].gpart = &s->gparts[k];

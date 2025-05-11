@@ -72,16 +72,14 @@ void space_parts_sort(struct part *parts, struct xpart *xparts,
         memswap(&parts[j], &temp_part, sizeof(struct part));
         memswap(&xparts[j], &temp_xpart, sizeof(struct xpart));
         memswap(&ind[j], &target_cid, sizeof(int));
-        struct gpart* gp = part_get_gpart(&parts[j]);
-        if (gp)
-          gp->id_or_neg_offset = -(j + parts_offset);
+        struct gpart *gp = part_get_gpart(&parts[j]);
+        if (gp) gp->id_or_neg_offset = -(j + parts_offset);
       }
       parts[k] = temp_part;
       xparts[k] = temp_xpart;
       ind[k] = target_cid;
-      struct gpart* gp = part_get_gpart(&parts[k]);
-      if (gp)
-        gp->id_or_neg_offset = -(k + parts_offset);
+      struct gpart *gp = part_get_gpart(&parts[k]);
+      if (gp) gp->id_or_neg_offset = -(k + parts_offset);
     }
   }
 
@@ -322,7 +320,7 @@ void space_gparts_sort(struct gpart *gparts, struct part *parts,
         memswap_unaligned(&gparts[j], &temp_gpart, sizeof(struct gpart));
         memswap(&ind[j], &target_cid, sizeof(int));
         if (gparts[j].type == swift_type_gas) {
-          struct part* p = &parts[-gparts[j].id_or_neg_offset];
+          struct part *p = &parts[-gparts[j].id_or_neg_offset];
           part_set_gpart(p, &gparts[j]);
         } else if (gparts[j].type == swift_type_stars) {
           sparts[-gparts[j].id_or_neg_offset].gpart = &gparts[j];
@@ -335,7 +333,7 @@ void space_gparts_sort(struct gpart *gparts, struct part *parts,
       gparts[k] = temp_gpart;
       ind[k] = target_cid;
       if (gparts[k].type == swift_type_gas) {
-        struct part* p = &parts[-gparts[k].id_or_neg_offset];
+        struct part *p = &parts[-gparts[k].id_or_neg_offset];
         part_set_gpart(p, &gparts[k]);
       } else if (gparts[k].type == swift_type_stars) {
         sparts[-gparts[k].id_or_neg_offset].gpart = &gparts[k];

@@ -73,8 +73,8 @@ void map_cells_plot(struct cell *c, void *data) {
     printf("%.16e %.16e %.16e\n\n\n", l[0] + h[0], l[1] + h[1], l[2]);
 
     if (!c->split) {
-      for (int k = 0; k < c->hydro.count; k++){
-        const double* const x = part_get_const_x(&c->hydro.parts[k]);
+      for (int k = 0; k < c->hydro.count; k++) {
+        const double *const x = part_get_const_x(&c->hydro.parts[k]);
         printf("0 0 0 %.16e %.16e %.16e\n", x[0], x[1], x[2]);
       }
       printf("\n\n");
@@ -91,10 +91,10 @@ void map_cells_plot(struct cell *c, void *data) {
  */
 void map_check(struct part *p, struct cell *c, void *data) {
 
-  const double* const x = part_get_const_x(p);
-  if (x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0] ||
-      x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0] ||
-      x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0]){
+  const double *const x = part_get_const_x(p);
+  if (x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0] || x[0] < c->loc[0] ||
+      x[0] > c->loc[0] + c->width[0] || x[0] < c->loc[0] ||
+      x[0] > c->loc[0] + c->width[0]) {
     printf("map_check: particle %lld is outside of its box.\n", part_get_id(p));
   }
 }
@@ -110,10 +110,9 @@ void map_cellcheck(struct cell *c, void *data) {
   /* Loop over all parts and check if they are in the cell. */
   for (int k = 0; k < c->hydro.count; k++) {
     struct part *p = &c->hydro.parts[k];
-    const double* const x = part_get_const_x(p);
+    const double *const x = part_get_const_x(p);
     if (x[0] < c->loc[0] || x[1] < c->loc[1] || x[2] < c->loc[2] ||
-        x[0] > c->loc[0] + c->width[0] ||
-        x[1] > c->loc[1] + c->width[1] ||
+        x[0] > c->loc[0] + c->width[0] || x[1] > c->loc[1] + c->width[1] ||
         x[2] > c->loc[2] + c->width[2]) {
       printf(
           "map_cellcheck: particle at [ %.16e %.16e %.16e ] outside of cell [ "
@@ -222,6 +221,5 @@ void map_dump(struct part *p, struct cell *c, void *data) {
   double *shift = (double *)data;
 
   printf("%g\t%g\t%g\n", part_get_x_ind(p, 0) - shift[0],
-      part_get_x_ind(p, 1) - shift[1],
-      part_get_x_ind(p, 2) - shift[2]);
+         part_get_x_ind(p, 1) - shift[1], part_get_x_ind(p, 2) - shift[2]);
 }

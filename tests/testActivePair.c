@@ -88,18 +88,18 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
   for (size_t x = 0; x < n; ++x) {
     for (size_t y = 0; y < n; ++y) {
       for (size_t z = 0; z < n; ++z) {
-        part_set_x_ind(part, 0,
+        part_set_x_ind(
+            part, 0,
             offset[0] +
-            size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
-        part_set_x_ind(part, 1,
+                size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 1,
             offset[1] +
-            size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
-        part_set_x_ind(part, 1,
+                size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 1,
             offset[2] +
-            size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
+                size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
         part_set_v_ind(part, 0, random_uniform(-0.05, 0.05));
         part_set_v_ind(part, 1, random_uniform(-0.05, 0.05));
         part_set_v_ind(part, 2, random_uniform(-0.05, 0.05));
@@ -133,11 +133,11 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
         part_set_conserved_energy(part, 1.f);
 #elif defined(PLANETARY_SPH)
         set_idg_def(&eos.idg_def, 0);
-        part_set_mat_id(part,0);
+        part_set_mat_id(part, 0);
         part_set_u(part, 1.f);
 #elif defined(REMIX_SPH)
         set_idg_def(&eos.idg_def, 0);
-        part_set_mat_id(part,0);
+        part_set_mat_id(part, 0);
         part_set_u(part, 1.f);
         part_set_rho_evol(part, 1.f);
 #endif
@@ -252,9 +252,9 @@ void zero_particle_fields_force(
     part_set_wcount(p, 48.f / (kernel_norm * pow_dimension(part_get_h(p))));
     part_set_wcount_dh(p, 0.f);
 #if defined(MINIMAL_SPH)
-    part_set_v_sig(p,  hydro_get_comoving_soundspeed(p));
+    part_set_v_sig(p, hydro_get_comoving_soundspeed(p));
 #else
-    part_set_v_sig(p,  hydro_get_comoving_soundspeed(p));
+    part_set_v_sig(p, hydro_get_comoving_soundspeed(p));
 #endif /* MINIMAL */
 #endif /* MINIMAL, SPHENIX, PHANTOM, GASOLINE */
 #ifdef HOPKINS_PE_SPH

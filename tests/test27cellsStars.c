@@ -88,25 +88,25 @@ struct cell *make_cell(size_t n, size_t n_stars, double *offset, double size,
   for (size_t x = 0; x < n; ++x) {
     for (size_t y = 0; y < n; ++y) {
       for (size_t z = 0; z < n; ++z) {
-        part_set_x_ind(part, 0,
+        part_set_x_ind(
+            part, 0,
             offset[0] +
-            size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
-        part_set_x_ind(part, 1,
+                size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 1,
             offset[1] +
-            size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
-        part_set_x_ind(part, 2,
+                size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 2,
             offset[2] +
-            size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n
-            );
+                size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
 
         part_set_v_ind(part, 0, 0.f);
         part_set_v_ind(part, 1, 0.f);
         part_set_v_ind(part, 2, 0.f);
-        if (h_pert){
+        if (h_pert) {
           part_set_h(part, size * h * random_uniform(1.f, h_pert) / (float)n);
-        }else{
+        } else {
           part_set_h(part, size * h / (float)n);
         }
         h_max = fmaxf(h_max, part_get_h(part));

@@ -51,8 +51,10 @@ void test(void) {
   }
 
   /* Make the particle smoothing length and position reasonable */
-  for (size_t i = 0; i < 3; ++i) part_set_x_ind(&pi, i, random_uniform(-1., 1.));
-  for (size_t i = 0; i < 3; ++i) part_set_x_ind(&pj, i, random_uniform(-1., 1.));
+  for (size_t i = 0; i < 3; ++i)
+    part_set_x_ind(&pi, i, random_uniform(-1., 1.));
+  for (size_t i = 0; i < 3; ++i)
+    part_set_x_ind(&pj, i, random_uniform(-1., 1.));
   part_set_h(&pi, 2.f);
   part_set_h(&pj, 2.f);
   part_set_id(&pi, 1ll);

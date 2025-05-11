@@ -655,7 +655,7 @@ void cell_check_part_drift_point(struct cell *c, void *data) {
     error("Cell in an incorrect time-zone! c->hydro.ti_old=%lld ti_drift=%lld",
           c->hydro.ti_old_part, ti_drift);
 
-  for (int i = 0; i < c->hydro.count; ++i){
+  for (int i = 0; i < c->hydro.count; ++i) {
     const struct part *p = &c->hydro.parts[i];
     if (part_get_ti_drift(p) != ti_drift &&
         part_get_time_bin(p) != time_bin_inhibited)
@@ -1388,15 +1388,15 @@ void cell_check_timesteps(const struct cell *c, const integertime_t ti_current,
     error("Cell without assigned time-step");
 
   if (c->split) {
-    for (int k = 0; k < 8; ++k){
-      if (c->progeny[k] != NULL){
+    for (int k = 0; k < 8; ++k) {
+      if (c->progeny[k] != NULL) {
         cell_check_timesteps(c->progeny[k], ti_current, max_bin);
       }
     }
   } else {
-    if (c->nodeID == engine_rank){
-      for (int i = 0; i < c->hydro.count; ++i){
-        if (part_get_time_bin(&c->hydro.parts[i]) == 0){
+    if (c->nodeID == engine_rank) {
+      for (int i = 0; i < c->hydro.count; ++i) {
+        if (part_get_time_bin(&c->hydro.parts[i]) == 0) {
           error("Particle without assigned time-bin");
         }
       }

@@ -43,7 +43,7 @@
 void part_relink_gparts_to_parts(struct part *parts, const size_t N,
                                  const ptrdiff_t offset) {
   for (size_t k = 0; k < N; k++) {
-    struct gpart* gp = part_get_gpart(&parts[k]);
+    struct gpart *gp = part_get_gpart(&parts[k]);
     if (gp) {
       gp->id_or_neg_offset = -(k + offset);
     }
@@ -109,7 +109,7 @@ void part_relink_parts_to_gparts(struct gpart *gparts, const size_t N,
                                  struct part *parts) {
   for (size_t k = 0; k < N; k++) {
     if (gparts[k].type == swift_type_gas) {
-      struct part* p = &parts[-gparts[k].id_or_neg_offset];
+      struct part *p = &parts[-gparts[k].id_or_neg_offset];
       part_set_gpart(p, &gparts[k]);
     }
   }
@@ -195,7 +195,7 @@ void part_relink_all_parts_to_gparts_mapper(void *restrict map_data, int count,
 
   for (int k = 0; k < count; k++) {
     if (gparts[k].type == swift_type_gas) {
-      struct part* p = &parts[-gparts[k].id_or_neg_offset];
+      struct part *p = &parts[-gparts[k].id_or_neg_offset];
       part_set_gpart(p, &gparts[k]);
     } else if (gparts[k].type == swift_type_stars) {
       sparts[-gparts[k].id_or_neg_offset].gpart = &gparts[k];
@@ -302,17 +302,18 @@ void part_verify_links(struct part *parts, struct gpart *gparts,
       if (part_get_gpart(part) != &gparts[k]) error("Linking problem!");
 
       /* Check that the particles are at the same place */
-      const double* const x = part_get_const_x(part);
-      if (gparts[k].x[0] != x[0] || gparts[k].x[1] != x[1] || gparts[k].x[2] != x[2]) {
+      const double *const x = part_get_const_x(part);
+      if (gparts[k].x[0] != x[0] || gparts[k].x[1] != x[1] ||
+          gparts[k].x[2] != x[2]) {
         error(
             "Linked particles are not at the same position!\n"
             "gp->x=[%e %e %e] p->x=[%e %e %e] diff=[%e %e %e]",
-            gparts[k].x[0], gparts[k].x[1], gparts[k].x[2], x[0],
-            x[1], x[2], gparts[k].x[0] - x[0],
-            gparts[k].x[1] - x[1], gparts[k].x[2] - x[2]);
+            gparts[k].x[0], gparts[k].x[1], gparts[k].x[2], x[0], x[1], x[2],
+            gparts[k].x[0] - x[0], gparts[k].x[1] - x[1],
+            gparts[k].x[2] - x[2]);
       }
       /* Check that the particles have the same mass */
-      if (gparts[k].mass != hydro_get_mass(part)){
+      if (gparts[k].mass != hydro_get_mass(part)) {
         error(
             "Linked particles do not have the same mass!\n"
             "gp->m=%e p->m=%e",
@@ -431,7 +432,7 @@ void part_verify_links(struct part *parts, struct gpart *gparts,
   for (size_t k = 0; k < nr_parts; ++k) {
 
     /* Ok, there is a link */
-    struct gpart* gp = part_get_gpart(&parts[k]);
+    struct gpart *gp = part_get_gpart(&parts[k]);
     if (gp != NULL) {
 
       /* Check the link */

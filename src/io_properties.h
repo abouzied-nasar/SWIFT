@@ -221,10 +221,10 @@ INLINE static void safe_strcpy(char *restrict dst, const char *restrict src,
  * @param part Pointer to the particle array where to write.
  * @param field Name of the field in the particle structure to write to.
  */
-#define io_make_getter_input_field(name, type, dim, importance, units, part, getter) \
+#define io_make_getter_input_field(name, type, dim, importance, units, part, \
+                                   getter)                                   \
   io_make_input_field_(name, type, dim, importance, units,                   \
                        (char *)(getter(&part[0])), sizeof(part[0]), NULL)
-
 
 /**
  * @brief Constructs an #io_props from its parameters
@@ -342,13 +342,12 @@ INLINE static struct io_props io_make_input_field_(
   return r;
 }
 
-
 /**
  * @brief Constructs an #io_props from its parameters
  * @TODO: documentation
  */
-#define io_make_getter_output_field(\
-    name, type, dim, units, a_exponent, part, getter, desc)                   \
+#define io_make_getter_output_field(name, type, dim, units, a_exponent, part, \
+                                    getter, desc)                             \
   io_make_output_field_(name, type, dim, units, a_exponent,                   \
                         (char *)(getter(&part[0])), sizeof(part[0]), desc,    \
                         /*physical=*/0, /*convertible_to_physical=*/1);
@@ -356,23 +355,21 @@ INLINE static struct io_props io_make_input_field_(
  * @TODO: documentation
  * An alias of io_make_getter_output_field().
  */
-#define io_make_comoving_getter_output_field(                   \
-    name, type, dim, units, a_exponent, part, getter, desc)     \
-  io_make_getter_output_field(                                  \
-      name, type, dim, units, a_exponent, part, getter, desc)
+#define io_make_comoving_getter_output_field(name, type, dim, units,         \
+                                             a_exponent, part, getter, desc) \
+  io_make_getter_output_field(name, type, dim, units, a_exponent, part,      \
+                              getter, desc)
 
 /**
  * @brief Constructs an #io_props from its parameters for a physical quantity
  * using a getter function for the particle fields
  */
-#define io_make_physical_getter_output_field(                             \
-    name, type, dim, units, a_exponent, part, getter, convertible, desc)  \
-  io_make_output_field_(name, type, dim, units, a_exponent,               \
-      (char *)(getter(&part[0])), sizeof(part[0]), desc,                  \
-      /*physical=*/1, /*convertible_to_physical=*/convertible);
-
-
-
+#define io_make_physical_getter_output_field(                              \
+    name, type, dim, units, a_exponent, part, getter, convertible, desc)   \
+  io_make_output_field_(name, type, dim, units, a_exponent,                \
+                        (char *)(getter(&part[0])), sizeof(part[0]), desc, \
+                        /*physical=*/1,                                    \
+                        /*convertible_to_physical=*/convertible);
 
 /**
  * @brief Constructs an #io_props from its parameters

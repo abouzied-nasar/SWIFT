@@ -44,7 +44,7 @@
  * @param mj The mass of the other particle.
  */
 __attribute__((always_inline)) INLINE static void
-adaptive_softening_add_correction_term(struct part *pi, const float ui,
+adaptive_softening_add_correction_term(struct part* pi, const float ui,
                                        const float hi_inv, const float mj) {
 
   struct adaptive_softening_data* adsd = part_get_adaptive_softening_data(pi);
@@ -67,14 +67,16 @@ adaptive_softening_add_correction_term(struct part *pi, const float ui,
  * @param r_inv the inverse of the distance linking the particles.
  */
 __attribute__((always_inline)) INLINE static float
-adaptive_softening_get_acc_term(const struct part *restrict pi,
-                                const struct part *restrict pj,
+adaptive_softening_get_acc_term(const struct part* restrict pi,
+                                const struct part* restrict pj,
                                 const float wi_dr, const float wj_dr,
                                 const float f_ij, const float f_ji,
                                 const float r_inv) {
 
-  const struct adaptive_softening_data* asdi = part_get_adaptive_softening_data(pi);
-  const struct adaptive_softening_data* asdj = part_get_adaptive_softening_data(pj);
+  const struct adaptive_softening_data* asdi =
+      part_get_adaptive_softening_data(pi);
+  const struct adaptive_softening_data* asdj =
+      part_get_adaptive_softening_data(pj);
 
   /* Recover some data */
   const float zetai = asdi->zeta;

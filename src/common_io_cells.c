@@ -79,7 +79,6 @@
     return count;                                                             \
   }
 
-
 /**
  * Same as above, but uses getters and setter functions.
  */
@@ -95,14 +94,14 @@
     max_pos[0] = max_pos[1] = max_pos[2] = -DBL_MAX;                          \
                                                                               \
     for (int i = 0; i < total_count; ++i) {                                   \
-      if (( TYPE##_get_time_bin(&parts[i]) != time_bin_inhibited) &&           \
-          ( TYPE##_get_time_bin(&parts[i]) != time_bin_not_created)) {         \
+      if ((TYPE##_get_time_bin(&parts[i]) != time_bin_inhibited) &&           \
+          (TYPE##_get_time_bin(&parts[i]) != time_bin_not_created)) {         \
                                                                               \
         /* When subsampling, select particles at random */                    \
         if (subsample) {                                                      \
-          const float r = random_unit_interval(                               \
-          TYPE##_get_id(&parts[i]), snap_num,                                 \
-              random_number_snapshot_sampling);                               \
+          const float r =                                                     \
+              random_unit_interval(TYPE##_get_id(&parts[i]), snap_num,        \
+                                   random_number_snapshot_sampling);          \
           if (r > subsample_ratio) continue;                                  \
         }                                                                     \
                                                                               \
@@ -120,7 +119,6 @@
     }                                                                         \
     return count;                                                             \
   }
-
 
 static long long CELL_COUNT_NON_INHIBITED_PARTICLES_GETTERS(part, hydro);
 static long long CELL_COUNT_NON_INHIBITED_PARTICLES(spart, stars);

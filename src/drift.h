@@ -184,20 +184,20 @@ __attribute__((always_inline)) INLINE static void drift_part(
 #endif
 
   /* Drift... */
-  double* x = part_get_x(p);
+  double *x = part_get_x(p);
   x[0] += xp->v_full[0] * dt_drift;
   x[1] += xp->v_full[1] * dt_drift;
   x[2] += xp->v_full[2] * dt_drift;
 
   /* Predict velocities (for hydro terms) */
-  float* v = part_get_v(p);
-  const float* const a_hydro = part_get_const_a_hydro(p);
+  float *v = part_get_v(p);
+  const float *const a_hydro = part_get_const_a_hydro(p);
   v[0] += a_hydro[0] * dt_kick_hydro;
   v[1] += a_hydro[1] * dt_kick_hydro;
   v[2] += a_hydro[2] * dt_kick_hydro;
 
   /* Predict velocities (for gravity terms) */
-  struct gpart* gp = part_get_gpart(p);
+  struct gpart *gp = part_get_gpart(p);
   if (gp != NULL) {
     v[0] += xp->a_grav[0] * dt_kick_grav;
     v[1] += xp->a_grav[1] * dt_kick_grav;

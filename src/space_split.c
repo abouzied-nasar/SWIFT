@@ -116,7 +116,7 @@ void space_split_recursive(struct space *s, struct cell *c,
         if (part_get_time_bin(&parts[k]) == time_bin_not_created)
           error("Extra particle present in space_split()");
 #endif
-        const double* const px = part_get_const_x(&parts[k]);
+        const double *const px = part_get_const_x(&parts[k]);
         buff[k].x[0] = px[0];
         buff[k].x[1] = px[1];
         buff[k].x[2] = px[2];
@@ -483,7 +483,8 @@ void space_split_recursive(struct space *s, struct cell *c,
 
       /* When does this particle's time-step start and end? */
       const timebin_t time_bin = part_get_time_bin(&parts[k]);
-      const struct rt_timestepping_data* const rt_time_data = part_get_const_rt_time_data(&parts[k]);
+      const struct rt_timestepping_data *const rt_time_data =
+          part_get_const_rt_time_data(&parts[k]);
       const timebin_t time_bin_rt = rt_time_data->time_bin;
       const integertime_t ti_end = get_integer_time_end(ti_current, time_bin);
       const integertime_t ti_beg = get_integer_time_begin(ti_current, time_bin);

@@ -293,7 +293,7 @@ void space_allocate_extras(struct space *s, int verbose) {
       if (part_get_time_bin(&s->parts[i]) == time_bin_not_created) {
 
         /* We want the extra particles to be at the centre of their cell */
-        double* px = part_get_x(&s->parts[i]);
+        double *px = part_get_x(&s->parts[i]);
         px[0] = cells[current_cell].loc[0] + half_cell_width[0];
         px[1] = cells[current_cell].loc[1] + half_cell_width[1];
         px[2] = cells[current_cell].loc[2] + half_cell_width[2];

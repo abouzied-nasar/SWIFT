@@ -121,10 +121,10 @@ void printParticle(const struct part *parts, const struct xpart *xparts,
   int found = 0;
 
   /* Look for the particle. */
-  for (size_t i = 0; i < N; i++){
+  for (size_t i = 0; i < N; i++) {
     if (part_get_id(&parts[i]) == id) {
-      warning("[PID%lld] ## Particle[%zu]:\n id=%lld ", part_get_id(&parts[i]), i,
-              part_get_id(&parts[i]));
+      warning("[PID%lld] ## Particle[%zu]:\n id=%lld ", part_get_id(&parts[i]),
+              i, part_get_id(&parts[i]));
       hydro_debug_particle(&parts[i], &xparts[i]);
       mhd_debug_particle(&parts[i], &xparts[i]);
       chemistry_debug_particle(&parts[i], &xparts[i]);
@@ -162,7 +162,7 @@ void printgParticle(const struct gpart *gparts, const struct part *parts,
   int found = 0;
 
   /* Look for the particle. */
-  for (size_t i = 0; i < N; i++){
+  for (size_t i = 0; i < N; i++) {
     if (gparts[i].id_or_neg_offset == id) {
       printf("## gParticle[%zu] (DM) :\n id=%lld", i, id);
       gravity_debug_particle(&gparts[i]);
@@ -368,7 +368,7 @@ int checkCellhdxmax(const struct cell *c, int *depth) {
 
     struct part *const p = &parts[k];
     struct xpart *const xp = &xparts[k];
-    const double* const x = part_get_const_x(p);
+    const double *const x = part_get_const_x(p);
 
     if (x[0] < loc_min[0] || x[0] >= loc_max[0] || x[1] < loc_min[1] ||
         x[1] >= loc_max[1] || x[2] < loc_min[2] || x[2] >= loc_max[2]) {
@@ -376,8 +376,8 @@ int checkCellhdxmax(const struct cell *c, int *depth) {
       message(
           "Inconsistent part position p->x=[%e %e %e], c->loc=[%e %e %e] "
           "c->width=[%e %e %e]",
-          x[0], x[1], x[2], c->loc[0], c->loc[1], c->loc[2],
-          c->width[0], c->width[1], c->width[2]);
+          x[0], x[1], x[2], c->loc[0], c->loc[1], c->loc[2], c->width[0],
+          c->width[1], c->width[2]);
 
       result = 0;
     }
@@ -667,8 +667,9 @@ void dumpCells(const char *prefix, int super, int active, int mpiactive,
  * @param edgeweights weights of edges
  */
 void dumpMETISGraph(const char *prefix, idx_t nvertices, idx_t nvertexweights,
-                    const idx_t *cellconruns, idx_t *cellcon, idx_t *vertexweights,
-                    idx_t *vertexsizes, idx_t *edgeweights) {
+                    const idx_t *cellconruns, idx_t *cellcon,
+                    idx_t *vertexweights, idx_t *vertexsizes,
+                    idx_t *edgeweights) {
   FILE *stdfile = NULL;
   FILE *simplefile = NULL;
   FILE *weightfile = NULL;

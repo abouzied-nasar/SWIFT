@@ -181,13 +181,15 @@ void engine_split_gas_particle_split_mapper(void *restrict map_data, int count,
         long long id = part_get_id(&global_parts[k_parts]);
         part_set_id(&global_parts[k_parts], id + 2 * (long long)rand_r(&seedp));
       } else {
-        part_set_id(&global_parts[k_parts], offset_id + 2 * atomic_inc(count_id));
+        part_set_id(&global_parts[k_parts],
+                    offset_id + 2 * atomic_inc(count_id));
       }
 
       /* Update splitting tree */
       particle_splitting_update_binary_tree(
           &xp->split_data, &global_xparts[k_parts].split_data, part_get_id(p),
-          part_get_id(&global_parts[k_parts]), data->extra_split_logger, &data->lock);
+          part_get_id(&global_parts[k_parts]), data->extra_split_logger,
+          &data->lock);
 
       /* Re-link everything */
       if (with_gravity) {
@@ -204,7 +206,7 @@ void engine_split_gas_particle_split_mapper(void *restrict map_data, int count,
                                                   (enum random_number_type)2);
 
       /* Displace the old particle */
-      double* x = part_get_x(p);
+      double *x = part_get_x(p);
       x[0] += delta_x * displacement_factor * h;
       x[1] += delta_y * displacement_factor * h;
       x[2] += delta_z * displacement_factor * h;
@@ -216,7 +218,7 @@ void engine_split_gas_particle_split_mapper(void *restrict map_data, int count,
       }
 
       /* Displace the new particle */
-      double* xk = part_get_x(&global_parts[k_parts]);
+      double *xk = part_get_x(&global_parts[k_parts]);
       xk[0] -= delta_x * displacement_factor * h;
       xk[1] -= delta_y * displacement_factor * h;
       xk[2] -= delta_z * displacement_factor * h;
@@ -267,7 +269,8 @@ void engine_split_gas_particle_split_mapper(void *restrict map_data, int count,
 
       /* Mark the particles as not having been swallowed by a sink */
       sink_mark_part_as_not_swallowed(part_get_sink_data(p));
-      sink_mark_part_as_not_swallowed(part_get_sink_data(&global_parts[k_parts]));
+      sink_mark_part_as_not_swallowed(
+          part_get_sink_data(&global_parts[k_parts]));
     }
   }
 }

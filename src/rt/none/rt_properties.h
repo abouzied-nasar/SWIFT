@@ -24,16 +24,14 @@
  * @brief Main header file for the 'none' radiative transfer scheme properties.
  */
 
-#include "error.h"
 #include "cosmology.h"
+#include "error.h"
 #include "inline.h"
 #include "physical_constants.h"
 #include "restart.h"
 #include "units.h"
 
-
 #define RT_IMPLEMENTATION "none"
-
 
 /**
  * @brief Properties of the 'none' radiative transfer model
