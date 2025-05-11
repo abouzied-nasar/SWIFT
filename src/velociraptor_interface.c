@@ -307,7 +307,7 @@ void velociraptor_convert_particles_mapper(void *map_data, int nr_gparts,
 
         convert_part_pos(e, p, xp, swift_parts[i].x);
         convert_part_vel(e, p, xp, swift_parts[i].v);
-        swift_parts[i].id = parts[-gparts[i].id_or_neg_offset].id;
+        swift_parts[i].id = part_get_id(&parts[-gparts[i].id_or_neg_offset]);
         swift_parts[i].u = hydro_get_drifted_physical_internal_energy(p, cosmo);
         swift_parts[i].T = cooling_get_temperature(phys_const, hydro_props, us,
                                                    cosmo, cool_func, p, xp);

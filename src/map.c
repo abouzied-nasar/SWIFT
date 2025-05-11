@@ -73,9 +73,10 @@ void map_cells_plot(struct cell *c, void *data) {
     printf("%.16e %.16e %.16e\n\n\n", l[0] + h[0], l[1] + h[1], l[2]);
 
     if (!c->split) {
-      for (int k = 0; k < c->hydro.count; k++)
-        printf("0 0 0 %.16e %.16e %.16e\n", c->hydro.parts[k].x[0],
-               c->hydro.parts[k].x[1], c->hydro.parts[k].x[2]);
+      for (int k = 0; k < c->hydro.count; k++){
+        const double* const x = part_get_const_x(&c->hydro.parts[k]);
+        printf("0 0 0 %.16e %.16e %.16e\n", x[0], x[1], x[2]);
+      }
       printf("\n\n");
     }
     /* else
@@ -90,10 +91,12 @@ void map_cells_plot(struct cell *c, void *data) {
  */
 void map_check(struct part *p, struct cell *c, void *data) {
 
-  if (p->x[0] < c->loc[0] || p->x[0] > c->loc[0] + c->width[0] ||
-      p->x[0] < c->loc[0] || p->x[0] > c->loc[0] + c->width[0] ||
-      p->x[0] < c->loc[0] || p->x[0] > c->loc[0] + c->width[0])
-    printf("map_check: particle %lld is outside of its box.\n", p->id);
+  const double* const x = part_get_const_x(p);
+  if (x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0] ||
+      x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0] ||
+      x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0]){
+    printf("map_check: particle %lld is outside of its box.\n", part_get_id(p));
+  }
 }
 
 /**
@@ -107,14 +110,15 @@ void map_cellcheck(struct cell *c, void *data) {
   /* Loop over all parts and check if they are in the cell. */
   for (int k = 0; k < c->hydro.count; k++) {
     struct part *p = &c->hydro.parts[k];
-    if (p->x[0] < c->loc[0] || p->x[1] < c->loc[1] || p->x[2] < c->loc[2] ||
-        p->x[0] > c->loc[0] + c->width[0] ||
-        p->x[1] > c->loc[1] + c->width[1] ||
-        p->x[2] > c->loc[2] + c->width[2]) {
+    const double* const x = part_get_const_x(p);
+    if (x[0] < c->loc[0] || x[1] < c->loc[1] || x[2] < c->loc[2] ||
+        x[0] > c->loc[0] + c->width[0] ||
+        x[1] > c->loc[1] + c->width[1] ||
+        x[2] > c->loc[2] + c->width[2]) {
       printf(
           "map_cellcheck: particle at [ %.16e %.16e %.16e ] outside of cell [ "
           "%.16e %.16e %.16e ] - [ %.16e %.16e %.16e ].\n",
-          p->x[0], p->x[1], p->x[2], c->loc[0], c->loc[1], c->loc[2],
+          x[0], x[1], x[2], c->loc[0], c->loc[1], c->loc[2],
           c->loc[0] + c->width[0], c->loc[1] + c->width[1],
           c->loc[2] + c->width[2]);
       error("particle out of bounds!");
@@ -161,34 +165,34 @@ void map_count(struct part *p, struct cell *c, void *data) {
 
   // printf( "%i %e %e\n" , p->id , p->count , p->count_dh );
 
-  *wcount += p->density.wcount;
+  *wcount += part_get_wcount(p);
 }
 void map_wcount_min(struct part *p, struct cell *c, void *data) {
 
   struct part **p2 = (struct part **)data;
 
-  if (p->density.wcount < (*p2)->density.wcount) *p2 = p;
+  if (part_get_wcount(p) < part_get_wcount(*p2)) *p2 = p;
 }
 
 void map_wcount_max(struct part *p, struct cell *c, void *data) {
 
   struct part **p2 = (struct part **)data;
 
-  if (p->density.wcount > (*p2)->density.wcount) *p2 = p;
+  if (part_get_wcount(p) > part_get_wcount(*p2)) *p2 = p;
 }
 
 void map_h_min(struct part *p, struct cell *c, void *data) {
 
   struct part **p2 = (struct part **)data;
 
-  if (p->h < (*p2)->h) *p2 = p;
+  if (part_get_h(p) < part_get_h(*p2)) *p2 = p;
 }
 
 void map_h_max(struct part *p, struct cell *c, void *data) {
 
   struct part **p2 = (struct part **)data;
 
-  if (p->h > (*p2)->h) *p2 = p;
+  if (part_get_h(p) > part_get_h(*p2)) *p2 = p;
 }
 
 void map_stars_h_max(struct spart *p, struct cell *c, void *data) {
@@ -217,6 +221,7 @@ void map_dump(struct part *p, struct cell *c, void *data) {
 
   double *shift = (double *)data;
 
-  printf("%g\t%g\t%g\n", p->x[0] - shift[0], p->x[1] - shift[1],
-         p->x[2] - shift[2]);
+  printf("%g\t%g\t%g\n", part_get_x_ind(p, 0) - shift[0],
+      part_get_x_ind(p, 1) - shift[1],
+      part_get_x_ind(p, 2) - shift[2]);
 }
