@@ -129,7 +129,7 @@ void io_write_cell_offsets(hid_t h_grp, const int cdim[3], const double dim[3],
 void io_read_unit_system(hid_t h_file, struct unit_system* ic_units,
                          const struct unit_system* internal_units,
                          int mpi_rank);
-void io_write_unit_system(hid_t h_grp, const struct unit_system* us,
+void io_write_unit_system(hid_t h_file, const struct unit_system* us,
                           const char* groupName);
 
 void io_copy_temp_buffer(void* temp, const struct engine* e,
@@ -243,7 +243,7 @@ void io_duplicate_sinks_gparts(struct threadpool* tp, struct sink* const sinks,
                                size_t Ndm);
 void io_duplicate_black_holes_gparts(struct threadpool* tp,
                                      struct bpart* const bparts,
-                                     struct gpart* const gparts, size_t Nstars,
+                                     struct gpart* const gparts, size_t Nblackholes,
                                      size_t Ndm);
 
 void io_prepare_output_fields(struct output_options* output_options,
