@@ -744,7 +744,9 @@ void DOPAIR_SUBSET_NAIVE(struct runner *r, const struct cell *restrict ci,
     struct part *restrict pi = &parts_i[ind[pid]];
     const double *const xi = part_get_const_x(pi);
     double pix[3];
-    for (int k = 0; k < 3; k++) pix[k] = xi[k] - shift[k];
+    for (int k = 0; k < 3; k++) {
+      pix[k] = xi[k] - shift[k];
+    }
     const float hi = part_get_h(pi);
     const float hig2 = hi * hi * kernel_gamma2;
 
@@ -781,23 +783,21 @@ void DOPAIR_SUBSET_NAIVE(struct runner *r, const struct cell *restrict ci,
 
       /* Hit or miss? */
       if (r2 < hig2) {
+        const float hj = part_get_h(pj);
 
-        IACT_NONSYM(r2, dx, hi, part_get_h(pj), pi, pj, a, H);
-        IACT_NONSYM_MHD(r2, dx, hi, part_get_h(pj), pi, pj, mu_0, a, H);
+        IACT_NONSYM(r2, dx, hi, hj, pi, pj, a, H);
+        IACT_NONSYM_MHD(r2, dx, hi, hj, pi, pj, mu_0, a, H);
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-        runner_iact_nonsym_chemistry(r2, dx, hi, part_get_h(pj), pi, pj, a, H);
-        runner_iact_nonsym_pressure_floor(r2, dx, hi, part_get_h(pj), pi, pj, a,
+        runner_iact_nonsym_chemistry(r2, dx, hi, hj, pi, pj, a, H);
+        runner_iact_nonsym_pressure_floor(r2, dx, hi, hj, pi, pj, a,
                                           H);
-        runner_iact_nonsym_star_formation(r2, dx, hi, part_get_h(pj), pi, pj, a,
-                                          H);
-        runner_iact_nonsym_sink(r2, dx, hi, part_get_h(pj), pi, pj, a, H);
+        runner_iact_nonsym_star_formation(r2, dx, hi, hj, pi, pj, a, H);
+        runner_iact_nonsym_sink(r2, dx, hi, hj, pi, pj, a, H);
 #endif
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
-        runner_iact_nonsym_timebin(r2, dx, hi, part_get_h(pj), pi, pj, a, H);
-        runner_iact_nonsym_rt_timebin(r2, dx, hi, part_get_h(pj), pi, pj, a, H);
-        runner_iact_nonsym_diffusion(r2, dx, hi, part_get_h(pj), pi, pj, a, H,
-                                     time_base, t_current, cosmo,
-                                     with_cosmology);
+        runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
+        runner_iact_nonsym_rt_timebin(r2, dx, hi, hj, pi, pj, a, H);
+        runner_iact_nonsym_diffusion(r2, dx, hi, hj, pi, pj, a, H, time_base, t_current, cosmo, with_cosmology);
 #endif
       }
     } /* loop over the parts in cj. */
@@ -1299,7 +1299,7 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
         if (part_is_inhibited(pj, e)) continue;
 
         const float hj = part_get_h(pj);
-        const double *const xj = part_get_const_x(pi);
+        const double *const xj = part_get_const_x(pj);
         const float pjx = xj[0] - cj->loc[0];
         const float pjy = xj[1] - cj->loc[1];
         const float pjz = xj[2] - cj->loc[2];

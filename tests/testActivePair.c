@@ -97,24 +97,25 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
             offset[1] +
                 size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
         part_set_x_ind(
-            part, 1,
+            part, 2,
             offset[2] +
                 size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
         part_set_v_ind(part, 0, random_uniform(-0.05, 0.05));
         part_set_v_ind(part, 1, random_uniform(-0.05, 0.05));
         part_set_v_ind(part, 2, random_uniform(-0.05, 0.05));
 
-        if (h_pert)
+        if (h_pert){
           part_set_h(part, size * h * random_uniform(1.f, h_pert) / (float)n);
-        else
+        } else {
           part_set_h(part, size * h / (float)n);
+        }
         h_max = fmaxf(h_max, part_get_h(part));
         part_set_id(part, ++(*partId));
         part_set_depth_h(part, 0);
 
 /* Set the mass */
 #if defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
-        part->conserved.mass = density * volume / count;
+        part_set_conserved_mass(part, density * volume / count);
 #else
         part_set_mass(part, density * volume / count);
 #endif
@@ -613,9 +614,14 @@ void test_all_pair_interactions(
 }
 
 int main(int argc, char *argv[]) {
-  size_t particles = 0, runs = 0, type = 0;
-  double h = 1.23485, size = 1., rho = 1.;
-  double perturbation = 0.1, h_pert = 1.1;
+  size_t particles = 0;
+  size_t runs = 0;
+  size_t type = 0;
+  double h = 1.23485;
+  double size = 1.;
+  double rho = 1.;
+  double perturbation = 0.1;
+  double h_pert = 1.1;
   struct space space;
   struct engine engine;
   struct cosmology cosmo;

@@ -84,12 +84,18 @@ void factor(int value, int *f1, int *f2) {
  * @param periodic Periodic boundary conditions flag.
  */
 void pairs_n2(double *dim, struct part *restrict parts, int N, int periodic) {
-  int i, j, k, count = 0;
+  int i;
+  int j;
+  int k;
+  int count = 0;
   // int mj, mk;
   // double maxratio = 1.0;
-  double r2, rho = 0.0;
-  double rho_max = 0.0, rho_min = 100;
-  float a = 1.f, H = 0.f;
+  double r2;
+  double rho = 0.0;
+  double rho_max = 0.0;
+  double rho_min = 100;
+  float a = 1.f;
+  float H = 0.f;
   float dx[3];
 
   /* Loop over all particle pairs. */
@@ -132,9 +138,10 @@ void pairs_n2(double *dim, struct part *restrict parts, int N, int periodic) {
   /* Aggregate the results. */
   for (k = 0; k < N; k++) {
     // count += parts[k].icount;
-    rho += part_get_wcount(&parts[k]);
-    rho_min = fmin(part_get_wcount(&parts[k]), rho_min);
-    rho_max = fmax(part_get_wcount(&parts[k]), rho_max);
+    const float wcount = part_get_wcount(&parts[k]);
+    rho += wcount;
+    rho_min = fmin(wcount, rho_min);
+    rho_max = fmax(wcount, rho_max);
   }
 
   /* Dump the result. */
@@ -170,6 +177,7 @@ void pairs_single_density(double *dim, long long int pid,
   adaptive_softening_init_part(&p);
   mhd_init_part(&p);
   const double *const xp = part_get_const_x(&p);
+  const float hp = part_get_h(&p);
 
   /* Loop over all particle pairs. */
   for (k = 0; k < N; k++) {
@@ -190,7 +198,6 @@ void pairs_single_density(double *dim, long long int pid,
       fdx[i] = dx[i];
     }
     const float r2 = fdx[0] * fdx[0] + fdx[1] * fdx[1] + fdx[2] * fdx[2];
-    const float hp = part_get_h(&p);
     if (r2 < hp * hp) {
       runner_iact_nonsym_density(r2, fdx, hp, part_get_h(&parts[k]), &p,
                                  &parts[k], a, H);
