@@ -631,17 +631,17 @@ void los_first_loop_mapper(void *restrict map_data, int count,
   for (int i = 0; i < count; i++) {
 
     /* Don't consider inhibited parts. */
-    if (parts[i].time_bin == time_bin_inhibited) continue;
+    if (part_get_time_bin(&parts[i]) == time_bin_inhibited) continue;
+
+    const double* const x = part_get_const_x(&parts[i]);
 
     /* Don't consider part if outwith allowed z-range. */
-    if (parts[i].x[LOS_list->zaxis] <
-            LOS_list->range_when_shooting_down_axis[0] ||
-        parts[i].x[LOS_list->zaxis] >
-            LOS_list->range_when_shooting_down_axis[1])
+    if (x[LOS_list->zaxis] < LOS_list->range_when_shooting_down_axis[0] ||
+        x[LOS_list->zaxis] > LOS_list->range_when_shooting_down_axis[1])
       continue;
 
     /* Distance from this part to LOS along x dim. */
-    double dx = parts[i].x[LOS_list->xaxis] - LOS_list->Xpos;
+    double dx = x[LOS_list->xaxis] - LOS_list->Xpos;
 
     /* Periodic wrap. */
     if (LOS_list->periodic) dx = nearest(dx, LOS_list->dim[LOS_list->xaxis]);
@@ -650,14 +650,14 @@ void los_first_loop_mapper(void *restrict map_data, int count,
     const double dx2 = dx * dx;
 
     /* Smoothing length of this part. */
-    const double hsml = parts[i].h * kernel_gamma;
+    const double hsml = part_get_h(&parts[i]) * kernel_gamma;
     const double hsml2 = hsml * hsml;
 
     /* Does this particle fall into our LOS? */
     if (dx2 < hsml2) {
 
       /* Distance from this part to LOS along y dim. */
-      double dy = parts[i].x[LOS_list->yaxis] - LOS_list->Ypos;
+      double dy = x[LOS_list->yaxis] - LOS_list->Ypos;
 
       /* Periodic wrap. */
       if (LOS_list->periodic) dy = nearest(dy, LOS_list->dim[LOS_list->yaxis]);
@@ -946,18 +946,17 @@ void do_line_of_sight(struct engine *e) {
       for (size_t i = 0; i < num_parts_in_cell; i++) {
 
         /* Don't consider inhibited parts. */
-        if (cell_parts[i].time_bin == time_bin_inhibited) continue;
-        if (cell_parts[i].time_bin == time_bin_not_created) continue;
+        if (part_get_time_bin(&cell_parts[i]) == time_bin_inhibited) continue;
+        if (part_get_time_bin(&cell_parts[i]) == time_bin_not_created) continue;
 
         /* Don't consider part if outwith allowed z-range. */
-        if (cell_parts[i].x[LOS_list[j].zaxis] <
-                LOS_list[j].range_when_shooting_down_axis[0] ||
-            cell_parts[i].x[LOS_list[j].zaxis] >
-                LOS_list[j].range_when_shooting_down_axis[1])
+        const double* const x = part_get_const_x(&cell_parts[i]);
+        if (x[LOS_list[j].zaxis] < LOS_list[j].range_when_shooting_down_axis[0] ||
+            x[LOS_list[j].zaxis] > LOS_list[j].range_when_shooting_down_axis[1])
           continue;
 
         /* Distance from this part to LOS along x dim. */
-        double dx = cell_parts[i].x[LOS_list[j].xaxis] - LOS_list[j].Xpos;
+        double dx = x[LOS_list[j].xaxis] - LOS_list[j].Xpos;
 
         /* Periodic wrap. */
         if (LOS_list[j].periodic)
@@ -967,14 +966,14 @@ void do_line_of_sight(struct engine *e) {
         const double dx2 = dx * dx;
 
         /* Smoothing length of this part. */
-        const double hsml = cell_parts[i].h * kernel_gamma;
+        const double hsml = part_get_h(&cell_parts[i]) * kernel_gamma;
         const double hsml2 = hsml * hsml;
 
         /* Does this part fall into our LOS? */
         if (dx2 < hsml2) {
 
           /* Distance from this part to LOS along y dim. */
-          double dy = cell_parts[i].x[LOS_list[j].yaxis] - LOS_list[j].Ypos;
+          double dy = x[LOS_list[j].yaxis] - LOS_list[j].Ypos;
 
           /* Periodic wrap. */
           if (LOS_list[j].periodic)
@@ -992,7 +991,7 @@ void do_line_of_sight(struct engine *e) {
               /* Store part and xpart properties. */
               memcpy(&LOS_parts[count], &cell_parts[i], sizeof(struct part));
               memcpy(&LOS_xparts[count], &cell_xparts[i], sizeof(struct xpart));
-              memcpy(&LOS_gparts[count], cell_parts[i].gpart,
+              memcpy(&LOS_gparts[count], part_get_gpart(&cell_parts[i]),
                      sizeof(struct gpart));
 
               count++;
@@ -1033,7 +1032,7 @@ void do_line_of_sight(struct engine *e) {
     if (e->nodeID == 0) {
 #ifdef WITH_MPI
       for (int i = 0; i < LOS_list[j].particles_in_los_total; ++i) {
-        LOS_parts[i].gpart = &LOS_gparts[i];
+        part_set_gpart(&LOS_parts[i], &LOS_gparts[i]);
         LOS_gparts[i].id_or_neg_offset = -i;
       }
 #endif
@@ -1059,7 +1058,7 @@ void do_line_of_sight(struct engine *e) {
 
 #ifdef SWIFT_DEBUG_CHECKS
       for (int i = 0; i < LOS_list[j].particles_in_los_total; ++i) {
-        if (LOS_parts[i].gpart != &LOS_gparts[i]) error("Incorrect pointers!");
+        if (part_get_gpart(&LOS_parts[i]) != &LOS_gparts[i]) error("Incorrect pointers!");
       }
 #endif
 
