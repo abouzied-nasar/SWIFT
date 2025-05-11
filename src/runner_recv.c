@@ -94,13 +94,14 @@ void runner_do_recv_part(struct runner *r, struct cell *c, int clear_sorts,
 
     /* Collect everything... */
     for (size_t k = 0; k < nr_parts; k++) {
-      if (parts[k].time_bin == time_bin_inhibited) continue;
-      time_bin_min = min(time_bin_min, parts[k].time_bin);
-      time_bin_max = max(time_bin_max, parts[k].time_bin);
-      h_max = max(h_max, parts[k].h);
-      parts[k].gpart = NULL;
-      if (parts[k].time_bin <= max_active_bin)
-        h_max_active = max(h_max_active, parts[k].h);
+      const timebin_t time_bin = part_get_time_bin(&parts[k]);
+      if (time_bin == time_bin_inhibited) continue;
+      time_bin_min = min(time_bin_min, time_bin);
+      time_bin_max = max(time_bin_max, time_bin);
+      h_max = max(h_max, part_get_h(&parts[k]));
+      part_set_gpart(&parts[k], NULL);
+      if (time_bin <= max_active_bin)
+        h_max_active = max(h_max_active, part_get_h(&parts[k]));
     }
 
     /* Convert into a time */

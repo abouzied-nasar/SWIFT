@@ -543,7 +543,7 @@ void cell_pack_timebin(const struct cell *const c, timebin_t *const t) {
   swift_declare_aligned_ptr(timebin_t, t_align, t, SWIFT_CACHE_ALIGNMENT);
 
   for (int i = 0; i < c->hydro.count; ++i)
-    t_align[i] = c->hydro.parts[i].time_bin;
+    t_align[i] = part_get_time_bin(&c->hydro.parts[i]);
 
 #else
   error("SWIFT was not compiled with MPI support.");

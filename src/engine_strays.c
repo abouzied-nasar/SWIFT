@@ -105,23 +105,25 @@ void engine_exchange_strays(
     if (node_id < 0 || node_id >= e->nr_nodes)
       error("Bad node ID %i.", node_id);
     const int pid = e->proxy_ind[node_id];
+    struct part* p = &s->parts[offset_parts + k];
     if (pid < 0) {
       error(
           "Do not have a proxy for the requested nodeID %i for part with "
           "id=%lld, x=[%e,%e,%e].",
-          node_id, s->parts[offset_parts + k].id,
-          s->parts[offset_parts + k].x[0], s->parts[offset_parts + k].x[1],
-          s->parts[offset_parts + k].x[2]);
+          node_id, part_get_id(p),
+          part_get_x_ind(p, 0),
+          part_get_x_ind(p, 1),
+          part_get_x_ind(p, 2));
     }
 
     /* Re-link the associated gpart with the buffer offset of the part. */
-    if (s->parts[offset_parts + k].gpart != NULL) {
-      s->parts[offset_parts + k].gpart->id_or_neg_offset =
-          -e->proxies[pid].nr_parts_out;
+    struct gpart* gp = part_get_gpart(p);
+    if (gp != NULL) {
+      gp->id_or_neg_offset = -e->proxies[pid].nr_parts_out;
     }
 
 #ifdef SWIFT_DEBUG_CHECKS
-    if (s->parts[offset_parts + k].time_bin == time_bin_inhibited)
+    if (part_get_time_bin(p) == time_bin_inhibited)
       error("Attempting to exchange an inhibited particle");
 #endif
 
@@ -369,8 +371,9 @@ void engine_exchange_strays(
 
     /* Reset the links */
     for (size_t k = 0; k < offset_parts; k++) {
-      if (s->parts[k].gpart != NULL) {
-        s->parts[k].gpart->id_or_neg_offset = -k;
+      struct gpart* gp = part_get_gpart(&s->parts[k]);
+      if (gp != NULL) {
+        gp->id_or_neg_offset = -k;
       }
     }
   }
@@ -442,7 +445,8 @@ void engine_exchange_strays(
     /* Reset the links */
     for (size_t k = 0; k < offset_gparts; k++) {
       if (s->gparts[k].type == swift_type_gas) {
-        s->parts[-s->gparts[k].id_or_neg_offset].gpart = &s->gparts[k];
+        struct part* p = &s->parts[-s->gparts[k].id_or_neg_offset];
+        part_set_gpart(p, &s->gparts[k]);
       } else if (s->gparts[k].type == swift_type_stars) {
         s->sparts[-s->gparts[k].id_or_neg_offset].gpart = &s->gparts[k];
       } else if (s->gparts[k].type == swift_type_black_hole) {
@@ -454,7 +458,8 @@ void engine_exchange_strays(
   }
 
   /* Collect the requests for the particle data from the proxies. */
-  int nr_in = 0, nr_out = 0;
+  int nr_in = 0;
+  int nr_out = 0;
   for (int k = 0; k < e->nr_proxies; k++) {
     if (e->proxies[k].nr_parts_in > 0) {
       reqs_in[MPI_REQUEST_NUMBER_PARTICLE_TYPES * k] =
@@ -538,8 +543,11 @@ void engine_exchange_strays(
 
   /* Wait for each part array to come in and collect the new
      parts from the proxies. */
-  int count_parts = 0, count_gparts = 0, count_sparts = 0, count_bparts = 0,
-      count_sinks = 0;
+  int count_parts = 0;
+  int count_gparts = 0;
+  int count_sparts = 0;
+  int count_bparts = 0;
+  int count_sinks = 0;
   for (int k = 0; k < nr_in; k++) {
     int err, pid;
     if ((err = MPI_Waitany(MPI_REQUEST_NUMBER_PARTICLE_TYPES * e->nr_proxies,
@@ -625,7 +633,7 @@ void engine_exchange_strays(
           struct part *p =
               &s->parts[offset_parts + count_parts - gp->id_or_neg_offset];
           gp->id_or_neg_offset = s->parts - p;
-          p->gpart = gp;
+          part_set_gpart(p, gp);
         } else if (gp->type == swift_type_stars) {
           struct spart *sp =
               &s->sparts[offset_sparts + count_sparts - gp->id_or_neg_offset];
