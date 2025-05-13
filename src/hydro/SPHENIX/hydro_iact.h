@@ -127,15 +127,15 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   curlvr[2] = dv[0] * dx[1] - dv[1] * dx[0];
 
   float* rot_v_i = part_get_rot_v(pi);
-  part_set_rot_v_ind(pi, 0, rot_v_i[0] + faci * curlvr[0]);
-  part_set_rot_v_ind(pi, 1, rot_v_i[1] + faci * curlvr[1]);
-  part_set_rot_v_ind(pi, 2, rot_v_i[2] + faci * curlvr[2]);
+  rot_v_i[0] += faci * curlvr[0];
+  rot_v_i[1] += faci * curlvr[1];
+  rot_v_i[2] += faci * curlvr[2];
 
   /* Negative because of the change in sign of dx & dv. */
-  float* rot_v_j = part_get_rot_v(pi);
-  part_set_rot_v_ind(pj, 0, rot_v_j[0] + facj * curlvr[0]);
-  part_set_rot_v_ind(pj, 1, rot_v_j[1] + facj * curlvr[1]);
-  part_set_rot_v_ind(pj, 2, rot_v_j[2] + facj * curlvr[2]);
+  float* rot_v_j = part_get_rot_v(pj);
+  rot_v_j[0] += facj * curlvr[0];
+  rot_v_j[1] += facj * curlvr[1];
+  rot_v_j[2] += facj * curlvr[2];
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_density += wi;
