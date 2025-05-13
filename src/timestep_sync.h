@@ -61,10 +61,8 @@ INLINE static void timestep_process_sync_part(struct part *p, struct xpart *xp,
   /* We want to make the particle finish it's time-step now. */
 
   /* Start by recovering the start and end point of the particle's time-step. */
-  const integertime_t old_ti_beg =
-      get_integer_time_begin(ti_current, time_bin);
-  const integertime_t old_ti_end =
-      get_integer_time_end(ti_current, time_bin);
+  const integertime_t old_ti_beg = get_integer_time_begin(ti_current, time_bin);
+  const integertime_t old_ti_end = get_integer_time_end(ti_current, time_bin);
 
   /* Old time-step length on the time-line */
   const integertime_t old_dti = old_ti_end - old_ti_beg;

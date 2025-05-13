@@ -1099,9 +1099,11 @@ void DOSELF1_SUBSET_STARS(struct runner *r, const struct cell *ci,
         const float hj = part_get_h(pj);
         IACT_STARS(r2, dx, hi, hj, spi, pj, a, H);
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
-        runner_iact_nonsym_feedback_density(r2, dx, hi, hj, spi, pj, NULL, cosmo, e->feedback_props,
+        runner_iact_nonsym_feedback_density(r2, dx, hi, hj, spi, pj, NULL,
+                                            cosmo, e->feedback_props,
                                             e->ti_current);
-        runner_iact_nonsym_rt_injection_prep(r2, dx, hi, hj, spi, pj, cosmo, e->rt_props);
+        runner_iact_nonsym_rt_injection_prep(r2, dx, hi, hj, spi, pj, cosmo,
+                                             e->rt_props);
 #elif (FUNCTION_TASK_LOOP == TASK_LOOP_FEEDBACK)
         error("No subset feedback iact functions do (or should) exist!");
         /* runner_iact_nonsym_feedback_apply(r2, dx, hi, hj, spi, pj, xpj, */

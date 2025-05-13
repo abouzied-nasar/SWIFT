@@ -104,7 +104,7 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
         part_set_x_ind(
             part, 1,
             offset[1] +
-              size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+                size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
         part_set_x_ind(
             part, 2,
             offset[2] +

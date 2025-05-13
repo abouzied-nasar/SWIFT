@@ -104,7 +104,7 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
         part_set_v_ind(part, 1, random_uniform(-0.05, 0.05));
         part_set_v_ind(part, 2, random_uniform(-0.05, 0.05));
 
-        if (h_pert){
+        if (h_pert) {
           part_set_h(part, size * h * random_uniform(1.f, h_pert) / (float)n);
         } else {
           part_set_h(part, size * h / (float)n);

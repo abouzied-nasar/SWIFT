@@ -443,7 +443,7 @@ void cell_split(struct cell *c, const ptrdiff_t parts_offset,
           memswap_unaligned(&gparts[j], &gpart, sizeof(struct gpart));
           memswap(&gbuff[j], &temp_buff, sizeof(struct cell_buff));
           if (gparts[j].type == swift_type_gas) {
-            struct part* p = &parts[-gparts[j].id_or_neg_offset - parts_offset];
+            struct part *p = &parts[-gparts[j].id_or_neg_offset - parts_offset];
             part_set_gpart(p, &gparts[j]);
           } else if (gparts[j].type == swift_type_stars) {
             sparts[-gparts[j].id_or_neg_offset - sparts_offset].gpart =
@@ -460,7 +460,7 @@ void cell_split(struct cell *c, const ptrdiff_t parts_offset,
         gparts[k] = gpart;
         gbuff[k] = temp_buff;
         if (gparts[k].type == swift_type_gas) {
-          struct part* p = &parts[-gparts[k].id_or_neg_offset - parts_offset];
+          struct part *p = &parts[-gparts[k].id_or_neg_offset - parts_offset];
           part_set_gpart(p, &gparts[k]);
         } else if (gparts[k].type == swift_type_stars) {
           sparts[-gparts[k].id_or_neg_offset - sparts_offset].gpart =
@@ -690,7 +690,7 @@ void cell_reorder_extra_gparts(struct cell *c, struct part *parts,
       memswap_unaligned(&gparts[i], &gparts[first_not_extra],
                         sizeof(struct gpart));
       if (gparts[i].type == swift_type_gas) {
-        struct part* p = &parts[-gparts[i].id_or_neg_offset];
+        struct part *p = &parts[-gparts[i].id_or_neg_offset];
         part_set_gpart(p, &gparts[i]);
       } else if (gparts[i].type == swift_type_sink) {
         sinks[-gparts[i].id_or_neg_offset].gpart = &gparts[i];

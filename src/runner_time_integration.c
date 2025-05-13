@@ -155,7 +155,8 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
 
         const timebin_t time_bin = part_get_time_bin(p);
         const integertime_t ti_step = get_integer_timestep(time_bin);
-        const integertime_t ti_begin = get_integer_time_begin(ti_current + 1, time_bin);
+        const integertime_t ti_begin =
+            get_integer_time_begin(ti_current + 1, time_bin);
         const integertime_t ti_end = ti_begin + ti_step / 2;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -439,8 +440,7 @@ void runner_do_kick2(struct runner *r, struct cell *c, const int timer) {
           error(
               "Particle in wrong time-bin, ti_begin=%lld, ti_step=%lld "
               "time_bin=%d wakeup=%d ti_current=%lld",
-              ti_begin, ti_step, time_bin, limiter_data->wakeup,
-              ti_current);
+              ti_begin, ti_step, time_bin, limiter_data->wakeup, ti_current);
 #endif
 
         /* Time intervals for this half-kick */
@@ -729,15 +729,13 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
         }
 #endif
         /* Old time-step length in physical units */
-        const integertime_t ti_old_step =
-            get_integer_timestep(time_bin);
+        const integertime_t ti_old_step = get_integer_timestep(time_bin);
         double old_time_step_length;
         if (with_cosmology) {
           old_time_step_length = cosmology_get_delta_time(
               e->cosmology, e->ti_current - ti_old_step, e->ti_current);
         } else {
-          old_time_step_length =
-              get_timestep(time_bin, e->time_base);
+          old_time_step_length = get_timestep(time_bin, e->time_base);
         }
 
         /* Get new time-step */

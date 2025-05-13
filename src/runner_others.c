@@ -406,8 +406,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
           double dt_star;
           const timebin_t time_bin = part_get_time_bin(p);
           if (with_cosmology) {
-            const integertime_t ti_step =
-                get_integer_timestep(time_bin);
+            const integertime_t ti_step = get_integer_timestep(time_bin);
             const integertime_t ti_begin =
                 get_integer_time_begin(ti_current - 1, time_bin);
 
@@ -646,8 +645,7 @@ void runner_do_sink_formation(struct runner *r, struct cell *c) {
           double dt_sink;
           const timebin_t time_bin = part_get_time_bin(p);
           if (with_cosmology) {
-            const integertime_t ti_step =
-                get_integer_timestep(time_bin);
+            const integertime_t ti_step = get_integer_timestep(time_bin);
             const integertime_t ti_begin =
                 get_integer_time_begin(ti_current - 1, time_bin);
 
