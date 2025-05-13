@@ -909,13 +909,13 @@ void runner_do_end_grav_force(struct runner *r, struct cell *c, int timer) {
         if (with_black_holes && gp->type == swift_type_gas) {
           const size_t offset = -gp->id_or_neg_offset;
           black_holes_store_potential_in_part(
-              part_get_black_holes_data(&s->parts[offset]), gp);
+              part_get_black_holes_data_p(&s->parts[offset]), gp);
         }
 
         /* Deal with sinks' need of potentials */
         if (with_sinks && gp->type == swift_type_gas) {
           const size_t offset = -gp->id_or_neg_offset;
-          sink_store_potential_in_part(part_get_sink_data(&s->parts[offset]),
+          sink_store_potential_in_part(part_get_sink_data_p(&s->parts[offset]),
                                        gp);
         }
       }
@@ -1213,7 +1213,7 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
 
       /* Finish the force loop */
       const struct rt_timestepping_data *rt_time_data =
-          part_get_const_rt_time_data(p);
+          part_get_const_rt_time_data_p(p);
       const integertime_t ti_current_subcycle = e->ti_current_subcycle;
       const integertime_t ti_step =
           get_integer_timestep(rt_time_data->time_bin);
@@ -1225,7 +1225,7 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
           rt_part_dt(ti_begin, ti_end, e->time_base, with_cosmology, cosmo);
 #ifdef SWIFT_DEBUG_CHECKS
       const struct timestep_limiter_data *limiter_data =
-          part_get_limiter_data(p);
+          part_get_limiter_data_p(p);
       if (ti_begin != ti_current_subcycle)
         error(
             "Particle in wrong time-bin, ti_end=%lld, ti_begin=%lld, "

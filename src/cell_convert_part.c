@@ -586,7 +586,7 @@ void cell_remove_part(const struct engine *e, struct cell *c, struct part *p,
   part_set_time_bin(p, time_bin_inhibited);
   /* Mark the RT time bin as inhibited as well,
    * so part_is_rt_active() checks work as intended */
-  struct rt_timestepping_data *rt_time_data = part_get_rt_time_data(p);
+  struct rt_timestepping_data *rt_time_data = part_get_rt_time_data_p(p);
   rt_time_data->time_bin = time_bin_inhibited;
 
   /* Mark the gpart as inhibited and stand-alone */

@@ -905,7 +905,7 @@ __attribute__((always_inline)) INLINE static void part_set_alpha_visc_max_ngb(
  */
 __attribute__((
     always_inline)) INLINE static struct adaptive_softening_part_data *
-part_get_adaptive_softening_data(struct part *restrict p) {
+part_get_adaptive_softening_data_p(struct part *restrict p) {
   return &p->_adaptive_softening_data;
 }
 
@@ -914,7 +914,7 @@ part_get_adaptive_softening_data(struct part *restrict p) {
  */
 __attribute__((
     always_inline)) INLINE const static struct adaptive_softening_part_data *
-part_get_const_adaptive_softening_data(const struct part *restrict p) {
+part_get_const_adaptive_softening_data_p(const struct part *restrict p) {
   return &p->_adaptive_softening_data;
 }
 
@@ -929,7 +929,7 @@ part_set_adaptive_softening_data(
  * Use this for read-write access.
  */
 __attribute__((always_inline)) INLINE static struct mhd_part_data *
-part_get_mhd_data(struct part *restrict p) {
+part_get_mhd_data_p(struct part *restrict p) {
   return &p->_mhd_data;
 }
 
@@ -937,7 +937,7 @@ part_get_mhd_data(struct part *restrict p) {
  * Use this for read-only access.
  */
 __attribute__((always_inline)) INLINE const static struct mhd_part_data *
-part_get_const_mhd_data(const struct part *restrict p) {
+part_get_const_mhd_data_p(const struct part *restrict p) {
   return &p->_mhd_data;
 }
 
@@ -950,7 +950,7 @@ __attribute__((always_inline)) INLINE static void part_set_mhd_data(
  * Use this for read-write access.
  */
 __attribute__((always_inline)) INLINE static struct chemistry_part_data *
-part_get_chemistry_data(struct part *restrict p) {
+part_get_chemistry_data_p(struct part *restrict p) {
   return &p->_chemistry_data;
 }
 
@@ -958,7 +958,7 @@ part_get_chemistry_data(struct part *restrict p) {
  * Use this for read-only access.
  */
 __attribute__((always_inline)) INLINE const static struct chemistry_part_data *
-part_get_const_chemistry_data(const struct part *restrict p) {
+part_get_const_chemistry_data_p(const struct part *restrict p) {
   return &p->_chemistry_data;
 }
 
@@ -971,7 +971,7 @@ __attribute__((always_inline)) INLINE static void part_set_chemistry_data(
  * Use this for read-write access.
  */
 __attribute__((always_inline)) INLINE static struct cooling_part_data *
-part_get_cooling_data(struct part *restrict p) {
+part_get_cooling_data_p(struct part *restrict p) {
   return &p->_cooling_data;
 }
 
@@ -979,7 +979,7 @@ part_get_cooling_data(struct part *restrict p) {
  * Use this for read-only access.
  */
 __attribute__((always_inline)) INLINE const static struct cooling_part_data *
-part_get_const_cooling_data(const struct part *restrict p) {
+part_get_const_cooling_data_p(const struct part *restrict p) {
   return &p->_cooling_data;
 }
 
@@ -992,7 +992,7 @@ __attribute__((always_inline)) INLINE static void part_set_cooling_data(
  * Use this for read-write access.
  */
 __attribute__((always_inline)) INLINE static struct feedback_part_data *
-part_get_feedback_data(struct part *restrict p) {
+part_get_feedback_data_p(struct part *restrict p) {
   return &p->_feedback_data;
 }
 
@@ -1000,7 +1000,7 @@ part_get_feedback_data(struct part *restrict p) {
  * Use this for read-only access.
  */
 __attribute__((always_inline)) INLINE const static struct feedback_part_data *
-part_get_const_feedback_data(const struct part *restrict p) {
+part_get_const_feedback_data_p(const struct part *restrict p) {
   return &p->_feedback_data;
 }
 
@@ -1013,7 +1013,7 @@ __attribute__((always_inline)) INLINE static void part_set_feedback_data(
  * Use this for read-write access.
  */
 __attribute__((always_inline)) INLINE static struct black_holes_part_data *
-part_get_black_holes_data(struct part *restrict p) {
+part_get_black_holes_data_p(struct part *restrict p) {
   return &p->_black_holes_data;
 }
 
@@ -1022,7 +1022,7 @@ part_get_black_holes_data(struct part *restrict p) {
  */
 __attribute__((
     always_inline)) INLINE const static struct black_holes_part_data *
-part_get_const_black_holes_data(const struct part *restrict p) {
+part_get_const_black_holes_data_p(const struct part *restrict p) {
   return &p->_black_holes_data;
 }
 
@@ -1036,7 +1036,7 @@ __attribute__((always_inline)) INLINE static void part_set_black_holes_data(
  * Use this for read-write access.
  */
 __attribute__((always_inline)) INLINE static struct sink_part_data *
-part_get_sink_data(struct part *restrict p) {
+part_get_sink_data_p(struct part *restrict p) {
   return &p->_sink_data;
 }
 
@@ -1044,7 +1044,7 @@ part_get_sink_data(struct part *restrict p) {
  * Use this for read-only access.
  */
 __attribute__((always_inline)) INLINE const static struct sink_part_data *
-part_get_const_sink_data(const struct part *restrict p) {
+part_get_const_sink_data_p(const struct part *restrict p) {
   return &p->_sink_data;
 }
 
@@ -1057,7 +1057,7 @@ __attribute__((always_inline)) INLINE static void part_set_sink_data(
  * Use this for read-write access.
  */
 __attribute__((always_inline)) INLINE static struct pressure_floor_part_data *
-part_get_pressure_floor_data(struct part *restrict p) {
+part_get_pressure_floor_data_p(struct part *restrict p) {
   return &p->_pressure_floor_data;
 }
 
@@ -1066,7 +1066,7 @@ part_get_pressure_floor_data(struct part *restrict p) {
  */
 __attribute__((
     always_inline)) INLINE const static struct pressure_floor_part_data *
-part_get_const_pressure_floor_data(const struct part *restrict p) {
+part_get_const_pressure_floor_data_p(const struct part *restrict p) {
   return &p->_pressure_floor_data;
 }
 
@@ -1080,7 +1080,7 @@ __attribute__((always_inline)) INLINE static void part_set_pressure_floor_data(
  * Use this for read-write access.
  */
 __attribute__((always_inline)) INLINE static struct rt_part_data *
-part_get_rt_data(struct part *restrict p) {
+part_get_rt_data_p(struct part *restrict p) {
   return &p->_rt_data;
 }
 
@@ -1088,7 +1088,7 @@ part_get_rt_data(struct part *restrict p) {
  * Use this for read-only access.
  */
 __attribute__((always_inline)) INLINE const static struct rt_part_data *
-part_get_const_rt_data(const struct part *restrict p) {
+part_get_const_rt_data_p(const struct part *restrict p) {
   return &p->_rt_data;
 }
 
@@ -1101,7 +1101,7 @@ __attribute__((always_inline)) INLINE static void part_set_rt_data(
  * Use this for read-write access.
  */
 __attribute__((always_inline)) INLINE static struct rt_timestepping_data *
-part_get_rt_time_data(struct part *restrict p) {
+part_get_rt_time_data_p(struct part *restrict p) {
   return &p->_rt_time_data;
 }
 
@@ -1109,7 +1109,7 @@ part_get_rt_time_data(struct part *restrict p) {
  * Use this for read-only access.
  */
 __attribute__((always_inline)) INLINE const static struct rt_timestepping_data *
-part_get_const_rt_time_data(const struct part *restrict p) {
+part_get_const_rt_time_data_p(const struct part *restrict p) {
   return &p->_rt_time_data;
 }
 
@@ -1142,7 +1142,7 @@ __attribute__((always_inline)) INLINE static void part_set_time_bin(
  * Use this for read-write access.
  */
 __attribute__((always_inline)) INLINE static struct timestep_limiter_data *
-part_get_limiter_data(struct part *restrict p) {
+part_get_limiter_data_p(struct part *restrict p) {
   return &p->_limiter_data;
 }
 
@@ -1151,7 +1151,7 @@ part_get_limiter_data(struct part *restrict p) {
  */
 __attribute__((
     always_inline)) INLINE const static struct timestep_limiter_data *
-part_get_const_limiter_data(const struct part *restrict p) {
+part_get_const_limiter_data_p(const struct part *restrict p) {
   return &p->_limiter_data;
 }
 
@@ -1198,8 +1198,13 @@ __attribute__((always_inline)) INLINE static void part_set_ti_kick(
 #endif
 }
 
+__attribute__((always_inline)) INLINE static struct fvpm_geometry_struct *
+part_get_fvpm_geometry_p(struct part *restrict p) {
+  return &p->_geometry;
+}
+
 __attribute__((always_inline)) INLINE const static struct fvpm_geometry_struct *
-part_get_fvpm_geometry(struct part *restrict p) {
+part_get_const_fvpm_geometry_p(const struct part *restrict p) {
   return &p->_geometry;
 }
 

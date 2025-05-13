@@ -355,10 +355,10 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
       cell_h_max = max(cell_h_max, part_get_h(p));
 
       /* Mark the particle has not being swallowed */
-      black_holes_mark_part_as_not_swallowed(part_get_black_holes_data(p));
+      black_holes_mark_part_as_not_swallowed(part_get_black_holes_data_p(p));
 
       /* Mark the particle has not being swallowed by a sink */
-      sink_mark_part_as_not_swallowed(part_get_sink_data(p));
+      sink_mark_part_as_not_swallowed(part_get_sink_data_p(p));
 
       /* Reset the gas particle-carried feedback fields */
       feedback_reset_part(p, xp);
@@ -368,7 +368,7 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
         hydro_init_part(p, &e->s->hs);
         adaptive_softening_init_part(p);
         mhd_init_part(p);
-        black_holes_init_potential(part_get_black_holes_data(p));
+        black_holes_init_potential(part_get_black_holes_data_p(p));
         chemistry_init_part(p, e->chemistry);
         star_formation_init_part(p, e->star_formation);
         tracers_after_init(p, xp, e->internal_units, e->physical_constants,

@@ -148,7 +148,7 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
       if (part_is_starting(p, e)) {
 
 #ifdef SWIFT_DEBUG_CHECKS
-        struct timestep_limiter_data *limiter_data = part_get_limiter_data(p);
+        struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
         if (limiter_data->wakeup != time_bin_not_awake)
           error("Woken-up particle that has not been processed in kick1");
 #endif
@@ -424,7 +424,7 @@ void runner_do_kick2(struct runner *r, struct cell *c, const int timer) {
       if (part_is_active(p, e)) {
 
 #ifdef SWIFT_DEBUG_CHECKS
-        struct timestep_limiter_data *limiter_data = part_get_limiter_data(p);
+        struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
         if (limiter_data->wakeup != time_bin_not_awake)
           error("Woken-up particle that has not been processed in kick1");
 #endif
@@ -721,7 +721,7 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
 
         if (with_rt) {
           const struct rt_timestepping_data *rt_time_data =
-              part_get_const_rt_time_data(p);
+              part_get_const_rt_time_data_p(p);
           const integertime_t ti_rt_end =
               get_integer_time_end(ti_current_subcycle, rt_time_data->time_bin);
           if (ti_rt_end != ti_current_subcycle)
@@ -790,7 +790,7 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
 
         /* Same for RT */
         if (with_rt) {
-          struct rt_timestepping_data *rt_time_data = part_get_rt_time_data(p);
+          struct rt_timestepping_data *rt_time_data = part_get_rt_time_data_p(p);
           rt_time_data->time_bin = get_time_bin(ti_rt_new_step);
           ti_rt_end_min =
               min(ti_current_subcycle + ti_rt_new_step, ti_rt_end_min);
@@ -825,7 +825,7 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
              * end up with results ti_rt_end == ti_current_subcyle, so we need
              * to pretend we're past ti_current_subcycle already. */
             const struct rt_timestepping_data *rt_time_data =
-                part_get_const_rt_time_data(p);
+                part_get_const_rt_time_data_p(p);
             integertime_t ti_rt_end = get_integer_time_end(
                 ti_current_subcycle + 1, rt_time_data->time_bin);
 
@@ -1417,7 +1417,7 @@ void runner_do_limiter(struct runner *r, struct cell *c, int force,
       /* Avoid inhibited particles */
       if (part_is_inhibited(p, e)) continue;
 
-      struct timestep_limiter_data *limiter_data = part_get_limiter_data(p);
+      struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
       /* Bip, bip, bip... wake-up time */
       if (limiter_data->wakeup != time_bin_not_awake) {
 
@@ -1570,7 +1570,7 @@ void runner_do_sync(struct runner *r, struct cell *c, int force,
       if (part_is_inhibited(p, e)) continue;
 
       /* If the particle is active no need to sync it */
-      struct timestep_limiter_data *limiter_data = part_get_limiter_data(p);
+      struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
       if (part_is_active(p, e) && limiter_data->to_be_synchronized) {
         limiter_data->to_be_synchronized = 0;
       }

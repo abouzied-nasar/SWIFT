@@ -2288,7 +2288,7 @@ void space_check_limiter_mapper(void *map_data, int nr_parts,
   for (int k = 0; k < nr_parts; k++) {
     const timebin_t time_bin = part_get_time_bin(&parts[k]);
     const struct timestep_limiter_data *limiter_data =
-        part_get_limiter_data(&parts[k]);
+        part_get_limiter_data_p(&parts[k]);
 
     if (time_bin == time_bin_inhibited) continue;
 
@@ -2347,7 +2347,7 @@ void space_check_part_swallow_mapper(void *map_data, int nr_parts,
     if (part_get_time_bin(&parts[k]) == time_bin_inhibited) continue;
 
     const long long swallow_id =
-        black_holes_get_part_swallow_id(part_get_black_holes_data(&parts[k]));
+        black_holes_get_part_swallow_id(part_get_black_holes_data_p(&parts[k]));
 
     if (swallow_id != -1)
       error("Particle has not been swallowed! id=%lld", part_get_id(&parts[k]));
@@ -2397,7 +2397,7 @@ void space_check_part_sink_swallow_mapper(void *map_data, int nr_parts,
     if (part_get_time_bin(&parts[k]) == time_bin_inhibited) continue;
 
     const long long swallow_id =
-        sink_get_part_swallow_id(part_get_sink_data(&parts[k]));
+        sink_get_part_swallow_id(part_get_sink_data_p(&parts[k]));
 
     if (swallow_id != -1)
       error("Particle has not been swallowed! id=%lld", part_get_id(&parts[k]));

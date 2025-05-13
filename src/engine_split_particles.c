@@ -263,14 +263,14 @@ void engine_split_gas_particle_split_mapper(void *restrict map_data, int count,
       rt_split_part(&global_parts[k_parts], particle_split_factor);
 
       /* Mark the particles as not having been swallowed */
-      black_holes_mark_part_as_not_swallowed(part_get_black_holes_data(p));
+      black_holes_mark_part_as_not_swallowed(part_get_black_holes_data_p(p));
       black_holes_mark_part_as_not_swallowed(
-          part_get_black_holes_data(&global_parts[k_parts]));
+          part_get_black_holes_data_p(&global_parts[k_parts]));
 
       /* Mark the particles as not having been swallowed by a sink */
-      sink_mark_part_as_not_swallowed(part_get_sink_data(p));
+      sink_mark_part_as_not_swallowed(part_get_sink_data_p(p));
       sink_mark_part_as_not_swallowed(
-          part_get_sink_data(&global_parts[k_parts]));
+          part_get_sink_data_p(&global_parts[k_parts]));
     }
   }
 }

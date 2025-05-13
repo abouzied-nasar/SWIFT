@@ -48,7 +48,7 @@ INLINE static void timestep_process_sync_part(struct part *p, struct xpart *xp,
   const timebin_t max_active_bin = e->max_active_bin;
   const timebin_t min_active_bin = e->min_active_bin;
   const double time_base = e->time_base;
-  struct timestep_limiter_data *limiter_data = part_get_limiter_data(p);
+  struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
 
   limiter_data->to_be_synchronized = 0;
   const timebin_t time_bin = part_get_time_bin(p);

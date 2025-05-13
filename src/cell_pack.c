@@ -190,7 +190,7 @@ void cell_pack_part_swallow(const struct cell *c,
   const struct part *parts = c->hydro.parts;
 
   for (size_t i = 0; i < count; ++i) {
-    data[i] = *part_get_const_black_holes_data(&parts[i]);
+    data[i] = *part_get_const_black_holes_data_p(&parts[i]);
   }
 }
 

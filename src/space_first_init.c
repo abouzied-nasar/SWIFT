@@ -112,7 +112,7 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
 
     hydro_first_init_part(&p[k], &xp[k]);
     mhd_first_init_part(&p[k], &xp[k], &hydro_props->mhd, s->dim[0]);
-    struct timestep_limiter_data *limiter_data = part_get_limiter_data(&p[k]);
+    struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(&p[k]);
     limiter_data->min_ngb_time_bin = num_time_bins + 1;
     limiter_data->wakeup = time_bin_not_awake;
     limiter_data->to_be_synchronized = 0;
@@ -137,10 +137,10 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
                              cool_func);
 
     /* And the black hole markers */
-    black_holes_mark_part_as_not_swallowed(part_get_black_holes_data(&p[k]));
+    black_holes_mark_part_as_not_swallowed(part_get_black_holes_data_p(&p[k]));
 
     /* And the sink markers */
-    sink_mark_part_as_not_swallowed(part_get_sink_data(&p[k]));
+    sink_mark_part_as_not_swallowed(part_get_sink_data_p(&p[k]));
 
     /* Also initialise the splitting data */
     particle_splitting_mark_part_as_not_split(&xp[k].split_data,

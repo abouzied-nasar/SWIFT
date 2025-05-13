@@ -45,13 +45,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_timebin(
 
   /* Update the minimal time-bin */
   if (tj > 0) {
-    struct timestep_limiter_data *limiter_data_i = part_get_limiter_data(pi);
+    struct timestep_limiter_data *limiter_data_i = part_get_limiter_data_p(pi);
     limiter_data_i->min_ngb_time_bin =
         min(limiter_data_i->min_ngb_time_bin, tj);
   }
 
   if (ti > 0) {
-    struct timestep_limiter_data *limiter_data_j = part_get_limiter_data(pj);
+    struct timestep_limiter_data *limiter_data_j = part_get_limiter_data_p(pj);
     limiter_data_j->min_ngb_time_bin =
         min(limiter_data_j->min_ngb_time_bin, ti);
   }
@@ -78,7 +78,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_timebin(
 
   /* Update the minimal time-bin */
   if (tj > 0) {
-    struct timestep_limiter_data *limiter_data_i = part_get_limiter_data(pi);
+    struct timestep_limiter_data *limiter_data_i = part_get_limiter_data_p(pi);
     limiter_data_i->min_ngb_time_bin =
         min(limiter_data_i->min_ngb_time_bin, tj);
   }
@@ -129,7 +129,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_limiter(
   if (tj > ti + time_bin_neighbour_max_delta_bin) {
 
     /* Store the smallest time bin that woke up this particle */
-    struct timestep_limiter_data *limiter_data_j = part_get_limiter_data(pj);
+    struct timestep_limiter_data *limiter_data_j = part_get_limiter_data_p(pj);
     accumulate_max_c(&limiter_data_j->wakeup, -ti);
   }
 

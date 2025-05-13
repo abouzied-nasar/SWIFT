@@ -276,9 +276,11 @@ void space_split_recursive(struct space *s, struct cell *c,
                buff, sbuff, bbuff, gbuff, sink_buff);
 
     /* Buffers for the progenitors */
-    struct cell_buff *progeny_buff = buff, *progeny_gbuff = gbuff,
-                     *progeny_sbuff = sbuff, *progeny_bbuff = bbuff,
-                     *progeny_sink_buff = sink_buff;
+    struct cell_buff *progeny_buff = buff;
+    struct cell_buff *progeny_gbuff = gbuff;
+    struct cell_buff *progeny_sbuff = sbuff;
+    struct cell_buff *progeny_bbuff = bbuff;
+    struct cell_buff *progeny_sink_buff = sink_buff;
 
     for (int k = 0; k < 8; k++) {
 
@@ -484,7 +486,7 @@ void space_split_recursive(struct space *s, struct cell *c,
       /* When does this particle's time-step start and end? */
       const timebin_t time_bin = part_get_time_bin(&parts[k]);
       const struct rt_timestepping_data *const rt_time_data =
-          part_get_const_rt_time_data(&parts[k]);
+          part_get_const_rt_time_data_p(&parts[k]);
       const timebin_t time_bin_rt = rt_time_data->time_bin;
       const integertime_t ti_end = get_integer_time_end(ti_current, time_bin);
       const integertime_t ti_beg = get_integer_time_begin(ti_current, time_bin);
