@@ -22,6 +22,7 @@
 #include <float.h>
 
 /* Local includes */
+#include "cooling_properties.h"
 #include "minmax.h"
 #include "random.h"
 #include "sink_part.h"

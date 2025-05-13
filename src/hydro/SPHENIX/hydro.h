@@ -1065,7 +1065,6 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
   u += part_get_u_dt(p) * dt_therm;
 
   float h = part_get_h(p);
-  float rho = part_get_rho(p);
   const float h_inv = 1.f / h;
 
   /* Predict smoothing length */
@@ -1078,6 +1077,7 @@ __attribute__((always_inline)) INLINE static void hydro_predict_extra(
   part_set_h(p, h);
 
   /* Predict density and weighted pressure */
+  float rho = part_get_rho(p);
   const float w2 = -hydro_dimension * w1;
   if (fabsf(w2) < 0.2f) {
     const float expf_approx =

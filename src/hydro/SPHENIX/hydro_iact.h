@@ -173,7 +173,6 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
 
   const float h_inv = 1.f / hi;
   const float ui = r * h_inv;
-
   kernel_deval(ui, &wi, &wi_dx);
 
   const float rho_i = part_get_rho(pi);
@@ -211,9 +210,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   curlvr[2] = dv[0] * dx[1] - dv[1] * dx[0];
 
   float* rot_v_i = part_get_rot_v(pi);
-  part_set_rot_v_ind(pi, 0, rot_v_i[0] + faci * curlvr[0]);
-  part_set_rot_v_ind(pi, 1, rot_v_i[1] + faci * curlvr[1]);
-  part_set_rot_v_ind(pi, 2, rot_v_i[2] + faci * curlvr[2]);
+  rot_v_i[0] += faci * curlvr[0];
+  rot_v_i[1] += faci * curlvr[1];
+  rot_v_i[2] += faci * curlvr[2];
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   pi->n_density += wi;
@@ -485,13 +484,15 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float acc = sph_acc_term + visc_acc_term + adapt_soft_acc_term;
 
   /* Use the force Luke ! */
-  part_set_a_hydro_ind(pi, 0, part_get_a_hydro_ind(pi, 0) - mj * acc * dx[0]);
-  part_set_a_hydro_ind(pi, 1, part_get_a_hydro_ind(pi, 1) - mj * acc * dx[1]);
-  part_set_a_hydro_ind(pi, 2, part_get_a_hydro_ind(pi, 2) - mj * acc * dx[2]);
+  float* a_hydro_i = part_get_a_hydro(pi);
+  a_hydro_i[0] -= mj * acc * dx[0];
+  a_hydro_i[1] -= mj * acc * dx[1];
+  a_hydro_i[2] -= mj * acc * dx[2];
 
-  part_set_a_hydro_ind(pj, 0, part_get_a_hydro_ind(pj, 0) + mi * acc * dx[0]);
-  part_set_a_hydro_ind(pj, 1, part_get_a_hydro_ind(pj, 1) + mi * acc * dx[1]);
-  part_set_a_hydro_ind(pj, 2, part_get_a_hydro_ind(pj, 2) + mi * acc * dx[2]);
+  float* a_hydro_j = part_get_a_hydro(pj);
+  a_hydro_j[0] += mi * acc * dx[0];
+  a_hydro_j[1] += mi * acc * dx[1];
+  a_hydro_j[2] += mi * acc * dx[2];
 
   /* Get the time derivative for u. */
   const float sph_du_term_i = P_over_rho2_i * dvdr * r_inv * wi_dr;
@@ -634,9 +635,10 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float acc = sph_acc_term + visc_acc_term + adapt_soft_acc_term;
 
   /* Use the force Luke ! */
-  part_set_a_hydro_ind(pi, 0, part_get_a_hydro_ind(pi, 0) - mj * acc * dx[0]);
-  part_set_a_hydro_ind(pi, 1, part_get_a_hydro_ind(pi, 1) - mj * acc * dx[1]);
-  part_set_a_hydro_ind(pi, 2, part_get_a_hydro_ind(pi, 2) - mj * acc * dx[2]);
+  float* a_hydro_i = part_get_a_hydro(pi);
+  a_hydro_i[0] -= mj * acc * dx[0];
+  a_hydro_i[1] -= mj * acc * dx[1];
+  a_hydro_i[2] -= mj * acc * dx[2];
 
   /* Get the time derivative for u. */
   const float sph_du_term_i = P_over_rho2_i * dvdr * r_inv * wi_dr;

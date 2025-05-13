@@ -51,9 +51,10 @@ INLINE static void timestep_process_sync_part(struct part *p, struct xpart *xp,
   struct timestep_limiter_data *limiter_data = part_get_limiter_data(p);
 
   limiter_data->to_be_synchronized = 0;
+  const timebin_t time_bin = part_get_time_bin(p);
 
   /* This particle is already active. Nothing to do here... */
-  if (part_get_time_bin(p) <= max_active_bin) {
+  if (time_bin <= max_active_bin) {
     return;
   }
 
@@ -61,9 +62,9 @@ INLINE static void timestep_process_sync_part(struct part *p, struct xpart *xp,
 
   /* Start by recovering the start and end point of the particle's time-step. */
   const integertime_t old_ti_beg =
-      get_integer_time_begin(ti_current, part_get_time_bin(p));
+      get_integer_time_begin(ti_current, time_bin);
   const integertime_t old_ti_end =
-      get_integer_time_end(ti_current, part_get_time_bin(p));
+      get_integer_time_end(ti_current, time_bin);
 
   /* Old time-step length on the time-line */
   const integertime_t old_dti = old_ti_end - old_ti_beg;

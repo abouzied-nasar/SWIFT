@@ -153,10 +153,9 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
           error("Woken-up particle that has not been processed in kick1");
 #endif
 
-        const integertime_t ti_step =
-            get_integer_timestep(part_get_time_bin(p));
-        const integertime_t ti_begin =
-            get_integer_time_begin(ti_current + 1, part_get_time_bin(p));
+        const timebin_t time_bin = part_get_time_bin(p);
+        const integertime_t ti_step = get_integer_timestep(time_bin);
+        const integertime_t ti_begin = get_integer_time_begin(ti_current + 1, time_bin);
         const integertime_t ti_end = ti_begin + ti_step / 2;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -164,8 +163,8 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
           error(
               "Particle in wrong time-bin, ti_end=%lld, ti_begin=%lld, "
               "ti_step=%lld time_bin=%d wakeup=%d ti_current=%lld",
-              ti_end, ti_begin, ti_step, part_get_time_bin(p),
-              limiter_data->wakeup, ti_current);
+              ti_end, ti_begin, ti_step, time_bin, limiter_data->wakeup,
+              ti_current);
 #endif
 
         /* Time intervals for this half-kick */
@@ -184,7 +183,7 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
                   entropy_floor, ti_begin, ti_end, ti_begin_mesh, ti_end_mesh);
 
         /* Update the accelerations to be used in the drift for hydro */
-        const struct gpart *const gp = part_get_gpart(p);
+        const struct gpart *gp = part_get_gpart(p);
         if (gp != NULL) {
 
           xp->a_grav[0] = gp->a_grav[0] + gp->a_grav_mesh[0];
@@ -429,11 +428,10 @@ void runner_do_kick2(struct runner *r, struct cell *c, const int timer) {
           error("Woken-up particle that has not been processed in kick1");
 #endif
         /* Time-step length on the integer timeline */
-        const integertime_t ti_step =
-            get_integer_timestep(part_get_time_bin(p));
+        const timebin_t time_bin = part_get_time_bin(p);
+        const integertime_t ti_step = get_integer_timestep(time_bin);
         const integertime_t ti_begin =
-            get_integer_time_begin(ti_current, part_get_time_bin(p)) +
-            ti_step / 2;
+            get_integer_time_begin(ti_current, time_bin) + ti_step / 2;
         const integertime_t ti_end = ti_begin + ti_step / 2;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -441,7 +439,7 @@ void runner_do_kick2(struct runner *r, struct cell *c, const int timer) {
           error(
               "Particle in wrong time-bin, ti_begin=%lld, ti_step=%lld "
               "time_bin=%d wakeup=%d ti_current=%lld",
-              ti_begin, ti_step, part_get_time_bin(p), limiter_data->wakeup,
+              ti_begin, ti_step, time_bin, limiter_data->wakeup,
               ti_current);
 #endif
 
@@ -715,14 +713,14 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
 
 #ifdef SWIFT_DEBUG_CHECKS
         /* Current end of time-step */
-        const integertime_t ti_end =
-            get_integer_time_end(ti_current, part_get_time_bin(p));
+        const timebin_t time_bin = part_get_time_bin(p);
+        const integertime_t ti_end = get_integer_time_end(ti_current, time_bin);
 
         if (ti_end != ti_current)
           error("Computing time-step of rogue particle.");
 
         if (with_rt) {
-          const struct rt_timestepping_data *const rt_time_data =
+          const struct rt_timestepping_data *rt_time_data =
               part_get_const_rt_time_data(p);
           const integertime_t ti_rt_end =
               get_integer_time_end(ti_current_subcycle, rt_time_data->time_bin);
@@ -732,14 +730,14 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
 #endif
         /* Old time-step length in physical units */
         const integertime_t ti_old_step =
-            get_integer_timestep(part_get_time_bin(p));
+            get_integer_timestep(time_bin);
         double old_time_step_length;
         if (with_cosmology) {
           old_time_step_length = cosmology_get_delta_time(
               e->cosmology, e->ti_current - ti_old_step, e->ti_current);
         } else {
           old_time_step_length =
-              get_timestep(part_get_time_bin(p), e->time_base);
+              get_timestep(time_bin, e->time_base);
         }
 
         /* Get new time-step */
@@ -808,11 +806,12 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
 
         if (!part_is_inhibited(p, e)) {
 
+          const timebin_t time_bin = part_get_time_bin(p);
           const integertime_t ti_end =
-              get_integer_time_end(ti_current, part_get_time_bin(p));
+              get_integer_time_end(ti_current, time_bin);
 
           const integertime_t ti_beg =
-              get_integer_time_begin(ti_current + 1, part_get_time_bin(p));
+              get_integer_time_begin(ti_current + 1, time_bin);
 
           /* What is the next sync-point ? */
           ti_hydro_end_min = min(ti_end, ti_hydro_end_min);
@@ -827,7 +826,7 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
              * only changed while the particle is hydro active. This allows to
              * end up with results ti_rt_end == ti_current_subcyle, so we need
              * to pretend we're past ti_current_subcycle already. */
-            const struct rt_timestepping_data *const rt_time_data =
+            const struct rt_timestepping_data *rt_time_data =
                 part_get_const_rt_time_data(p);
             integertime_t ti_rt_end = get_integer_time_end(
                 ti_current_subcycle + 1, rt_time_data->time_bin);
@@ -843,7 +842,7 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
             ti_rt_min_step_size = min(ti_rt_min_step_size, ti_rt_step);
           }
 
-          const struct gpart *const gp = part_get_gpart(p);
+          const struct gpart *gp = part_get_gpart(p);
           if (gp != NULL) {
 
             /* What is the next sync-point ? */

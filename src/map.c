@@ -74,7 +74,7 @@ void map_cells_plot(struct cell *c, void *data) {
 
     if (!c->split) {
       for (int k = 0; k < c->hydro.count; k++) {
-        const double *const x = part_get_const_x(&c->hydro.parts[k]);
+        const double *x = part_get_const_x(&c->hydro.parts[k]);
         printf("0 0 0 %.16e %.16e %.16e\n", x[0], x[1], x[2]);
       }
       printf("\n\n");
@@ -91,10 +91,10 @@ void map_cells_plot(struct cell *c, void *data) {
  */
 void map_check(struct part *p, struct cell *c, void *data) {
 
-  const double *const x = part_get_const_x(p);
-  if (x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0] || x[0] < c->loc[0] ||
-      x[0] > c->loc[0] + c->width[0] || x[0] < c->loc[0] ||
-      x[0] > c->loc[0] + c->width[0]) {
+  const double *x = part_get_const_x(p);
+  if (x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0] ||
+      x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0] ||
+      x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0]) {
     printf("map_check: particle %lld is outside of its box.\n", part_get_id(p));
   }
 }
@@ -110,7 +110,7 @@ void map_cellcheck(struct cell *c, void *data) {
   /* Loop over all parts and check if they are in the cell. */
   for (int k = 0; k < c->hydro.count; k++) {
     struct part *p = &c->hydro.parts[k];
-    const double *const x = part_get_const_x(p);
+    const double * x = part_get_const_x(p);
     if (x[0] < c->loc[0] || x[1] < c->loc[1] || x[2] < c->loc[2] ||
         x[0] > c->loc[0] + c->width[0] || x[1] > c->loc[1] + c->width[1] ||
         x[2] > c->loc[2] + c->width[2]) {

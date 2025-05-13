@@ -116,7 +116,7 @@ void space_split_recursive(struct space *s, struct cell *c,
         if (part_get_time_bin(&parts[k]) == time_bin_not_created)
           error("Extra particle present in space_split()");
 #endif
-        const double *const px = part_get_const_x(&parts[k]);
+        const double *px = part_get_const_x(&parts[k]);
         buff[k].x[0] = px[0];
         buff[k].x[1] = px[1];
         buff[k].x[2] = px[2];

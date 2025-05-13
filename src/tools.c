@@ -176,7 +176,7 @@ void pairs_single_density(double *dim, long long int pid,
   hydro_init_part(&p, NULL);
   adaptive_softening_init_part(&p);
   mhd_init_part(&p);
-  const double *const xp = part_get_const_x(&p);
+  const double *xp = part_get_const_x(&p);
   const float hp = part_get_h(&p);
 
   /* Loop over all particle pairs. */
@@ -186,7 +186,7 @@ void pairs_single_density(double *dim, long long int pid,
     double dx[3];
     float fdx[3];
 
-    const double *const xk = part_get_const_x(&parts[k]);
+    const double *xk = part_get_const_x(&parts[k]);
     for (int i = 0; i < 3; i++) {
       dx[i] = xp[i] - xk[i];
       if (periodic) {
@@ -242,7 +242,7 @@ void pairs_all_density(struct runner *r, struct cell *ci, struct cell *cj) {
     /* Skip inactive particles. */
     if (!part_is_active(pi, e)) continue;
 
-    const double *const xi = part_get_const_x(pi);
+    const double *xi = part_get_const_x(pi);
     const float pix = xi[0] - shift_i[0];
     const float piy = xi[1] - shift_i[1];
     const float piz = xi[2] - shift_i[2];
@@ -251,7 +251,7 @@ void pairs_all_density(struct runner *r, struct cell *ci, struct cell *cj) {
 
       pj = &cj->hydro.parts[j];
 
-      const double *const xj = part_get_const_x(pj);
+      const double *xj = part_get_const_x(pj);
       const float pjx = xj[0] - shift_j[0];
       const float pjy = xj[1] - shift_j[1];
       const float pjz = xj[2] - shift_j[2];
@@ -286,7 +286,7 @@ void pairs_all_density(struct runner *r, struct cell *ci, struct cell *cj) {
     /* Skip inactive particles. */
     if (!part_is_active(pj, e)) continue;
 
-    const double *const xj = part_get_const_x(pj);
+    const double *xj = part_get_const_x(pj);
     const float pjx = xj[0] - shift_j[0];
     const float pjy = xj[1] - shift_j[1];
     const float pjz = xj[2] - shift_j[2];
@@ -295,7 +295,7 @@ void pairs_all_density(struct runner *r, struct cell *ci, struct cell *cj) {
 
       pi = &ci->hydro.parts[i];
 
-      const double *const xi = part_get_const_x(pi);
+      const double *xi = part_get_const_x(pi);
       const float pix = xi[0] - shift_i[0];
       const float piy = xi[1] - shift_i[1];
       const float piz = xi[2] - shift_i[2];
@@ -350,7 +350,7 @@ void pairs_all_gradient(struct runner *r, struct cell *ci, struct cell *cj) {
     /* Skip inactive particles. */
     if (!part_is_active(pi, e)) continue;
 
-    const double *const xi = part_get_const_x(pi);
+    const double *xi = part_get_const_x(pi);
     const float pix = xi[0] - shift_i[0];
     const float piy = xi[1] - shift_i[1];
     const float piz = xi[2] - shift_i[2];
@@ -361,7 +361,7 @@ void pairs_all_gradient(struct runner *r, struct cell *ci, struct cell *cj) {
       const float hj = part_get_h(pj);
       hjg2 = hj * hj * kernel_gamma2;
 
-      const double *const xj = part_get_const_x(pj);
+      const double *xj = part_get_const_x(pj);
       const float pjx = xj[0] - shift_j[0];
       const float pjy = xj[1] - shift_j[1];
       const float pjz = xj[2] - shift_j[2];
@@ -399,7 +399,7 @@ void pairs_all_gradient(struct runner *r, struct cell *ci, struct cell *cj) {
     /* Skip inactive particles. */
     if (!part_is_active(pj, e)) continue;
 
-    const double *const xj = part_get_const_x(pj);
+    const double *xj = part_get_const_x(pj);
     const float pjx = xj[0] - shift_j[0];
     const float pjy = xj[1] - shift_j[1];
     const float pjz = xj[2] - shift_j[2];
@@ -410,7 +410,7 @@ void pairs_all_gradient(struct runner *r, struct cell *ci, struct cell *cj) {
       const float hi = part_get_h(pi);
       hig2 = hi * hi * kernel_gamma2;
 
-      const double *const xi = part_get_const_x(pi);
+      const double *xi = part_get_const_x(pi);
       const float pix = xi[0] - shift_i[0];
       const float piy = xi[1] - shift_i[1];
       const float piz = xi[2] - shift_i[2];
@@ -442,7 +442,8 @@ void pairs_all_gradient(struct runner *r, struct cell *ci, struct cell *cj) {
 
 void pairs_all_force(struct runner *r, struct cell *ci, struct cell *cj) {
 
-  struct part *pi, *pj;
+  struct part *pi;
+  struct part *pj;
   const double dim[3] = {r->e->s->dim[0], r->e->s->dim[1], r->e->s->dim[2]};
   const struct engine *e = r->e;
   const struct cosmology *cosmo = e->cosmology;
@@ -464,7 +465,7 @@ void pairs_all_force(struct runner *r, struct cell *ci, struct cell *cj) {
     /* Skip inactive particles. */
     if (!part_is_active(pi, e)) continue;
 
-    const double *const xi = part_get_const_x(pi);
+    const double *xi = part_get_const_x(pi);
     const float pix = xi[0] - shift_i[0];
     const float piy = xi[1] - shift_i[1];
     const float piz = xi[2] - shift_i[2];
@@ -475,7 +476,7 @@ void pairs_all_force(struct runner *r, struct cell *ci, struct cell *cj) {
       const float hj = part_get_h(pj);
       const float hjg2 = hj * hj * kernel_gamma2;
 
-      const double *const xj = part_get_const_x(pj);
+      const double *xj = part_get_const_x(pj);
       const float pjx = xj[0] - shift_j[0];
       const float pjy = xj[1] - shift_j[1];
       const float pjz = xj[2] - shift_j[2];
@@ -505,7 +506,7 @@ void pairs_all_force(struct runner *r, struct cell *ci, struct cell *cj) {
     /* Skip inactive particles. */
     if (!part_is_active(pj, e)) continue;
 
-    const double *const xj = part_get_const_x(pj);
+    const double *xj = part_get_const_x(pj);
     const float pjx = xj[0] - shift_j[0];
     const float pjy = xj[1] - shift_j[1];
     const float pjz = xj[2] - shift_j[2];
@@ -516,7 +517,7 @@ void pairs_all_force(struct runner *r, struct cell *ci, struct cell *cj) {
       const float hi = part_get_h(pi);
       const float hig2 = hi * hi * kernel_gamma2;
 
-      const double *const xi = part_get_const_x(pi);
+      const double *xi = part_get_const_x(pi);
       const float pix = xi[0] - shift_i[0];
       const float piy = xi[1] - shift_i[1];
       const float piz = xi[2] - shift_i[2];
@@ -633,7 +634,7 @@ void self_all_density(struct runner *r, struct cell *ci) {
     hi = part_get_h(pi);
     hig2 = hi * hi * kernel_gamma2;
 
-    const double *const pix = part_get_const_x(pi);
+    const double *pix = part_get_const_x(pi);
 
     for (int j = i + 1; j < ci->hydro.count; ++j) {
 
@@ -643,7 +644,7 @@ void self_all_density(struct runner *r, struct cell *ci) {
 
       if (pi == pj) continue;
 
-      const double *const pjx = part_get_const_x(pj);
+      const double *pjx = part_get_const_x(pj);
 
       /* Pairwise distance */
       float dx[3] = {(float)(pix[0] - pjx[0]), (float)(pix[1] - pjx[1]),
@@ -695,7 +696,7 @@ void self_all_gradient(struct runner *r, struct cell *ci) {
     hi = part_get_h(pi);
     hig2 = hi * hi * kernel_gamma2;
 
-    const double *const pix = part_get_const_x(pi);
+    const double *pix = part_get_const_x(pi);
 
     for (int j = i + 1; j < ci->hydro.count; ++j) {
 
@@ -705,7 +706,7 @@ void self_all_gradient(struct runner *r, struct cell *ci) {
 
       if (pi == pj) continue;
 
-      const double *const pjx = part_get_const_x(pj);
+      const double *pjx = part_get_const_x(pj);
 
       /* Pairwise distance */
       float dx[3] = {(float)(pix[0] - pjx[0]), (float)(pix[1] - pjx[1]),
@@ -766,7 +767,7 @@ void self_all_force(struct runner *r, struct cell *ci) {
     hi = part_get_h(pi);
     hig2 = hi * hi * kernel_gamma2;
 
-    const double *const pix = part_get_const_x(pi);
+    const double *pix = part_get_const_x(pi);
 
     for (int j = i + 1; j < ci->hydro.count; ++j) {
 
@@ -776,7 +777,7 @@ void self_all_force(struct runner *r, struct cell *ci) {
 
       if (pi == pj) continue;
 
-      const double *const pjx = part_get_const_x(pj);
+      const double *pjx = part_get_const_x(pj);
 
       /* Pairwise distance */
       float dx[3] = {(float)(pix[0] - pjx[0]), (float)(pix[1] - pjx[1]),

@@ -122,7 +122,7 @@ void DOPAIR1_NAIVE(struct runner *r, const struct cell *restrict ci,
       const char depth_j = part_get_depth_h(pj);
       const float hj = part_get_h(pj);
       const float hjg2 = hj * hj * kernel_gamma2;
-      const double *const xj = part_get_const_x(pj);
+      const double *xj = part_get_const_x(pj);
 
       /* Compute the pairwise distance. */
       const float pjx[3] = {(float)(xj[0] - cj->loc[0]),
@@ -267,7 +267,7 @@ void DOPAIR2_NAIVE(struct runner *r, const struct cell *restrict ci,
     const char depth_i = part_get_depth_h(pi);
     const float hi = part_get_h(pi);
     const float hig2 = hi * hi * kernel_gamma2;
-    const double *const xi = part_get_const_x(pi);
+    const double *xi = part_get_const_x(pi);
     const float pix[3] = {(float)(xi[0] - (cj->loc[0] + shift[0])),
                           (float)(xi[1] - (cj->loc[1] + shift[1])),
                           (float)(xi[2] - (cj->loc[2] + shift[2]))};
@@ -287,7 +287,7 @@ void DOPAIR2_NAIVE(struct runner *r, const struct cell *restrict ci,
       const float hjg2 = hj * hj * kernel_gamma2;
 
       /* Compute the pairwise distance. */
-      const double *const xj = part_get_const_x(pj);
+      const double *xj = part_get_const_x(pj);
       const float pjx[3] = {(float)(xj[0] - cj->loc[0]),
                             (float)(xj[1] - cj->loc[1]),
                             (float)(xj[2] - cj->loc[2])};
@@ -417,7 +417,7 @@ void DOSELF1_NAIVE(struct runner *r, const struct cell *c,
     const char depth_i = part_get_depth_h(pi);
     const float hi = part_get_h(pi);
     const float hig2 = hi * hi * kernel_gamma2;
-    const double *const xi = part_get_const_x(pi);
+    const double *xi = part_get_const_x(pi);
     const float pix[3] = {(float)(xi[0] - c->loc[0]),
                           (float)(xi[1] - c->loc[1]),
                           (float)(xi[2] - c->loc[2])};
@@ -437,7 +437,7 @@ void DOSELF1_NAIVE(struct runner *r, const struct cell *c,
       const char depth_j = part_get_depth_h(pj);
 
       /* Compute the pairwise distance. */
-      const double *const xj = part_get_const_x(pj);
+      const double *xj = part_get_const_x(pj);
       const float pjx[3] = {(float)(xj[0] - c->loc[0]),
                             (float)(xj[1] - c->loc[1]),
                             (float)(xj[2] - c->loc[2])};
@@ -587,7 +587,7 @@ void DOSELF2_NAIVE(struct runner *r, const struct cell *c,
     const char depth_i = part_get_depth_h(pi);
     const float hi = part_get_h(pi);
     const float hig2 = hi * hi * kernel_gamma2;
-    const double *const xi = part_get_const_x(pi);
+    const double *xi = part_get_const_x(pi);
     const float pix[3] = {(float)(xi[0] - c->loc[0]),
                           (float)(xi[1] - c->loc[1]),
                           (float)(xi[2] - c->loc[2])};
@@ -607,7 +607,7 @@ void DOSELF2_NAIVE(struct runner *r, const struct cell *c,
       const float hjg2 = hj * hj * kernel_gamma2;
 
       /* Compute the pairwise distance. */
-      const double *const xj = part_get_const_x(pj);
+      const double *xj = part_get_const_x(pj);
       const float pjx[3] = {(float)(xj[0] - c->loc[0]),
                             (float)(xj[1] - c->loc[1]),
                             (float)(xj[2] - c->loc[2])};
@@ -742,7 +742,7 @@ void DOPAIR_SUBSET_NAIVE(struct runner *r, const struct cell *restrict ci,
 
     /* Get a hold of the ith part in ci. */
     struct part *restrict pi = &parts_i[ind[pid]];
-    const double *const xi = part_get_const_x(pi);
+    const double *xi = part_get_const_x(pi);
     double pix[3];
     for (int k = 0; k < 3; k++) {
       pix[k] = xi[k] - shift[k];
@@ -760,7 +760,7 @@ void DOPAIR_SUBSET_NAIVE(struct runner *r, const struct cell *restrict ci,
 
       /* Get a pointer to the jth particle. */
       struct part *restrict pj = &parts_j[pjd];
-      const double *const xj = part_get_const_x(pj);
+      const double *xj = part_get_const_x(pj);
 
       /* Skip inhibited particles. */
       if (part_is_inhibited(pj, e)) continue;
@@ -789,8 +789,7 @@ void DOPAIR_SUBSET_NAIVE(struct runner *r, const struct cell *restrict ci,
         IACT_NONSYM_MHD(r2, dx, hi, hj, pi, pj, mu_0, a, H);
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_DENSITY)
         runner_iact_nonsym_chemistry(r2, dx, hi, hj, pi, pj, a, H);
-        runner_iact_nonsym_pressure_floor(r2, dx, hi, hj, pi, pj, a,
-                                          H);
+        runner_iact_nonsym_pressure_floor(r2, dx, hi, hj, pi, pj, a, H);
         runner_iact_nonsym_star_formation(r2, dx, hi, hj, pi, pj, a, H);
         runner_iact_nonsym_sink(r2, dx, hi, hj, pi, pj, a, H);
 #endif
@@ -855,7 +854,7 @@ void DOPAIR_SUBSET(struct runner *r, const struct cell *restrict ci,
 
       /* Get a hold of the ith part in ci. */
       struct part *restrict pi = &parts_i[ind[pid]];
-      const double *const xi = part_get_const_x(pi);
+      const double *xi = part_get_const_x(pi);
       const double pix = xi[0] - (shift[0]);
       const double piy = xi[1] - (shift[1]);
       const double piz = xi[2] - (shift[2]);
@@ -874,7 +873,7 @@ void DOPAIR_SUBSET(struct runner *r, const struct cell *restrict ci,
         if (part_is_inhibited(pj, e)) continue;
 
         const float hj = part_get_h(pj);
-        const double *const xj = part_get_const_x(pj);
+        const double *xj = part_get_const_x(pj);
         const double pjx = xj[0];
         const double pjy = xj[1];
         const double pjz = xj[2];
@@ -922,7 +921,7 @@ void DOPAIR_SUBSET(struct runner *r, const struct cell *restrict ci,
 
       /* Get a hold of the ith part in ci. */
       struct part *restrict pi = &parts_i[ind[pid]];
-      const double *const xi = part_get_const_x(pi);
+      const double *xi = part_get_const_x(pi);
       const double pix = xi[0] - (shift[0]);
       const double piy = xi[1] - (shift[1]);
       const double piz = xi[2] - (shift[2]);
@@ -1094,7 +1093,7 @@ void DOSELF_SUBSET(struct runner *r, const struct cell *c,
 
     /* Get a hold of the ith part in ci. */
     struct part *pi = &parts[ind[pid]];
-    const double *const xi = part_get_const_x(pi);
+    const double *xi = part_get_const_x(pi);
     const float pix[3] = {(float)(xi[0] - c->loc[0]),
                           (float)(xi[1] - c->loc[1]),
                           (float)(xi[2] - c->loc[2])};
@@ -1120,7 +1119,7 @@ void DOSELF_SUBSET(struct runner *r, const struct cell *c,
       const float hj = part_get_h(pj);
 
       /* Compute the pairwise distance. */
-      const double *const xj = part_get_const_x(pj);
+      const double *xj = part_get_const_x(pj);
       const float pjx[3] = {(float)(xj[0] - c->loc[0]),
                             (float)(xj[1] - c->loc[1]),
                             (float)(xj[2] - c->loc[2])};
@@ -1284,7 +1283,7 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
 
       /* Get some additional information about pi */
       const float hig2 = hi * hi * kernel_gamma2;
-      const double *const xi = part_get_const_x(pi);
+      const double *xi = part_get_const_x(pi);
       const float pix = xi[0] - (cj->loc[0] + shift[0]);
       const float piy = xi[1] - (cj->loc[1] + shift[1]);
       const float piz = xi[2] - (cj->loc[2] + shift[2]);
@@ -1299,7 +1298,7 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
         if (part_is_inhibited(pj, e)) continue;
 
         const float hj = part_get_h(pj);
-        const double *const xj = part_get_const_x(pj);
+        const double *xj = part_get_const_x(pj);
         const float pjx = xj[0] - cj->loc[0];
         const float pjy = xj[1] - cj->loc[1];
         const float pjz = xj[2] - cj->loc[2];
@@ -1401,7 +1400,7 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
 
       /* Get some additional information about pj */
       const float hjg2 = hj * hj * kernel_gamma2;
-      const double *const xj = part_get_const_x(pj);
+      const double *xj = part_get_const_x(pj);
       const float pjx = xj[0] - cj->loc[0];
       const float pjy = xj[1] - cj->loc[1];
       const float pjz = xj[2] - cj->loc[2];
@@ -1416,7 +1415,7 @@ void DOPAIR1(struct runner *r, const struct cell *restrict ci,
         if (part_is_inhibited(pi, e)) continue;
 
         const float hi = part_get_h(pi);
-        const double *const xi = part_get_const_x(pi);
+        const double *xi = part_get_const_x(pi);
         const float pix = xi[0] - (cj->loc[0] + shift[0]);
         const float piy = xi[1] - (cj->loc[1] + shift[1]);
         const float piz = xi[2] - (cj->loc[2] + shift[2]);
@@ -1729,7 +1728,7 @@ void DOPAIR2(struct runner *r, const struct cell *restrict ci,
         const float hj = part_get_h(pj);
 
         /* Get the position of pj in the right frame */
-        const double *const xj = part_get_const_x(pj);
+        const double *xj = part_get_const_x(pj);
         const float pjx = xj[0] - shift_j[0];
         const float pjy = xj[1] - shift_j[1];
         const float pjz = xj[2] - shift_j[2];
@@ -1817,7 +1816,7 @@ void DOPAIR2(struct runner *r, const struct cell *restrict ci,
         const float hj = part_get_h(pj);
 
         /* Get the position of pj in the right frame */
-        const double *const xj = part_get_const_x(pj);
+        const double *xj = part_get_const_x(pj);
         const float pjx = xj[0] - shift_j[0];
         const float pjy = xj[1] - shift_j[1];
         const float pjz = xj[2] - shift_j[2];
@@ -1944,7 +1943,7 @@ void DOPAIR2(struct runner *r, const struct cell *restrict ci,
 
     /* Get some additional information about pj */
     const float hjg2 = hj * hj * kernel_gamma2;
-    const double *const xj = part_get_const_x(pj);
+    const double *xj = part_get_const_x(pj);
     const float pjx = xj[0] - shift_j[0];
     const float pjy = xj[1] - shift_j[1];
     const float pjz = xj[2] - shift_j[2];
@@ -1974,7 +1973,7 @@ void DOPAIR2(struct runner *r, const struct cell *restrict ci,
         const float hig2 = hi * hi * kernel_gamma2;
 
         /* Get the position of pi in the right frame */
-        const double *const xi = part_get_const_x(pi);
+        const double *xi = part_get_const_x(pi);
         const float pix = xi[0] - shift_i[0];
         const float piy = xi[1] - shift_i[1];
         const float piz = xi[2] - shift_i[2];
@@ -2063,7 +2062,7 @@ void DOPAIR2(struct runner *r, const struct cell *restrict ci,
         const float hig2 = hi * hi * kernel_gamma2;
 
         /* Get the position of pi in the right frame */
-        const double *const xi = part_get_const_x(pi);
+        const double *xi = part_get_const_x(pi);
         const float pix = xi[0] - shift_i[0];
         const float piy = xi[1] - shift_i[1];
         const float piz = xi[2] - shift_i[2];
@@ -2325,7 +2324,7 @@ void DOSELF1(struct runner *r, const struct cell *c, const int limit_min_h,
 #endif
 
         /* Compute the (square of) pairwise distance. */
-        const double *const pjx = part_get_const_x(pj);
+        const double *pjx = part_get_const_x(pj);
         const float dx[3] = {(float)(pjx[0] - pix[0]), (float)(pjx[1] - pix[1]),
                              (float)(pjx[2] - pix[2])};
         const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
@@ -2389,7 +2388,7 @@ void DOSELF1(struct runner *r, const struct cell *c, const int limit_min_h,
 #endif
 
         /* Compute the (square of) pairwise distance. */
-        const double *const pjx = part_get_const_x(pj);
+        const double *pjx = part_get_const_x(pj);
         float dx[3] = {(float)(pix[0] - pjx[0]), (float)(pix[1] - pjx[1]),
                        (float)(pix[2] - pjx[2])};
         const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
@@ -2603,7 +2602,7 @@ void DOSELF2(struct runner *r, const struct cell *c, const int limit_min_h,
     if (part_is_inhibited(pi, e)) continue;
 
     /* Get the particle position and (square of) search radius. */
-    const double *const pix = part_get_const_x(pi);
+    const double *pix = part_get_const_x(pi);
     const float hi = part_get_h(pi);
     const float hig2 = hi * hi * kernel_gamma2;
 
@@ -2633,7 +2632,7 @@ void DOSELF2(struct runner *r, const struct cell *c, const int limit_min_h,
 #endif
 
         /* Compute the (square of) pairwise distance. */
-        const double *const pjx = part_get_const_x(pj);
+        const double *pjx = part_get_const_x(pj);
         const float dx[3] = {(float)(pjx[0] - pix[0]), (float)(pjx[1] - pix[1]),
                              (float)(pjx[2] - pix[2])};
         const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];

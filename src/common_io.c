@@ -1021,12 +1021,12 @@ void io_duplicate_hydro_gparts_mapper(void* restrict data, int Ngas,
 
     /* Duplicate the crucial information */
     struct part* p = &parts[i];
-    const double* const x = part_get_const_x(p);
+    const double* x = part_get_const_x(p);
     gparts[i + Ndm].x[0] = x[0];
     gparts[i + Ndm].x[1] = x[1];
     gparts[i + Ndm].x[2] = x[2];
 
-    const float* const v = part_get_const_v(p);
+    const float* v = part_get_const_v(p);
     gparts[i + Ndm].v_full[0] = v[0];
     gparts[i + Ndm].v_full[1] = v[1];
     gparts[i + Ndm].v_full[2] = v[2];

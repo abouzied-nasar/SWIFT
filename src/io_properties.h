@@ -210,8 +210,8 @@ INLINE static void safe_strcpy(char *restrict dst, const char *restrict src,
 }
 
 /**
- * @brief Constructs an #io_props from its parameters
- * @TODO: documentation
+ * @brief Constructs an #io_props from its parameters. This version uses
+ * getters to access particle fields.
  *
  * @param name The name of the field in the ICs.
  * @param type The data type.
@@ -219,7 +219,8 @@ INLINE static void safe_strcpy(char *restrict dst, const char *restrict src,
  * @param importance Is this field compulsory or optional?
  * @param units The units used for this field.
  * @param part Pointer to the particle array where to write.
- * @param field Name of the field in the particle structure to write to.
+ * @param getter The getter function returning a pointer to the particle field
+ * to be read in.
  */
 #define io_make_getter_input_field(name, type, dim, importance, units, part, \
                                    getter)                                   \
@@ -343,8 +344,20 @@ INLINE static struct io_props io_make_input_field_(
 }
 
 /**
- * @brief Constructs an #io_props from its parameters
- * @TODO: documentation
+ * @brief Constructs an #io_props from its parameters. This version uses
+ * getter functions to access particle fields to be written out.
+ *
+ * @param name The name of the field in the ICs.
+ * @param type The data type.
+ * @param dim The dimensionality of the field.
+ * @param importance Is this field compulsory or optional?
+ * @param units The units used for this field.
+ * @param a_exponent The exponent of the cosmological scale factor attached to
+ * the quantity
+ * @param part Pointer to the particle array where to write.
+ * @param getter The getter function returning a pointer to the particle field
+ * to be read in.
+ * @param desc Description of the field.
  */
 #define io_make_getter_output_field(name, type, dim, units, a_exponent, part, \
                                     getter, desc)                             \
@@ -352,7 +365,6 @@ INLINE static struct io_props io_make_input_field_(
                         (char *)(getter(&part[0])), sizeof(part[0]), desc,    \
                         /*physical=*/0, /*convertible_to_physical=*/1);
 /**
- * @TODO: documentation
  * An alias of io_make_getter_output_field().
  */
 #define io_make_comoving_getter_output_field(name, type, dim, units,         \

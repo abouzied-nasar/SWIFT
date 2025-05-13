@@ -368,7 +368,7 @@ int checkCellhdxmax(const struct cell *c, int *depth) {
 
     struct part *const p = &parts[k];
     struct xpart *const xp = &xparts[k];
-    const double *const x = part_get_const_x(p);
+    const double *x = part_get_const_x(p);
 
     if (x[0] < loc_min[0] || x[0] >= loc_max[0] || x[1] < loc_min[1] ||
         x[1] >= loc_max[1] || x[2] < loc_min[2] || x[2] >= loc_max[2]) {

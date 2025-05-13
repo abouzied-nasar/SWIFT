@@ -302,7 +302,7 @@ void part_verify_links(struct part *parts, struct gpart *gparts,
       if (part_get_gpart(part) != &gparts[k]) error("Linking problem!");
 
       /* Check that the particles are at the same place */
-      const double *const x = part_get_const_x(part);
+      const double *x = part_get_const_x(part);
       if (gparts[k].x[0] != x[0] || gparts[k].x[1] != x[1] ||
           gparts[k].x[2] != x[2]) {
         error(

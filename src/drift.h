@@ -191,7 +191,7 @@ __attribute__((always_inline)) INLINE static void drift_part(
 
   /* Predict velocities (for hydro terms) */
   float *v = part_get_v(p);
-  const float *const a_hydro = part_get_const_a_hydro(p);
+  const float *a_hydro = part_get_const_a_hydro(p);
   v[0] += a_hydro[0] * dt_kick_hydro;
   v[1] += a_hydro[1] * dt_kick_hydro;
   v[2] += a_hydro[2] * dt_kick_hydro;

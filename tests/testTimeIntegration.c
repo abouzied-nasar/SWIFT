@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     eng.time += dt;
 
     /* Compute gravitational acceleration */
-    const double *const x = part_get_const_x(&c.hydro.parts[0]);
+    const double *x = part_get_const_x(&c.hydro.parts[0]);
     float r2 = x[0] * x[0] + x[1] * x[1];
     float r = sqrtf(r2);
     float *a_hydro = part_get_a_hydro(&c.hydro.parts[0]);

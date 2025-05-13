@@ -306,10 +306,13 @@ int main(int argc, char *argv[]) {
   engine_pin();
 #endif
 
-  size_t runs = 0, particles = 0;
+  size_t runs = 0;
+  size_t particles = 0;
   size_t sparticles = 0;
-  double h = 1.23485, size = 1.;
-  double perturbation = 0., h_pert = 0.;
+  double h = 1.23485;
+  double size = 1.;
+  double perturbation = 0.;
+  double h_pert = 0.;
   char outputFileNameExtension[100] = "";
   char outputFileName[200] = "";
 

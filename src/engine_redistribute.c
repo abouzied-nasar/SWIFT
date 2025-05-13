@@ -830,7 +830,7 @@ void engine_redistribute(struct engine *e) {
       error("Inhibited particle found after sorting!");
 
     /* New cell index */
-    const double *const x = part_get_const_x(p);
+    const double *x = part_get_const_x(p);
     const int new_cid = cell_getid(s->cdim, x[0] * s->iwidth[0],
                                    x[1] * s->iwidth[1], x[2] * s->iwidth[2]);
 

@@ -169,8 +169,8 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
 #endif
 
 #if defined(HOPKINS_PE_SPH)
-        part - set_entropy(part, 1.f);
-        part - set_entropy_one_over_gamma(part, 1.f);
+        part_set_entropy(part, 1.f);
+        part_set_entropy_one_over_gamma(part, 1.f);
 #endif
 
         part_set_time_bin(part, 1);
@@ -373,9 +373,13 @@ int main(int argc, char *argv[]) {
   engine_pin();
 #endif
 
-  size_t runs = 0, particles = 0;
-  double h = 1.23485, size = 1., rho = 1.;
-  double perturbation = 0., h_pert = 0.;
+  size_t runs = 0;
+  size_t particles = 0;
+  double h = 1.23485;
+  double size = 1.;
+  double rho = 1.;
+  double perturbation = 0.;
+  double h_pert = 0.;
   char outputFileNameExtension[100] = "";
   char outputFileName[200] = "";
   enum velocity_types vel = velocity_zero;

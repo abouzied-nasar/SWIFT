@@ -369,7 +369,7 @@ struct counts_mapper_data {
     if ((lcounts = (double *)calloc(nused, sizeof(double))) == NULL)           \
       error("Failed to allocate counts thread-specific buffer");               \
     for (int k = 0; k < num_elements; k++) {                                   \
-      const double *const x = TYPE##_get_const_x(&parts[k]);                   \
+      const double *x = TYPE##_get_const_x(&parts[k]);                   \
       const int cid = cell_getid(cdim, x[0] * iwidth[0], x[1] * iwidth[1],     \
                                  x[2] * iwidth[2]);                            \
       lcounts[cid - lcid] += size;                                             \

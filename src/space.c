@@ -625,7 +625,7 @@ void space_synchronize_part_positions_mapper(void *map_data, int nr_parts,
 #endif
 
     /* Synchronize positions, velocities and masses */
-    const double *const x = part_get_const_x(p);
+    const double *x = part_get_const_x(p);
     gp->x[0] = x[0];
     gp->x[1] = x[1];
     gp->x[2] = x[2];

@@ -1041,20 +1041,21 @@ void runner_do_extra_ghost(struct runner *r, struct cell *c, int timer) {
          * without any scale-factor powers. */
         double dt_alpha;
         double dt_therm;
+        const timebin_t time_bin = part_get_time_bin(p);
 
         if (with_cosmology) {
           const integertime_t ti_step =
               get_integer_timestep(part_get_time_bin(p));
           const integertime_t ti_begin =
-              get_integer_time_begin(ti_current - 1, part_get_time_bin(p));
+              get_integer_time_begin(ti_current - 1, time_bin);
 
           dt_alpha =
               cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
           dt_therm = cosmology_get_therm_kick_factor(cosmo, ti_begin,
                                                      ti_begin + ti_step);
         } else {
-          dt_alpha = get_timestep(part_get_time_bin(p), time_base);
-          dt_therm = get_timestep(part_get_time_bin(p), time_base);
+          dt_alpha = get_timestep(time_bin, time_base);
+          dt_therm = get_timestep(time_bin, time_base);
         }
 
         /* Compute variables required for the force loop */

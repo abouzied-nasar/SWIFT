@@ -660,7 +660,7 @@ void space_rebuild(struct space *s, int repartitioned, int verbose) {
       error("Inhibited particle sorted into a cell!");
 
     /* New cell index */
-    const double *const px = part_get_const_x(p);
+    const double *px = part_get_const_x(p);
     const int new_ind = cell_getid(s->cdim, px[0] * s->iwidth[0],
                                    px[1] * s->iwidth[1], px[2] * s->iwidth[2]);
 

@@ -216,8 +216,7 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
           part_get_id(p), new_dt, e->dt_min);
 
   /* Convert to integer time */
-  const struct timestep_limiter_data *const limiter_data =
-      part_get_const_limiter_data(p);
+  const struct timestep_limiter_data *limiter_data = part_get_const_limiter_data(p);
   integertime_t new_dti = make_integer_timestep(
       new_dt, part_get_time_bin(p), limiter_data->min_ngb_time_bin,
       e->ti_current, e->time_base_inv);
@@ -288,7 +287,7 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_rt_timestep(
         p->id, new_dt, e->dt_min / f);
 #endif
 
-  const struct rt_timestepping_data *const rt_time_data =
+  const struct rt_timestepping_data *rt_time_data =
       part_get_const_rt_time_data(p);
   const integertime_t new_dti = make_integer_timestep(
       new_dt, rt_time_data->time_bin, rt_time_data->min_ngb_time_bin,

@@ -365,8 +365,9 @@ int cell_link_foreign_parts(struct cell *c, struct part *parts) {
       }
     }
     return count;
+  } else {
+    return 0;
   }
-  return 0;
 
 #else
   error("Calling linking of foregin particles in non-MPI mode.");
@@ -667,7 +668,7 @@ void cell_check_part_drift_point(struct cell *c, void *data) {
     const struct part *p = &c->hydro.parts[i];
     const float h = part_get_h(p);
     const char depth_h = part_get_depth_h(p);
-    if (part_get_depth_h(p) == c->depth) {
+    if (depth_h == c->depth) {
       if (!(h >= c->h_min_allowed && h < c->h_max_allowed) && c->split) {
         error(
             "depth_h set incorrectly! c->depth=%d p->depth_h=%d h=%e h_min=%e "

@@ -164,11 +164,12 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
 
         double dt_cool;
         double dt_therm;
+        const timebin_t time_bin = part_get_time_bin(p);
         if (with_cosmology) {
           const integertime_t ti_step =
               get_integer_timestep(part_get_time_bin(p));
           const integertime_t ti_begin =
-              get_integer_time_begin(ti_current - 1, part_get_time_bin(p));
+              get_integer_time_begin(ti_current - 1, time_bin);
 
           dt_cool =
               cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
@@ -176,8 +177,8 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
                                                      ti_begin + ti_step);
 
         } else {
-          dt_cool = get_timestep(part_get_time_bin(p), time_base);
-          dt_therm = get_timestep(part_get_time_bin(p), time_base);
+          dt_cool = get_timestep(time_bin, time_base);
+          dt_therm = get_timestep(time_bin, time_base);
         }
 
         /* Let's cool ! */
@@ -403,17 +404,18 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
 
           /* Time-step size for this particle */
           double dt_star;
+          const timebin_t time_bin = part_get_time_bin(p);
           if (with_cosmology) {
             const integertime_t ti_step =
-                get_integer_timestep(part_get_time_bin(p));
+                get_integer_timestep(time_bin);
             const integertime_t ti_begin =
-                get_integer_time_begin(ti_current - 1, part_get_time_bin(p));
+                get_integer_time_begin(ti_current - 1, time_bin);
 
             dt_star =
                 cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
 
           } else {
-            dt_star = get_timestep(part_get_time_bin(p), time_base);
+            dt_star = get_timestep(time_bin, time_base);
           }
 
           /* Compute the SF rate of the particle */
@@ -642,16 +644,17 @@ void runner_do_sink_formation(struct runner *r, struct cell *c) {
 
           /* Time-step size for this particle */
           double dt_sink;
+          const timebin_t time_bin = part_get_time_bin(p);
           if (with_cosmology) {
             const integertime_t ti_step =
-                get_integer_timestep(part_get_time_bin(p));
+                get_integer_timestep(time_bin);
             const integertime_t ti_begin =
-                get_integer_time_begin(ti_current - 1, part_get_time_bin(p));
+                get_integer_time_begin(ti_current - 1, time_bin);
 
             dt_sink =
                 cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
           } else {
-            dt_sink = get_timestep(part_get_time_bin(p), time_base);
+            dt_sink = get_timestep(time_bin, time_base);
           }
 
           /* Are we forming a sink particle? */
@@ -725,16 +728,16 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
       double dt = 0;
       if (part_is_active(p, e)) {
 
+        const timebin_t time_bin = part_get_time_bin(p);
         if (with_cosmology) {
           /* Compute the time step. */
-          const integertime_t ti_step =
-              get_integer_timestep(part_get_time_bin(p));
+          const integertime_t ti_step = get_integer_timestep(time_bin);
           const integertime_t ti_begin =
-              get_integer_time_begin(e->ti_current - 1, part_get_time_bin(p));
+              get_integer_time_begin(e->ti_current - 1, time_bin);
 
           dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
         } else {
-          dt = get_timestep(part_get_time_bin(p), e->time_base);
+          dt = get_timestep(time_bin, e->time_base);
         }
 
         /* Finish the force loop */
@@ -1211,7 +1214,7 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
       if (!part_is_rt_active(p, e)) continue;
 
       /* Finish the force loop */
-      const struct rt_timestepping_data *const rt_time_data =
+      const struct rt_timestepping_data *rt_time_data =
           part_get_const_rt_time_data(p);
       const integertime_t ti_current_subcycle = e->ti_current_subcycle;
       const integertime_t ti_step =
@@ -1223,7 +1226,7 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
       const double dt =
           rt_part_dt(ti_begin, ti_end, e->time_base, with_cosmology, cosmo);
 #ifdef SWIFT_DEBUG_CHECKS
-      const struct timestep_limiter_data *const limiter_data =
+      const struct timestep_limiter_data *limiter_data =
           part_get_limiter_data(p);
       if (ti_begin != ti_current_subcycle)
         error(

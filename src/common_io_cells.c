@@ -107,7 +107,7 @@
                                                                               \
         ++count;                                                              \
                                                                               \
-        const double* const x = TYPE##_get_const_x(&parts[i]);                \
+        const double* x = TYPE##_get_const_x(&parts[i]);                      \
         min_pos[0] = min(x[0], min_pos[0]);                                   \
         min_pos[1] = min(x[1], min_pos[1]);                                   \
         min_pos[2] = min(x[2], min_pos[2]);                                   \
