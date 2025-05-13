@@ -48,9 +48,9 @@ INLINE static void hydro_read_particles(struct part* parts,
 
   /* List what we want to read */
   list[0] = io_make_getter_input_field("Coordinates", DOUBLE, 3, COMPULSORY,
-                                       UNIT_CONV_LENGTH, parts, part_get_x_p);
+                                       UNIT_CONV_LENGTH, parts, part_get_x);
   list[1] = io_make_getter_input_field("Velocities", FLOAT, 3, COMPULSORY,
-                                       UNIT_CONV_SPEED, parts, part_get_v_p);
+                                       UNIT_CONV_SPEED, parts, part_get_v);
   list[2] = io_make_getter_input_field("Masses", FLOAT, 1, COMPULSORY,
                                        UNIT_CONV_MASS, parts, part_get_mass_p);
   list[3] = io_make_getter_input_field("SmoothingLength", FLOAT, 1, COMPULSORY,
@@ -63,7 +63,7 @@ INLINE static void hydro_read_particles(struct part* parts,
                                  UNIT_CONV_NO_UNITS, parts, part_get_id_p);
   list[6] = io_make_getter_input_field("Accelerations", FLOAT, 3, OPTIONAL,
                                        UNIT_CONV_ACCELERATION, parts,
-                                       part_get_a_hydro_p);
+                                       part_get_a_hydro);
   list[7] = io_make_getter_input_field(
       "Density", FLOAT, 1, OPTIONAL, UNIT_CONV_DENSITY, parts, part_get_rho_p);
 }
@@ -85,7 +85,7 @@ INLINE static void convert_part_pos(const struct engine* e,
                                     const struct xpart* xp, double* ret) {
 
   const struct space* s = e->s;
-  const double* const x = part_get_const_x(p);
+  const double* x = part_get_const_x(p);
   if (s->periodic) {
     ret[0] = box_wrap(x[0], 0.0, s->dim[0]);
     ret[1] = box_wrap(x[1], 0.0, s->dim[1]);
@@ -133,7 +133,7 @@ INLINE static void convert_part_vel(const struct engine* e,
   }
 
   /* Extrapolate the velocites to the current time (hydro term)*/
-  const float* const a_hydro = part_get_const_a_hydro(p);
+  const float* a_hydro = part_get_const_a_hydro(p);
   ret[0] = xp->v_full[0] + a_hydro[0] * dt_kick_hydro;
   ret[1] = xp->v_full[1] + a_hydro[1] * dt_kick_hydro;
   ret[2] = xp->v_full[2] + a_hydro[2] * dt_kick_hydro;
