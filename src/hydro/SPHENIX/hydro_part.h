@@ -379,14 +379,6 @@ __attribute__((always_inline)) INLINE const static double *part_get_const_x(
 }
 
 /**
- * @brief get pointer to particle position.
- */
-__attribute__((always_inline)) INLINE static double (
-    *part_get_x_p(struct part *restrict p))[3] {
-  return &(p->_x);
-}
-
-/**
  * @brief get particle position
  */
 __attribute__((always_inline)) INLINE static double part_get_x_ind(
@@ -430,11 +422,6 @@ __attribute__((always_inline)) INLINE static float *part_get_v(
 __attribute__((always_inline)) INLINE const static float *part_get_const_v(
     const struct part *restrict p) {
   return p->_v;
-}
-
-__attribute__((always_inline)) INLINE static float (
-    *part_get_v_p(struct part *restrict p))[3] {
-  return &(p->_v);
 }
 
 /**
@@ -481,11 +468,6 @@ __attribute__((always_inline)) INLINE static float *part_get_a_hydro(
 __attribute__((always_inline)) INLINE const static float *
 part_get_const_a_hydro(const struct part *restrict p) {
   return p->_a_hydro;
-}
-
-__attribute__((always_inline)) INLINE static float (
-    *part_get_a_hydro_p(struct part *restrict p))[3] {
-  return &(p->_a_hydro);
 }
 
 /**
@@ -802,11 +784,6 @@ __attribute__((always_inline)) INLINE static float *part_get_rot_v(
 __attribute__((always_inline)) INLINE static float part_get_rot_v_ind(
     const struct part *restrict p, size_t ind) {
   return p->density._rot_v[ind];
-}
-
-__attribute__((always_inline)) INLINE static float (
-    *part_get_rot_v_p(struct part *restrict p))[3] {
-  return &(p->density._rot_v);
 }
 
 /**
