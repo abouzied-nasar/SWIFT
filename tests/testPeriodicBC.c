@@ -102,11 +102,11 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
             offset[0] +
                 size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
         part_set_x_ind(
-            part, 0,
+            part, 1,
             offset[1] +
-                size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+              size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
         part_set_x_ind(
-            part, 0,
+            part, 2,
             offset[2] +
                 size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
         switch (vel) {
@@ -147,8 +147,8 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
 #endif
 
 #if defined(HOPKINS_PE_SPH)
-        part - set_entropy(part, 1.f);
-        part - set_entropy_one_over_gamma(part, 1.f);
+        part_set_entropy(part, 1.f);
+        part_set_entropy_one_over_gamma(part, 1.f);
 #endif
 
         part_set_time_bin(part, 1);
