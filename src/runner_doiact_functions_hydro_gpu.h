@@ -44,6 +44,7 @@ struct leaf_cell_list{
   double *  shiftz;
   int n_leaves;
   int n_packed;
+  int lpdt; //lpdt is an acronym for "last packed daughter task" before we launched on GPU
   int n_end;
   int n_offload;
 };
