@@ -1048,6 +1048,7 @@ void *runner_main2(void *data) {
             pack_vars_pair_dens->leaf_list[top_tasks_packed].n_leaves = 0;
             pack_vars_pair_dens->leaf_list[top_tasks_packed].n_offload = 0;
             pack_vars_pair_dens->leaf_list[top_tasks_packed].n_packed = 0;
+            pack_vars_pair_dens->leaf_list[top_tasks_packed].lpdt = 0;
 
             struct cell * cells_left[128];
             struct cell * cells_right[128];
@@ -1126,23 +1127,29 @@ void *runner_main2(void *data) {
                       &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
                       pair_end, npacked, n_leaves_found);
 
-                if(npacked < n_leaves_found){
+                //We have magically launched after packing all the daughter tasks in this parent task.
+                //Reset everything and move onto next parent task
+                if(npacked == n_leaves_found){
+                	pack_vars_pair_dens->top_tasks_packed = 0;
+                	pack_vars_pair_dens->tasks_packed = 0;
+                }
+                //Special treatment required here
+                else{
                 	//If we launch but still have daughters left re-set this task to be the first in the list
                 	//so that we can continue packing correctly
-
               	  pack_vars_pair_dens->leaf_list[0] = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1];
               	  int noffload = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].n_offload;
-              	  for(int cc = 0; cc < npacked; cc++){
-                		pack_vars_pair_dens->leaf_list[0]->ci[cc] =
-                				pack_vars_pair_dens->leaf_list[0]->ci[cc + noffload];
-                		pack_vars_pair_dens->leaf_list[0]->cj[cc] =
-                				pack_vars_pair_dens->leaf_list[0]->cj[cc + noffload];
+
+              	  // Last packed daughter task -> index of the last task we packed before last launch (not this launch)
+              	  int lpdt = pack_vars_pair_dens->leaf_list[top_tasks_packed].lpdt;
+              	  for(int cc = lpdt; cc < npacked; cc++){
+                		pack_vars_pair_dens->leaf_list[0].ci[cc] =
+                				pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[cc];
+                		pack_vars_pair_dens->leaf_list[0].cj[cc] =
+                				pack_vars_pair_dens->leaf_list[top_tasks_packed].cj[cc];
               	  }
             	  pack_vars_pair_dens->top_tasks_packed = 1;
-            	  pack_vars_pair_dens->top_task_list[0] = t;
-                }
-                else{
-              	  pack_vars_pair_dens->top_tasks_packed = 0;
+                  pack_vars_pair_dens->leaf_list[top_tasks_packed].lpdt = npacked;
                 }
                 pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].n_offload = 0;
           	    pack_vars_pair_dens->tasks_packed = 0;
