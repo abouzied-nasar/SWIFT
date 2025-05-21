@@ -1088,18 +1088,19 @@ void *runner_main2(void *data) {
               //Set to zero here in case we have launched previously in this loop
               pack_vars_pair_dens->launch = 0;
               int launch = 0;
+              struct leaf_cell_list * ll_current = &pack_vars_pair_dens->leaf_list[top_tasks_packed - 1];
               //Record how many daughters we've packed as this is used in unpacking
-              pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].n_packed = npacked;
+              ll_current->n_packed++;// = npacked;
               //A. Nasar: NOTE
               // noffload is incremented in pack. However, for cases where we have launched
               // but there are still some daughters left unpacked, we need to restart the
               // count from zero for the packed arrays as the daughters we previously worked on are no longer necessary.
               // Thus, the counter for cii and cjj should remain npacked but counter for packing/unpacking arrays
               // should be noffload which is set to zero after launch. count_parts should also be zero after launch
-              struct cell * cii = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[npacked];
-              struct cell * cjj = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj[npacked];
+              struct cell * cii = ll_current->ci[npacked];
+              struct cell * cjj = ll_current->cj[npacked];
               message("Packing ttid %i t_packed %i npacked %i", top_tasks_packed - 1, pack_vars_pair_dens->tasks_packed, npacked);
-
+        	  message("Packing % i % i %i", cii->hydro.count, cjj->hydro.count, pack_vars_pair_dens->count_parts);
               packing_time_pair += runner_dopair1_pack_f4(
                   r, sched, pack_vars_pair_dens, cii, cjj, t,
                   parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens);
@@ -1132,24 +1133,29 @@ void *runner_main2(void *data) {
                 if(npacked == n_leaves_found){
                 	pack_vars_pair_dens->top_tasks_packed = 0;
                 	pack_vars_pair_dens->tasks_packed = 0;
+//                    error("Stop");
                 }
                 //Special treatment required here
                 else{
                 	//If we launch but still have daughters left re-set this task to be the first in the list
                 	//so that we can continue packing correctly
-              	  pack_vars_pair_dens->leaf_list[0] = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1];
-              	  int noffload = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].n_offload;
+                  struct leaf_cell_list * ll_zero = &pack_vars_pair_dens->leaf_list[0];
+//                  struct leaf_cell_list * ll_current = &pack_vars_pair_dens->leaf_list[top_tasks_packed - 1];
+                  *(ll_zero) = *(ll_current);
+//                  error("Stop");
+//                  ll_zero->n_leaves = ll_current->n_leaves;
+//                  error("Stop");
 
               	  // Last packed daughter task -> index of the last task we packed before last launch (not this launch)
-              	  int lpdt = pack_vars_pair_dens->leaf_list[top_tasks_packed].lpdt;
-              	  for(int cc = lpdt; cc < npacked; cc++){
-                		pack_vars_pair_dens->leaf_list[0].ci[cc] =
-                				pack_vars_pair_dens->leaf_list[top_tasks_packed].ci[cc];
-                		pack_vars_pair_dens->leaf_list[0].cj[cc] =
-                				pack_vars_pair_dens->leaf_list[top_tasks_packed].cj[cc];
-              	  }
+//              	  int lpdt = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].lpdt;
+              	  //un-necessary as the copy above handles this
+//              	  for(int cc = 0; cc < ll_zero->n_leaves; cc++){
+////              		if(ll_zero->ci[cc] == ll_current->ci[cc]) error("stop");
+//              		ll_zero->ci[cc] = ll_current->ci[cc];
+//              		ll_zero->cj[cc] = ll_current->cj[cc];
+//              	  }
             	  pack_vars_pair_dens->top_tasks_packed = 1;
-                  pack_vars_pair_dens->leaf_list[top_tasks_packed].lpdt = npacked;
+                  ll_zero->lpdt = npacked;
                 }
                 pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].n_offload = 0;
           	    pack_vars_pair_dens->tasks_packed = 0;
@@ -1161,6 +1167,7 @@ void *runner_main2(void *data) {
               }
               if(pack_vars_pair_dens->launch_leftovers){
                 int nleft = n_leaves_found - npacked;
+				  error("Launching Leftovers");
                 //Check to see if we have enough tasks left to launch a full pack
 				if(nleft > target_n_tasks && npacked < n_leaves_found){
 				  //Don't launch leftovers,
@@ -1168,7 +1175,6 @@ void *runner_main2(void *data) {
 				  continue;
 				}
 				else if(nleft <= target_n_tasks && npacked == n_leaves_found){
-				  error("Launching Leftovers");
 	              runner_dopair1_launch_f4_one_memcpy_no_unpack(
 	                      r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
 	                      parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,

@@ -1914,13 +1914,15 @@ void runner_dopair1_unpack_f4(
   /*Loop over top level tasks*/
   for (topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
 	const ticks tic = getticks();
+	struct leaf_cell_list * ll_current =  &pack_vars->leaf_list[topid];
 	/* Loop through each daughter task */
-	for(int tid = npacked - pack_vars->leaf_list[topid].n_offload; tid < npacked; tid++){
+	for(int tid = pack_vars->leaf_list[topid].lpdt; tid < pack_vars->leaf_list[topid].n_packed; tid++){
 	  /*Get pointers to the leaf cells*/
-	  struct cell * cii_l = pack_vars->leaf_list[topid].ci[tid];
-	  struct cell * cjj_l = pack_vars->leaf_list[topid].cj[tid];
+	  struct cell * cii_l = ll_current->ci[tid];
+	  struct cell * cjj_l = ll_current->cj[tid];
 	  message("unpacking % i % i %i", cii_l->hydro.count, cjj_l->hydro.count, pack_vars->count_parts);
-	  if(cii_l->loc[0] != pack_vars->leaf_list[topid].ci[tid]->loc[0])
+	  message("unpacking ttid %i tid %i npacked %i", topid, tid, npacked);
+	  if(cii_l->loc[0] != ll_current->ci[tid]->loc[0])
 		  error("stop");
 	  if(cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
 		  error("Unpacking empty cells");
