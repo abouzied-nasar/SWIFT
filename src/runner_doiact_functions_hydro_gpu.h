@@ -44,6 +44,8 @@ struct leaf_cell_list{
   double *  shiftz;
   int n_leaves;
   int n_packed;
+  int citop;
+  int cjtop;
   int lpdt; //lpdt is an acronym for "last packed daughter task" before we launched on GPU
   int n_end;
   int n_offload;
@@ -1916,12 +1918,13 @@ void runner_dopair1_unpack_f4(
 	const ticks tic = getticks();
 	struct leaf_cell_list * ll_current =  &pack_vars->leaf_list[topid];
 	/* Loop through each daughter task */
-	for(int tid = pack_vars->leaf_list[topid].lpdt; tid < pack_vars->leaf_list[topid].n_packed; tid++){
+	for(int tid = ll_current->lpdt; tid < ll_current->n_packed; tid++){
 	  /*Get pointers to the leaf cells*/
 	  struct cell * cii_l = ll_current->ci[tid];
 	  struct cell * cjj_l = ll_current->cj[tid];
 	  message("unpacking % i % i %i", cii_l->hydro.count, cjj_l->hydro.count, pack_vars->count_parts);
-	  message("unpacking ttid %i tid %i npacked %i", topid, tid, npacked);
+	  message("unpacking ttid %i tid %i npacked %i, ci %i, cj %i, citop %i, cjtop %i", topid, tid, npacked,
+	      cii_l->cellID, cjj_l->cellID, cii_l->top->cellID, cjj_l->top->cellID);
 	  if(cii_l->loc[0] != ll_current->ci[tid]->loc[0])
 		  error("stop");
 	  if(cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
