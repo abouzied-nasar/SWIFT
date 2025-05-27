@@ -1218,10 +1218,10 @@ static void scheduler_splittask_hydro(struct task *t, struct scheduler *s) {
       /* Is this cell even split and the task does not violate h ? */
       if (cell_can_split_self_hydro_task(ci)) {
         /* Make a sub? */
-        if (scheduler_dosub && (ci->hydro.count < space_subsize_self_hydro_default) &&
+        if (scheduler_dosub && (ci->hydro.count < space_subsize_self_hydro) &&
             (ci->stars.count < space_subsize_self_stars)) {
-          /* convert to a self-subtask. */
-          t->type = task_type_sub_self;
+
+          /* Nothing to do here */
 
           /* Otherwise, make tasks explicitly. */
         } else {
@@ -1268,9 +1268,7 @@ static void scheduler_splittask_hydro(struct task *t, struct scheduler *s) {
             }
           }
         }
-
-      } /* Cell is split */
-
+      }
     } /* Self interaction */
 
     /* Pair interaction? */
@@ -1313,7 +1311,7 @@ static void scheduler_splittask_hydro(struct task *t, struct scheduler *s) {
 
           /* Note: Use division to avoid integer overflow. */
           do_sub_hydro =
-              h_count_i * sid_scale[sid] < space_subsize_pair_hydro_default / h_count_j;
+              h_count_i * sid_scale[sid] < space_subsize_pair_hydro / h_count_j;
         }
         if (s_count_i > 0 && h_count_j > 0) {
 
@@ -1333,8 +1331,7 @@ static void scheduler_splittask_hydro(struct task *t, struct scheduler *s) {
             (do_sub_hydro && do_sub_stars_i && do_sub_stars_j) &&
             !sort_is_corner(sid)) {
 
-          /* Make this task a sub task. */
-          t->type = task_type_sub_pair;
+          /* Nothing to do here! */
 
           /* Otherwise, split it. */
         } else {
@@ -1364,6 +1361,8 @@ static void scheduler_splittask_hydro(struct task *t, struct scheduler *s) {
         /* Otherwise, break it up if it is too large? */
       } else if (scheduler_doforcesplit && ci->split && cj->split &&
                  (ci->hydro.count > space_maxsize / cj->hydro.count)) {
+        // message( "force splitting pair with %i and %i parts." ,
+        // ci->hydro.count , cj->hydro.count );
 
         /* Replace the current task. */
         t->type = task_type_none;
@@ -1384,8 +1383,11 @@ static void scheduler_splittask_hydro(struct task *t, struct scheduler *s) {
   } /* iterate over the current task. */
 }
 
+
 /**
  * @brief Split a hydrodynamic task if too large.
+ *
+ * @TODO Abouzied: THis seems identical to scheduler_splittask_hydro. Do we still need it?
  *
  * @param t The #task
  * @param s The #scheduler we are working in.
@@ -1989,21 +1991,21 @@ struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
 
   // #ifdef WITH_CUDA  A. Nasar
   if (t->subtype == task_subtype_gpu_pack_d) {
-    if (t->type == task_type_self || t->type == task_type_sub_self)
+    if (t->type == task_type_self)
       atomic_inc(&s->nr_self_pack_tasks_d);
-    if (t->type == task_type_pair || t->type == task_type_sub_pair)
+    if (t->type == task_type_pair)
       atomic_inc(&s->nr_pair_pack_tasks_d);
   }
   if (t->subtype == task_subtype_gpu_pack_f) {
-    if (t->type == task_type_self || t->type == task_type_sub_self)
+    if (t->type == task_type_self)
       atomic_inc(&s->nr_self_pack_tasks_f);
-    if (t->type == task_type_pair || t->type == task_type_sub_pair)
+    if (t->type == task_type_pair)
       atomic_inc(&s->nr_pair_pack_tasks_f);
   }
   if (t->subtype == task_subtype_gpu_pack_g) {
-    if (t->type == task_type_self || t->type == task_type_sub_self)
+    if (t->type == task_type_self)
       atomic_inc(&s->nr_self_pack_tasks_g);
-    if (t->type == task_type_pair || t->type == task_type_sub_pair)
+    if (t->type == task_type_pair)
       atomic_inc(&s->nr_pair_pack_tasks_g);
   }
   // #endif
@@ -3094,7 +3096,7 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
 
     /* Save qid as owner for next time a task accesses this cell. */
     if (owner != NULL) *owner = qid;
-//    if (t->type == task_type_self || t->type == task_type_sub_self) {
+//    if (t->type == task_type_self) {
 //      if (t->subtype == task_subtype_gpu_pack_d && t->ci->hydro.count > 0) {
 //    	  return;
 //      }
@@ -3107,7 +3109,7 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
 //    }
 //    /* A. Nasar NEED to think about how to do this with
 //     MPI where ci may not be on this node/rank */
-//    if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+//    if (t->type == task_type_pair) {
 //      if (t->subtype == task_subtype_gpu_pack_d  && t->ci->hydro.count > 0  && t->cj->hydro.count > 0) {
 //    	  return;
 //      }

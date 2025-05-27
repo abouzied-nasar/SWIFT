@@ -1,7 +1,7 @@
 /*******************************************************************************
  * This file is part of SWIFT.
  * Copyright (c) 2012 Pedro Gonnet (pedro.gonnet@durham.ac.uk)
- *                    Matthieu Schaller (matthieu.schaller@durham.ac.uk)
+ *                    Matthieu Schaller (schaller@strw.leidenuniv.nl)
  *               2015 Peter W. Draper (p.w.draper@durham.ac.uk)
  *
  * This program is free software: you can redistribute it and/or modify
@@ -51,7 +51,6 @@ extern "C" {
 /* Local headers. */
 #include "engine.h"
 #include "feedback.h"
-#include "runner_doiact_sinks.h"
 #include "scheduler.h"
 #include "space_getsid.h"
 #include "timers.h"
@@ -129,6 +128,18 @@ extern "C" {
 #define FUNCTION feedback
 #define FUNCTION_TASK_LOOP TASK_LOOP_FEEDBACK
 #include "runner_doiact_black_holes.h"
+#include "runner_doiact_undef.h"
+
+/* Import the sink density loop functions. */
+#define FUNCTION density
+#define FUNCTION_TASK_LOOP TASK_LOOP_DENSITY
+#include "runner_doiact_sinks.h"
+#include "runner_doiact_undef.h"
+
+/* Import the sink swallow loop functions. */
+#define FUNCTION swallow
+#define FUNCTION_TASK_LOOP TASK_LOOP_SWALLOW
+#include "runner_doiact_sinks.h"
 #include "runner_doiact_undef.h"
 
 /* Import the RT gradient loop functions */
@@ -696,6 +707,7 @@ void *runner_main2(void *data) {
     double tot_time_for_hard_memcpys = 0.0;
     /* Can we go home yet? */
     if (e->step_props & engine_step_prop_done) break;
+
     /* Re-set the pointer to the previous task, as there is none. */
     struct task *t = NULL;
     struct task *prev = NULL;
@@ -763,7 +775,7 @@ void *runner_main2(void *data) {
       t->rid = r->cpuid;
 
       /* And recover the pair direction */
-      if (t->type == task_type_pair || t->type == task_type_sub_pair) {
+      if (t->type == task_type_pair) {
         struct cell *ci_temp = ci;
         struct cell *cj_temp = cj;
         double shift[3];
@@ -786,8 +798,13 @@ void *runner_main2(void *data) {
       const ticks task_beg = getticks();
       /* Different types of tasks... */
       switch (t->type) {
+
         case task_type_self:
-          if (t->subtype == task_subtype_gpu_unpack_d) {
+          if (t->subtype == task_subtype_grav)
+            runner_doself_recursive_grav(r, ci, 1);
+          else if (t->subtype == task_subtype_external_grav)
+            runner_do_grav_external(r, ci, 1);
+          else if (t->subtype == task_subtype_gpu_unpack_d) {
             unpacked++;
           } else if (t->subtype == task_subtype_gpu_unpack_g) {
             unpacked_g++;
@@ -798,7 +815,8 @@ void *runner_main2(void *data) {
 #ifndef GPUOFFLOAD_DENSITY
             struct timespec t0, t1, dt;
             clock_gettime(CLOCK_REALTIME, &t0);
-            runner_doself1_branch_density(r, ci);
+            // runner_doself1_branch_density(r, ci);
+            runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
             clock_gettime(CLOCK_REALTIME, &t1);
             tasks_done_cpu++;
             time_for_density_cpu += (t1.tv_sec - t0.tv_sec) +
@@ -889,7 +907,12 @@ void *runner_main2(void *data) {
 #ifndef GPUOFFLOAD_GRADIENT
             struct timespec t0, t1, dt;
             clock_gettime(CLOCK_REALTIME, &t0);
-            runner_doself1_branch_gradient(r, ci);
+            // runner_doself1_branch_gradient(r, ci);
+#ifdef EXTRA_HYDRO_LOOP_TYPE2
+            runner_dosub_self2_gradient(r, ci, /*below_h_max=*/0, 1);
+#else
+            runner_dosub_self1_gradient(r, ci, /*below_h_max=*/0, 1);
+#endif 
             clock_gettime(CLOCK_REALTIME, &t1);
             tasks_done_cpu++;
             time_for_cpu_g += (t1.tv_sec - t0.tv_sec) +
@@ -902,60 +925,73 @@ void *runner_main2(void *data) {
 #ifndef GPUOFFLOAD_FORCE
             struct timespec t0, t1;
             clock_gettime(CLOCK_REALTIME, &t0);
-            runner_doself2_branch_force(r, ci);
+            // runner_doself2_branch_force(r, ci);
+            runner_dosub_self2_force(r, ci, /*below_h_max=*/0, 1);
             clock_gettime(CLOCK_REALTIME, &t1);
             tasks_done_cpu++;
             time_for_cpu_f += (t1.tv_sec - t0.tv_sec) +
                               (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 #endif
           } else if (t->subtype == task_subtype_limiter)
-            runner_doself1_branch_limiter(r, ci);
-          else if (t->subtype == task_subtype_grav)
-            runner_doself_recursive_grav(r, ci, 1);
-          else if (t->subtype == task_subtype_external_grav)
-            runner_do_grav_external(r, ci, 1);
+            // runner_doself1_branch_limiter(r, ci);
+            runner_dosub_self1_limiter(r, ci, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_stars_density)
-            runner_doself_branch_stars_density(r, ci);
+            // runner_doself_branch_stars_density(r, ci);
+            runner_dosub_self_stars_density(r, ci, /*below_h_max=*/0, 1);
 #ifdef EXTRA_STAR_LOOPS
           else if (t->subtype == task_subtype_stars_prep1)
-            runner_doself_branch_stars_prep1(r, ci);
+            // runner_doself_branch_stars_prep1(r, ci);
+            runner_dosub_self_stars_prep1(r, ci, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_stars_prep2)
-            runner_doself_branch_stars_prep2(r, ci);
+            // runner_doself_branch_stars_prep2(r, ci);
+            runner_dosub_self_stars_prep2(r, ci, /*below_h_max=*/0, 1);
 #endif
           else if (t->subtype == task_subtype_stars_feedback)
-            runner_doself_branch_stars_feedback(r, ci);
+            // runner_doself_branch_stars_feedback(r, ci);
+            runner_dosub_self_stars_feedback(r, ci, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_bh_density)
-            runner_doself_branch_bh_density(r, ci);
+            // runner_doself_branch_bh_density(r, ci);
+            runner_dosub_self_bh_density(r, ci, 1);
           else if (t->subtype == task_subtype_bh_swallow)
-            runner_doself_branch_bh_swallow(r, ci);
+            // runner_doself_branch_bh_swallow(r, ci);
+            runner_dosub_self_bh_swallow(r, ci, 1);
           else if (t->subtype == task_subtype_do_gas_swallow)
             runner_do_gas_swallow_self(r, ci, 1);
           else if (t->subtype == task_subtype_do_bh_swallow)
             runner_do_bh_swallow_self(r, ci, 1);
           else if (t->subtype == task_subtype_bh_feedback)
-            runner_doself_branch_bh_feedback(r, ci);
+            // runner_doself_branch_bh_feedback(r, ci);
+            runner_dosub_self_bh_feedback(r, ci, 1);
           else if (t->subtype == task_subtype_rt_gradient)
-            runner_doself1_branch_rt_gradient(r, ci);
+            // runner_doself1_branch_rt_gradient(r, ci);
+            runner_dosub_self1_rt_gradient(r, ci, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_rt_transport)
-            runner_doself2_branch_rt_transport(r, ci);
+            // runner_doself2_branch_rt_transport(r, ci);
+            runner_dosub_self2_rt_transport(r, ci, /*below_h_max=*/0, 1);
+          else if (t->subtype == task_subtype_sink_density)
+            runner_dosub_self_sinks_density(r, ci, 1);
           else if (t->subtype == task_subtype_sink_swallow)
-            runner_doself_branch_sinks_swallow(r, ci);
+            // runner_doself_branch_sinks_swallow(r, ci);
+            runner_dosub_self_sinks_swallow(r, ci, 1);
           else if (t->subtype == task_subtype_sink_do_gas_swallow)
             runner_do_sinks_gas_swallow_self(r, ci, 1);
           else if (t->subtype == task_subtype_sink_do_sink_swallow)
             runner_do_sinks_sink_swallow_self(r, ci, 1);
           else
-            error("Unknown/invalid task subtype (%s).",
-                  subtaskID_names[t->subtype]);
+            error("Unknown/invalid task subtype (%s/%s).",
+                  taskID_names[t->type], subtaskID_names[t->subtype]);
           break;
 
         case task_type_pair:
-          if (t->subtype == task_subtype_density) {
+          if (t->subtype == task_subtype_grav)
+            runner_dopair_recursive_grav(r, ci, cj, 1);
+          else if (t->subtype == task_subtype_density) {
             cpu_pair++;
 #ifndef GPUOFFLOAD_DENSITY
             struct timespec t0, t1, dt;
             clock_gettime(CLOCK_REALTIME, &t0);
-            runner_dopair1_branch_density(r, ci, cj);
+            // runner_dopair1_branch_density(r, ci, cj);
+            runner_dosub_pair1_density(r, ci, cj, /*below_h_max=*/0, 1);
             clock_gettime(CLOCK_REALTIME, &t1);
             tasks_done_cpu++;
             time_for_density_cpu_pair +=
@@ -1308,13 +1344,19 @@ void *runner_main2(void *data) {
           } else if (t->subtype == task_subtype_gpu_unpack_f) {
             unpacked_pair_f++;
           }
+
 #ifdef EXTRA_HYDRO_LOOP
           else if (t->subtype == task_subtype_gradient) {
             int Do_nothing = 0;
 #ifndef GPUOFFLOAD_GRADIENT
             struct timespec t0, t1, dt;
             clock_gettime(CLOCK_REALTIME, &t0);
-            runner_dopair1_branch_gradient(r, ci, cj);
+            // runner_dopair1_branch_gradient(r, ci, cj);
+#ifdef EXTRA_HYDRO_LOOP_TYPE2
+            runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 1);
+#else
+            runner_dosub_pair1_gradient(r, ci, cj, /*below_h_max=*/0, 1);
+#endif
             clock_gettime(CLOCK_REALTIME, &t1);
             tasks_done_cpu++;
             time_for_cpu_pair_g += (t1.tv_sec - t0.tv_sec) +
@@ -1327,147 +1369,53 @@ void *runner_main2(void *data) {
 #ifndef GPUOFFLOAD_FORCE
             struct timespec t0, t1, dt;
             clock_gettime(CLOCK_REALTIME, &t0);
-            runner_dopair2_branch_force(r, ci, cj);
+            // runner_dopair2_branch_force(r, ci, cj);
+            runner_dosub_pair2_force(r, ci, cj, /*below_h_max=*/0, 1);
             clock_gettime(CLOCK_REALTIME, &t1);
             tasks_done_cpu++;
             time_for_cpu_pair_f += (t1.tv_sec - t0.tv_sec) +
                                    (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 #endif  // GPUOFFLOAD_FORCE
           } else if (t->subtype == task_subtype_limiter)
-            runner_dopair1_branch_limiter(r, ci, cj);
-          else if (t->subtype == task_subtype_grav)
-            runner_dopair_recursive_grav(r, ci, cj, 1);
+            // runner_dopair1_branch_limiter(r, ci, cj);
+            runner_dosub_pair1_limiter(r, ci, cj, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_stars_density)
-            runner_dopair_branch_stars_density(r, ci, cj);
+            // runner_dopair_branch_stars_density(r, ci, cj);
+            runner_dosub_pair_stars_density(r, ci, cj, /*below_h_max=*/0, 1);
 #ifdef EXTRA_STAR_LOOPS
           else if (t->subtype == task_subtype_stars_prep1)
-            runner_dopair_branch_stars_prep1(r, ci, cj);
+            // runner_dopair_branch_stars_prep1(r, ci, cj);
+            runner_dosub_pair_stars_prep1(r, ci, cj, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_stars_prep2)
-            runner_dopair_branch_stars_prep2(r, ci, cj);
+            // runner_dopair_branch_stars_prep2(r, ci, cj);
+            runner_dosub_pair_stars_prep2(r, ci, cj, /*below_h_max=*/0, 1);
 #endif
           else if (t->subtype == task_subtype_stars_feedback)
-            runner_dopair_branch_stars_feedback(r, ci, cj);
+            // runner_dopair_branch_stars_feedback(r, ci, cj);
+            runner_dosub_pair_stars_feedback(r, ci, cj, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_bh_density)
-            runner_dopair_branch_bh_density(r, ci, cj);
-          else if (t->subtype == task_subtype_bh_swallow)
-            runner_dopair_branch_bh_swallow(r, ci, cj);
-          else if (t->subtype == task_subtype_do_gas_swallow)
-            runner_do_gas_swallow_pair(r, ci, cj, 1);
-          else if (t->subtype == task_subtype_do_bh_swallow)
-            runner_do_bh_swallow_pair(r, ci, cj, 1);
-          else if (t->subtype == task_subtype_bh_feedback)
-            runner_dopair_branch_bh_feedback(r, ci, cj);
-          else if (t->subtype == task_subtype_rt_gradient)
-            runner_dopair1_branch_rt_gradient(r, ci, cj);
-          else if (t->subtype == task_subtype_rt_transport)
-            runner_dopair2_branch_rt_transport(r, ci, cj);
-          else if (t->subtype == task_subtype_sink_swallow)
-            runner_dopair_branch_sinks_swallow(r, ci, cj);
-          else if (t->subtype == task_subtype_sink_do_gas_swallow)
-            runner_do_sinks_gas_swallow_pair(r, ci, cj, 1);
-          else if (t->subtype == task_subtype_sink_do_sink_swallow)
-            runner_do_sinks_sink_swallow_pair(r, ci, cj, 1);
-          else
-            error("Unknown/invalid task subtype (%s/%s).",
-                  taskID_names[t->type], subtaskID_names[t->subtype]);
-          break;
-
-        case task_type_sub_self:
-          if (t->subtype == task_subtype_density) {
-            struct timespec t0, t1, dt;
-            const int count = ci->hydro.count;
-            density_sub++;
-            clock_gettime(CLOCK_REALTIME, &t0);
-            runner_dosub_self1_density(r, ci, 1);
-            clock_gettime(CLOCK_REALTIME, &t1);
-            tasks_done_cpu++;
-            time_for_density_cpu_sub +=
-                (t1.tv_sec - t0.tv_sec) +
-                (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-          }
-#ifdef EXTRA_HYDRO_LOOP
-          else if (t->subtype == task_subtype_gradient) {
-            runner_dosub_self1_gradient(r, ci, 1);
-          }
-#endif
-          else if (t->subtype == task_subtype_force) {
-            runner_dosub_self2_force(r, ci, 1);
-          } else if (t->subtype == task_subtype_limiter)
-            runner_dosub_self1_limiter(r, ci, 1);
-          else if (t->subtype == task_subtype_stars_density)
-            runner_dosub_self_stars_density(r, ci, 1);
-#ifdef EXTRA_STAR_LOOPS
-          else if (t->subtype == task_subtype_stars_prep1)
-            runner_dosub_self_stars_prep1(r, ci, 1);
-          else if (t->subtype == task_subtype_stars_prep2)
-            runner_dosub_self_stars_prep2(r, ci, 1);
-#endif
-          else if (t->subtype == task_subtype_stars_feedback)
-            runner_dosub_self_stars_feedback(r, ci, 1);
-          else if (t->subtype == task_subtype_bh_density)
-            runner_dosub_self_bh_density(r, ci, 1);
-          else if (t->subtype == task_subtype_bh_swallow)
-            runner_dosub_self_bh_swallow(r, ci, 1);
-          else if (t->subtype == task_subtype_do_gas_swallow)
-            runner_do_gas_swallow_self(r, ci, 1);
-          else if (t->subtype == task_subtype_do_bh_swallow)
-            runner_do_bh_swallow_self(r, ci, 1);
-          else if (t->subtype == task_subtype_bh_feedback)
-            runner_dosub_self_bh_feedback(r, ci, 1);
-          else if (t->subtype == task_subtype_rt_gradient)
-            runner_dosub_self1_rt_gradient(r, ci, 1);
-          else if (t->subtype == task_subtype_rt_transport)
-            runner_dosub_self2_rt_transport(r, ci, 1);
-          else if (t->subtype == task_subtype_sink_swallow)
-            runner_dosub_self_sinks_swallow(r, ci, 1);
-          else if (t->subtype == task_subtype_sink_do_gas_swallow)
-            runner_do_sinks_gas_swallow_self(r, ci, 1);
-          else if (t->subtype == task_subtype_sink_do_sink_swallow)
-            runner_do_sinks_sink_swallow_self(r, ci, 1);
-          else
-            error("Unknown/invalid task subtype (%s/%s).",
-                  taskID_names[t->type], subtaskID_names[t->subtype]);
-          break;
-
-        case task_type_sub_pair:
-          if (t->subtype == task_subtype_density) {
-            int nothing = 0;
-            runner_dosub_pair1_density(r, ci, cj, 1);
-          }
-#ifdef EXTRA_HYDRO_LOOP
-          else if (t->subtype == task_subtype_gradient) {
-            runner_dosub_pair1_gradient(r, ci, cj, 1);
-          }
-#endif
-          else if (t->subtype == task_subtype_force) {
-            runner_dosub_pair2_force(r, ci, cj, 1);
-          } else if (t->subtype == task_subtype_limiter)
-            runner_dosub_pair1_limiter(r, ci, cj, 1);
-          else if (t->subtype == task_subtype_stars_density)
-            runner_dosub_pair_stars_density(r, ci, cj, 1);
-#ifdef EXTRA_STAR_LOOPS
-          else if (t->subtype == task_subtype_stars_prep1)
-            runner_dosub_pair_stars_prep1(r, ci, cj, 1);
-          else if (t->subtype == task_subtype_stars_prep2)
-            runner_dosub_pair_stars_prep2(r, ci, cj, 1);
-#endif
-          else if (t->subtype == task_subtype_stars_feedback)
-            runner_dosub_pair_stars_feedback(r, ci, cj, 1);
-          else if (t->subtype == task_subtype_bh_density)
+            // runner_dopair_branch_bh_density(r, ci, cj);
             runner_dosub_pair_bh_density(r, ci, cj, 1);
           else if (t->subtype == task_subtype_bh_swallow)
+            // runner_dopair_branch_bh_swallow(r, ci, cj);
             runner_dosub_pair_bh_swallow(r, ci, cj, 1);
           else if (t->subtype == task_subtype_do_gas_swallow)
             runner_do_gas_swallow_pair(r, ci, cj, 1);
           else if (t->subtype == task_subtype_do_bh_swallow)
             runner_do_bh_swallow_pair(r, ci, cj, 1);
           else if (t->subtype == task_subtype_bh_feedback)
+            // runner_dopair_branch_bh_feedback(r, ci, cj);
             runner_dosub_pair_bh_feedback(r, ci, cj, 1);
           else if (t->subtype == task_subtype_rt_gradient)
-            runner_dosub_pair1_rt_gradient(r, ci, cj, 1);
+            // runner_dopair1_branch_rt_gradient(r, ci, cj);
+            runner_dosub_pair1_rt_gradient(r, ci, cj, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_rt_transport)
-            runner_dosub_pair2_rt_transport(r, ci, cj, 1);
+            // runner_dopair2_branch_rt_transport(r, ci, cj);
+            runner_dosub_pair2_rt_transport(r, ci, cj, /*below_h_max=*/0, 1);
+          else if (t->subtype == task_subtype_sink_density)
+            runner_dosub_pair_sinks_density(r, ci, cj, 1);
           else if (t->subtype == task_subtype_sink_swallow)
+            // runner_dopair_branch_sinks_swallow(r, ci, cj);
             runner_dosub_pair_sinks_swallow(r, ci, cj, 1);
           else if (t->subtype == task_subtype_sink_do_gas_swallow)
             runner_do_sinks_gas_swallow_pair(r, ci, cj, 1);
@@ -1528,6 +1476,9 @@ void *runner_main2(void *data) {
         case task_type_bh_swallow_ghost3:
           runner_do_black_holes_swallow_ghost(r, ci, 1);
           break;
+        case task_type_sink_density_ghost:
+          runner_do_sinks_density_ghost(r, ci, 1);
+          break;
         case task_type_drift_part:
           runner_do_drift_part(r, ci, 1);
           break;
@@ -1579,6 +1530,8 @@ void *runner_main2(void *data) {
             free(t->buff);
           } else if (t->subtype == task_subtype_sf_counts) {
             free(t->buff);
+          } else if (t->subtype == task_subtype_grav_counts) {
+            free(t->buff);
           } else if (t->subtype == task_subtype_part_swallow) {
             free(t->buff);
           } else if (t->subtype == task_subtype_bpart_merger) {
@@ -1592,8 +1545,11 @@ void *runner_main2(void *data) {
             cell_unpack_end_step(ci, (struct pcell_step *)t->buff);
             free(t->buff);
           } else if (t->subtype == task_subtype_sf_counts) {
-            cell_unpack_sf_counts(ci, (struct pcell_sf *)t->buff);
+            cell_unpack_sf_counts(ci, (struct pcell_sf_stars *)t->buff);
             cell_clear_stars_sort_flags(ci, /*clear_unused_flags=*/0);
+            free(t->buff);
+          } else if (t->subtype == task_subtype_grav_counts) {
+            cell_unpack_grav_counts(ci, (struct pcell_sf_grav *)t->buff);
             free(t->buff);
           } else if (t->subtype == task_subtype_xv) {
             runner_do_recv_part(r, ci, 1, 1);
@@ -1706,6 +1662,7 @@ void *runner_main2(void *data) {
         cj->tasks_executed[t->type]++;
         cj->subtasks_executed[t->subtype]++;
       }
+
       /* This runner is not doing a task anymore */
       r->t = NULL;
 #endif
@@ -2015,5 +1972,10 @@ void *runner_main2(void *data) {
   return NULL;
 }
 
-#endif  // WITH_CUDA
+ticks runner_get_active_time(const struct runner *restrict r) {
+  return r->active_time;
+}
 
+void runner_reset_active_time(struct runner *restrict r) { r->active_time = 0; }
+
+#endif  // WITH_CUDA
