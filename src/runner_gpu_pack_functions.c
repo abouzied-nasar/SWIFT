@@ -135,14 +135,16 @@ void pack_neat_aos_f4(struct cell *__restrict__ c,
     const int id_in_pack = i + local_pack_position;
     //    const struct part p = ptmps[i];
     /*Data to be copied to GPU*/
-    parts_aos_buffer[id_in_pack].x_p_h.x = ptmps[i].x[0] - cellx;
-    parts_aos_buffer[id_in_pack].x_p_h.y = ptmps[i].x[1] - celly;
-    parts_aos_buffer[id_in_pack].x_p_h.z = ptmps[i].x[2] - cellz;
-    parts_aos_buffer[id_in_pack].x_p_h.w = ptmps[i].h;
-    parts_aos_buffer[id_in_pack].ux_m.x = ptmps[i].v[0];
-    parts_aos_buffer[id_in_pack].ux_m.y = ptmps[i].v[1];
-    parts_aos_buffer[id_in_pack].ux_m.z = ptmps[i].v[2];
-    parts_aos_buffer[id_in_pack].ux_m.w = ptmps[i].mass;
+    const double *x = part_get_const_x(&ptmps[i]);
+    parts_aos_buffer[id_in_pack].x_p_h.x = x[0] - cellx;
+    parts_aos_buffer[id_in_pack].x_p_h.y = x[1] - celly;
+    parts_aos_buffer[id_in_pack].x_p_h.z = x[2] - cellz;
+    parts_aos_buffer[id_in_pack].x_p_h.w = part_get_h(&ptmps[i]);
+    const float *v = part_get_const_v(&ptmps[i]);
+    parts_aos_buffer[id_in_pack].ux_m.x = v[0] ;
+    parts_aos_buffer[id_in_pack].ux_m.y = v[1];
+    parts_aos_buffer[id_in_pack].ux_m.z = v[2];
+    parts_aos_buffer[id_in_pack].ux_m.w = part_get_mass(&ptmps[i]);
     //    /*Initialise sums to zero before CPU/GPU copy*/
     //    const float4 zeroes = {0.0, 0.0, 0.0, 0.0};
     //    parts_aos_buffer[id_in_pack].rho_dh_wcount = zeroes;
@@ -315,8 +317,8 @@ void runner_doself1_gpu_unpack_neat_aos_f4(
 #endif
 
   /* Copy particle data from CPU buffers to cells */
-  //  unpack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count,
-  //  e);
+    unpack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count,
+    e);
   // Increment pack length accordingly
   (*pack_length) += count;
 }
@@ -396,14 +398,19 @@ void unpack_neat_aos_f4(struct cell *c,
     float4 rot_ux_div_v = p_tmp.rot_ux_div_v;
     struct part *p = &c->hydro.parts[i];
     if (!PART_IS_ACTIVE(p, e)) continue;
-    p->rho += rho_dh_wcount.x;
-    p->density.rho_dh += rho_dh_wcount.y;
-    p->density.wcount += rho_dh_wcount.z;
-    p->density.wcount_dh += rho_dh_wcount.w;
-    p->density.rot_v[0] += rot_ux_div_v.x;
-    p->density.rot_v[1] += rot_ux_div_v.y;
-    p->density.rot_v[2] += rot_ux_div_v.z;
-    p->viscosity.div_v += rot_ux_div_v.w;
+    part_set_rho(p, part_get_rho(p) + rho_dh_wcount.x);
+    part_set_rho_dh(p, part_get_rho_dh(p) + rho_dh_wcount.y);
+    part_set_wcount(p, part_get_wcount(p) + rho_dh_wcount.z);
+    part_set_wcount_dh(p, part_get_wcount_dh(p) + rho_dh_wcount.w);
+//    p->rho += rho_dh_wcount.x;
+//    p->density.rho_dh += rho_dh_wcount.y;
+//    p->density.wcount += rho_dh_wcount.z;
+//    p->density.wcount_dh += rho_dh_wcount.w;
+    float *rot_v = part_get_rot_v(p);
+    rot_v[0] += rot_ux_div_v.x;
+    rot_v[1] += rot_ux_div_v.y;
+    rot_v[2] += rot_ux_div_v.z;
+    part_set_div_v(p, part_get_div_v(p) + rot_ux_div_v.w);
   }
 }
 
