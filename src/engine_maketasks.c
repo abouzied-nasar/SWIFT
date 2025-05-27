@@ -2926,8 +2926,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       }
 #endif
 
-    } else if (t_type == task_type_pair &&
-               t_subtype == task_subtype_density) {
+    } else if (t_type == task_type_pair && t_subtype == task_subtype_density) {
 
       const int bcount_i = ci->black_holes.count;
       const int bcount_j = cj->black_holes.count;
@@ -3474,7 +3473,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
         }
       }
     }
-
 
     /*Make packing depend on sorts and drift A. Nasar */
     else if (t_type == task_type_pair && t_subtype == task_subtype_gpu_pack_d) {

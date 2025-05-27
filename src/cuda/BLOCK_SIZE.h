@@ -3,7 +3,7 @@
 
 #define BLOCK_SIZE 64
 #define N_TASKS_PER_PACK_SELF 8
-#define N_TASKS_BUNDLE_SELF 2 
+#define N_TASKS_BUNDLE_SELF 2
 
 #define BLOCK_SIZE_PAIR 64
 #define N_TASKS_PER_PACK_PAIR 8

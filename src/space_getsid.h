@@ -80,7 +80,7 @@ space_getsid_and_swap_cells(const struct space *s, struct cell **ci,
 
 __attribute__((always_inline, nonnull)) INLINE static int
 space_getsid_but_not_swap_cells(const struct space *s, struct cell **ci,
-                            struct cell **cj, double shift[3]) {
+                                struct cell **cj, double shift[3]) {
   /* Get the relative distance between the pairs, wrapping. */
   const int periodic = s->periodic;
   double dx[3];

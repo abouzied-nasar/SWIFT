@@ -1,6 +1,7 @@
-#include "scheduler.h"
-#include "runner_doiact_hydro.h"
 #include "active.h"
+#include "runner_doiact_hydro.h"
+#include "scheduler.h"
+
 #include <atomic.h>
 struct pack_vars_self {
   /*List of tasks and respective cells to be packed*/
@@ -36,7 +37,7 @@ struct pack_vars_self {
   int tasksperbundle;
 
 } pack_vars_self;
-struct leaf_cell_list{
+struct leaf_cell_list {
   struct cell **ci;
   struct cell **cj;
   int n_leaves;
@@ -48,7 +49,7 @@ struct pack_vars_pair {
   /*List of tasks and respective cells to be packed*/
   struct task **task_list;
   struct task **top_task_list;
-  struct leaf_cell_list * leaf_list;
+  struct leaf_cell_list *leaf_list;
   struct cell **ci_list;
   struct cell **cj_list;
   /*List of cell shifts*/
@@ -167,7 +168,8 @@ double runner_doself1_pack_f4(struct runner *r, struct scheduler *s,
   pack_vars->launch = 0;
   pack_vars->launch_leftovers = 0;
 
-  /*Get a lock to the queue so we can safely decrement counter and check for launch leftover condition*/
+  /*Get a lock to the queue so we can safely decrement counter and check for
+   * launch leftover condition*/
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_self_left_d--;
   if (s->queues[qid].n_packs_self_left_d < 1) pack_vars->launch_leftovers = 1;
@@ -228,7 +230,8 @@ double runner_doself1_pack_f4_g(struct runner *r, struct scheduler *s,
   pack_vars->tasks_packed++;
   pack_vars->launch = 0;
   pack_vars->launch_leftovers = 0;
-  /*Get a lock to the queue so we can safely decrement counter and check for launch leftover condition*/
+  /*Get a lock to the queue so we can safely decrement counter and check for
+   * launch leftover condition*/
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_self_left_g--;
   if (s->queues[qid].n_packs_self_left_g < 1) pack_vars->launch_leftovers = 1;
@@ -288,7 +291,8 @@ double runner_doself1_pack_f4_f(struct runner *r, struct scheduler *s,
   pack_vars->tasks_packed++;
   pack_vars->launch = 0;
   pack_vars->launch_leftovers = 0;
-  /*Get a lock to the queue so we can safely decrement counter and check for launch leftover condition*/
+  /*Get a lock to the queue so we can safely decrement counter and check for
+   * launch leftover condition*/
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_self_left_f--;
   if (s->queues[qid].n_packs_self_left_f < 1) pack_vars->launch_leftovers = 1;
@@ -306,14 +310,14 @@ double runner_doself1_pack_f4_f(struct runner *r, struct scheduler *s,
 }
 
 void runner_recurse_gpu(struct runner *r, struct scheduler *s,
-                              struct pack_vars_pair *restrict pack_vars,
-                              struct cell *ci, struct cell *cj, struct task *t,
-                              struct part_aos_f4_send *parts_send,
-                              struct engine *e,
-                              int4 *fparti_fpartj_lparti_lpartj, int *n_leafs_found,
-							  int depth, int n_expected_tasks) {
+                        struct pack_vars_pair *restrict pack_vars,
+                        struct cell *ci, struct cell *cj, struct task *t,
+                        struct part_aos_f4_send *parts_send, struct engine *e,
+                        int4 *fparti_fpartj_lparti_lpartj, int *n_leafs_found,
+                        int depth, int n_expected_tasks) {
 
-	/* Should we even bother? A. Nasar: For GPU code we need to be clever about this */
+  /* Should we even bother? A. Nasar: For GPU code we need to be clever about
+   * this */
   if (!CELL_IS_ACTIVE(ci, e) && !CELL_IS_ACTIVE(cj, e)) return;
   if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
 
@@ -323,38 +327,38 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
 
   /* Recurse? */
   if (cell_can_recurse_in_pair_hydro_task(ci) &&
-	  cell_can_recurse_in_pair_hydro_task(cj)) {
-	struct cell_split_pair *csp = &cell_split_pairs[sid];
-	for (int k = 0; k < csp->count; k++) {
-	  const int pid = csp->pairs[k].pid;
-	  const int pjd = csp->pairs[k].pjd;
-	  /*Do we want to do anything before we recurse?*/
+      cell_can_recurse_in_pair_hydro_task(cj)) {
+    struct cell_split_pair *csp = &cell_split_pairs[sid];
+    for (int k = 0; k < csp->count; k++) {
+      const int pid = csp->pairs[k].pid;
+      const int pjd = csp->pairs[k].pjd;
+      /*Do we want to do anything before we recurse?*/
 
-	  /*We probably want to record */
-	  if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL){
-		runner_recurse_gpu(r, s, pack_vars, ci->progeny[pid], cj->progeny[pjd], t, parts_send, e, fparti_fpartj_lparti_lpartj,
-				n_leafs_found, depth + 1, n_expected_tasks);
-//	        message("recursing to depth %i", depth + 1);
-	  }
-	}
+      /*We probably want to record */
+      if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL) {
+        runner_recurse_gpu(r, s, pack_vars, ci->progeny[pid], cj->progeny[pjd],
+                           t, parts_send, e, fparti_fpartj_lparti_lpartj,
+                           n_leafs_found, depth + 1, n_expected_tasks);
+        //	        message("recursing to depth %i", depth + 1);
+      }
+    }
+  } else if (CELL_IS_ACTIVE(ci, e) || CELL_IS_ACTIVE(cj, e)) {
+    /* if any cell empty: skip */
+    if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
+    int leafs_found = *n_leafs_found;
+    /*for all leafs to be sent add to cell list */
+    //	cells_left[leafs_found] = ci;
+    //	cells_right[leafs_found] = cj;
+    /*Add leaf cells to list for each top_level task*/
+    pack_vars->leaf_list[pack_vars->top_tasks_packed].ci[leafs_found] = ci;
+    pack_vars->leaf_list[pack_vars->top_tasks_packed].cj[leafs_found] = cj;
+    pack_vars->leaf_list[pack_vars->top_tasks_packed].n_leaves++;
+    //	error("stop");
+    *n_leafs_found = leafs_found + 1;
+    if (*n_leafs_found >= n_expected_tasks)
+      error("Created %i more than expected leaf cells. depth %i",
+            *n_leafs_found, depth);
   }
-  else if (CELL_IS_ACTIVE(ci, e) || CELL_IS_ACTIVE(cj, e)) {
-	/* if any cell empty: skip */
-	if(ci->hydro.count == 0 || cj->hydro.count == 0) return;
-	int leafs_found = *n_leafs_found;
-	/*for all leafs to be sent add to cell list */
-//	cells_left[leafs_found] = ci;
-//	cells_right[leafs_found] = cj;
-	/*Add leaf cells to list for each top_level task*/
-	pack_vars->leaf_list[pack_vars->top_tasks_packed].ci[leafs_found] = ci;
-	pack_vars->leaf_list[pack_vars->top_tasks_packed].cj[leafs_found] = cj;
-	pack_vars->leaf_list[pack_vars->top_tasks_packed].n_leaves++;
-//	error("stop");
-	*n_leafs_found = leafs_found + 1;
-	if(*n_leafs_found >= n_expected_tasks)
-		error("Created %i more than expected leaf cells. depth %i", *n_leafs_found, depth);
-  }
-
 };
 
 double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
@@ -373,17 +377,17 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
 
   double x_tmp = 0.0, y_tmp = 0.0, z_tmp = 0.0;
   struct cell *citmp, *cjtmp;
-  citmp=ci;
-  cjtmp=cj;
+  citmp = ci;
+  cjtmp = cj;
   /* Get the type of pair and flip ci/cj if needed. */
   double shift[3];
   const int sid = space_getsid_and_swap_cells(s, &citmp, &cjtmp, shift);
-  if(citmp != ci) error("I'm flipped");
+  if (citmp != ci) error("I'm flipped");
   /*Get the shifts in case of periodics*/
   space_getsid_GPU(e->s, &ci, &cj, &x_tmp, &y_tmp, &z_tmp);
 
   /*Get pointers to the list of tasks and cells packed*/
-//  pack_vars->task_list[tasks_packed] = t;
+  //  pack_vars->task_list[tasks_packed] = t;
   pack_vars->ci_list[tasks_packed] = ci;
   pack_vars->cj_list[tasks_packed] = cj;
 
@@ -432,12 +436,12 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   pack_vars->launch_leftovers = 0;
   pack_vars->leaf_list[pack_vars->top_tasks_packed - 1].n_packed++;
 
-  //A. Nasar: Need to come back to this at some point!
+  // A. Nasar: Need to come back to this at some point!
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_pair_left_d--;
   if (s->queues[qid].n_packs_pair_left_d < 1) pack_vars->launch_leftovers = 1;
   lock_unlock(&s->queues[qid].lock);
-  if (pack_vars->tasks_packed == pack_vars->target_n_tasks){
+  if (pack_vars->tasks_packed == pack_vars->target_n_tasks) {
     pack_vars->launch = 1;
   }
   /*Add time to packing_time. Timer for end of GPU work after the if(launch ||
@@ -801,9 +805,8 @@ void runner_doself1_launch_f4(
     struct part_aos_f4_recv *parts_recv, struct part_aos_f4_send *d_parts_send,
     struct part_aos_f4_recv *d_parts_recv, hipStream_t *stream, float d_a,
     float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int devId,
-    int2 *task_first_part_f4, int2 *d_task_first_part_f4,
-    hipEvent_t *self_end) {
+    double *unpack_time, int devId, int2 *task_first_part_f4,
+    int2 *d_task_first_part_f4, hipEvent_t *self_end) {
 
   struct timespec t0, t1, tp0, tp1;  //
   clock_gettime(CLOCK_REALTIME, &t0);
@@ -885,9 +888,9 @@ void runner_doself1_launch_f4(
     //      (last_task - first_task) * sizeof(int2),
     //    		  devId, stream[bid]);
     hipMemcpyAsync(&d_task_first_part_f4[first_task],
-                    &task_first_part_f4[first_task],
-                    (last_task + 1 - first_task) * sizeof(int2),
-                    hipMemcpyHostToDevice, stream[bid]);
+                   &task_first_part_f4[first_task],
+                   (last_task + 1 - first_task) * sizeof(int2),
+                   hipMemcpyHostToDevice, stream[bid]);
     //	  hipError_t cu_error = hipPeekAtLastError(); // hipGetLastError();
     //// 	  if (cu_error != hipSuccess) { 		fprintf(
     /// stderr, 			"CUDA error in density
@@ -900,8 +903,8 @@ void runner_doself1_launch_f4(
     //   			(t1hmemcpy.tv_nsec - t0hmemcpy.tv_nsec) /
     //   1000000000.0;
     hipMemcpyAsync(&d_parts_send[first_part_tmp], &parts_send[first_part_tmp],
-                    bundle_n_parts * sizeof(struct part_aos_f4_send),
-                    hipMemcpyHostToDevice, stream[bid]);
+                   bundle_n_parts * sizeof(struct part_aos_f4_send),
+                   hipMemcpyHostToDevice, stream[bid]);
 
     // #ifdef CUDA_DEBUG
     //	  hipError_t cu_error = hipPeekAtLastError(); // hipGetLastError();
@@ -944,8 +947,8 @@ void runner_doself1_launch_f4(
     //	  }
     // #endif
     hipMemcpyAsync(&parts_recv[first_part_tmp], &d_parts_recv[first_part_tmp],
-                    bundle_n_parts * sizeof(struct part_aos_f4_recv),
-                    hipMemcpyDeviceToHost, stream[bid]);
+                   bundle_n_parts * sizeof(struct part_aos_f4_recv),
+                   hipMemcpyDeviceToHost, stream[bid]);
     hipEventRecord(self_end[bid], stream[bid]);
     // #ifdef CUDA_DEBUG
     //	  cu_error = hipPeekAtLastError(); // hipGetLastError();        //
@@ -1114,20 +1117,19 @@ void runner_doself1_launch_f4_g(
         pack_vars->bundle_last_part[bid] - first_part_tmp;
 
     hipMemcpyAsync(&d_task_first_part_f4[first_task],
-                    &task_first_part_f4[first_task],
-                    (last_task + 1 - first_task) * sizeof(int2),
-                    hipMemcpyHostToDevice, stream[bid]);
+                   &task_first_part_f4[first_task],
+                   (last_task + 1 - first_task) * sizeof(int2),
+                   hipMemcpyHostToDevice, stream[bid]);
 
     hipMemcpyAsync(&d_parts_send[first_part_tmp], &parts_send[first_part_tmp],
-                    bundle_n_parts * sizeof(struct part_aos_f4_g_send),
-                    hipMemcpyHostToDevice, stream[bid]);
+                   bundle_n_parts * sizeof(struct part_aos_f4_g_send),
+                   hipMemcpyHostToDevice, stream[bid]);
     //	  fprintf(stderr, "bid %i first_part %i nparts %i\n", bid,
     // first_part_tmp, bundle_n_parts);
 
 #ifdef CUDA_DEBUG
-    hipError_t cu_error =
-        hipPeekAtLastError();  // hipGetLastError();        //
-                                // Get error code
+    hipError_t cu_error = hipPeekAtLastError();  // hipGetLastError();        //
+                                                 // Get error code
     if (cu_error != hipSuccess) {
       fprintf(stderr,
               "CUDA error in gradient self host 2 device memcpy: %s cpuid id "
@@ -1162,13 +1164,13 @@ void runner_doself1_launch_f4_g(
     }
 #endif
     hipMemcpyAsync(&parts_recv[first_part_tmp], &d_parts_recv[first_part_tmp],
-                    bundle_n_parts * sizeof(struct part_aos_f4_g_recv),
-                    hipMemcpyDeviceToHost, stream[bid]);
+                   bundle_n_parts * sizeof(struct part_aos_f4_g_recv),
+                   hipMemcpyDeviceToHost, stream[bid]);
     hipEventRecord(self_end[bid], stream[bid]);
 
 #ifdef CUDA_DEBUG
     cu_error = hipPeekAtLastError();  // hipGetLastError();        //
-                                       // Get error code
+                                      // Get error code
     if (cu_error != hipSuccess) {
       fprintf(stderr,
               "CUDA error with self gradient D2H memcpy: %s cpuid id is: %i\n ",
@@ -1344,18 +1346,17 @@ void runner_doself1_launch_f4_f(
     const int bundle_n_parts =
         pack_vars->bundle_last_part[bid] - first_part_tmp;
     hipMemcpyAsync(&d_task_first_part_f4_f[first_task],
-                    &task_first_part_f4_f[first_task],
-                    (last_task + 1 - first_task) * sizeof(int2),
-                    hipMemcpyHostToDevice, stream[bid]);
+                   &task_first_part_f4_f[first_task],
+                   (last_task + 1 - first_task) * sizeof(int2),
+                   hipMemcpyHostToDevice, stream[bid]);
 
     hipMemcpyAsync(&d_parts_send[first_part_tmp], &parts_send[first_part_tmp],
-                    bundle_n_parts * sizeof(struct part_aos_f4_f_send),
-                    hipMemcpyHostToDevice, stream[bid]);
+                   bundle_n_parts * sizeof(struct part_aos_f4_f_send),
+                   hipMemcpyHostToDevice, stream[bid]);
 
 #ifdef CUDA_DEBUG
-    hipError_t cu_error =
-        hipPeekAtLastError();  // hipGetLastError();        //
-                                // Get error code
+    hipError_t cu_error = hipPeekAtLastError();  // hipGetLastError();        //
+                                                 // Get error code
     if (cu_error != hipSuccess) {
       fprintf(stderr,
               "CUDA error in density self host 2 device memcpy: %s cpuid id "
@@ -1388,13 +1389,13 @@ void runner_doself1_launch_f4_f(
     }
 #endif
     hipMemcpyAsync(&parts_recv[first_part_tmp], &d_parts_recv[first_part_tmp],
-                    bundle_n_parts * sizeof(struct part_aos_f4_f_recv),
-                    hipMemcpyDeviceToHost, stream[bid]);
+                   bundle_n_parts * sizeof(struct part_aos_f4_f_recv),
+                   hipMemcpyDeviceToHost, stream[bid]);
     hipEventRecord(self_end[bid], stream[bid]);
 
 #ifdef CUDA_DEBUG
     cu_error = hipPeekAtLastError();  // hipGetLastError();        //
-                                       // Get error code
+                                      // Get error code
     if (cu_error != hipSuccess) {
       fprintf(stderr,
               "CUDA error with self firce D2H memcpy: %s cpuid id is: %i\n ",
@@ -1488,8 +1489,7 @@ void runner_doself1_launch_f4_f(
 void runner_dopair1_launch_f4_one_memcpy(
     struct runner *r, struct scheduler *s, struct pack_vars_pair *pack_vars,
     struct task *t, struct part_aos_f4_send *parts_send,
-    struct part_aos_f4_recv *parts_recv,
-    struct part_aos_f4_send *d_parts_send,
+    struct part_aos_f4_recv *parts_recv, struct part_aos_f4_send *d_parts_send,
     struct part_aos_f4_recv *d_parts_recv, hipStream_t *stream, float d_a,
     float d_H, struct engine *e, double *packing_time, double *gpu_time,
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj,
@@ -1559,19 +1559,19 @@ void runner_dopair1_launch_f4_one_memcpy(
     const int bundle_n_parts =
         pack_vars->bundle_last_part[bid] - first_part_tmp_i;
 
-//    hipMemcpyAsync(&d_parts_send[first_part_tmp_i],
-//                    &parts_send[first_part_tmp_i],
-//                    bundle_n_parts * sizeof(struct part_aos_f4_send),
-//                    hipMemcpyHostToDevice, stream[bid]);
+    //    hipMemcpyAsync(&d_parts_send[first_part_tmp_i],
+    //                    &parts_send[first_part_tmp_i],
+    //                    bundle_n_parts * sizeof(struct part_aos_f4_send),
+    //                    hipMemcpyHostToDevice, stream[bid]);
 
 #ifdef CUDA_DEBUG
-    hipError_t cu_error =
-        hipPeekAtLastError();  // hipGetLastError();        //
-                                // Get error code
+    hipError_t cu_error = hipPeekAtLastError();  // hipGetLastError();        //
+                                                 // Get error code
     if (cu_error != hipSuccess) {
-      error("CUDA error with pair density H2D async  memcpy ci: %s cpuid id "
-              "is: %i\n ",
-              hipGetErrorString(cu_error), r->cpuid);
+      error(
+          "CUDA error with pair density H2D async  memcpy ci: %s cpuid id "
+          "is: %i\n ",
+          hipGetErrorString(cu_error), r->cpuid);
     }
 #endif
 
@@ -1588,8 +1588,8 @@ void runner_dopair1_launch_f4_one_memcpy(
 
     /* Launch the kernel for ci using data for ci and cj */
     runner_dopair_branch_density_gpu_aos_f4(
-        parts_send, parts_recv, d_a, d_H, stream[bid], numBlocks_x,
-        numBlocks_y, bundle_part_0, bundle_n_parts);
+        parts_send, parts_recv, d_a, d_H, stream[bid], numBlocks_x, numBlocks_y,
+        bundle_part_0, bundle_n_parts);
 
 #ifdef CUDA_DEBUG
     cu_error = hipPeekAtLastError();  // Get error code
@@ -1603,7 +1603,7 @@ void runner_dopair1_launch_f4_one_memcpy(
 #endif
 
     // Copy results back to CPU BUFFERS
-    //hipmemcpyAsync(&parts_recv[first_part_tmp_i],
+    // hipmemcpyAsync(&parts_recv[first_part_tmp_i],
     //                &d_parts_recv[first_part_tmp_i],
     //                bundle_n_parts * sizeof(struct part_aos_f4_recv),
     //                hipMemcpyDeviceToHost, stream[bid]);
@@ -1611,7 +1611,7 @@ void runner_dopair1_launch_f4_one_memcpy(
 
 #ifdef CUDA_DEBUG
     cu_error = hipPeekAtLastError();  // hipGetLastError();        //
-                                       // Get error code
+                                      // Get error code
     if (cu_error != hipSuccess) {
       fprintf(stderr,
               "CUDA error with self density D2H memcpy: %s cpuid id is: %i\n ",
@@ -1786,14 +1786,13 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
         pack_vars->bundle_last_part[bid] - first_part_tmp_i;
 
     hipMemcpyAsync(&d_parts_send[first_part_tmp_i],
-                    &parts_send[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_send),
-                    hipMemcpyHostToDevice, stream[bid]);
+                   &parts_send[first_part_tmp_i],
+                   bundle_n_parts * sizeof(struct part_aos_f4_send),
+                   hipMemcpyHostToDevice, stream[bid]);
 
 #ifdef CUDA_DEBUG
-    hipError_t cu_error =
-        hipPeekAtLastError();  // hipGetLastError();        //
-                                // Get error code
+    hipError_t cu_error = hipPeekAtLastError();  // hipGetLastError();        //
+                                                 // Get error code
     if (cu_error != hipSuccess) {
       fprintf(stderr,
               "CUDA error with pair density H2D async  memcpy ci: %s cpuid id "
@@ -1829,14 +1828,14 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
 
     // Copy results back to CPU BUFFERS
     hipMemcpyAsync(&parts_recv[first_part_tmp_i],
-                    &d_parts_recv[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_recv),
-                    hipMemcpyDeviceToHost, stream[bid]);
+                   &d_parts_recv[first_part_tmp_i],
+                   bundle_n_parts * sizeof(struct part_aos_f4_recv),
+                   hipMemcpyDeviceToHost, stream[bid]);
     hipEventRecord(pair_end[bid], stream[bid]);
 
 #ifdef CUDA_DEBUG
     cu_error = hipPeekAtLastError();  // hipGetLastError();        //
-                                       // Get error code
+                                      // Get error code
     if (cu_error != hipSuccess) {
       fprintf(stderr,
               "CUDA error with self density D2H memcpy: %s cpuid id is: %i\n ",
@@ -1876,65 +1875,66 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
     /*Time unpacking*/
     //		clock_gettime(CLOCK_REALTIME, &tp0);
 
-//    for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
-//
-//      if (tid < tasks_packed) {
-//        clock_gettime(CLOCK_REALTIME, &tp0);
-//        /*grab cell and task pointers*/
-//        struct cell *cii = pack_vars->ci_list[tid];
-//        struct cell *cjj = pack_vars->cj_list[tid];
-//        struct task *tii = pack_vars->task_list[tid];
-//
-////        if(!pack_vars->task_locked){
-////          /*Let's lock ci*/
-////          while (cell_locktree(cii)) {
-////            ; /* spin until we acquire the lock */
-////          }
-////          /*Let's lock cj*/
-////          while (cell_locktree(cjj)) {
-////            ; /* spin until we acquire the lock */
-////          }
-////          pack_vars->task_locked = 1;
-////        }
-//
-//        const ticks tic = getticks();
-//
-//        /* Do the copy */
-//        runner_do_ci_cj_gpu_unpack_neat_aos_f4(
-//            r, cii, cjj, parts_recv, 0, &pack_length_unpack, tid,
-//            2 * pack_vars->count_max_parts, e);
-//
-//        const ticks toc = getticks();
-//
-//        total_cpu_unpack_ticks += toc - tic;
-//
-//        /* Record things for debugging */
-//        cii->gpu_done_pair++;
-//        cjj->gpu_done_pair++;
-//
-////        if(pack_vars->task_locked){
-////          /* Release the locks */
-////          cell_unlocktree(cii);
-////          /* Release the locks */
-////          cell_unlocktree(cjj);
-//          pack_vars->task_locked = 0;
-////        }
-//
-//        /*Time end of unpacking*/
-//        clock_gettime(CLOCK_REALTIME, &tp1);
-//        *unpack_time += (tp1.tv_sec - tp0.tv_sec) +
-//                        (tp1.tv_nsec - tp0.tv_nsec) / 1000000000.0;
-//        /*Signal sleeping runners*/
-//        // MATTHIEU signal_sleeping_runners(s, tii);
-//
-//        tii->gpu_done = 1;
-//      }
-//    }
+    //    for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size;
+    //    tid++) {
+    //
+    //      if (tid < tasks_packed) {
+    //        clock_gettime(CLOCK_REALTIME, &tp0);
+    //        /*grab cell and task pointers*/
+    //        struct cell *cii = pack_vars->ci_list[tid];
+    //        struct cell *cjj = pack_vars->cj_list[tid];
+    //        struct task *tii = pack_vars->task_list[tid];
+    //
+    ////        if(!pack_vars->task_locked){
+    ////          /*Let's lock ci*/
+    ////          while (cell_locktree(cii)) {
+    ////            ; /* spin until we acquire the lock */
+    ////          }
+    ////          /*Let's lock cj*/
+    ////          while (cell_locktree(cjj)) {
+    ////            ; /* spin until we acquire the lock */
+    ////          }
+    ////          pack_vars->task_locked = 1;
+    ////        }
+    //
+    //        const ticks tic = getticks();
+    //
+    //        /* Do the copy */
+    //        runner_do_ci_cj_gpu_unpack_neat_aos_f4(
+    //            r, cii, cjj, parts_recv, 0, &pack_length_unpack, tid,
+    //            2 * pack_vars->count_max_parts, e);
+    //
+    //        const ticks toc = getticks();
+    //
+    //        total_cpu_unpack_ticks += toc - tic;
+    //
+    //        /* Record things for debugging */
+    //        cii->gpu_done_pair++;
+    //        cjj->gpu_done_pair++;
+    //
+    ////        if(pack_vars->task_locked){
+    ////          /* Release the locks */
+    ////          cell_unlocktree(cii);
+    ////          /* Release the locks */
+    ////          cell_unlocktree(cjj);
+    //          pack_vars->task_locked = 0;
+    ////        }
+    //
+    //        /*Time end of unpacking*/
+    //        clock_gettime(CLOCK_REALTIME, &tp1);
+    //        *unpack_time += (tp1.tv_sec - tp0.tv_sec) +
+    //                        (tp1.tv_nsec - tp0.tv_nsec) / 1000000000.0;
+    //        /*Signal sleeping runners*/
+    //        // MATTHIEU signal_sleeping_runners(s, tii);
+    //
+    //        tii->gpu_done = 1;
+    //      }
+    //    }
   }
 
   /* Zero counters for the next pack operations */
-//  pack_vars->count_parts = 0;
-//  pack_vars->tasks_packed = 0;
+  //  pack_vars->count_parts = 0;
+  //  pack_vars->tasks_packed = 0;
 
   //	/*Time end of unpacking*/
   //	clock_gettime(CLOCK_REALTIME, &t1);
@@ -1953,39 +1953,40 @@ void runner_dopair1_unpack_f4(
     struct part_aos_f4_recv *d_parts_recv, hipStream_t *stream, float d_a,
     float d_H, struct engine *e, double *packing_time, double *gpu_time,
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
-    hipEvent_t *pair_end, int cstart, int n_leaves_found){
+    hipEvent_t *pair_end, int cstart, int n_leaves_found) {
 
   int topid;
   int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0;
   /*Loop over top level tasks*/
   for (topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
-	const ticks tic = getticks();
-	/* Loop through each daughter task */
-	int n_leaves_in_task = pack_vars->leaf_list[topid].n_packed;
-	int nstart = pack_vars->leaf_list[topid].n_start;
-	for(int tid = nstart; tid < n_leaves_in_task + nstart; tid++){
-	  /*Get pointers to the leaf cells. SEEMS I'm NOT GETTING A CORRECT POINTER
-	   *but likely due to incorrect book keeping*/
-	  struct cell * cii_l = pack_vars->leaf_list[topid].ci[tid];
-	  struct cell * cjj_l = pack_vars->leaf_list[topid].cj[tid];
-	  message("loc %f %f %f topid %i tid %i nleaves %i", pack_vars->leaf_list[topid].ci[tid]->loc[0]
-                            , pack_vars->leaf_list[topid].ci[tid]->loc[1]
-	                        , pack_vars->leaf_list[topid].ci[tid]->loc[2]
-                            , topid, tid, n_leaves_in_task);
-//	  if(*cii_l == NULL || *cjj_l == NULL)error("stop");
-	  runner_do_ci_cj_gpu_unpack_neat_aos_f4(
-			r, cii_l, cjj_l, parts_recv, 0, &pack_length_unpack, tid,
-			2 * pack_vars->count_max_parts, e);
-	}
+    const ticks tic = getticks();
+    /* Loop through each daughter task */
+    int n_leaves_in_task = pack_vars->leaf_list[topid].n_packed;
+    int nstart = pack_vars->leaf_list[topid].n_start;
+    for (int tid = nstart; tid < n_leaves_in_task + nstart; tid++) {
+      /*Get pointers to the leaf cells. SEEMS I'm NOT GETTING A CORRECT POINTER
+       *but likely due to incorrect book keeping*/
+      struct cell *cii_l = pack_vars->leaf_list[topid].ci[tid];
+      struct cell *cjj_l = pack_vars->leaf_list[topid].cj[tid];
+      message("loc %f %f %f topid %i tid %i nleaves %i",
+              pack_vars->leaf_list[topid].ci[tid]->loc[0],
+              pack_vars->leaf_list[topid].ci[tid]->loc[1],
+              pack_vars->leaf_list[topid].ci[tid]->loc[2], topid, tid,
+              n_leaves_in_task);
+      //	  if(*cii_l == NULL || *cjj_l == NULL)error("stop");
+      runner_do_ci_cj_gpu_unpack_neat_aos_f4(r, cii_l, cjj_l, parts_recv, 0,
+                                             &pack_length_unpack, tid,
+                                             2 * pack_vars->count_max_parts, e);
+    }
 
-	const ticks toc = getticks();
-	total_cpu_unpack_ticks += toc - tic;
-	pack_vars->count_parts = 0;
-	/*For some reason the code fails if we get a leaf pair task
-	 *this if statement stops the code from trying to unlock same cells twice*/
-	if(topid == pack_vars->top_tasks_packed -1 && cstart != n_leaves_found)
-		continue;
+    const ticks toc = getticks();
+    total_cpu_unpack_ticks += toc - tic;
+    pack_vars->count_parts = 0;
+    /*For some reason the code fails if we get a leaf pair task
+     *this if statement stops the code from trying to unlock same cells twice*/
+    if (topid == pack_vars->top_tasks_packed - 1 && cstart != n_leaves_found)
+      continue;
     enqueue_dependencies(s, pack_vars->top_task_list[topid]);
     pthread_mutex_lock(&s->sleep_mutex);
     atomic_dec(&s->waiting);
@@ -2068,14 +2069,13 @@ void runner_dopair1_launch_f4_g_one_memcpy(
         pack_vars->bundle_last_part[bid] - first_part_tmp_i;
 
     hipMemcpyAsync(&d_parts_send[first_part_tmp_i],
-                    &parts_send[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_g_send),
-                    hipMemcpyHostToDevice, stream[bid]);
+                   &parts_send[first_part_tmp_i],
+                   bundle_n_parts * sizeof(struct part_aos_f4_g_send),
+                   hipMemcpyHostToDevice, stream[bid]);
 
 #ifdef CUDA_DEBUG
-    hipError_t cu_error =
-        hipPeekAtLastError();  // hipGetLastError();        //
-                                // Get error code
+    hipError_t cu_error = hipPeekAtLastError();  // hipGetLastError();        //
+                                                 // Get error code
     if (cu_error != hipSuccess) {
       fprintf(stderr,
               "CUDA error with pair density H2D async  memcpy ci: %s cpuid id "
@@ -2115,14 +2115,14 @@ void runner_dopair1_launch_f4_g_one_memcpy(
 
     // Copy results back to CPU BUFFERS
     hipMemcpyAsync(&parts_recv[first_part_tmp_i],
-                    &d_parts_recv[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_g_recv),
-                    hipMemcpyDeviceToHost, stream[bid]);
+                   &d_parts_recv[first_part_tmp_i],
+                   bundle_n_parts * sizeof(struct part_aos_f4_g_recv),
+                   hipMemcpyDeviceToHost, stream[bid]);
     hipEventRecord(pair_end[bid], stream[bid]);
 
 #ifdef CUDA_DEBUG
     cu_error = hipPeekAtLastError();  // hipGetLastError();        //
-                                       // Get error code
+                                      // Get error code
     if (cu_error != hipSuccess) {
       fprintf(stderr,
               "CUDA error with self density D2H memcpy: %s cpuid id is: %i\n ",
@@ -2305,14 +2305,13 @@ void runner_dopair1_launch_f4_f_one_memcpy(
         pack_vars->bundle_last_part[bid] - first_part_tmp_i;
 
     hipMemcpyAsync(&d_parts_send[first_part_tmp_i],
-                    &parts_send[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_f_send),
-                    hipMemcpyHostToDevice, stream[bid]);
+                   &parts_send[first_part_tmp_i],
+                   bundle_n_parts * sizeof(struct part_aos_f4_f_send),
+                   hipMemcpyHostToDevice, stream[bid]);
 
 #ifdef CUDA_DEBUG
-    hipError_t cu_error =
-        hipPeekAtLastError();  // hipGetLastError();        //
-                                // Get error code
+    hipError_t cu_error = hipPeekAtLastError();  // hipGetLastError();        //
+                                                 // Get error code
     if (cu_error != hipSuccess) {
       fprintf(stderr,
               "CUDA error with pair density H2D async  memcpy ci: %s cpuid id "
@@ -2361,14 +2360,14 @@ void runner_dopair1_launch_f4_f_one_memcpy(
 
     // Copy results back to CPU BUFFERS
     hipMemcpyAsync(&parts_recv[first_part_tmp_i],
-                    &d_parts_recv[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_f_recv),
-                    hipMemcpyDeviceToHost, stream[bid]);
+                   &d_parts_recv[first_part_tmp_i],
+                   bundle_n_parts * sizeof(struct part_aos_f4_f_recv),
+                   hipMemcpyDeviceToHost, stream[bid]);
     hipEventRecord(pair_end[bid], stream[bid]);
 
 #ifdef CUDA_DEBUG
     cu_error = hipPeekAtLastError();  // hipGetLastError();        //
-                                       // Get error code
+                                      // Get error code
     if (cu_error != hipSuccess) {
       fprintf(stderr,
               "CUDA error with self density D2H memcpy: %s cpuid id is: %i\n ",

@@ -2280,7 +2280,8 @@ void engine_init_particles(struct engine *e, int flag_entropy_ICs,
   /* Zero the list of cells that have had their time-step updated */
   bzero(e->s->cells_top_updated, e->s->nr_cells * sizeof(char));
 
-//  scheduler_write_dependencies(&e->sched, e->verbose, e->step); // A. Nasar write deps before running first step
+  //  scheduler_write_dependencies(&e->sched, e->verbose, e->step); // A. Nasar
+  //  write deps before running first step
   /* Now, launch the calculation */
   //  message("n tasks %i", e->sched.nr_tasks);
   //  for (int i = 0; i < e->sched.nr_tasks; i++){

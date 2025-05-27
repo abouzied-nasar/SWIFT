@@ -38,11 +38,10 @@ void launch_gradient_aos_f4(struct part_aos_f4_g_send *parts_send,
                             int2 *d_task_first_part_f4);
 void launch_force_aos(struct part_aos_f *parts_aos, int *d_task_first_part,
                       int *d_task_last_part, float d_a, float d_H,
-                      const char *loop_type, hipStream_t stream,
-                      int block_size, int count_tasks, int tasksperbundle,
-                      int numBlocks_x, int numBlocks_y, int bundle_first_task,
-                      int max_parts, double *d_cell_x, double *d_cell_y,
-                      double *d_cell_z);
+                      const char *loop_type, hipStream_t stream, int block_size,
+                      int count_tasks, int tasksperbundle, int numBlocks_x,
+                      int numBlocks_y, int bundle_first_task, int max_parts,
+                      double *d_cell_x, double *d_cell_y, double *d_cell_z);
 void launch_force_aos_f4(struct part_aos_f4_f_send *parts_send,
                          struct part_aos_f4_f_recv *parts_recv, float d_a,
                          float d_H, hipStream_t stream, int numBlocks_x,
@@ -120,8 +119,8 @@ void runner_dopaircj_branch_density_gpu_aos_g(
 void runner_dopair_branch_gradient_gpu_aos_f4(
     struct part_aos_f4_g_send *parts_send,
     struct part_aos_f4_g_recv *parts_recv, float d_a, float d_H,
-    hipStream_t stream, int numBlocks_x, int numBlocks_y,
-    int bundle_first_part, int bundle_n_parts);
+    hipStream_t stream, int numBlocks_x, int numBlocks_y, int bundle_first_part,
+    int bundle_n_parts);
 void runner_dopairci_branch_density_gpu_aos_f(
     struct part_aos_f *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,
@@ -139,8 +138,8 @@ void runner_dopaircj_branch_density_gpu_aos_f(
 void runner_dopair_branch_force_gpu_aos_f4(
     struct part_aos_f4_f_send *parts_send,
     struct part_aos_f4_f_recv *parts_recv, float d_a, float d_H,
-    hipStream_t stream, int numBlocks_x, int numBlocks_y,
-    int bundle_first_part, int bundle_n_parts);
+    hipStream_t stream, int numBlocks_x, int numBlocks_y, int bundle_first_part,
+    int bundle_n_parts);
 #ifdef __cplusplus
 }
 #endif

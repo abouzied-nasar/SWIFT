@@ -182,8 +182,8 @@ typedef struct part_aos_f4_send {
   /*! Particle predicted velocity and mass -> ux, uy, uz, m */
   float4 ux_m;
 
-//  /*Temporary trial to see if doing shifts on GPU works*/
-//  float3 shift;
+  //  /*Temporary trial to see if doing shifts on GPU works*/
+  //  float3 shift;
 
   /*Markers for where neighbour cell j starts and stops in array indices for
    * pair tasks*/

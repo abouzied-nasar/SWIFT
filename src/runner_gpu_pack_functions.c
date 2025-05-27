@@ -8,11 +8,11 @@
 /* Local headers. */
 #include "active.h"
 #include "engine.h"
+#include "runner_doiact_hydro.h"
 #include "runner_gpu_pack_functions.h"
 #include "scheduler.h"
 #include "space_getsid.h"
 #include "timers.h"
-#include "runner_doiact_hydro.h"
 
 void runner_doself1_gpu_pack_neat_aos_f4(
     struct runner *r, struct cell *__restrict__ c,
@@ -103,8 +103,7 @@ void runner_doself1_gpu_pack_neat_aos_f4_f(
 }
 
 extern inline void pack_neat_pair_aos_f4(
-    struct cell * c,
-    struct part_aos_f4_send * parts_aos_buffer, int tid,
+    struct cell *c, struct part_aos_f4_send *parts_aos_buffer, int tid,
     const int local_pack_position, const int count, const double3 shift,
     const int2 cstarts) {
   /*Data to be copied to GPU*/
@@ -316,7 +315,8 @@ void runner_doself1_gpu_unpack_neat_aos_f4(
 #endif
 
   /* Copy particle data from CPU buffers to cells */
-//  unpack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count, e);
+  //  unpack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count,
+  //  e);
   // Increment pack length accordingly
   (*pack_length) += count;
 }
@@ -395,7 +395,7 @@ void unpack_neat_aos_f4(struct cell *c,
     float4 rho_dh_wcount = p_tmp.rho_dh_wcount;
     float4 rot_ux_div_v = p_tmp.rot_ux_div_v;
     struct part *p = &c->hydro.parts[i];
-    if(!PART_IS_ACTIVE(p, e))continue;
+    if (!PART_IS_ACTIVE(p, e)) continue;
     p->rho += rho_dh_wcount.x;
     p->density.rho_dh += rho_dh_wcount.y;
     p->density.wcount += rho_dh_wcount.z;
@@ -416,7 +416,7 @@ void unpack_neat_aos_f4_g(struct cell *c,
   for (int i = 0; i < count; i++) {
     struct part_aos_f4_g_recv p_tmp = parts_tmp[i];
     struct part *p = &c->hydro.parts[i];
-    if(!PART_IS_ACTIVE(p, e))continue;
+    if (!PART_IS_ACTIVE(p, e)) continue;
     const float v_sig = p->viscosity.v_sig;
     p->viscosity.v_sig = fmaxf(p_tmp.vsig_lapu_aviscmax.x, v_sig);
     p->diffusion.laplace_u += p_tmp.vsig_lapu_aviscmax.y;
@@ -431,13 +431,13 @@ void unpack_neat_aos_f4_f(struct cell *restrict c,
                           struct engine *e) {
   int pp = local_pack_position;
   for (int i = 0; i < count; i++) {
-	if(!PART_IS_ACTIVE(&c->hydro.parts[i], e))continue;
+    if (!PART_IS_ACTIVE(&c->hydro.parts[i], e)) continue;
     c->hydro.parts[i].a_hydro[0] += parts_aos_buffer[i + pp].a_hydro.x;
     c->hydro.parts[i].a_hydro[1] += parts_aos_buffer[i + pp].a_hydro.y;
     c->hydro.parts[i].a_hydro[2] += parts_aos_buffer[i + pp].a_hydro.z;
   }
   for (int i = 0; i < count; i++) {
-	if(!PART_IS_ACTIVE(&c->hydro.parts[i], e))continue;
+    if (!PART_IS_ACTIVE(&c->hydro.parts[i], e)) continue;
     c->hydro.parts[i].viscosity.v_sig =
         fmaxf(parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.z,
               c->hydro.parts[i].viscosity.v_sig);
@@ -445,7 +445,7 @@ void unpack_neat_aos_f4_f(struct cell *restrict c,
         (int)(parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
   }
   for (int i = 0; i < count; i++) {
-    if(!PART_IS_ACTIVE(&c->hydro.parts[i], e))continue;
+    if (!PART_IS_ACTIVE(&c->hydro.parts[i], e)) continue;
     c->hydro.parts[i].u_dt +=
         parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.x;
     c->hydro.parts[i].force.h_dt +=
@@ -453,9 +453,9 @@ void unpack_neat_aos_f4_f(struct cell *restrict c,
   }
 }
 
-void unpack_neat_pair_aos_f4(struct runner *r, struct cell * c,
-                             struct part_aos_f4_recv * parts_aos_buffer,
-                             int tid, int local_pack_position, int count,
+void unpack_neat_pair_aos_f4(struct runner *r, struct cell *c,
+                             struct part_aos_f4_recv *parts_aos_buffer, int tid,
+                             int local_pack_position, int count,
                              struct engine *e) {
 
   //  struct part_aos_f4_recv * restrict parts_tmp =
@@ -542,8 +542,8 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
     int tid, int count_max_parts_tmp, struct engine *e) {
 
   /* Anything to do here? */
-//    if (ci->hydro.count == 0 || cj->hydro.count == 0)
-//      return;
+  //    if (ci->hydro.count == 0 || cj->hydro.count == 0)
+  //      return;
   if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) {
     message("Inactive cell\n");
     return;
@@ -663,10 +663,10 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
 }
 
 void runner_do_ci_cj_gpu_pack_neat_aos_f4(
-    struct runner *r, struct cell * ci, struct cell * cj,
-    struct part_aos_f4_send * parts_aos_buffer, int timer,
-    int *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
-    const int count_cj, double3 shift_tmp) {
+    struct runner *r, struct cell *ci, struct cell *cj,
+    struct part_aos_f4_send *parts_aos_buffer, int timer, int *pack_length,
+    int tid, int count_max_parts_tmp, const int count_ci, const int count_cj,
+    double3 shift_tmp) {
 
   TIMER_TIC;
 
@@ -685,9 +685,10 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4(
     error();
   }
 #endif
-  /* Pack the particle data into CPU-side buffers. Start by assigning the shifts (if positions shifts are required)*/
+  /* Pack the particle data into CPU-side buffers. Start by assigning the shifts
+   * (if positions shifts are required)*/
   const double3 shift_i = {shift_tmp.x + cj->loc[0], shift_tmp.y + cj->loc[1],
-                          shift_tmp.z + cj->loc[2]};
+                           shift_tmp.z + cj->loc[2]};
 
   const int lpp1 = local_pack_position;
 
