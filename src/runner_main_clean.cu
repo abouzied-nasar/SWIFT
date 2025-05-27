@@ -23,7 +23,7 @@
 #define GPUOFFLOAD_GRADIENT 1  // off-load hydro gradient to GPU
 #define GPUOFFLOAD_FORCE 1     // off-load hydro force to GPU
 
-#define RECURSE 1 //Allow recursion through sub-tasks before offloading
+//#define RECURSE 1 //Allow recursion through sub-tasks before offloading
 
 // #define DUMP_TIMINGS 1
 #include "../config.h"
@@ -1483,7 +1483,8 @@ void *runner_main2(void *data) {
           runner_do_hydro_sort(
               r, ci, t->flags,
               ci->hydro.dx_max_sort_old > space_maxreldx * ci->dmin,
-              cell_get_flag(ci, cell_flag_rt_requests_sort), 1);
+              /*lock=*/0, cell_get_flag(ci, cell_flag_rt_requests_sort),
+              /*clock=*/1);
           /* Reset the sort flags as our work here is done. */
           t->flags = 0;
           break;
@@ -1494,7 +1495,8 @@ void *runner_main2(void *data) {
            * don't have rt_sort tasks. */
           runner_do_hydro_sort(
               r, ci, t->flags,
-              ci->hydro.dx_max_sort_old > space_maxreldx * ci->dmin, 1, 1);
+              ci->hydro.dx_max_sort_old > space_maxreldx * ci->dmin,
+              /*lock=*/0, /*rt_requests_sorts=*/1, /*clock=*/1);
           /* Reset the sort flags as our work here is done. */
           t->flags = 0;
           break;
