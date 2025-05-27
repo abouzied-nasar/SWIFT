@@ -26,6 +26,10 @@
  */
 
 /* Config parameters. */
+#include "inline.h"
+#include "part.h"
+#include "rt_struct.h"
+
 #include <config.h>
 
 /* Import the right RT definition */
@@ -54,8 +58,9 @@
 __attribute__((always_inline)) INLINE static void rt_first_init_timestep_data(
     struct part *restrict p) {
 
-  p->rt_time_data.min_ngb_time_bin = num_time_bins + 1;
-  p->rt_time_data.time_bin = 0;
+  struct rt_timestepping_data *td = part_get_rt_time_data_p(p);
+  td->min_ngb_time_bin = num_time_bins + 1;
+  td->time_bin = 0;
 }
 
 /**
@@ -66,7 +71,8 @@ __attribute__((always_inline)) INLINE static void rt_first_init_timestep_data(
 __attribute__((always_inline)) INLINE static void rt_timestep_prepare_force(
     struct part *restrict p) {
 
-  p->rt_time_data.min_ngb_time_bin = num_time_bins + 1;
+  struct rt_timestepping_data *td = part_get_rt_time_data_p(p);
+  td->min_ngb_time_bin = num_time_bins + 1;
 }
 
 /**

@@ -219,11 +219,13 @@ void space_rebuild(struct space *s, int repartitioned, int verbose) {
         memswap(&s->parts[k], &s->parts[nr_parts], sizeof(struct part));
 
         /* Swap the link with the gpart */
-        if (s->parts[k].gpart != NULL) {
-          s->parts[k].gpart->id_or_neg_offset = -k;
+        struct gpart *gp_k = part_get_gpart(&s->parts[k]);
+        if (gp_k != NULL) {
+          gp_k->id_or_neg_offset = -k;
         }
-        if (s->parts[nr_parts].gpart != NULL) {
-          s->parts[nr_parts].gpart->id_or_neg_offset = -nr_parts;
+        struct gpart *gp_nr_parts = part_get_gpart(&s->parts[nr_parts]);
+        if (gp_nr_parts != NULL) {
+          gp_nr_parts->id_or_neg_offset = -nr_parts;
         }
 
         /* Swap the xpart */
@@ -426,7 +428,8 @@ void space_rebuild(struct space *s, int repartitioned, int verbose) {
 
         /* Swap the link with part/spart */
         if (s->gparts[k].type == swift_type_gas) {
-          s->parts[-s->gparts[k].id_or_neg_offset].gpart = &s->gparts[k];
+          struct part *p = &s->parts[-s->gparts[k].id_or_neg_offset];
+          part_set_gpart(p, &s->gparts[k]);
         } else if (s->gparts[k].type == swift_type_stars) {
           s->sparts[-s->gparts[k].id_or_neg_offset].gpart = &s->gparts[k];
         } else if (s->gparts[k].type == swift_type_sink) {
@@ -436,8 +439,8 @@ void space_rebuild(struct space *s, int repartitioned, int verbose) {
         }
 
         if (s->gparts[nr_gparts].type == swift_type_gas) {
-          s->parts[-s->gparts[nr_gparts].id_or_neg_offset].gpart =
-              &s->gparts[nr_gparts];
+          struct part *p = &s->parts[-s->gparts[nr_gparts].id_or_neg_offset];
+          part_set_gpart(p, &s->gparts[nr_gparts]);
         } else if (s->gparts[nr_gparts].type == swift_type_stars) {
           s->sparts[-s->gparts[nr_gparts].id_or_neg_offset].gpart =
               &s->gparts[nr_gparts];
@@ -580,8 +583,8 @@ void space_rebuild(struct space *s, int repartitioned, int verbose) {
   /* Assign each received part to its cell. */
   for (size_t k = nr_parts; k < s->nr_parts; k++) {
     const struct part *const p = &s->parts[k];
-    h_index[k] =
-        cell_getid(cdim, p->x[0] * ih[0], p->x[1] * ih[1], p->x[2] * ih[2]);
+    const double *const px = part_get_const_x(p);
+    h_index[k] = cell_getid(cdim, px[0] * ih[0], px[1] * ih[1], px[2] * ih[2]);
     cell_part_counts[h_index[k]]++;
 #ifdef SWIFT_DEBUG_CHECKS
     if (cells_top[h_index[k]].nodeID != local_nodeID)
@@ -653,13 +656,13 @@ void space_rebuild(struct space *s, int repartitioned, int verbose) {
   for (size_t k = 0; k < nr_parts; k++) {
     const struct part *p = &s->parts[k];
 
-    if (p->time_bin == time_bin_inhibited)
+    if (part_get_time_bin(p) == time_bin_inhibited)
       error("Inhibited particle sorted into a cell!");
 
     /* New cell index */
-    const int new_ind =
-        cell_getid(s->cdim, p->x[0] * s->iwidth[0], p->x[1] * s->iwidth[1],
-                   p->x[2] * s->iwidth[2]);
+    const double *px = part_get_const_x(p);
+    const int new_ind = cell_getid(s->cdim, px[0] * s->iwidth[0],
+                                   px[1] * s->iwidth[1], px[2] * s->iwidth[2]);
 
     /* New cell of this part */
     const struct cell *c = &s->cells_top[new_ind];
@@ -667,9 +670,9 @@ void space_rebuild(struct space *s, int repartitioned, int verbose) {
     if (h_index[k] != new_ind)
       error("part's new cell index not matching sorted index.");
 
-    if (p->x[0] < c->loc[0] || p->x[0] > c->loc[0] + c->width[0] ||
-        p->x[1] < c->loc[1] || p->x[1] > c->loc[1] + c->width[1] ||
-        p->x[2] < c->loc[2] || p->x[2] > c->loc[2] + c->width[2])
+    if (px[0] < c->loc[0] || px[0] > c->loc[0] + c->width[0] ||
+        px[1] < c->loc[1] || px[1] > c->loc[1] + c->width[1] ||
+        px[2] < c->loc[2] || px[2] > c->loc[2] + c->width[2])
       error("part not sorted into the right top-level cell!");
   }
 #endif /* SWIFT_DEBUG_CHECKS */

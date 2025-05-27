@@ -387,7 +387,7 @@ void runner_do_hydro_sort(struct runner *r, struct cell *c, int flags,
 
     /* Fill the sort array. */
     for (int k = 0; k < count; k++) {
-      const double px[3] = {parts[k].x[0], parts[k].x[1], parts[k].x[2]};
+      const double *px = part_get_const_x(&parts[k]);
       for (int j = 0; j < 13; j++)
         if (flags & (1 << j)) {
           struct sort_entry *entries = cell_get_hydro_sorts(c, j);

@@ -350,11 +350,11 @@ __attribute__((always_inline)) INLINE static int part_is_active(
     const struct part *p, const struct engine *e) {
 
   const timebin_t max_active_bin = e->max_active_bin;
-  const timebin_t part_bin = p->time_bin;
+  const timebin_t part_bin = part_get_time_bin(p);
 
 #ifdef SWIFT_DEBUG_CHECKS
   const integertime_t ti_current = e->ti_current;
-  const integertime_t ti_end = get_integer_time_end(ti_current, p->time_bin);
+  const integertime_t ti_end = get_integer_time_end(ti_current, part_bin);
   if (ti_end < ti_current)
     error(
         "particle in an impossible time-zone! p->ti_end=%lld "
@@ -368,7 +368,7 @@ __attribute__((always_inline)) INLINE static int part_is_active(
 __attribute__((always_inline)) INLINE static int part_is_active_no_debug(
     const struct part *p, const timebin_t max_active_bin) {
 
-  const timebin_t part_bin = p->time_bin;
+  const timebin_t part_bin = part_get_time_bin(p);
 
   return (part_bin <= max_active_bin);
 }
@@ -384,12 +384,14 @@ __attribute__((always_inline)) INLINE static int part_is_rt_active(
     const struct part *p, const struct engine *e) {
 
   const timebin_t max_active_bin = e->max_active_bin_subcycle;
-  const timebin_t part_bin = p->rt_time_data.time_bin;
+  const struct rt_timestepping_data *const rt_time_data =
+      part_get_const_rt_time_data_p(p);
+  const timebin_t part_bin = rt_time_data->time_bin;
 
 #ifdef SWIFT_DEBUG_CHECKS
   const integertime_t ti_current_subcycle = e->ti_current_subcycle;
   const integertime_t ti_end =
-      get_integer_time_end(ti_current_subcycle, p->rt_time_data.time_bin);
+      get_integer_time_end(ti_current_subcycle, part_bin);
   if (ti_end < ti_current_subcycle)
     error(
         "particle in an impossible time-zone! p->ti_end_subcycle=%lld "
@@ -517,7 +519,7 @@ __attribute__((always_inline)) INLINE static int bpart_is_active(
  */
 __attribute__((always_inline)) INLINE static int part_is_inhibited(
     const struct part *p, const struct engine *e) {
-  return p->time_bin == time_bin_inhibited;
+  return part_get_time_bin(p) == time_bin_inhibited;
 }
 
 /**
@@ -691,12 +693,11 @@ __attribute__((always_inline)) INLINE static int part_is_starting(
     const struct part *p, const struct engine *e) {
 
   const timebin_t max_active_bin = e->max_active_bin;
-  const timebin_t part_bin = p->time_bin;
+  const timebin_t part_bin = part_get_time_bin(p);
 
 #ifdef SWIFT_DEBUG_CHECKS
   const integertime_t ti_current = e->ti_current;
-  const integertime_t ti_beg =
-      get_integer_time_begin(ti_current + 1, p->time_bin);
+  const integertime_t ti_beg = get_integer_time_begin(ti_current + 1, part_bin);
 
   if (ti_beg > ti_current)
     error(

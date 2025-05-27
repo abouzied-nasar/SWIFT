@@ -27,6 +27,7 @@
 #include "gravity_properties.h"
 #include "inline.h"
 #include "kernel_hydro.h"
+#include "part.h"
 
 #ifdef ADAPTIVE_SOFTENING
 
@@ -58,7 +59,7 @@
  * @param grav_props The properties of the gravity scheme.
  */
 INLINE static void gravity_update_softening(
-    struct gpart* gp, const struct part* p,
+    struct gpart* restrict gp, const struct part* restrict p,
     const struct gravity_props* grav_props) {
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -124,7 +125,7 @@ INLINE static void adaptive_softening_end_density(
  * @param grav_props The properties of the gravity scheme.
  */
 INLINE static void gravity_update_softening(
-    struct gpart* gp, const struct part* p,
+    struct gpart* restrict gp, const struct part* restrict p,
     const struct gravity_props* grav_props) {}
 
 /**

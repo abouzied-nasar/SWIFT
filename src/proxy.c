@@ -794,10 +794,12 @@ void proxy_parts_exchange_first(struct proxy *p) {
 #ifdef SWIFT_DEBUG_CHECKS
     message("isent particle data (%i) to node %i.", p->nr_parts_out, p->nodeID);
     fflush(stdout);
-    for (int k = 0; k < p->nr_parts_out; k++)
+    for (int k = 0; k < p->nr_parts_out; k++) {
+      struct part *pk = &p->parts_out[k];
       message("sending particle %lli, x=[%.3e %.3e %.3e], h=%.3e, to node %i.",
-              p->parts_out[k].id, p->parts_out[k].x[0], p->parts_out[k].x[1],
-              p->parts_out[k].x[2], p->parts_out[k].h, p->nodeID);
+              part_get_id(pk), part_get_x_ind(pk, 0), part_get_x_ind(pk, 1),
+              part_get_x_ind(pk, 2), part_get_h(pk), p->nodeID);
+    }
 #endif /* SWIFT_DEBUG_CHECKS */
   }
   if (p->nr_gparts_out > 0) {
@@ -950,10 +952,12 @@ void proxy_parts_exchange_second(struct proxy *p) {
     message("irecv particle data (%i) from node %i.", p->nr_parts_in,
             p->nodeID);
     fflush(stdout);
-    for (int k = 0; k < p->nr_parts_in; k++)
+    for (int k = 0; k < p->nr_parts_in; k++) {
+      struct part *pk = &p->parts_in[k];
       message("receiving parts %lli, x=[%.3e %.3e %.3e], h=%.3e, from node %i.",
-              p->parts_in[k].id, p->parts_in[k].x[0], p->parts_in[k].x[1],
-              p->parts_in[k].x[2], p->parts_in[k].h, p->nodeID);
+              part_get_id(pk), part_get_x_ind(pk, 0), part_get_x_ind(pk, 1),
+              part_get_x_ind(pk, 2), part_get_h(pk), p->nodeID);
+    }
 #endif /* SWIFT_DEBUG_CHECKS */
   }
   if (p->nr_gparts_in > 0) {

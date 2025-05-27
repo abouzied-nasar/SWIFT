@@ -20,6 +20,8 @@
 #ifndef SWIFT_SINK_STRUCT_DEFAULT_H
 #define SWIFT_SINK_STRUCT_DEFAULT_H
 
+#include "inline.h"
+
 /**
  * @brief Sink-related fields carried by each *gas* particle.
  */
@@ -89,7 +91,7 @@ struct sink_sink_data {
  * @param s_data The #part's #sink_part_data structure.
  */
 __attribute__((always_inline)) INLINE static long long sink_get_part_swallow_id(
-    struct sink_part_data* s_data) {
+    const struct sink_part_data* s_data) {
 
   return s_data->swallow_id;
 }

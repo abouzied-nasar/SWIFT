@@ -162,11 +162,14 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
       /* Anything to do here? (i.e. does this particle need updating?) */
       if (part_is_active(p, e)) {
 
-        double dt_cool, dt_therm;
+        double dt_cool;
+        double dt_therm;
+        const timebin_t time_bin = part_get_time_bin(p);
         if (with_cosmology) {
-          const integertime_t ti_step = get_integer_timestep(p->time_bin);
+          const integertime_t ti_step =
+              get_integer_timestep(part_get_time_bin(p));
           const integertime_t ti_begin =
-              get_integer_time_begin(ti_current - 1, p->time_bin);
+              get_integer_time_begin(ti_current - 1, time_bin);
 
           dt_cool =
               cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
@@ -174,8 +177,8 @@ void runner_do_cooling(struct runner *r, struct cell *c, int timer) {
                                                      ti_begin + ti_step);
 
         } else {
-          dt_cool = get_timestep(p->time_bin, time_base);
-          dt_therm = get_timestep(p->time_bin, time_base);
+          dt_cool = get_timestep(time_bin, time_base);
+          dt_therm = get_timestep(time_bin, time_base);
         }
 
         /* Let's cool ! */
@@ -227,7 +230,7 @@ void runner_do_star_formation_sink(struct runner *r, struct cell *c,
 
   /* Recurse? */
   if (c->split) {
-    for (int k = 0; k < 8; k++)
+    for (int k = 0; k < 8; k++) {
       if (c->progeny[k] != NULL) {
         /* Load the child cell */
         struct cell *restrict cp = c->progeny[k];
@@ -240,6 +243,7 @@ void runner_do_star_formation_sink(struct runner *r, struct cell *c,
         c->stars.h_max_active =
             max(c->stars.h_max_active, cp->stars.h_max_active);
       }
+    }
   } else {
 
     /* Loop over the sink particles in this cell. */
@@ -356,7 +360,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
 
   /* Recurse? */
   if (c->split) {
-    for (int k = 0; k < 8; k++)
+    for (int k = 0; k < 8; k++) {
       if (c->progeny[k] != NULL) {
         /* Load the child cell */
         struct cell *restrict cp = c->progeny[k];
@@ -380,6 +384,7 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
               max(cp->hydro.dx_max_sort, c->hydro.dx_max_sort);
         }
       }
+    }
   } else {
 
     /* Loop over the gas particles in this cell. */
@@ -399,16 +404,17 @@ void runner_do_star_formation(struct runner *r, struct cell *c, int timer) {
 
           /* Time-step size for this particle */
           double dt_star;
+          const timebin_t time_bin = part_get_time_bin(p);
           if (with_cosmology) {
-            const integertime_t ti_step = get_integer_timestep(p->time_bin);
+            const integertime_t ti_step = get_integer_timestep(time_bin);
             const integertime_t ti_begin =
-                get_integer_time_begin(ti_current - 1, p->time_bin);
+                get_integer_time_begin(ti_current - 1, time_bin);
 
             dt_star =
                 cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
 
           } else {
-            dt_star = get_timestep(p->time_bin, time_base);
+            dt_star = get_timestep(time_bin, time_base);
           }
 
           /* Compute the SF rate of the particle */
@@ -601,7 +607,7 @@ void runner_do_sink_formation(struct runner *r, struct cell *c) {
 
   /* Recurse? */
   if (c->split) {
-    for (int k = 0; k < 8; k++)
+    for (int k = 0; k < 8; k++) {
       if (c->progeny[k] != NULL) {
         /* Load the child cell */
         struct cell *restrict cp = c->progeny[k];
@@ -614,6 +620,7 @@ void runner_do_sink_formation(struct runner *r, struct cell *c) {
         c->sinks.h_max_active =
             max(c->sinks.h_max_active, cp->sinks.h_max_active);
       }
+    }
   } else {
 
     /* Loop over the gas particles in this cell. */
@@ -636,15 +643,16 @@ void runner_do_sink_formation(struct runner *r, struct cell *c) {
 
           /* Time-step size for this particle */
           double dt_sink;
+          const timebin_t time_bin = part_get_time_bin(p);
           if (with_cosmology) {
-            const integertime_t ti_step = get_integer_timestep(p->time_bin);
+            const integertime_t ti_step = get_integer_timestep(time_bin);
             const integertime_t ti_begin =
-                get_integer_time_begin(ti_current - 1, p->time_bin);
+                get_integer_time_begin(ti_current - 1, time_bin);
 
             dt_sink =
                 cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
           } else {
-            dt_sink = get_timestep(p->time_bin, time_base);
+            dt_sink = get_timestep(time_bin, time_base);
           }
 
           /* Are we forming a sink particle? */
@@ -718,15 +726,16 @@ void runner_do_end_hydro_force(struct runner *r, struct cell *c, int timer) {
       double dt = 0;
       if (part_is_active(p, e)) {
 
+        const timebin_t time_bin = part_get_time_bin(p);
         if (with_cosmology) {
           /* Compute the time step. */
-          const integertime_t ti_step = get_integer_timestep(p->time_bin);
+          const integertime_t ti_step = get_integer_timestep(time_bin);
           const integertime_t ti_begin =
-              get_integer_time_begin(e->ti_current - 1, p->time_bin);
+              get_integer_time_begin(e->ti_current - 1, time_bin);
 
           dt = cosmology_get_delta_time(cosmo, ti_begin, ti_begin + ti_step);
         } else {
-          dt = get_timestep(p->time_bin, e->time_base);
+          dt = get_timestep(time_bin, e->time_base);
         }
 
         /* Finish the force loop */
@@ -871,7 +880,7 @@ void runner_do_end_grav_force(struct runner *r, struct cell *c, int timer) {
             /* Get the ID of the gpart */
             long long my_id = 0;
             if (gp->type == swift_type_gas)
-              my_id = e->s->parts[-gp->id_or_neg_offset].id;
+              my_id = part_get_id(&e->s->parts[-gp->id_or_neg_offset]);
             else if (gp->type == swift_type_stars)
               my_id = e->s->sparts[-gp->id_or_neg_offset].id;
             else if (gp->type == swift_type_sink)
@@ -900,13 +909,14 @@ void runner_do_end_grav_force(struct runner *r, struct cell *c, int timer) {
         if (with_black_holes && gp->type == swift_type_gas) {
           const size_t offset = -gp->id_or_neg_offset;
           black_holes_store_potential_in_part(
-              &s->parts[offset].black_holes_data, gp);
+              part_get_black_holes_data_p(&s->parts[offset]), gp);
         }
 
         /* Deal with sinks' need of potentials */
         if (with_sinks && gp->type == swift_type_gas) {
           const size_t offset = -gp->id_or_neg_offset;
-          sink_store_potential_in_part(&s->parts[offset].sink_data, gp);
+          sink_store_potential_in_part(part_get_sink_data_p(&s->parts[offset]),
+                                       gp);
         }
       }
     }
@@ -1202,24 +1212,29 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
       if (!part_is_rt_active(p, e)) continue;
 
       /* Finish the force loop */
+      const struct rt_timestepping_data *rt_time_data =
+          part_get_const_rt_time_data_p(p);
       const integertime_t ti_current_subcycle = e->ti_current_subcycle;
       const integertime_t ti_step =
-          get_integer_timestep(p->rt_time_data.time_bin);
+          get_integer_timestep(rt_time_data->time_bin);
       const integertime_t ti_begin = get_integer_time_begin(
-          ti_current_subcycle + 1, p->rt_time_data.time_bin);
+          ti_current_subcycle + 1, rt_time_data->time_bin);
       const integertime_t ti_end = ti_begin + ti_step;
 
       const double dt =
           rt_part_dt(ti_begin, ti_end, e->time_base, with_cosmology, cosmo);
 #ifdef SWIFT_DEBUG_CHECKS
+      const struct timestep_limiter_data *limiter_data =
+          part_get_limiter_data_p(p);
       if (ti_begin != ti_current_subcycle)
         error(
             "Particle in wrong time-bin, ti_end=%lld, ti_begin=%lld, "
             "ti_step=%lld time_bin=%d wakeup=%d ti_current=%lld",
-            ti_end, ti_begin, ti_step, p->time_bin, p->limiter_data.wakeup,
-            ti_current_subcycle);
+            ti_end, ti_begin, ti_step, part_get_time_bin(p),
+            limiter_data->wakeup, ti_current_subcycle);
       if (dt < 0.)
-        error("Got part with negative time-step: %lld, %.6g", p->id, dt);
+        error("Got part with negative time-step: %lld, %.6g", part_get_id(p),
+              dt);
 #endif
 
       rt_finalise_transport(p, rt_props, dt, cosmo);

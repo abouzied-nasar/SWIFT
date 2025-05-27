@@ -96,12 +96,13 @@ void space_parts_get_cell_index_mapper(void *map_data, int nr_parts,
     /* Get the particle */
     struct part *restrict p = &parts[k];
 
-    double old_pos_x = p->x[0];
-    double old_pos_y = p->x[1];
-    double old_pos_z = p->x[2];
+    double *x = part_get_x(p);
+    double old_pos_x = x[0];
+    double old_pos_y = x[1];
+    double old_pos_z = x[2];
 
 #ifdef SWIFT_DEBUG_CHECKS
-    if (!s->periodic && p->time_bin != time_bin_inhibited) {
+    if (!s->periodic && part_get_time_bin(p) != time_bin_inhibited) {
       if (old_pos_x < 0. || old_pos_x > dim_x)
         error("Particle outside of volume along X.");
       if (old_pos_y < 0. || old_pos_y > dim_y)
@@ -138,11 +139,11 @@ void space_parts_get_cell_index_mapper(void *map_data, int nr_parts,
             pos_z);
 #endif
 
-    if (p->time_bin == time_bin_inhibited) {
+    if (part_get_time_bin(p) == time_bin_inhibited) {
       /* Is this particle to be removed? */
       ind[k] = -1;
       ++count_inhibited_part;
-    } else if (p->time_bin == time_bin_not_created) {
+    } else if (part_get_time_bin(p) == time_bin_not_created) {
       /* Is this a place-holder for on-the-fly creation? */
       ind[k] = index;
       cell_counts[index]++;
@@ -157,12 +158,13 @@ void space_parts_get_cell_index_mapper(void *map_data, int nr_parts,
       min_mass = min(min_mass, hydro_get_mass(p));
 
       /* Compute sum of velocity norm */
-      sum_vel_norm += p->v[0] * p->v[0] + p->v[1] * p->v[1] + p->v[2] * p->v[2];
+      float *v = part_get_v(p);
+      sum_vel_norm += v[0] * v[0] + v[1] * v[1] + v[2] * v[2];
 
       /* Update the position */
-      p->x[0] = pos_x;
-      p->x[1] = pos_y;
-      p->x[2] = pos_z;
+      x[0] = pos_x;
+      x[1] = pos_y;
+      x[2] = pos_z;
     }
   }
 

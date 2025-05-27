@@ -335,6 +335,52 @@ struct counts_mapper_data {
 
 /* Generic function for accumulating sized counts for TYPE parts. Note uses
  * local memory to reduce contention, the amount of memory required is
+ * precalculated by an additional loop determining the range of cell IDs.
+ * This version uses getters/setters to access particle fields.*/
+#define ACCUMULATE_SIZES_GETTERS_MAPPER(TYPE)                                  \
+  partition_accumulate_sizes_mapper_##TYPE(void *map_data, int num_elements,   \
+                                           void *extra_data) {                 \
+    struct TYPE *parts = (struct TYPE *)map_data;                              \
+    struct counts_mapper_data *mydata =                                        \
+        (struct counts_mapper_data *)extra_data;                               \
+    double size = mydata->size;                                                \
+    int *cdim = mydata->s->cdim;                                               \
+    double iwidth[3] = {mydata->s->iwidth[0], mydata->s->iwidth[1],            \
+                        mydata->s->iwidth[2]};                                 \
+    double dim[3] = {mydata->s->dim[0], mydata->s->dim[1], mydata->s->dim[2]}; \
+    double *lcounts = NULL;                                                    \
+    int lcid = mydata->s->nr_cells;                                            \
+    int ucid = 0;                                                              \
+    for (int k = 0; k < num_elements; k++) {                                   \
+      double *x = TYPE##_get_x(&parts[k]);                                     \
+      for (int j = 0; j < 3; j++) {                                            \
+        if (x[j] < 0.0) {                                                      \
+          x[j] += dim[j];                                                      \
+        } else if (x[j] >= dim[j]) {                                           \
+          x[j] -= dim[j];                                                      \
+        }                                                                      \
+      }                                                                        \
+      const int cid = cell_getid(cdim, x[0] * iwidth[0], x[1] * iwidth[1],     \
+                                 x[2] * iwidth[2]);                            \
+      if (cid > ucid) ucid = cid;                                              \
+      if (cid < lcid) lcid = cid;                                              \
+    }                                                                          \
+    int nused = ucid - lcid + 1;                                               \
+    if ((lcounts = (double *)calloc(nused, sizeof(double))) == NULL)           \
+      error("Failed to allocate counts thread-specific buffer");               \
+    for (int k = 0; k < num_elements; k++) {                                   \
+      const double *x = TYPE##_get_const_x(&parts[k]);                         \
+      const int cid = cell_getid(cdim, x[0] * iwidth[0], x[1] * iwidth[1],     \
+                                 x[2] * iwidth[2]);                            \
+      lcounts[cid - lcid] += size;                                             \
+    }                                                                          \
+    for (int k = 0; k < nused; k++)                                            \
+      atomic_add_d(&mydata->counts[k + lcid], lcounts[k]);                     \
+    free(lcounts);                                                             \
+  }
+
+/* Generic function for accumulating sized counts for TYPE parts. Note uses
+ * local memory to reduce contention, the amount of memory required is
  * precalculated by an additional loop determining the range of cell IDs. */
 #define ACCUMULATE_SIZES_MAPPER(TYPE)                                          \
   partition_accumulate_sizes_mapper_##TYPE(void *map_data, int num_elements,   \
@@ -383,7 +429,7 @@ struct counts_mapper_data {
  *
  * part version.
  */
-void ACCUMULATE_SIZES_MAPPER(part);
+void ACCUMULATE_SIZES_GETTERS_MAPPER(part);
 
 /**
  * @brief Accumulate the sized counts of particles per cell.

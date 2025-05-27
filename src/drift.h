@@ -153,13 +153,13 @@ __attribute__((always_inline)) INLINE static void drift_part(
   const struct pressure_floor_props *pressure_floor = e->pressure_floor_props;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (p->ti_drift != ti_old)
+  if (part_get_ti_drift(p) != ti_old)
     error(
         "particle has not been drifted to the current time p->ti_drift=%lld, "
         "c->ti_old=%lld, ti_current=%lld",
-        p->ti_drift, ti_old, ti_current);
+        part_get_ti_drift(p), ti_old, ti_current);
 
-  p->ti_drift = ti_current;
+  part_set_ti_drift(p, ti_current);
 #endif
 
 #ifdef SWIFT_FIXED_BOUNDARY_PARTICLES
@@ -184,20 +184,24 @@ __attribute__((always_inline)) INLINE static void drift_part(
 #endif
 
   /* Drift... */
-  p->x[0] += xp->v_full[0] * dt_drift;
-  p->x[1] += xp->v_full[1] * dt_drift;
-  p->x[2] += xp->v_full[2] * dt_drift;
+  double *x = part_get_x(p);
+  x[0] += xp->v_full[0] * dt_drift;
+  x[1] += xp->v_full[1] * dt_drift;
+  x[2] += xp->v_full[2] * dt_drift;
 
   /* Predict velocities (for hydro terms) */
-  p->v[0] += p->a_hydro[0] * dt_kick_hydro;
-  p->v[1] += p->a_hydro[1] * dt_kick_hydro;
-  p->v[2] += p->a_hydro[2] * dt_kick_hydro;
+  float *v = part_get_v(p);
+  const float *a_hydro = part_get_const_a_hydro(p);
+  v[0] += a_hydro[0] * dt_kick_hydro;
+  v[1] += a_hydro[1] * dt_kick_hydro;
+  v[2] += a_hydro[2] * dt_kick_hydro;
 
   /* Predict velocities (for gravity terms) */
-  if (p->gpart != NULL) {
-    p->v[0] += xp->a_grav[0] * dt_kick_grav;
-    p->v[1] += xp->a_grav[1] * dt_kick_grav;
-    p->v[2] += xp->a_grav[2] * dt_kick_grav;
+  struct gpart *gp = part_get_gpart(p);
+  if (gp != NULL) {
+    v[0] += xp->a_grav[0] * dt_kick_grav;
+    v[1] += xp->a_grav[1] * dt_kick_grav;
+    v[2] += xp->a_grav[2] * dt_kick_grav;
   }
 
   /* Predict the values of the extra fields */
@@ -206,7 +210,7 @@ __attribute__((always_inline)) INLINE static void drift_part(
   mhd_predict_extra(p, xp, dt_drift, dt_therm, cosmo, hydro_props,
                     entropy_floor);
   rt_predict_extra(p, xp, dt_drift);
-  if (p->gpart) gravity_update_softening(p->gpart, p, e->gravity_properties);
+  if (gp) gravity_update_softening(gp, p, e->gravity_properties);
 
   /* Compute offsets since last cell construction */
   for (int k = 0; k < 3; k++) {

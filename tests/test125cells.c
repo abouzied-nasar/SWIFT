@@ -55,24 +55,24 @@ void set_velocity(struct part *part, enum velocity_field vel, float size) {
 
   switch (vel) {
     case velocity_zero:
-      part->v[0] = 0.f;
-      part->v[1] = 0.f;
-      part->v[2] = 0.f;
+      part_set_v_ind(part, 0, 0.f);
+      part_set_v_ind(part, 1, 0.f);
+      part_set_v_ind(part, 2, 0.f);
       break;
     case velocity_const:
-      part->v[0] = 1.f;
-      part->v[1] = 0.f;
-      part->v[2] = 0.f;
+      part_set_v_ind(part, 0, 1.f);
+      part_set_v_ind(part, 1, 0.f);
+      part_set_v_ind(part, 2, 0.f);
       break;
     case velocity_divergent:
-      part->v[0] = part->x[0] - 2.5 * size;
-      part->v[1] = part->x[1] - 2.5 * size;
-      part->v[2] = part->x[2] - 2.5 * size;
+      part_set_v_ind(part, 0, part_get_x_ind(part, 0) - 2.5 * size);
+      part_set_v_ind(part, 1, part_get_x_ind(part, 1) - 2.5 * size);
+      part_set_v_ind(part, 2, part_get_x_ind(part, 2) - 2.5 * size);
       break;
     case velocity_rotating:
-      part->v[0] = part->x[1];
-      part->v[1] = -part->x[0];
-      part->v[2] = 0.f;
+      part_set_v_ind(part, 0, part_get_x_ind(part, 1));
+      part_set_v_ind(part, 1, -part_get_x_ind(part, 0));
+      part_set_v_ind(part, 2, 0.f);
       break;
   }
 }
@@ -94,7 +94,7 @@ float get_pressure(double x[3], enum pressure_field press, float size) {
       dx[1] = x[1] - 2.5 * size;
       dx[2] = x[2] - 2.5 * size;
       r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-      return sqrt(r2) + 1.5f;
+      return sqrtf(r2) + 1.5f;
       break;
   }
   return 0.f;
@@ -103,24 +103,24 @@ float get_pressure(double x[3], enum pressure_field press, float size) {
 void set_energy_state(struct part *part, enum pressure_field press, float size,
                       float density) {
 
-  const float pressure = get_pressure(part->x, press, size);
+  const float pressure = get_pressure(part_get_x(part), press, size);
 
 #if defined(GADGET2_SPH)
-  part->entropy = pressure / pow_gamma(density);
+  part_set_entropy(part, pressure / pow_gamma(density));
 #elif defined(HOPKINS_PE_SPH)
-  part->entropy = pressure / pow_gamma(density);
+  part_set_entropy(part, pressure / pow_gamma(density));
 #elif defined(PHANTOM_SPH)
-  part->u = pressure / (hydro_gamma_minus_one * density);
+  part_set_u(pressure / (hydro_gamma_minus_one * density));
 #elif defined(MINIMAL_SPH) || defined(HOPKINS_PU_SPH) ||           \
     defined(HOPKINS_PU_SPH_MONAGHAN) || defined(ANARCHY_PU_SPH) || \
     defined(SPHENIX_SPH) || defined(PHANTOM_SPH) || defined(GASOLINE_SPH)
-  part->u = pressure / (hydro_gamma_minus_one * density);
+  part_set_u(part, pressure / (hydro_gamma_minus_one * density));
 #elif defined(PLANETARY_SPH) || defined(REMIX_SPH)
   set_idg_def(&eos.idg_def, 0);
-  part->mat_id = 0;
-  part->u = pressure / (hydro_gamma_minus_one * density);
+  part_set_mat_id(part, 0);
+  part_set_u(part, pressure / (hydro_gamma_minus_one * density));
 #elif defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
-  part->conserved.energy = pressure / (hydro_gamma_minus_one * density);
+  part_set_conserved_energy(part, pressure / (hydro_gamma_minus_one * density));
 #else
   error("Need to define pressure here !");
 #endif
@@ -151,24 +151,24 @@ void get_solution(const struct cell *main_cell, struct solution_part *solution,
 
   for (int i = 0; i < main_cell->hydro.count; ++i) {
 
-    solution[i].id = main_cell->hydro.parts[i].id;
+    const struct part *pi = &main_cell->hydro.parts[i];
 
-    solution[i].x[0] = main_cell->hydro.parts[i].x[0];
-    solution[i].x[1] = main_cell->hydro.parts[i].x[1];
-    solution[i].x[2] = main_cell->hydro.parts[i].x[2];
+    solution[i].id = part_get_id(pi);
+    solution[i].x[0] = part_get_x_ind(pi, 0);
+    solution[i].x[1] = part_get_x_ind(pi, 1);
+    solution[i].x[2] = part_get_x_ind(pi, 2);
+    solution[i].v[0] = part_get_v_ind(pi, 0);
+    solution[i].v[1] = part_get_v_ind(pi, 1);
+    solution[i].v[2] = part_get_v_ind(pi, 2);
 
-    solution[i].v[0] = main_cell->hydro.parts[i].v[0];
-    solution[i].v[1] = main_cell->hydro.parts[i].v[1];
-    solution[i].v[2] = main_cell->hydro.parts[i].v[2];
-
-    solution[i].h = main_cell->hydro.parts[i].h;
+    solution[i].h = part_get_h(pi);
 
     solution[i].rho = density;
 
     solution[i].P = get_pressure(solution[i].x, press, size);
     solution[i].u = solution[i].P / (solution[i].rho * hydro_gamma_minus_one);
     solution[i].S = solution[i].P / pow_gamma(solution[i].rho);
-    solution[i].c = sqrt(hydro_gamma * solution[i].P / solution[i].rho);
+    solution[i].c = sqrtf(hydro_gamma * solution[i].P / solution[i].rho);
 
     if (vel == velocity_divergent)
       solution[i].div_v = 3.f;
@@ -187,7 +187,7 @@ void get_solution(const struct cell *main_cell, struct solution_part *solution,
       dx[0] = solution[i].x[0] - 2.5 * size;
       dx[1] = solution[i].x[1] - 2.5 * size;
       dx[2] = solution[i].x[2] - 2.5 * size;
-      float r = sqrt(dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2]);
+      float r = sqrtf(dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2]);
       if (r > 0.) {
         gradP[0] = dx[0] / r;
         gradP[1] = dx[1] / r;
@@ -278,26 +278,29 @@ struct cell *make_cell(size_t n, const double offset[3], double size, double h,
   for (size_t x = 0; x < n; ++x) {
     for (size_t y = 0; y < n; ++y) {
       for (size_t z = 0; z < n; ++z) {
-        part->x[0] =
+        part_set_x_ind(
+            part, 0,
             offset[0] +
-            size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
-        part->x[1] =
+                size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 1,
             offset[1] +
-            size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
-        part->x[2] =
+                size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 2,
             offset[2] +
-            size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
-        part->h = size * h / (float)n;
-        h_max = fmax(h_max, part->h);
-        part->depth_h = 0;
+                size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_h(part, size * h / (float)n);
+        h_max = fmaxf(h_max, part_get_h(part));
+        part_set_depth_h(part, 0);
 
 #if defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
-        part->conserved.mass = density * volume / count;
+        part_set_conserved_mass(part, density * volume / count);
 #else
-        part->mass = density * volume / count;
+        part_set_mass(part, density * volume / count);
 #endif
 #if defined(REMIX_SPH)
-        part->rho = density;
+        part_set_rho(part, density);
 #endif
 
         set_velocity(part, vel, size);
@@ -305,12 +308,12 @@ struct cell *make_cell(size_t n, const double offset[3], double size, double h,
 
         hydro_first_init_part(part, xpart);
 
-        part->id = ++(*partId);
-        part->time_bin = 1;
+        part_set_id(part, ++(*partId));
+        part_set_time_bin(part, 1);
 
 #ifdef SWIFT_DEBUG_CHECKS
-        part->ti_drift = 8;
-        part->ti_kick = 8;
+        part_set_ti_drift(part, 8);
+        part_set_ti_kick(part, 8);
 #endif
 
         ++part;
@@ -377,45 +380,38 @@ void dump_particle_fields(char *fileName, struct cell *main_cell,
 
   /* Write main cell */
   for (int pid = 0; pid < main_cell->hydro.count; pid++) {
+    const struct part *pi = &main_cell->hydro.parts[pid];
     fprintf(file,
             "%6llu %8.5f %8.5f %8.5f %8.5f %8.5f %8.5f %8.5f %8.5f %8.5f %8.5f "
             "%8.5f "
             "%8.5f %8.5f %13e %13e %13e %13e %13e %8.5f %8.5f\n",
-            main_cell->hydro.parts[pid].id, main_cell->hydro.parts[pid].x[0],
-            main_cell->hydro.parts[pid].x[1], main_cell->hydro.parts[pid].x[2],
-            main_cell->hydro.parts[pid].v[0], main_cell->hydro.parts[pid].v[1],
-            main_cell->hydro.parts[pid].v[2], main_cell->hydro.parts[pid].h,
-            hydro_get_comoving_density(&main_cell->hydro.parts[pid]),
+            part_get_id(pi), part_get_x_ind(pi, 0), part_get_x_ind(pi, 1),
+            part_get_x_ind(pi, 2), part_get_v_ind(pi, 0), part_get_v_ind(pi, 1),
+            part_get_v_ind(pi, 2), part_get_h(pi),
+            hydro_get_comoving_density(pi),
 #if defined(MINIMAL_SPH) || defined(PLANETARY_SPH) ||              \
     defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH) ||            \
     defined(HOPKINS_PU_SPH) || defined(HOPKINS_PU_SPH_MONAGHAN) || \
     defined(GASOLINE_SPH) || defined(REMIX_SPH)
             0.f,
 #elif defined(ANARCHY_PU_SPH) || defined(SPHENIX_SPH) || defined(PHANTOM_SPH)
-            main_cell->hydro.parts[pid].viscosity.div_v,
+            part_get_div_v(pi),
 #else
-            main_cell->hydro.parts[pid].density.div_v,
+            part_get_div_v(pi),
 #endif
-            hydro_get_drifted_comoving_entropy(&main_cell->hydro.parts[pid]),
-            hydro_get_drifted_comoving_internal_energy(
-                &main_cell->hydro.parts[pid]),
-            hydro_get_comoving_pressure(&main_cell->hydro.parts[pid]),
-            hydro_get_comoving_soundspeed(&main_cell->hydro.parts[pid]),
-            main_cell->hydro.parts[pid].a_hydro[0],
-            main_cell->hydro.parts[pid].a_hydro[1],
-            main_cell->hydro.parts[pid].a_hydro[2],
-            main_cell->hydro.parts[pid].force.h_dt,
+            hydro_get_drifted_comoving_entropy(pi),
+            hydro_get_drifted_comoving_internal_energy(pi),
+            hydro_get_comoving_pressure(pi), hydro_get_comoving_soundspeed(pi),
+            part_get_a_hydro_ind(pi, 0), part_get_a_hydro_ind(pi, 1),
+            part_get_a_hydro_ind(pi, 2), part_get_h_dt(pi),
 #if defined(GADGET2_SPH)
-            main_cell->hydro.parts[pid].force.v_sig,
-            main_cell->hydro.parts[pid].entropy_dt, 0.f
+            part_get_v_sig(pi), part_get_entropy_dt(pi), 0.f
 #elif defined(MINIMAL_SPH) || defined(HOPKINS_PU_SPH) || \
     defined(HOPKINS_PU_SPH_MONAGHAN)
-            main_cell->hydro.parts[pid].force.v_sig, 0.f,
-            main_cell->hydro.parts[pid].u_dt
+            part_get_v_sig(pi), 0.f, part_get_u_dt(pi)
 #elif defined(ANARCHY_PU_SPH) || defined(SPHENIX_SPH) || \
     defined(PHANTOM_SPH) || defined(GASOLINE_SPH)
-            main_cell->hydro.parts[pid].viscosity.v_sig, 0.f,
-            main_cell->hydro.parts[pid].u_dt
+            part_get_v_sig(pi), 0.f, part_get_u_dt(pi)
 #else
             0.f, 0.f, 0.f
 #endif

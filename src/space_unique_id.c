@@ -177,7 +177,7 @@ void space_init_unique_id(struct space *s, int nr_nodes) {
   /* Check the parts for the max id. */
   for (size_t i = 0; i < s->nr_parts; i++) {
     s->unique_id.global_next_id =
-        max(s->unique_id.global_next_id, s->parts[i].id);
+        max(s->unique_id.global_next_id, part_get_id(&s->parts[i]));
   }
 
   /* Check the gparts for the max id. */

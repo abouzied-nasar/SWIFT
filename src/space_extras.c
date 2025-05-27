@@ -272,8 +272,8 @@ void space_allocate_extras(struct space *s, int verbose) {
          ++i) {
       bzero(&s->parts[i], sizeof(struct part));
       bzero(&s->xparts[i], sizeof(struct xpart));
-      s->parts[i].time_bin = time_bin_not_created;
-      s->parts[i].id = -42;
+      part_set_time_bin(&s->parts[i], time_bin_not_created);
+      part_set_id(&s->parts[i], -42);
     }
 
     /* Put the spare particles in their correct cell */
@@ -290,12 +290,13 @@ void space_allocate_extras(struct space *s, int verbose) {
         error("Cell counter beyond the maximal nr. cells.");
 #endif
 
-      if (s->parts[i].time_bin == time_bin_not_created) {
+      if (part_get_time_bin(&s->parts[i]) == time_bin_not_created) {
 
         /* We want the extra particles to be at the centre of their cell */
-        s->parts[i].x[0] = cells[current_cell].loc[0] + half_cell_width[0];
-        s->parts[i].x[1] = cells[current_cell].loc[1] + half_cell_width[1];
-        s->parts[i].x[2] = cells[current_cell].loc[2] + half_cell_width[2];
+        double *px = part_get_x(&s->parts[i]);
+        px[0] = cells[current_cell].loc[0] + half_cell_width[0];
+        px[1] = cells[current_cell].loc[1] + half_cell_width[1];
+        px[2] = cells[current_cell].loc[2] + half_cell_width[2];
         ++count_in_cell;
 #ifdef SWIFT_DEBUG_CHECKS
         count_extra_parts++;

@@ -22,9 +22,6 @@
 /* Config parameters. */
 #include <config.h>
 
-/* Local headers. */
-#include "part.h"
-
 /* Import the right functions */
 #if defined(NONE_MHD)
 #include "./mhd/None/mhd_struct.h"

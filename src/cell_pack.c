@@ -190,7 +190,7 @@ void cell_pack_part_swallow(const struct cell *c,
   const struct part *parts = c->hydro.parts;
 
   for (size_t i = 0; i < count; ++i) {
-    data[i] = parts[i].black_holes_data;
+    data[i] = *part_get_const_black_holes_data_p(&parts[i]);
   }
 }
 
@@ -201,7 +201,7 @@ void cell_unpack_part_swallow(struct cell *c,
   struct part *parts = c->hydro.parts;
 
   for (size_t i = 0; i < count; ++i) {
-    parts[i].black_holes_data = data[i];
+    part_set_black_holes_data(&parts[i], data[i]);
   }
 }
 
@@ -296,7 +296,7 @@ int cell_unpack(struct pcell *restrict pc, struct cell *restrict c,
 
   /* Fill the progeny recursively, depth-first. */
   c->split = 0;
-  for (int k = 0; k < 8; k++)
+  for (int k = 0; k < 8; k++) {
     if (pc->progeny[k] >= 0) {
       struct cell *temp;
       space_getcells(s, 1, &temp, 0);
@@ -331,6 +331,7 @@ int cell_unpack(struct pcell *restrict pc, struct cell *restrict c,
       c->split = 1;
       count += cell_unpack(&pc[pc->progeny[k]], temp, s, with_gravity);
     }
+  }
 
   /* Return the total number of unpacked cells. */
   c->mpi.pcell_size = count;
@@ -542,7 +543,7 @@ void cell_pack_timebin(const struct cell *const c, timebin_t *const t) {
   swift_declare_aligned_ptr(timebin_t, t_align, t, SWIFT_CACHE_ALIGNMENT);
 
   for (int i = 0; i < c->hydro.count; ++i)
-    t_align[i] = c->hydro.parts[i].time_bin;
+    t_align[i] = part_get_time_bin(&c->hydro.parts[i]);
 
 #else
   error("SWIFT was not compiled with MPI support.");
@@ -563,8 +564,9 @@ void cell_unpack_timebin(struct cell *const c, timebin_t *const t) {
 
   swift_declare_aligned_ptr(timebin_t, t_align, t, SWIFT_CACHE_ALIGNMENT);
 
-  for (int i = 0; i < c->hydro.count; ++i)
-    c->hydro.parts[i].time_bin = t_align[i];
+  for (int i = 0; i < c->hydro.count; ++i) {
+    part_set_time_bin(&c->hydro.parts[i], t_align[i]);
+  }
 
 #else
   error("SWIFT was not compiled with MPI support.");

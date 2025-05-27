@@ -603,14 +603,14 @@ void io_write_meta_data(hid_t h_file, const struct engine* e,
   h_grp =
       H5Gcreate(h_file, "/Parameters", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
   if (h_grp < 0) error("Error while creating parameters group");
-  parser_write_params_to_hdf5(e->parameter_file, h_grp, /*write_used=*/1);
+  parser_write_params_to_hdf5(e->parameter_file, h_grp, /*write_all=*/1);
   H5Gclose(h_grp);
 
   /* Print the runtime unused parameters */
   h_grp = H5Gcreate(h_file, "/UnusedParameters", H5P_DEFAULT, H5P_DEFAULT,
                     H5P_DEFAULT);
   if (h_grp < 0) error("Error while creating parameters group");
-  parser_write_params_to_hdf5(e->parameter_file, h_grp, /*write_used=*/0);
+  parser_write_params_to_hdf5(e->parameter_file, h_grp, /*write_all=*/0);
   H5Gclose(h_grp);
 
   /* Print the recording triggers */
@@ -1020,13 +1020,16 @@ void io_duplicate_hydro_gparts_mapper(void* restrict data, int Ngas,
   for (int i = 0; i < Ngas; ++i) {
 
     /* Duplicate the crucial information */
-    gparts[i + Ndm].x[0] = parts[i].x[0];
-    gparts[i + Ndm].x[1] = parts[i].x[1];
-    gparts[i + Ndm].x[2] = parts[i].x[2];
+    struct part* p = &parts[i];
+    const double* x = part_get_const_x(p);
+    gparts[i + Ndm].x[0] = x[0];
+    gparts[i + Ndm].x[1] = x[1];
+    gparts[i + Ndm].x[2] = x[2];
 
-    gparts[i + Ndm].v_full[0] = parts[i].v[0];
-    gparts[i + Ndm].v_full[1] = parts[i].v[1];
-    gparts[i + Ndm].v_full[2] = parts[i].v[2];
+    const float* v = part_get_const_v(p);
+    gparts[i + Ndm].v_full[0] = v[0];
+    gparts[i + Ndm].v_full[1] = v[1];
+    gparts[i + Ndm].v_full[2] = v[2];
 
     gparts[i + Ndm].mass = hydro_get_mass(&parts[i]);
 
@@ -1035,7 +1038,7 @@ void io_duplicate_hydro_gparts_mapper(void* restrict data, int Ngas,
 
     /* Link the particles */
     gparts[i + Ndm].id_or_neg_offset = -(long long)(offset + i);
-    parts[i].gpart = &gparts[i + Ndm];
+    part_set_gpart(&parts[i], &gparts[i + Ndm]);
   }
 }
 
@@ -1272,12 +1275,12 @@ void io_collect_parts_to_write(const struct part* restrict parts,
   for (size_t i = 0; i < Nparts; ++i) {
 
     /* And collect the ones that have not been removed */
-    if (parts[i].time_bin != time_bin_inhibited &&
-        parts[i].time_bin != time_bin_not_created) {
+    if (part_get_time_bin(&parts[i]) != time_bin_inhibited &&
+        part_get_time_bin(&parts[i]) != time_bin_not_created) {
 
       /* When subsampling, select particles at random */
       if (subsample) {
-        const float r = random_unit_interval(parts[i].id, snap_num,
+        const float r = random_unit_interval(part_get_id(&parts[i]), snap_num,
                                              random_number_snapshot_sampling);
 
         if (r > subsample_ratio) continue;

@@ -90,7 +90,7 @@ void space_regrid(struct space *s, int verbose) {
       /* Last option: run through the particles */
     } else {
       for (size_t k = 0; k < nr_parts; k++) {
-        if (s->parts[k].h > h_max) h_max = s->parts[k].h;
+        if (part_get_h(&s->parts[k]) > h_max) h_max = part_get_h(&s->parts[k]);
       }
       for (size_t k = 0; k < nr_sparts; k++) {
         if (s->sparts[k].h > h_max) h_max = s->sparts[k].h;

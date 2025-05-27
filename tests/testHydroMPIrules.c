@@ -51,14 +51,16 @@ void test(void) {
   }
 
   /* Make the particle smoothing length and position reasonable */
-  for (size_t i = 0; i < 3; ++i) pi.x[i] = random_uniform(-1., 1.);
-  for (size_t i = 0; i < 3; ++i) pj.x[i] = random_uniform(-1., 1.);
-  pi.h = 2.f;
-  pj.h = 2.f;
-  pi.id = 1ll;
-  pj.id = 2ll;
-  pi.time_bin = 1;
-  pj.time_bin = 1;
+  for (size_t i = 0; i < 3; ++i)
+    part_set_x_ind(&pi, i, random_uniform(-1., 1.));
+  for (size_t i = 0; i < 3; ++i)
+    part_set_x_ind(&pj, i, random_uniform(-1., 1.));
+  part_set_h(&pi, 2.f);
+  part_set_h(&pj, 2.f);
+  part_set_id(&pi, 1ll);
+  part_set_id(&pj, 2ll);
+  part_set_time_bin(&pi, 1);
+  part_set_time_bin(&pj, 1);
 
   /* Make an xpart companion */
   struct xpart xpi, xpj;
@@ -78,17 +80,20 @@ void test(void) {
 
   /* Compute distance vector */
   float dx[3];
-  dx[0] = pi.x[0] - pj.x[0];
-  dx[1] = pi.x[1] - pj.x[1];
-  dx[2] = pi.x[2] - pj.x[2];
+  dx[0] = part_get_x_ind(&pi, 0) - part_get_x_ind(&pj, 0);
+  dx[1] = part_get_x_ind(&pi, 1) - part_get_x_ind(&pj, 1);
+  dx[2] = part_get_x_ind(&pi, 2) - part_get_x_ind(&pj, 2);
   float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
 
+  const float hi = part_get_h(&pi);
+  const float hj = part_get_h(&pj);
+
   /* --- Test the density loop --- */
-  runner_iact_nonsym_density(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
-  runner_iact_nonsym_mhd_density(r2, dx, pi.h, pj.h, &pi, &pj, mu_0, a, H);
-  runner_iact_nonsym_chemistry(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
-  runner_iact_nonsym_pressure_floor(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
-  runner_iact_nonsym_star_formation(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
+  runner_iact_nonsym_density(r2, dx, hi, hj, &pi, &pj, a, H);
+  runner_iact_nonsym_mhd_density(r2, dx, hi, hj, &pi, &pj, mu_0, a, H);
+  runner_iact_nonsym_chemistry(r2, dx, hi, hj, &pi, &pj, a, H);
+  runner_iact_nonsym_pressure_floor(r2, dx, hi, hj, &pi, &pj, a, H);
+  runner_iact_nonsym_star_formation(r2, dx, hi, hj, &pi, &pj, a, H);
 
   /* Check whether pj has been modified */
   j_not_ok = memcmp(&pj, &pj2, sizeof(struct part));
@@ -104,8 +109,8 @@ void test(void) {
   /* --- Test the gradient loop --- */
 #ifdef EXTRA_HYDRO_LOOP
 
-  runner_iact_nonsym_gradient(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
-  runner_iact_nonsym_mhd_gradient(r2, dx, pi.h, pj.h, &pi, &pj, mu_0, a, H);
+  runner_iact_nonsym_gradient(r2, dx, hi, hj, &pi, &pj, a, H);
+  runner_iact_nonsym_mhd_gradient(r2, dx, hi, hj, &pi, &pj, mu_0, a, H);
 
   /* Check whether pj has been modified */
   j_not_ok = memcmp((char *)&pj, (char *)&pj2, sizeof(struct part));
@@ -120,8 +125,8 @@ void test(void) {
 #endif
 
   /* --- Test the force loop --- */
-  runner_iact_nonsym_force(r2, dx, pi.h, pj.h, &pi, &pj, a, H);
-  runner_iact_nonsym_mhd_force(r2, dx, pi.h, pj.h, &pi, &pj, mu_0, a, H);
+  runner_iact_nonsym_force(r2, dx, hi, hj, &pi, &pj, a, H);
+  runner_iact_nonsym_mhd_force(r2, dx, hi, hj, &pi, &pj, mu_0, a, H);
 
   /* Check that the particles are the same */
   j_not_ok = memcmp((char *)&pj, (char *)&pj2, sizeof(struct part));

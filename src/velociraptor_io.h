@@ -20,16 +20,22 @@
 #define SWIFT_VELOCIRAPTOR_IO_H
 
 /* Config parameters. */
+#include "engine.h"
+#include "inline.h"
+#include "io_properties.h"
+#include "part.h"
+
 #include <config.h>
 
 INLINE static void velociraptor_convert_part_groupID(const struct engine* e,
                                                      const struct part* p,
                                                      const struct xpart* xp,
                                                      long long* ret) {
-  if (p->gpart == NULL)
+  const struct gpart* gp = part_get_gpart(p);
+  if (gp == NULL)
     ret[0] = 0.f;
   else {
-    const ptrdiff_t offset = p->gpart - e->s->gparts;
+    const ptrdiff_t offset = gp - e->s->gparts;
     *ret = (e->s->gpart_group_data + offset)->groupID;
   }
 }

@@ -600,8 +600,10 @@ int cell_pack_end_step(const struct cell *c, struct pcell_step *pcell);
 int cell_unpack_end_step(struct cell *c, const struct pcell_step *pcell);
 void cell_pack_timebin(const struct cell *const c, timebin_t *const t);
 void cell_unpack_timebin(struct cell *const c, timebin_t *const t);
-int cell_pack_multipoles(struct cell *c, struct gravity_tensors *m);
-int cell_unpack_multipoles(struct cell *c, struct gravity_tensors *m);
+int cell_pack_multipoles(struct cell *restrict c,
+                         struct gravity_tensors *restrict pcells);
+int cell_unpack_multipoles(struct cell *restrict c,
+                           struct gravity_tensors *restrict pcells);
 int cell_pack_sf_counts(struct cell *c, struct pcell_sf_stars *pcell);
 int cell_unpack_sf_counts(struct cell *c, struct pcell_sf_stars *pcell);
 int cell_pack_grav_counts(struct cell *c, struct pcell_sf_grav *pcell);
@@ -1683,7 +1685,7 @@ __attribute__((always_inline)) INLINE void cell_assign_cell_index(
 __attribute__((always_inline)) static INLINE void cell_set_part_h_depth(
     struct part *p, const struct cell *leaf_cell) {
 
-  const float h = p->h;
+  const float h = part_get_h(p);
   const struct cell *c = leaf_cell;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -1692,14 +1694,14 @@ __attribute__((always_inline)) static INLINE void cell_set_part_h_depth(
 
   /* Case where h is much smaller than the leaf cell itself */
   if (h < c->h_min_allowed) {
-    p->depth_h = c->depth;
+    part_set_depth_h(p, c->depth);
     return;
   }
 
   /* Climb the tree to find the correct level */
   while (c != NULL) {
     if (h >= c->h_min_allowed && h < c->h_max_allowed) {
-      p->depth_h = c->depth;
+      part_set_depth_h(p, c->depth);
       return;
     }
     c = c->parent;

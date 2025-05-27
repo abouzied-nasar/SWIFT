@@ -395,7 +395,7 @@ int lightcone_store_gas(const struct engine *e, struct lightcone_props *props,
     }
   }
 
-  data->id = p->id;
+  data->id = part_get_id(p);
   data->x[0] = x_cross[0];
   data->x[1] = x_cross[1];
   data->x[2] = x_cross[2];
@@ -405,7 +405,7 @@ int lightcone_store_gas(const struct engine *e, struct lightcone_props *props,
   data->vel[2] = xp->v_full[2] / a_cross;
   data->mass = hydro_get_mass(p);
   data->a = a_cross;
-  data->h = p->h;
+  data->h = part_get_h(p);
   data->rho = hydro_get_comoving_density(p);
   data->temperature = cooling_get_temperature(
       e->physical_constants, e->hydro_properties, e->internal_units,

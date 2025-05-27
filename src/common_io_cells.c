@@ -79,7 +79,48 @@
     return count;                                                             \
   }
 
-static long long CELL_COUNT_NON_INHIBITED_PARTICLES(part, hydro);
+/**
+ * Same as above, but uses getters and setter functions.
+ */
+#define CELL_COUNT_NON_INHIBITED_PARTICLES_GETTERS(TYPE, CELL_TYPE)           \
+  cell_count_non_inhibited_##TYPE(                                            \
+      const struct cell* c, const int subsample, const float subsample_ratio, \
+      const int snap_num, double min_pos[3], double max_pos[3]) {             \
+                                                                              \
+    const int total_count = c->CELL_TYPE.count;                               \
+    const struct TYPE* parts = c->CELL_TYPE.parts;                            \
+    long long count = 0;                                                      \
+    min_pos[0] = min_pos[1] = min_pos[2] = DBL_MAX;                           \
+    max_pos[0] = max_pos[1] = max_pos[2] = -DBL_MAX;                          \
+                                                                              \
+    for (int i = 0; i < total_count; ++i) {                                   \
+      if ((TYPE##_get_time_bin(&parts[i]) != time_bin_inhibited) &&           \
+          (TYPE##_get_time_bin(&parts[i]) != time_bin_not_created)) {         \
+                                                                              \
+        /* When subsampling, select particles at random */                    \
+        if (subsample) {                                                      \
+          const float r =                                                     \
+              random_unit_interval(TYPE##_get_id(&parts[i]), snap_num,        \
+                                   random_number_snapshot_sampling);          \
+          if (r > subsample_ratio) continue;                                  \
+        }                                                                     \
+                                                                              \
+        ++count;                                                              \
+                                                                              \
+        const double* x = TYPE##_get_const_x(&parts[i]);                      \
+        min_pos[0] = min(x[0], min_pos[0]);                                   \
+        min_pos[1] = min(x[1], min_pos[1]);                                   \
+        min_pos[2] = min(x[2], min_pos[2]);                                   \
+                                                                              \
+        max_pos[0] = max(x[0], max_pos[0]);                                   \
+        max_pos[1] = max(x[1], max_pos[1]);                                   \
+        max_pos[2] = max(x[2], max_pos[2]);                                   \
+      }                                                                       \
+    }                                                                         \
+    return count;                                                             \
+  }
+
+static long long CELL_COUNT_NON_INHIBITED_PARTICLES_GETTERS(part, hydro);
 static long long CELL_COUNT_NON_INHIBITED_PARTICLES(spart, stars);
 static long long CELL_COUNT_NON_INHIBITED_PARTICLES(bpart, black_holes);
 static long long CELL_COUNT_NON_INHIBITED_PARTICLES(sink, sinks);
