@@ -1177,6 +1177,8 @@ void *runner_main2(void *data) {
 //                    message("ctop i_c %i ctop_c j %i", ll_current->ci[cc]->top->cellID, ll_current->cj[cc]->top->cellID);
               		ll_zero->ci[cc] = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[cc];
               		ll_zero->cj[cc] = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj[cc];
+              		message("ciid %i cjid %i citop %i cjtop %i", ll_zero->ci[cc]->cellID, ll_zero->cj[cc]->cellID,
+              				ll_zero->ci[cc]->top->cellID, ll_zero->cj[cc]->top->cellID);
               	  }
             	  pack_vars_pair_dens->top_tasks_packed = 1;
                   ll_zero->lpdt = npacked;
