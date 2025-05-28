@@ -109,14 +109,17 @@ extern inline void pack_neat_pair_aos_f4(
   /*Data to be copied to GPU*/
   for (int i = 0; i < count; i++) {
     const int id_in_pack = i + local_pack_position;
-    parts_aos_buffer[id_in_pack].x_p_h.x = c->hydro.parts[i].x[0] - shift.x;
-    parts_aos_buffer[id_in_pack].x_p_h.y = c->hydro.parts[i].x[1] - shift.y;
-    parts_aos_buffer[id_in_pack].x_p_h.z = c->hydro.parts[i].x[2] - shift.z;
-    parts_aos_buffer[id_in_pack].x_p_h.w = c->hydro.parts[i].h;
-    parts_aos_buffer[id_in_pack].ux_m.x = c->hydro.parts[i].v[0];
-    parts_aos_buffer[id_in_pack].ux_m.y = c->hydro.parts[i].v[1];
-    parts_aos_buffer[id_in_pack].ux_m.z = c->hydro.parts[i].v[2];
-    parts_aos_buffer[id_in_pack].ux_m.w = c->hydro.parts[i].mass;
+	const struct part *p = &c->hydro.parts[i];
+    const double *x = part_get_const_x(p);
+    parts_aos_buffer[id_in_pack].x_p_h.x = x[0] - shift.x;
+    parts_aos_buffer[id_in_pack].x_p_h.y = x[1] - shift.y;
+    parts_aos_buffer[id_in_pack].x_p_h.z = x[2] - shift.z;
+    parts_aos_buffer[id_in_pack].x_p_h.w = part_get_h(p);
+    const float *v = part_get_const_v(p);
+    parts_aos_buffer[id_in_pack].ux_m.x = v[0];
+    parts_aos_buffer[id_in_pack].ux_m.y = v[1];
+    parts_aos_buffer[id_in_pack].ux_m.z = v[2];
+    parts_aos_buffer[id_in_pack].ux_m.w = part_get_mass(p);
     parts_aos_buffer[id_in_pack].cjs_cje.x = cstarts.x;
     parts_aos_buffer[id_in_pack].cjs_cje.y = cstarts.y;
   }
@@ -161,21 +164,23 @@ void pack_neat_aos_f4_g(struct cell *c,
   const float cellx = c->loc[0], celly = c->loc[1], cellz = c->loc[2];
   for (int i = 0; i < count; i++) {
     int id_in_pack = i + local_pack_position;
-    const struct part p = ptmps[i];
+    const struct part *p = &ptmps[i];
     /*Data to be copied to GPU*/
-    parts_aos_buffer[id_in_pack].x_h.x = p.x[0] - cellx;
-    parts_aos_buffer[id_in_pack].x_h.y = p.x[1] - celly;
-    parts_aos_buffer[id_in_pack].x_h.z = p.x[2] - cellz;
-    parts_aos_buffer[id_in_pack].x_h.w = p.h;
-    parts_aos_buffer[id_in_pack].ux_m.x = p.v[0];
-    parts_aos_buffer[id_in_pack].ux_m.y = p.v[1];
-    parts_aos_buffer[id_in_pack].ux_m.z = p.v[2];
-    parts_aos_buffer[id_in_pack].ux_m.w = p.mass;
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.x = p.rho;
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.y = p.viscosity.alpha;
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.z = p.u;  // p.density.rot_v[0];
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.w =
-        p.force.soundspeed;  // p.density.rot_v[0];
+    const double *x = part_get_const_x(p);
+    parts_aos_buffer[id_in_pack].x_h.x = x[0] - cellx;
+    parts_aos_buffer[id_in_pack].x_h.y = x[1] - celly;
+    parts_aos_buffer[id_in_pack].x_h.z = x[2] - cellz;
+    parts_aos_buffer[id_in_pack].x_h.w = part_get_h(p);
+    const float *v = part_get_const_v(&ptmps[i]);
+    parts_aos_buffer[id_in_pack].ux_m.x = v[0];
+    parts_aos_buffer[id_in_pack].ux_m.y = v[1];
+    parts_aos_buffer[id_in_pack].ux_m.z = v[2];
+    parts_aos_buffer[id_in_pack].ux_m.w = part_get_mass(p);
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.x = part_get_rho(p);
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.y = part_get_alpha_av(p);
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.z = part_get_u(p);  // p.density.rot_v[0];
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.w = part_get_soundspeed(p);
+//        p.force.soundspeed;  // p.density.rot_v[0];
   }
 }
 
@@ -185,23 +190,26 @@ extern inline void pack_neat_pair_aos_f4_g(
     const int local_pack_position, const int count, const float3 shift,
     const int2 cstarts) {
   /*Data to be copied to GPU*/
+  const struct part *ptmps;
+  ptmps = c->hydro.parts;
   for (int i = 0; i < count; i++) {
     const int id_in_pack = i + local_pack_position;
-    parts_aos_buffer[id_in_pack].x_h.x = c->hydro.parts[i].x[0] - shift.x;
-    parts_aos_buffer[id_in_pack].x_h.y = c->hydro.parts[i].x[1] - shift.y;
-    parts_aos_buffer[id_in_pack].x_h.z = c->hydro.parts[i].x[2] - shift.z;
-    parts_aos_buffer[id_in_pack].x_h.w = c->hydro.parts[i].h;
-    parts_aos_buffer[id_in_pack].ux_m.x = c->hydro.parts[i].v[0];
-    parts_aos_buffer[id_in_pack].ux_m.y = c->hydro.parts[i].v[1];
-    parts_aos_buffer[id_in_pack].ux_m.z = c->hydro.parts[i].v[2];
-    parts_aos_buffer[id_in_pack].ux_m.w = c->hydro.parts[i].mass;
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.x = c->hydro.parts[i].rho;
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.y =
-        c->hydro.parts[i].viscosity.alpha;
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.z =
-        c->hydro.parts[i].u;  // p.density.rot_v[0];
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.w =
-        c->hydro.parts[i].force.soundspeed;  // p.density.rot_v[0];
+    const struct part *p = &ptmps[i];
+    const double *x = part_get_const_x(p);
+    parts_aos_buffer[id_in_pack].x_h.x = x[0] - shift.x;
+    parts_aos_buffer[id_in_pack].x_h.y = x[1] - shift.y;
+    parts_aos_buffer[id_in_pack].x_h.z = x[2] - shift.z;
+    parts_aos_buffer[id_in_pack].x_h.w = part_get_h(p);
+    const float *v = part_get_const_v(&ptmps[i]);
+    parts_aos_buffer[id_in_pack].ux_m.x = v[0];
+    parts_aos_buffer[id_in_pack].ux_m.y = v[1];
+    parts_aos_buffer[id_in_pack].ux_m.z = v[2];
+    parts_aos_buffer[id_in_pack].ux_m.w = part_get_mass(p);
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.x = part_get_rho(p);
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.y = part_get_alpha_av(p);
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.z = part_get_u(p);  // p.density.rot_v[0];
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.w = part_get_soundspeed(p);
+
     parts_aos_buffer[id_in_pack].cjs_cje.x = cstarts.x;
     parts_aos_buffer[id_in_pack].cjs_cje.y = cstarts.y;
   }
@@ -218,40 +226,36 @@ void pack_neat_aos_f4_f(const struct cell *restrict c,
   const float celly = c->loc[1];
   const float cellz = c->loc[2];
   /*Data to be copied to GPU local memory*/
+  const struct part *ptmps;
+  ptmps = c->hydro.parts;
   for (int i = 0; i < count; i++) {
-    parts_aos[i + pp].x_h.x = c->hydro.parts[i].x[0] - cellx;
-    parts_aos[i + pp].x_h.y = c->hydro.parts[i].x[1] - celly;
-    parts_aos[i + pp].x_h.z = c->hydro.parts[i].x[2] - cellz;
-    parts_aos[i + pp].x_h.w = c->hydro.parts[i].h;
-  }
-  for (int i = 0; i < count; i++) {
-    parts_aos[i + pp].ux_m.x = c->hydro.parts[i].v[0];
-    parts_aos[i + pp].ux_m.y = c->hydro.parts[i].v[1];
-    parts_aos[i + pp].ux_m.z = c->hydro.parts[i].v[2];
-    parts_aos[i + pp].ux_m.w = c->hydro.parts[i].mass;
-  }
-  for (int i = 0; i < count; i++) {
-    parts_aos[i + pp].f_bals_timebin_mintimebin_ngb.x =
-        c->hydro.parts[i].force.f;
-    parts_aos[i + pp].f_bals_timebin_mintimebin_ngb.y =
-        c->hydro.parts[i].force.balsara;
-    parts_aos[i + pp].f_bals_timebin_mintimebin_ngb.z =
-        c->hydro.parts[i].time_bin;
-    parts_aos[i + pp].f_bals_timebin_mintimebin_ngb.w =
-        c->hydro.parts[i].limiter_data.min_ngb_time_bin;
-  }
-  for (int i = 0; i < count; i++) {
-    parts_aos[i + pp].rho_p_c_vsigi.x = c->hydro.parts[i].rho;
-    parts_aos[i + pp].rho_p_c_vsigi.y = c->hydro.parts[i].force.pressure;
-    parts_aos[i + pp].rho_p_c_vsigi.z = c->hydro.parts[i].force.soundspeed;
-    parts_aos[i + pp].rho_p_c_vsigi.w = c->hydro.parts[i].viscosity.v_sig;
-  }
-  for (int i = 0; i < count; i++) {
-    parts_aos[i + pp].u_alphavisc_alphadiff.x = c->hydro.parts[i].u;
-    parts_aos[i + pp].u_alphavisc_alphadiff.y =
-        c->hydro.parts[i].viscosity.alpha;
-    parts_aos[i + pp].u_alphavisc_alphadiff.z =
-        c->hydro.parts[i].diffusion.alpha;
+	const struct part *p = &ptmps[i];
+    const double *x = part_get_const_x(p);
+    const int id_in_pack = i + pp;
+    parts_aos[id_in_pack].x_h.x = x[0] - cellx;
+    parts_aos[id_in_pack].x_h.y = x[1] - celly;
+    parts_aos[id_in_pack].x_h.z = x[2] - cellz;
+//    parts_aos[i + pp].x_h.x = c->hydro.parts[i].x[0] - cellx;
+//    parts_aos[i + pp].x_h.y = c->hydro.parts[i].x[1] - celly;
+//    parts_aos[i + pp].x_h.z = c->hydro.parts[i].x[2] - cellz;
+    parts_aos[id_in_pack].x_h.w = part_get_h(p);
+
+    const float *v = part_get_const_v(p);
+    parts_aos[id_in_pack].ux_m.x = v[0];
+    parts_aos[id_in_pack].ux_m.y = v[1];
+    parts_aos[id_in_pack].ux_m.z = v[2];
+    parts_aos[id_in_pack].ux_m.w = part_get_mass(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.z = part_get_time_bin(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.w = part_get_time_bin(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.z = part_get_soundspeed(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.w = part_get_v_sig(p);
+    parts_aos[id_in_pack].u_alphavisc_alphadiff.x = part_get_u(p);
+    parts_aos[id_in_pack].u_alphavisc_alphadiff.y = part_get_alpha_av(p);
+    parts_aos[id_in_pack].u_alphavisc_alphadiff.z = part_get_alpha_diff(p);
   }
 }
 
@@ -262,32 +266,38 @@ extern inline void pack_neat_pair_aos_f4_f(
   //  const struct part *restrict ptmps;
   //  ptmps = c->hydro.parts;
   const int pp = local_pack_position;
+  const struct part *ptmps;
+  ptmps = c->hydro.parts;
   /*Data to be copied to GPU local memory*/
   for (int i = 0; i < count; i++) {
-    const int id = i + pp;
-    parts_aos[id].x_h.x = c->hydro.parts[i].x[0] - shift.x;
-    parts_aos[id].x_h.y = c->hydro.parts[i].x[1] - shift.y;
-    parts_aos[id].x_h.z = c->hydro.parts[i].x[2] - shift.z;
-    parts_aos[id].x_h.w = c->hydro.parts[i].h;
-    parts_aos[id].ux_m.x = c->hydro.parts[i].v[0];
-    parts_aos[id].ux_m.y = c->hydro.parts[i].v[1];
-    parts_aos[id].ux_m.z = c->hydro.parts[i].v[2];
-    parts_aos[id].ux_m.w = c->hydro.parts[i].mass;
-    parts_aos[id].f_bals_timebin_mintimebin_ngb.x = c->hydro.parts[i].force.f;
-    parts_aos[id].f_bals_timebin_mintimebin_ngb.y =
-        c->hydro.parts[i].force.balsara;
-    parts_aos[id].f_bals_timebin_mintimebin_ngb.z = c->hydro.parts[i].time_bin;
-    parts_aos[id].f_bals_timebin_mintimebin_ngb.w =
-        c->hydro.parts[i].limiter_data.min_ngb_time_bin;
-    parts_aos[id].rho_p_c_vsigi.x = c->hydro.parts[i].rho;
-    parts_aos[id].rho_p_c_vsigi.y = c->hydro.parts[i].force.pressure;
-    parts_aos[id].rho_p_c_vsigi.z = c->hydro.parts[i].force.soundspeed;
-    parts_aos[id].rho_p_c_vsigi.w = c->hydro.parts[i].viscosity.v_sig;
-    parts_aos[id].u_alphavisc_alphadiff.x = c->hydro.parts[i].u;
-    parts_aos[id].u_alphavisc_alphadiff.y = c->hydro.parts[i].viscosity.alpha;
-    parts_aos[id].u_alphavisc_alphadiff.z = c->hydro.parts[i].diffusion.alpha;
-    parts_aos[id].cjs_cje.x = cstarts.x;
-    parts_aos[id].cjs_cje.y = cstarts.y;
+    const struct part *p = &ptmps[i];
+    const double *x = part_get_const_x(p);
+    const int id_in_pack = i + pp;
+    parts_aos[id_in_pack].x_h.x = x[0] - shift.x;
+    parts_aos[id_in_pack].x_h.y = x[1] - shift.y;
+    parts_aos[id_in_pack].x_h.z = x[2] - shift.z;
+//    parts_aos[i + pp].x_h.x = c->hydro.parts[i].x[0] - cellx;
+//    parts_aos[i + pp].x_h.y = c->hydro.parts[i].x[1] - celly;
+//    parts_aos[i + pp].x_h.z = c->hydro.parts[i].x[2] - cellz;
+
+    parts_aos[id_in_pack].x_h.w = part_get_h(p);
+
+    const float *v = part_get_const_v(p);
+    parts_aos[id_in_pack].ux_m.x = v[0];
+    parts_aos[id_in_pack].ux_m.y = v[1];
+    parts_aos[id_in_pack].ux_m.z = v[2];
+    parts_aos[id_in_pack].ux_m.w = part_get_mass(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.z = part_get_time_bin(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.w = part_get_time_bin(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.z = part_get_soundspeed(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.w = part_get_v_sig(p);
+    parts_aos[id_in_pack].u_alphavisc_alphadiff.x = part_get_u(p);
+    parts_aos[id_in_pack].u_alphavisc_alphadiff.y = part_get_alpha_av(p);
+    parts_aos[id_in_pack].u_alphavisc_alphadiff.z = part_get_alpha_diff(p);
   }
 }
 
@@ -424,11 +434,10 @@ void unpack_neat_aos_f4_g(struct cell *c,
     struct part_aos_f4_g_recv p_tmp = parts_tmp[i];
     struct part *p = &c->hydro.parts[i];
     if (!PART_IS_ACTIVE(p, e)) continue;
-    const float v_sig = p->viscosity.v_sig;
-    p->viscosity.v_sig = fmaxf(p_tmp.vsig_lapu_aviscmax.x, v_sig);
-    p->diffusion.laplace_u += p_tmp.vsig_lapu_aviscmax.y;
-    const float max_ngb = p->force.alpha_visc_max_ngb;
-    p->force.alpha_visc_max_ngb = fmaxf(p_tmp.vsig_lapu_aviscmax.z, max_ngb);
+
+    part_set_v_sig(p, fmaxf(p_tmp.vsig_lapu_aviscmax.x, part_get_v_sig(p)));
+    part_set_laplace_u(p, part_get_laplace_u(p) + p_tmp.vsig_lapu_aviscmax.y);
+    part_set_alpha_visc_max_ngb(p, fmaxf(part_get_alpha_visc_max_ngb(p), p_tmp.vsig_lapu_aviscmax.z));
   }
 }
 
@@ -437,26 +446,36 @@ void unpack_neat_aos_f4_f(struct cell *restrict c,
                           int tid, int local_pack_position, int count,
                           struct engine *e) {
   int pp = local_pack_position;
+  struct part_aos_f4_f_recv *parts_tmp = &parts_aos_buffer[local_pack_position];
   for (int i = 0; i < count; i++) {
-    if (!PART_IS_ACTIVE(&c->hydro.parts[i], e)) continue;
-    c->hydro.parts[i].a_hydro[0] += parts_aos_buffer[i + pp].a_hydro.x;
-    c->hydro.parts[i].a_hydro[1] += parts_aos_buffer[i + pp].a_hydro.y;
-    c->hydro.parts[i].a_hydro[2] += parts_aos_buffer[i + pp].a_hydro.z;
-  }
-  for (int i = 0; i < count; i++) {
-    if (!PART_IS_ACTIVE(&c->hydro.parts[i], e)) continue;
-    c->hydro.parts[i].viscosity.v_sig =
-        fmaxf(parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.z,
-              c->hydro.parts[i].viscosity.v_sig);
-    c->hydro.parts[i].limiter_data.min_ngb_time_bin =
-        (int)(parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
-  }
-  for (int i = 0; i < count; i++) {
-    if (!PART_IS_ACTIVE(&c->hydro.parts[i], e)) continue;
-    c->hydro.parts[i].u_dt +=
-        parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.x;
-    c->hydro.parts[i].force.h_dt +=
-        parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.y;
+	struct part_aos_f4_f_recv p_tmp = parts_tmp[i];
+	struct part *p = &c->hydro.parts[i];
+    if (!PART_IS_ACTIVE(p, e)) continue;
+    float *a = part_get_a_hydro(p);
+    part_set_a_hydro_ind(p, 0,  a[0] + p_tmp.a_hydro.x);
+    part_set_a_hydro_ind(p, 1,  a[1] + p_tmp.a_hydro.y);
+    part_set_a_hydro_ind(p, 2,  a[2] + p_tmp.a_hydro.z);
+
+//    c->hydro.parts[i].u_dt +=
+//        parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.x;
+
+    part_set_u_dt(p, p_tmp.udt_hdt_vsig_mintimebin_ngb.x + part_get_u_dt(p));
+
+//    c->hydro.parts[i].force.h_dt +=
+//        parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.y;
+
+    part_set_h_dt(p, p_tmp.udt_hdt_vsig_mintimebin_ngb.y + part_get_h_dt(p));
+
+//    c->hydro.parts[i].viscosity.v_sig =
+//        fmaxf(parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.z,
+//              c->hydro.parts[i].viscosity.v_sig);
+
+    part_set_v_sig(p, fmaxf(p_tmp.udt_hdt_vsig_mintimebin_ngb.z, part_get_v_sig(p)));
+
+//    c->hydro.parts[i].limiter_data.min_ngb_time_bin =
+//        (int)(parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
+
+    part_set_time_bin(p, fmaxf((int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f), part_get_time_bin(p)));
   }
 }
 
@@ -465,21 +484,30 @@ void unpack_neat_pair_aos_f4(struct runner *r, struct cell *c,
                              int local_pack_position, int count,
                              struct engine *e) {
 
-  //  struct part_aos_f4_recv * restrict parts_tmp =
-  //  &parts_aos_buffer[local_pack_position];
+
+  struct part_aos_f4_recv *parts_tmp = &parts_aos_buffer[local_pack_position];
   if (cell_is_active_hydro(c, e)) {
-    int pp = local_pack_position;
     for (int i = 0; i < count; i++) {
-      int j = i + pp;
-      c->hydro.parts[i].rho += parts_aos_buffer[j].rho_dh_wcount.x;
-      c->hydro.parts[i].density.rho_dh += parts_aos_buffer[j].rho_dh_wcount.y;
-      c->hydro.parts[i].density.wcount += parts_aos_buffer[j].rho_dh_wcount.z;
-      c->hydro.parts[i].density.wcount_dh +=
-          parts_aos_buffer[j].rho_dh_wcount.w;
-      c->hydro.parts[i].density.rot_v[0] += parts_aos_buffer[j].rot_ux_div_v.x;
-      c->hydro.parts[i].density.rot_v[1] += parts_aos_buffer[j].rot_ux_div_v.y;
-      c->hydro.parts[i].density.rot_v[2] += parts_aos_buffer[j].rot_ux_div_v.z;
-      c->hydro.parts[i].viscosity.div_v += parts_aos_buffer[j].rot_ux_div_v.w;
+      struct part_aos_f4_recv p_tmp = parts_tmp[i];
+      struct part *p = &c->hydro.parts[i];
+//      c->hydro.parts[i].rho += parts_aos_buffer[j].rho_dh_wcount.x;
+      part_set_rho(p, part_get_rho(p) + p_tmp.rho_dh_wcount.x);
+//      c->hydro.parts[i].density.rho_dh += parts_aos_buffer[j].rho_dh_wcount.y;
+      part_set_rho_dh(p, part_get_rho_dh(p) + p_tmp.rho_dh_wcount.y);
+//      c->hydro.parts[i].density.wcount += parts_aos_buffer[j].rho_dh_wcount.z;
+      part_set_wcount(p, part_get_wcount(p) + p_tmp.rho_dh_wcount.z);
+//      c->hydro.parts[i].density.wcount_dh +=
+//          parts_aos_buffer[j].rho_dh_wcount.w;
+      part_set_wcount_dh(p, part_get_wcount_dh(p) + p_tmp.rho_dh_wcount.w);
+//      c->hydro.parts[i].density.rot_v[0] += parts_aos_buffer[j].rot_ux_div_v.x;
+//      c->hydro.parts[i].density.rot_v[1] += parts_aos_buffer[j].rot_ux_div_v.y;
+//      c->hydro.parts[i].density.rot_v[2] += parts_aos_buffer[j].rot_ux_div_v.z;
+      const float *rot_v = part_get_rot_v(p);
+      part_set_rot_v_ind(p, 0, rot_v[0] + p_tmp.rot_ux_div_v.x);
+      part_set_rot_v_ind(p, 1, rot_v[1] + p_tmp.rot_ux_div_v.y);
+      part_set_rot_v_ind(p, 2, rot_v[2] + p_tmp.rot_ux_div_v.z);
+//      c->hydro.parts[i].viscosity.div_v += parts_aos_buffer[j].rot_ux_div_v.w;
+      part_set_div_v(p, part_get_div_v(p) + p_tmp.rot_ux_div_v.w);
     }
   }
 }
@@ -506,11 +534,15 @@ void unpack_neat_pair_aos_f4_g(
     for (int i = 0; i < count; i++) {
       struct part_aos_f4_g_recv p_tmp = parts_tmp[i];
       struct part *p = &c->hydro.parts[i];
-      const float v_sig = p->viscosity.v_sig;
-      p->viscosity.v_sig = fmaxf(p_tmp.vsig_lapu_aviscmax.x, v_sig);
-      p->diffusion.laplace_u += p_tmp.vsig_lapu_aviscmax.y;
-      const float max_ngb = p->force.alpha_visc_max_ngb;
-      p->force.alpha_visc_max_ngb = fmaxf(p_tmp.vsig_lapu_aviscmax.z, max_ngb);
+//      const float v_sig = p->viscosity.v_sig;
+//      p->viscosity.v_sig = fmaxf(p_tmp.vsig_lapu_aviscmax.x, v_sig);
+//      p->diffusion.laplace_u += p_tmp.vsig_lapu_aviscmax.y;
+//      const float max_ngb = p->force.alpha_visc_max_ngb;
+//      p->force.alpha_visc_max_ngb = fmaxf(p_tmp.vsig_lapu_aviscmax.z, max_ngb);
+
+      part_set_v_sig(p, fmaxf(p_tmp.vsig_lapu_aviscmax.x, part_get_v_sig(p)));
+      part_set_laplace_u(p, part_get_laplace_u(p) + p_tmp.vsig_lapu_aviscmax.y);
+      part_set_alpha_visc_max_ngb(p, fmaxf(part_get_alpha_visc_max_ngb(p), p_tmp.vsig_lapu_aviscmax.z));
     }
   }
 }
@@ -519,26 +551,46 @@ void unpack_neat_pair_aos_f4_f(
     struct runner *r, struct cell *restrict c,
     struct part_aos_f4_f_recv *restrict parts_aos_buffer, int tid,
     int local_pack_position, int count, struct engine *e) {
-  //	  struct part_aos_f4_f_recv *restrict parts_tmp =
-  //&parts_aos_buffer[local_pack_position];
+
+  struct part_aos_f4_f_recv *restrict parts_tmp =
+    &parts_aos_buffer[local_pack_position];
   if (cell_is_active_hydro(c, e)) {
     int pp = local_pack_position;
     for (int i = 0; i < count; i++) {
-      //	      struct part_aos_f4_f_recv p_tmp = parts_tmp[i];
-      //	      struct part *restrict p = &c->hydro.parts[i];
-      int j = i + pp;
-      c->hydro.parts[i].a_hydro[0] += parts_aos_buffer[j].a_hydro.x;
-      c->hydro.parts[i].a_hydro[1] += parts_aos_buffer[j].a_hydro.y;
-      c->hydro.parts[i].a_hydro[2] += parts_aos_buffer[j].a_hydro.z;
-      c->hydro.parts[i].viscosity.v_sig =
-          fmaxf(parts_aos_buffer[j].udt_hdt_vsig_mintimebin_ngb.z,
-                c->hydro.parts[i].viscosity.v_sig);
-      c->hydro.parts[i].limiter_data.min_ngb_time_bin =
-          (int)(parts_aos_buffer[j].udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
-      c->hydro.parts[i].u_dt +=
-          parts_aos_buffer[j].udt_hdt_vsig_mintimebin_ngb.x;
-      c->hydro.parts[i].force.h_dt +=
-          parts_aos_buffer[j].udt_hdt_vsig_mintimebin_ngb.y;
+      struct part_aos_f4_f_recv p_tmp = parts_tmp[i];
+      struct part *restrict p = &c->hydro.parts[i];
+
+//      c->hydro.parts[i].a_hydro[0] += parts_aos_buffer[j].a_hydro.x;
+//      c->hydro.parts[i].a_hydro[1] += parts_aos_buffer[j].a_hydro.y;
+//      c->hydro.parts[i].a_hydro[2] += parts_aos_buffer[j].a_hydro.z;
+
+      float *a = part_get_a_hydro(p);
+      part_set_a_hydro_ind(p, 0,  a[0] + p_tmp.a_hydro.x);
+      part_set_a_hydro_ind(p, 1,  a[1] + p_tmp.a_hydro.y);
+      part_set_a_hydro_ind(p, 2,  a[2] + p_tmp.a_hydro.z);
+
+//      c->hydro.parts[i].u_dt +=
+//          parts_aos_buffer[j].udt_hdt_vsig_mintimebin_ngb.x;
+
+      part_set_u_dt(p, p_tmp.udt_hdt_vsig_mintimebin_ngb.x + part_get_u_dt(p));
+
+//      c->hydro.parts[i].force.h_dt +=
+//          parts_aos_buffer[j].udt_hdt_vsig_mintimebin_ngb.y;
+
+      part_set_h_dt(p, p_tmp.udt_hdt_vsig_mintimebin_ngb.y + part_get_h_dt(p));
+
+//      c->hydro.parts[i].viscosity.v_sig =
+//          fmaxf(parts_aos_buffer[j].udt_hdt_vsig_mintimebin_ngb.z,
+//                c->hydro.parts[i].viscosity.v_sig);
+
+      part_set_v_sig(p, fmaxf(p_tmp.udt_hdt_vsig_mintimebin_ngb.z, part_get_v_sig(p)));
+
+//      c->hydro.parts[i].limiter_data.min_ngb_time_bin =
+//          (int)(parts_aos_buffer[j].udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
+
+      part_set_time_bin(p, fmaxf((int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f), part_get_time_bin(p)));
+
+
     }
   }
 }
