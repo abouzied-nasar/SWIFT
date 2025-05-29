@@ -248,7 +248,8 @@ void pack_neat_aos_f4_f(const struct cell *restrict c,
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.z = part_get_time_bin(p);
-    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.w = part_get_time_bin(p);
+    struct timestep_limiter_data* limiter_data = part_get_limiter_data_p(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.w = limiter_data->min_ngb_time_bin;
     parts_aos[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
     parts_aos[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
     parts_aos[id_in_pack].rho_p_c_vsigi.z = part_get_soundspeed(p);
@@ -290,7 +291,8 @@ extern inline void pack_neat_pair_aos_f4_f(
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.z = part_get_time_bin(p);
-    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.w = part_get_time_bin(p);
+    struct timestep_limiter_data* limiter_data = part_get_limiter_data_p(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.w = limiter_data->min_ngb_time_bin;
     parts_aos[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
     parts_aos[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
     parts_aos[id_in_pack].rho_p_c_vsigi.z = part_get_soundspeed(p);
@@ -298,6 +300,8 @@ extern inline void pack_neat_pair_aos_f4_f(
     parts_aos[id_in_pack].u_alphavisc_alphadiff.x = part_get_u(p);
     parts_aos[id_in_pack].u_alphavisc_alphadiff.y = part_get_alpha_av(p);
     parts_aos[id_in_pack].u_alphavisc_alphadiff.z = part_get_alpha_diff(p);
+    parts_aos[id_in_pack].cjs_cje.x = cstarts.x;
+    parts_aos[id_in_pack].cjs_cje.y = cstarts.y;
   }
 }
 
