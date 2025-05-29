@@ -479,7 +479,8 @@ void unpack_neat_aos_f4_f(struct cell *restrict c,
 //    c->hydro.parts[i].limiter_data.min_ngb_time_bin =
 //        (int)(parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
 
-    part_set_time_bin(p, fmaxf((int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f), part_get_time_bin(p)));
+    struct timestep_limiter_data* limiter_data = part_get_limiter_data_p(p);
+    limiter_data->min_ngb_time_bin = (int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
   }
 }
 
@@ -591,8 +592,8 @@ void unpack_neat_pair_aos_f4_f(
 
 //      c->hydro.parts[i].limiter_data.min_ngb_time_bin =
 //          (int)(parts_aos_buffer[j].udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
-
-      part_set_time_bin(p, fmaxf((int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f), part_get_time_bin(p)));
+      struct timestep_limiter_data* limiter_data = part_get_limiter_data_p(p);
+      limiter_data->min_ngb_time_bin = (int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
 
 
     }
