@@ -710,10 +710,10 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
 
       /* If particle needs updating */
       if (part_is_active(p, e)) {
-
+        const timebin_t time_bin = part_get_time_bin(p);
 #ifdef SWIFT_DEBUG_CHECKS
         /* Current end of time-step */
-        const timebin_t time_bin = part_get_time_bin(p);
+
         const integertime_t ti_end = get_integer_time_end(ti_current, time_bin);
 
         if (ti_end != ti_current)
