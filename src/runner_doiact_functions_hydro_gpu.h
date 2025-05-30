@@ -1910,14 +1910,14 @@ void runner_dopair1_unpack_f4(
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
     cudaEvent_t *pair_end, int npacked, int n_leaves_found) {
 
-  int topid;
+//  int topid;
   /////////////////////////////////
   // Should this be reset to zero HERE???
   /////////////////////////////////
   int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0;
   /*Loop over top level tasks*/
-  for (topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
+  for (int topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
     const ticks tic = getticks();
     struct leaf_cell_list *ll_current = &pack_vars->leaf_list[topid];
     /* Loop through each daughter task */
@@ -1925,8 +1925,8 @@ void runner_dopair1_unpack_f4(
       /*Get pointers to the leaf cells*/
       struct cell *cii_l = ll_current->ci[tid];
       struct cell *cjj_l = ll_current->cj[tid];
-      message("unpacking % i % i %i", cii_l->hydro.count, cjj_l->hydro.count,
-              pack_vars->count_parts);
+//      message("unpacking % i % i %i", cii_l->hydro.count, cjj_l->hydro.count,
+//              pack_vars->count_parts);
       message(
           "unpacking ttid %i tid %i npacked %i, ci %i, cj %i, citop %i, cjtop "
           "%i",
