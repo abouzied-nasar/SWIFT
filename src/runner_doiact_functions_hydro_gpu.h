@@ -320,7 +320,7 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
                         struct cell *ci, struct cell *cj, struct task *t,
                         struct part_aos_f4_send *parts_send, struct engine *e,
                         int4 *fparti_fpartj_lparti_lpartj, int *n_leafs_found,
-                        int depth, int n_expected_tasks) {
+                        int depth, int n_expected_tasks, struct cell ** ci_d, struct cell ** cj_d, int n_daughters) {
 
   /* Should we even bother? A. Nasar: For GPU code we need to be clever about
    * this */
@@ -344,7 +344,7 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
       if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL) {
         runner_recurse_gpu(r, s, pack_vars, ci->progeny[pid], cj->progeny[pjd],
                            t, parts_send, e, fparti_fpartj_lparti_lpartj,
-                           n_leafs_found, depth + 1, n_expected_tasks);
+                           n_leafs_found, depth + 1, n_expected_tasks, ci_d, cj_d, n_daughters);
         //	        message("recursing to depth %i", depth + 1);
       }
     }
@@ -357,13 +357,17 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
     //	cells_left[leafs_found] = ci;
     //	cells_right[leafs_found] = cj;
     /*Add leaf cells to list for each top_level task*/
-    pack_vars->leaf_list[tt_packed].ci[leafs_found] = ci;
-    pack_vars->leaf_list[tt_packed].cj[leafs_found] = cj;
+//    pack_vars->leaf_list[tt_packed].ci[leafs_found] = ci;
+//    pack_vars->leaf_list[tt_packed].cj[leafs_found] = cj;
+    ci_d[n_daughters + leafs_found] = ci;
+    cj_d[n_daughters + leafs_found] = cj;
+//    error("stop");
     //	pack_vars->leaf_list[tt_packed].shiftx[leafs_found] = shift[0];
     //	pack_vars->leaf_list[tt_packed].shifty[leafs_found] = shift[1];
     //	pack_vars->leaf_list[tt_packed].shiftz[leafs_found] = shift[2];
     pack_vars->leaf_list[tt_packed].n_leaves++;
-    if (ci != pack_vars->leaf_list[tt_packed].ci[leafs_found]) error("stop");
+//    message("leaves found %i", pack_vars->leaf_list[tt_packed].n_leaves++);
+//    if (ci != pack_vars->leaf_list[tt_packed].ci[leafs_found]) error("stop");
     (*n_leafs_found)++;  //= leafs_found + 1;
     if (*n_leafs_found >= n_expected_tasks)
       error("Created %i more than expected leaf cells. depth %i",
@@ -1908,7 +1912,7 @@ void runner_dopair1_unpack_f4(
     struct part_aos_f4_recv *d_parts_recv, cudaStream_t *stream, float d_a,
     float d_H, struct engine *e, double *packing_time, double *gpu_time,
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
-    cudaEvent_t *pair_end, int npacked, int n_leaves_found) {
+    cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters) {
 
 //  int topid;
   /////////////////////////////////
@@ -1921,18 +1925,19 @@ void runner_dopair1_unpack_f4(
     const ticks tic = getticks();
     struct leaf_cell_list *ll_current = &pack_vars->leaf_list[topid];
     /* Loop through each daughter task */
-    for (int tid = ll_current->lpdt; tid < ll_current->n_packed; tid++) {
+//    for (int tid = ll_current->lpdt; tid < ll_current->n_packed; tid++) {
+    for (int tid = f_l_daughters[topid][0]; tid < f_l_daughters[topid][1]; tid++){
       /*Get pointers to the leaf cells*/
-      struct cell *cii_l = ll_current->ci[tid];
-      struct cell *cjj_l = ll_current->cj[tid];
+      struct cell *cii_l = ci_d[tid];//ll_current->ci[tid];
+      struct cell *cjj_l = cj_d[tid];
 //      message("unpacking % i % i %i", cii_l->hydro.count, cjj_l->hydro.count,
 //              pack_vars->count_parts);
       message(
           "unpacking ttid %i tid %i npacked %i, ci %i, cj %i, citop %i, cjtop "
-          "%i",
+          "%i count i %i, count j %i",
           topid, tid, npacked, cii_l->cellID, cjj_l->cellID, cii_l->top->cellID,
-          cjj_l->top->cellID);
-      if (cii_l->loc[0] != ll_current->ci[tid]->loc[0]) error("stop");
+          cjj_l->top->cellID, cii_l->hydro.count, cjj_l->hydro.count);
+//      if (cii_l->loc[0] != ll_current->ci[tid]->loc[0]) error("stop");
       if (cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
         error("Unpacking empty cells");
       runner_do_ci_cj_gpu_unpack_neat_aos_f4(r, cii_l, cjj_l, parts_recv, 0,
