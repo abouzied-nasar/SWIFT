@@ -1125,10 +1125,10 @@ void *runner_main2(void *data) {
 
             n_daughters += n_leaves_found;
             int n_d_tmp = n_daughters - n_leaves_found;
-            for(int i = 0; i < n_leaves_found; i++){
-            	struct cell *ccc = ci_d[n_d_tmp + i];
-            	message("count %i", (ccc->hydro.count));
-            }
+//            for(int i = 0; i < n_leaves_found; i++){
+//            	struct cell *ccc = ci_d[n_d_tmp + i];
+//            	message("count %i", (ccc->hydro.count));
+//            }
             first_and_last_daughters[top_tasks_packed][0] = n_d_tmp;
             first_and_last_daughters[top_tasks_packed][1] = n_leaves_found + n_d_tmp;
             tops_packed_in_step++;
@@ -1244,6 +1244,8 @@ void *runner_main2(void *data) {
                   pack_vars_pair_dens->top_task_list[0] = t;
 //                  struct leaf_cell_list * ll_current = &pack_vars_pair_dens->leaf_list[top_tasks_packed - 1];
                   pack_vars_pair_dens->leaf_list = ll_current;
+//                  int first = first_and_last_daughters[top_tasks_packed - 1][0];
+//                  int last = first_and_last_daughters[top_tasks_packed - 1][1];
                   int first = n_d_tmp + npacked;
                   int last = n_d_tmp + n_leaves_found;
                   for(int i = first; i < last; i++){
