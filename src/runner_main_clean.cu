@@ -751,7 +751,7 @@ void *runner_main2(void *data) {
     sched->nr_packs_self_grad_done = 0;
     sched->nr_packs_pair_grad_done = 0;
 
-    int n_daughters = 0;
+    int n_daughters_total = 0;
 
     int n_cells_d = 0;
     int n_cells_g = 0;
@@ -1121,19 +1121,20 @@ void *runner_main2(void *data) {
 //            struct cell ** cj_ds = cj_d[top_tasks_packed];
 
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
-                      parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_d, cj_d, n_daughters);
+                      parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_d, cj_d, n_daughters_total);
 
-            n_daughters += n_leaves_found;
-            int n_d_tmp = n_daughters - n_leaves_found;
+            message("ndaughters prev %i, nfound %i, ntotal %i", n_daughters_total, n_leaves_found, n_daughters_total + n_leaves_found);
+            n_daughters_total += n_leaves_found;
+            int n_daughters_prev = n_daughters_total - n_leaves_found;
 //            for(int i = 0; i < n_leaves_found; i++){
 //            	struct cell *ccc = ci_d[n_d_tmp + i];
 //            	message("count %i", (ccc->hydro.count));
 //            }
-            first_and_last_daughters[top_tasks_packed][0] = n_d_tmp;
-            first_and_last_daughters[top_tasks_packed][1] = n_leaves_found + n_d_tmp;
+            first_and_last_daughters[top_tasks_packed][0] = n_daughters_prev;
+            first_and_last_daughters[top_tasks_packed][1] = n_daughters_total;
             tops_packed_in_step++;
             n_tops_reset++;
-            message("Found %i daughter tasks", n_leaves_found);
+//            message("Found %i daughter tasks", n_leaves_found);
 
             n_leafs_total += n_leaves_found;
             int cid = 0;
@@ -1171,7 +1172,7 @@ void *runner_main2(void *data) {
 //            }
             int launched = 0;
             //A. Nasar: Loop through the daughter tasks we found
-            int n_offload = 0;
+            int n_offloaded = 0;
             while(npacked < n_leaves_found){
               top_tasks_packed = pack_vars_pair_dens->top_tasks_packed;
 
@@ -1189,17 +1190,20 @@ void *runner_main2(void *data) {
               // should be noffload which is set to zero after launch. count_parts should also be zero after launch
 //              struct cell * cii = ll_fresh->ci[npacked];
 //              struct cell * cjj = ll_fresh->cj[npacked];
-              struct cell * cii = ci_d[n_offload + n_d_tmp];
-              struct cell * cjj = cj_d[n_offload + n_d_tmp];
+              struct cell * cii = ci_d[n_offloaded + n_daughters_prev];
+              struct cell * cjj = cj_d[n_offloaded + n_daughters_prev];
               message("Packing ttid %i t_packed %i npacked %i, ci %i, cj %i citop %i, cjtop %i, count i %i, count j %i",
-                  top_tasks_packed - 1, pack_vars_pair_dens->tasks_packed, npacked,
+                  top_tasks_packed - 1, pack_vars_pair_dens->tasks_packed, n_offloaded + n_daughters_prev,
                   cii->cellID, cjj->cellID, cii->top->cellID, cjj->top->cellID, cii->hydro.count, cjj->hydro.count);
 //        	  message("Packing % i % i %i", cii->hydro.count, cjj->hydro.count, pack_vars_pair_dens->count_parts);
               packing_time_pair += runner_dopair1_pack_f4(
                   r, sched, pack_vars_pair_dens, cii, cjj, t,
                   parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens);
-              n_offload++;
-              first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + n_offload;
+              n_offloaded++;
+//              if(n_daughters > n_d_tmp)
+//                first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + n_offload - n_daughters + n_d_tmp;
+//              else
+            	first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + n_offloaded;
               //Record how many daughters we've packed as this is used in unpacking
               ll_current->n_packed++;// = npacked;
               npacked++;
@@ -1229,7 +1233,7 @@ void *runner_main2(void *data) {
                 //Reset everything and move onto next parent task
                 if(npacked == n_leaves_found){
                 	pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].lpdt = npacked;
-                	n_daughters = 0;
+                	n_daughters_total = 0;
                 	pack_vars_pair_dens->top_tasks_packed = 0;
                 	ll_current = NULL;
                     message("packed all leaves");
@@ -1240,54 +1244,22 @@ void *runner_main2(void *data) {
                 else{
                 	//If we launch but still have daughters left re-set this task to be the first in the list
                 	//so that we can continue packing correctly
-//                  struct leaf_cell_list * ll_zero = &pack_vars_pair_dens->leaf_list[0];
                   pack_vars_pair_dens->top_task_list[0] = t;
-//                  struct leaf_cell_list * ll_current = &pack_vars_pair_dens->leaf_list[top_tasks_packed - 1];
                   pack_vars_pair_dens->leaf_list = ll_current;
-//                  int first = first_and_last_daughters[top_tasks_packed - 1][0];
-//                  int last = first_and_last_daughters[top_tasks_packed - 1][1];
-                  int first = n_d_tmp + npacked;
-                  int last = n_d_tmp + n_leaves_found;
+                  int first = n_daughters_prev + n_offloaded;
+                  int last = n_daughters_prev + n_leaves_found;
+                  message("first %i last %i nd %i ndp %i noff %i",
+                		  first, last, n_daughters_total, n_daughters_prev, n_offloaded);
                   for(int i = first; i < last; i++){
-                    ci_d[i - first] = ci_d[i];
-                    cj_d[i - first] = cj_d[i];
-//                  for(int i = 0; i < ll_current->n_packed; i++){
-//                      ci_d[0][i] = ci_d[top_tasks_packed - 1][i];
-//                      cj_d[0][i] = cj_d[top_tasks_packed - 1][i];
+                	int shuffle = i - first;
+                    ci_d[shuffle] = ci_d[i];
+                    cj_d[shuffle] = cj_d[i];
                   }
-                  n_offload = 0;
+                  n_offloaded = 0;
                   first_and_last_daughters[0][0] = 0;
                   first_and_last_daughters[0][1] = last - first;
-                  message("first %i last %i", first, last);
-//                  ci_d[0] = ci_d[top_tasks_packed - 1];
-//                  cj_d[0] = cj_d[top_tasks_packed - 1];
+
                   ll_current = pack_vars_pair_dens->leaf_list;
-//                  for(int i = 1; i < pack_vars_pair_dens->top_tasks_packed; i++){
-//                	  pack_vars_pair_dens->leaf_list[i].ci = NULL;
-//                	  pack_vars_pair_dens->leaf_list[i].cj = NULL;
-//                  }
-//                  struct leaf_cell_list * ll_zero = &pack_vars_pair_dens->leaf_list[0];
-////                  *(ll_zero) = *(ll_current);
-//                  ll_zero->citop = ll_zero->ci[0]->top->cellID;
-//                  ll_zero->cjtop = ll_zero->cj[0]->top->cellID;
-//                  *(ll_zero->ci) = *(pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci);
-//                  *(ll_zero->cj) = *(pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj);
-////                  error("Stop");
-////                  ll_zero->n_leaves = ll_current->n_leaves;
-////                  error("Stop");
-//
-//              	  // Last packed daughter task -> index of the last task we packed before last launch (not this launch)
-////              	  int lpdt = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].lpdt;
-//              	  //un-necessary as the copy above handles this
-//              	  for(int cc = 0; cc < ll_zero->n_packed; cc++){
-////              		if(ll_zero->ci[cc] == ll_current->ci[cc]) error("stop");
-////                    message("ctop i %i ctop j %i", ll_zero->ci[cc]->top->cellID, ll_zero->cj[cc]->top->cellID);
-////                    message("ctop i_c %i ctop_c j %i", ll_current->ci[cc]->top->cellID, ll_current->cj[cc]->top->cellID);
-//              		*(ll_zero->ci[cc]) = *(pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[cc]);
-//              		*(ll_zero->cj[cc]) = *(pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj[cc]);
-//              		message("After unpacking ciid %i cjid %i citop %i cjtop %i npacked %i Nleaves %i", ll_zero->ci[cc]->cellID, ll_zero->cj[cc]->cellID,
-//              				ll_zero->ci[cc]->top->cellID, ll_zero->cj[cc]->top->cellID, npacked, n_leaves_found);
-//              	  }
                   n_tops_reset--;
             	  pack_vars_pair_dens->top_tasks_packed = 1;
                   ll_current->lpdt = npacked;
@@ -1301,47 +1273,22 @@ void *runner_main2(void *data) {
                 continue;
               }
               if(npacked == n_leaves_found && launched == 1){
-//              	pack_vars_pair_dens->top_tasks_packed = 0;
-//              	pack_vars_pair_dens->tasks_packed = 0;
                   pack_vars_pair_dens->leaf_list = ll_current;
                   ll_current = pack_vars_pair_dens->leaf_list;
-//                  for(int i = 0; i < ll_current->n_packed; i++){
-//                      ci_d[0][i] = ci_d[top_tasks_packed - 1][i];
-//                      cj_d[0][i] = cj_d[top_tasks_packed - 1][i];
-//                  }
-                  int first = n_d_tmp + n_offload;
-                  int last = n_d_tmp + n_leaves_found;
+                  int first = n_daughters_prev + n_offloaded;
+                  int last = n_daughters_prev + n_leaves_found;
                   for(int i = first; i < last; i++){
                     ci_d[i - first] = ci_d[i];
                     cj_d[i - first] = cj_d[i];
-//                  for(int i = 0; i < ll_current->n_packed; i++){
-//                      ci_d[0][i] = ci_d[top_tasks_packed - 1][i];
-//                      cj_d[0][i] = cj_d[top_tasks_packed - 1][i];
                   }
                   message("launched but have some left");
-                  n_offload = 0;
-                  n_daughters = n_offload;
+                  n_offloaded = 0;
+                  n_daughters_total = n_offloaded;
                   first_and_last_daughters[0][0] = 0;
                   first_and_last_daughters[0][1] = last - first;
-//                  ci_d[0] = &ci_d[top_tasks_packed - 1];
-//                  cj_d[0] = &cj_d[top_tasks_packed - 1];
-//                  struct leaf_cell_list * ll_zero = &pack_vars_pair_dens->leaf_list[0];
-//                  *(ll_zero->ci) = *(pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci);
-//                  *(ll_zero->cj) = *(pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj);
-//              	  for(int cc = 0; cc < ll_zero->n_leaves; cc++){
-////              		if(ll_zero->ci[cc] == ll_current->ci[cc]) error("stop");
-////                    message("ctop i %i ctop j %i", ll_zero->ci[cc]->top->cellID, ll_zero->cj[cc]->top->cellID);
-////                    message("ctop i_c %i ctop_c j %i", ll_current->ci[cc]->top->cellID, ll_current->cj[cc]->top->cellID);
-//              		*(ll_zero->ci[cc]) = *(pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[cc]);
-//              		*(ll_zero->cj[cc]) = *(pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj[cc]);
-//              		message("ALL LEAVES FOUND & LAUNCHED PREVIOUSLY ciid %i cjid %i citop %i cjtop %i npacked %i Nleaves %i", ll_zero->ci[cc]->cellID, ll_zero->cj[cc]->cellID,
-//              				ll_zero->ci[cc]->top->cellID, ll_zero->cj[cc]->top->cellID, npacked, n_leaves_found);
-//              	  }
             	  pack_vars_pair_dens->top_tasks_packed = 1;
             	  n_tops_reset--;
             	  launched = 0;
-//                  ll_zero->lpdt = npacked;
-//                    exit(0);
               }
 
               pack_vars_pair_dens->launch = 0;
