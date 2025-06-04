@@ -399,6 +399,8 @@ struct cell {
   /*Has the pair task run on the GPU? 0->No, 1-> Yes*/
   int gpu_done_pair_f;
 
+  int index;
+
   /*! The cell location on the grid (corner nearest to the origin). */
   double loc[3];
 
