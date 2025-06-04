@@ -361,6 +361,9 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
 //    pack_vars->leaf_list[tt_packed].cj[leafs_found] = cj;
     ci_d[n_daughters + leafs_found] = ci;
     cj_d[n_daughters + leafs_found] = cj;
+
+    ci->index = n_daughters + leafs_found;
+    cj->index = n_daughters + leafs_found;
 //    error("stop");
     //	pack_vars->leaf_list[tt_packed].shiftx[leafs_found] = shift[0];
     //	pack_vars->leaf_list[tt_packed].shifty[leafs_found] = shift[1];
@@ -1932,11 +1935,11 @@ void runner_dopair1_unpack_f4(
       struct cell *cjj_l = cj_d[tid];
 //      message("unpacking % i % i %i", cii_l->hydro.count, cjj_l->hydro.count,
 //              pack_vars->count_parts);
-//      message(
-//          "unpacking ttid %i tid %i npacked %i, ci %i, cj %i, citop %i, cjtop "
-//          "%i count i %i, count j %i",
-//          topid, tid, npacked, cii_l->cellID, cjj_l->cellID, cii_l->top->cellID,
-//          cjj_l->top->cellID, cii_l->hydro.count, cjj_l->hydro.count);
+      message(
+          "unpacking ttid %i tid %i npacked %i, ci %i, cj %i, citop %i, cjtop "
+          "%i count i %i, count j %i",
+          topid, tid, npacked, cii_l->cellID, cjj_l->cellID, cii_l->top->cellID,
+          cjj_l->top->cellID, cii_l->hydro.count, cjj_l->hydro.count);
 //      if (cii_l->loc[0] != ll_current->ci[tid]->loc[0]) error("stop");
       if (cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
         error("Unpacking empty cells");
