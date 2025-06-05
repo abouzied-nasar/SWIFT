@@ -653,6 +653,7 @@ void *runner_main2(void *data) {
     int packed_pair_f = 0;
     int packed_self_g = 0;
     int packed_pair_g = 0;
+    int last_launched = 0;
     int density = 0;
     int density_sub = 0;
     int unpacked = 0;
@@ -1160,7 +1161,8 @@ void *runner_main2(void *data) {
             int index_start_packing = n_daughters_packed_index;
             int index_end_packing = n_daughters_total;
             int index_start_unpacking = 0;
-            int last_launched = n_daughters_packed_index;
+            //not strictly true!!! Could be that we packed and moved on without launching
+//            last_launched = n_daughters_packed_index;
             int n_p_current_task = 0;
             int had_prev_task = 0;
             if(n_daughters_packed_index > 0)
@@ -1201,6 +1203,7 @@ void *runner_main2(void *data) {
               if(pack_vars_pair_dens->tasks_packed == target_n_tasks)
             	  pack_vars_pair_dens->launch = 1;
               if(pack_vars_pair_dens->launch){
+                last_launched = first_and_last_daughters[top_tasks_packed - 1][1];
 //                if(had_prev_task)
 //                  first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index - n_daughters_packed_index;
 //                else
@@ -1262,12 +1265,13 @@ void *runner_main2(void *data) {
                   last_launched = first_move_index;
 
                   for(int i = first_move_index; i < last_move_index; i++){
-                    message("Moving cell %i to index %i last %i n_d_p_i % i", i, i-first_move_index, last_move_index, n_daughters_packed_index);
-                	int shuffle = i - first_move_index;
+                    int shuffle = i - first_move_index;
+                    message("Moving cell %i to index %i last %i n_d_p_i % i", i, shuffle, last_move_index, n_daughters_packed_index);
                     ci_d[shuffle] = ci_d[i];
                     cj_d[shuffle] = cj_d[i];
-                    if(ci_d[shuffle]->hydro.count == 0 || cj_d[shuffle]->hydro.count == 0)
-                      error("Here");
+//                    message("ci %i cj %i i %i", ci_d[i]->hydro.count, cj_d[i]->hydro.count, i);
+//                    if(ci_d[shuffle]->hydro.count == 0 || cj_d[shuffle]->hydro.count == 0)
+//                      error("Here");
                   }
                   copy_index = 0;
                   first_and_last_daughters[0][0] = 0;
@@ -1283,26 +1287,31 @@ void *runner_main2(void *data) {
                 pack_vars_pair_dens->launch = 0;
               }
               //case when we have launched then gone back to pack but did not pack enough to launch again
-              else if(npacked == n_leaves_found && launched == 1){
-                pack_vars_pair_dens->leaf_list = ll_current;
-                ll_current = pack_vars_pair_dens->leaf_list;
-                //Unnecessary as n_daughters_packed_index is set to zero when we launch
-                int first = last_launched;// + copy_index;
-                int last = n_daughters_total;//n_leaves_found;
-                for(int i = first; i < last; i++){
-                  int shuffle = i - first;
-                  ci_d[shuffle] = ci_d[i];
-                  cj_d[shuffle] = cj_d[i];
-                  message("leftovers Moving cell %i to index %i last %i n_d_p_i %i", i, shuffle, last, n_daughters_packed_index);
+              else if(npacked == n_leaves_found){
+                if(launched == 1){
+
+                  pack_vars_pair_dens->leaf_list = ll_current;
+                  ll_current = pack_vars_pair_dens->leaf_list;
+                  //Unnecessary as n_daughters_packed_index is set to zero when we launch
+                  int first = last_launched;// + copy_index;
+                  int last = n_daughters_total;//n_leaves_found;
+                  for(int i = first; i < last; i++){
+                    int shuffle = i - first;
+                    ci_d[shuffle] = ci_d[i];
+                    cj_d[shuffle] = cj_d[i];
+                    message("leftovers Moving cell %i to index %i last %i n_d_p_i %i", i, shuffle, last, n_daughters_packed_index);
+                  }
+//                  last_launched = 0;
+                  n_daughters_total = last - first;
+                  if(n_daughters_total <= 0)
+                    error("n_d_t %i", n_daughters_total);
+                  n_daughters_packed_index = 0;
+                  first_and_last_daughters[0][0] = 0;
+                  first_and_last_daughters[0][1] = n_daughters_total;
+                  pack_vars_pair_dens->top_tasks_packed = 1;
+                  launched = 0;
                 }
-                n_daughters_total = last - first;
-                n_daughters_packed_index = 0;
-                first_and_last_daughters[0][0] = 0;
-                first_and_last_daughters[0][1] = n_daughters_total;
-                pack_vars_pair_dens->top_tasks_packed = 1;
-                launched = 0;
-              }
-              else if(npacked == n_leaves_found && launched == 0){
+                else {
 //                if(had_prev_task){
                   first_and_last_daughters[top_tasks_packed - 1][0] = n_daughters_packed_index;
                   first_and_last_daughters[top_tasks_packed - 1][1] = n_daughters_total;//last - first;
@@ -1311,6 +1320,7 @@ void *runner_main2(void *data) {
 //                  first_and_last_daughters[0][0] = n_daughters_packed_index;
 //                  first_and_last_daughters[0][1] = n_daughters_total;//last - first;
 //                }
+                }
               }
 
               pack_vars_pair_dens->launch = 0;
