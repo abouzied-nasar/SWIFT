@@ -563,6 +563,7 @@ void *runner_main2(void *data) {
   struct cell **ci_d = malloc(max_length * sizeof(struct cell *));
   struct cell **cj_d = malloc(max_length * sizeof(struct cell *));
   int **first_and_last_daughters;
+  int launch_count = 0;
 
   first_and_last_daughters = malloc(2 * target_n_tasks * sizeof(int *));
   for(int i = 0; i < max_length; i++){
@@ -1147,6 +1148,7 @@ void *runner_main2(void *data) {
             // If so, set launch_leftovers to 1 and recursively pack and launch daughter tasks on GPU
             lock_lock(&sched->queues[qid].lock);
             sched->queues[qid].n_packs_pair_left_d--;
+//            message("tasks left %i", sched->queues[qid].n_packs_pair_left_d);
 //            if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
             lock_unlock(&sched->queues[qid].lock);
             /*Counter for how many tasks we've packed*/
@@ -1191,13 +1193,18 @@ void *runner_main2(void *data) {
               //Record how many daughters we've packed in total for while loop
               ll_current->n_packed++;// = npacked;
               npacked++;
+
+              if(had_prev_task)
+                first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index - n_daughters_packed_index;
+              else
+                first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index;
               if(pack_vars_pair_dens->tasks_packed == target_n_tasks)
             	  pack_vars_pair_dens->launch = 1;
               if(pack_vars_pair_dens->launch){
-                if(had_prev_task)
-                  first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index - n_daughters_packed_index;
-                else
-                  first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index;
+//                if(had_prev_task)
+//                  first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index - n_daughters_packed_index;
+//                else
+//                  first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index;
             	launched = 1;
             	//Here we only launch the tasks. No unpacking! This is done in next function ;)
             	message("Launch copy index %i, daughter index %i", copy_index, n_daughters_packed_index);
@@ -1209,6 +1216,7 @@ void *runner_main2(void *data) {
                       &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
                       pair_end);
 
+                launch_count++;
                 runner_dopair1_unpack_f4(
                       r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
                       parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
@@ -1217,21 +1225,22 @@ void *runner_main2(void *data) {
                       &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
                       pair_end, npacked, n_leaves_found, ci_d, cj_d, first_and_last_daughters);
 
+                message("launch count %i", launch_count);
                 //We have magically launched after packing all the daughter tasks in this parent task.
                 //Reset everything and move onto next parent task
                 if(npacked > n_leaves_found)
                   error("Some thing fishy");
                 if(npacked == n_leaves_found){
-                  pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].lpdt = npacked;
-                  for(int i = 0; i < top_tasks_packed; i++){
-                    int first = first_and_last_daughters[i][0];
-                    int last = first_and_last_daughters[i][1];
-                    for (int j = first; j < last; j++){
-                      int k = i + j;
-                      ci_d[k] = NULL;
-                      cj_d[k] = NULL;
-                    }
-                  }
+//                  pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].lpdt = npacked;
+//                  for(int i = 0; i < top_tasks_packed; i++){
+//                    int first = first_and_last_daughters[i][0];
+//                    int last = first_and_last_daughters[i][1];
+//                    for (int j = first; j < last; j++){
+//                      int k = i + j;
+//                      ci_d[k] = NULL;
+//                      cj_d[k] = NULL;
+//                    }
+//                  }
 
                   n_daughters_total = 0;
                   pack_vars_pair_dens->top_tasks_packed = 0;
@@ -1246,6 +1255,7 @@ void *runner_main2(void *data) {
                   pack_vars_pair_dens->leaf_list = ll_current;
 
                   //Move all tasks forward in list so that the first next task will be packed to index 0
+                  //This seems iffy
                   int first_move_index = n_daughters_packed_index + npacked;
                   int last_move_index = n_daughters_total;
                   int n_left = last_move_index - first_move_index;
@@ -1280,9 +1290,10 @@ void *runner_main2(void *data) {
                 int first = last_launched;// + copy_index;
                 int last = n_daughters_total;//n_leaves_found;
                 for(int i = first; i < last; i++){
-                  ci_d[i - first] = ci_d[i];
-                  cj_d[i - first] = cj_d[i];
-                  message("leftovers Moving cell %i to index %i last %i n_d_p_i %i", i, i-first, last, n_daughters_packed_index);
+                  int shuffle = i - first;
+                  ci_d[shuffle] = ci_d[i];
+                  cj_d[shuffle] = cj_d[i];
+                  message("leftovers Moving cell %i to index %i last %i n_d_p_i %i", i, shuffle, last, n_daughters_packed_index);
                 }
                 n_daughters_total = last - first;
                 n_daughters_packed_index = 0;
