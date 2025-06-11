@@ -37,26 +37,10 @@ struct pack_vars_self {
   int tasksperbundle;
 
 } pack_vars_self;
-struct leaf_cell_list {
-  struct cell **ci;
-  struct cell **cj;
-  double *shiftx;
-  double *shifty;
-  double *shiftz;
-  int n_leaves;
-  int n_packed;
-  int citop;
-  int cjtop;
-  int lpdt;  // lpdt is an acronym for "last packed daughter task" before we
-             // launched on GPU
-  int n_end;
-  int n_offload;
-};
 struct pack_vars_pair {
   /*List of tasks and respective cells to be packed*/
   struct task **task_list;
   struct task **top_task_list;
-  struct leaf_cell_list *leaf_list;
   struct cell **ci_list;
   struct cell **cj_list;
   /*List of cell shifts*/
@@ -357,20 +341,12 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
     //	cells_left[leafs_found] = ci;
     //	cells_right[leafs_found] = cj;
     /*Add leaf cells to list for each top_level task*/
-//    pack_vars->leaf_list[tt_packed].ci[leafs_found] = ci;
-//    pack_vars->leaf_list[tt_packed].cj[leafs_found] = cj;
     ci_d[n_daughters + leafs_found] = ci;
     cj_d[n_daughters + leafs_found] = cj;
 
     ci->index = n_daughters + leafs_found;
     cj->index = n_daughters + leafs_found;
 //    error("stop");
-    //	pack_vars->leaf_list[tt_packed].shiftx[leafs_found] = shift[0];
-    //	pack_vars->leaf_list[tt_packed].shifty[leafs_found] = shift[1];
-    //	pack_vars->leaf_list[tt_packed].shiftz[leafs_found] = shift[2];
-//    pack_vars->leaf_list[tt_packed].n_leaves++;
-//    message("leaves found %i", pack_vars->leaf_list[tt_packed].n_leaves++);
-//    if (ci != pack_vars->leaf_list[tt_packed].ci[leafs_found]) error("stop");
     (*n_leafs_found)++;  //= leafs_found + 1;
     if (*n_leafs_found >= n_expected_tasks)
       error("Created %i more than expected leaf cells. depth %i",
@@ -406,8 +382,6 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   const int tid = pack_vars->tasks_packed;
   /*Get the id for the parent task*/
   const int current_tt = pack_vars->top_tasks_packed - 1;
-  /*How many tasks have we packed so far?*/
-//  int npacked = pack_vars->leaf_list[current_tt].n_packed;
 
   /* Get the relative distance between the pairs, wrapping (For M. S.: what does
    * we mean by wrapping??). */
@@ -461,7 +435,6 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   /* Record that we have now done a pair pack task & increment number of tasks
    * to offload*/
   pack_vars->tasks_packed++;
-//  pack_vars->leaf_list[current_tt].n_offload++;
 
   /*Add time to packing_time. Timer for end of GPU work after the if(launch ||
    * launch_leftovers statement)*/
@@ -1926,12 +1899,10 @@ void runner_dopair1_unpack_f4(
   /*Loop over top level tasks*/
   for (int topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
     const ticks tic = getticks();
-//    struct leaf_cell_list *ll_current = &pack_vars->leaf_list[topid];
     /* Loop through each daughter task */
-//    for (int tid = ll_current->lpdt; tid < ll_current->n_packed; tid++) {
     for (int tid = f_l_daughters[topid][0]; tid < f_l_daughters[topid][1]; tid++){
       /*Get pointers to the leaf cells*/
-      struct cell *cii_l = ci_d[tid];//ll_current->ci[tid];
+      struct cell *cii_l = ci_d[tid];
       struct cell *cjj_l = cj_d[tid];
 //      message("unpacking % i % i %i", cii_l->hydro.count, cjj_l->hydro.count,
 //              pack_vars->count_parts);

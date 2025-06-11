@@ -557,8 +557,6 @@ void *runner_main2(void *data) {
       (struct task **)calloc(target_n_tasks, sizeof(struct task *));
   int n_leaves_max = 2 * 128;
   /*Allocate target_n_tasks for top level tasks. This is a 2D array with length target_n_tasks and width n_leaves_max*/
-  struct leaf_cell_list l_list[target_n_tasks];
-  pack_vars_pair_dens->leaf_list = (struct leaf_cell_list *)calloc(target_n_tasks, sizeof(struct leaf_cell_list));
   int max_length = 2 * target_n_tasks * n_leaves_max;
   struct cell **ci_d = malloc(max_length * sizeof(struct cell *));
   struct cell **cj_d = malloc(max_length * sizeof(struct cell *));
@@ -571,36 +569,9 @@ void *runner_main2(void *data) {
 	  cj_d[i] = malloc(sizeof(struct cell *));
   }
   //chanege above declaration to the assignment below
-//  pack_vars_pair_dens->leaf_list = &l_list;
   for (int i = 0; i < 2 * target_n_tasks; i++){
 	  first_and_last_daughters[i] = malloc(2 * sizeof(int));
-//	  for(int j = 0; j < n_leaves_max; j++){
-//		ci_d[i][j] = malloc(sizeof(struct cell *));
-//		cj_d[i][j] = malloc(sizeof(struct cell *));
-//	  }
-//    l_list[i].ci = (struct cell **)calloc(n_leaves_max, sizeof(struct cell *));
-//    l_list[i].cj = (struct cell **)calloc(n_leaves_max, sizeof(struct cell *));
-//    l_list[i].n_leaves = 0;
-//	pack_vars_pair_dens->leaf_list[i].ci = malloc(n_leaves_max * sizeof(struct cell *));
-//	pack_vars_pair_dens->leaf_list[i].cj = malloc(n_leaves_max * sizeof(struct cell *));
-//	pack_vars_pair_dens->leaf_list[i].ci = ci_d[i];
-//	pack_vars_pair_dens->leaf_list[i].cj = cj_d[i];
-//    pack_vars_pair_dens->leaf_list[i].shiftx = malloc(n_leaves_max * sizeof(double));
-//    pack_vars_pair_dens->leaf_list[i].shifty = malloc(n_leaves_max * sizeof(double));
-//    pack_vars_pair_dens->leaf_list[i].shiftz = malloc(n_leaves_max * sizeof(double));
-    pack_vars_pair_dens->leaf_list[i].n_leaves = 0;
-    pack_vars_pair_dens->leaf_list[i].n_packed = 0;
-    pack_vars_pair_dens->leaf_list[i].n_offload = 0;
-//    for (int j = 0; j < n_leaves_max; j++){
-//      pack_vars_pair_dens->leaf_list[i].ci[j] = l_list[i].ci[j];
-//      pack_vars_pair_dens->leaf_list[i].cj[j] = l_list[i].cj[j];
-//    }
   }
-//  pack_vars_pair_dens->leaf_list = l_list;
-//  pack_vars_pair_dens->leaf_list->ci =
-//	      (struct cell **)calloc(n_leaves_max, sizeof(struct cell *));
-//  pack_vars_pair_dens->leaf_list->cj =
-//	      (struct cell **)calloc(n_leaves_max, sizeof(struct cell *));
   /*Allocate memory for n_leaves_max task pointers per top level task*/
 
   pack_vars_pair_dens->ci_list =
@@ -710,8 +681,6 @@ void *runner_main2(void *data) {
     pack_vars_pair_grad->tasks_packed = 0;
     pack_vars_self_grad->count_parts = 0;
     pack_vars_pair_grad->count_parts = 0;
-    for(int i = 0; i < target_n_tasks; i++)
-    	pack_vars_pair_dens->leaf_list[i].n_leaves = 0;
 
     int total_tasks_packed_this_time_pair = 0;
     double packing_time = 0.0;
@@ -1109,15 +1078,6 @@ void *runner_main2(void *data) {
             int top_tasks_packed = pack_vars_pair_dens->top_tasks_packed;
             int depth = 0;
 
-//            struct leaf_cell_list * ll_fresh = &pack_vars_pair_dens->leaf_list[top_tasks_packed];
-//            ll_fresh->n_leaves = 0;
-//            ll_fresh->n_offload = 0;
-//            ll_fresh->n_packed = 0;
-//            ll_fresh->lpdt = 0;
-//            ll_fresh->n_end = 0;
-//            ll_fresh->citop = ci->top->cellID;
-//            ll_fresh->cjtop = cj->top->cellID;
-
             int n_daughters_packed_index = n_daughters_total;
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
                       parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_d, cj_d, n_daughters_total);
@@ -1173,7 +1133,6 @@ void *runner_main2(void *data) {
             while(npacked < n_leaves_found){
               top_tasks_packed = pack_vars_pair_dens->top_tasks_packed;
 
-//              struct leaf_cell_list * ll_current = &pack_vars_pair_dens->leaf_list[top_tasks_packed - 1];
               tic_cpu_pack = getticks();
               int launch = 0;
 
@@ -1239,20 +1198,8 @@ void *runner_main2(void *data) {
                 if(npacked > n_leaves_found)
                   error("Some thing fishy");
                 if(npacked == n_leaves_found){
-//                  pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].lpdt = npacked;
-//                  for(int i = 0; i < top_tasks_packed; i++){
-//                    int first = first_and_last_daughters[i][0];
-//                    int last = first_and_last_daughters[i][1];
-//                    for (int j = first; j < last; j++){
-//                      int k = i + j;
-//                      ci_d[k] = NULL;
-//                      cj_d[k] = NULL;
-//                    }
-//                  }
-
                   n_daughters_total = 0;
                   pack_vars_pair_dens->top_tasks_packed = 0;
-//                  ll_current = NULL;
                   message("packed all leaves");
                 }
                 //Special treatment required here. Launched but have not packed all tasks
@@ -1260,7 +1207,6 @@ void *runner_main2(void *data) {
                   //If we launch but still have daughters left re-set this task to be the first in the list
                   //so that we can continue packing correctly
                   pack_vars_pair_dens->top_task_list[0] = t;
-//                  pack_vars_pair_dens->leaf_list = ll_current;
 
                   //Move all tasks forward in list so that the first next task will be packed to index 0
                   //This seems iffy
@@ -1286,9 +1232,7 @@ void *runner_main2(void *data) {
                   n_daughters_left -= first_cell_to_move;
                   first_cell_to_move = 0;
 
-//                  ll_current = pack_vars_pair_dens->leaf_list;
             	  pack_vars_pair_dens->top_tasks_packed = 1;
-//                  ll_current->lpdt = npacked;
                   had_prev_task = 0;
                 }
           	    pack_vars_pair_dens->tasks_packed = 0;
@@ -1299,8 +1243,6 @@ void *runner_main2(void *data) {
               else if(npacked == n_leaves_found){
                 if(launched == 1){
 
-//                  pack_vars_pair_dens->leaf_list = ll_current;
-//                  ll_current = pack_vars_pair_dens->leaf_list;
 //                  //Unnecessary as n_daughters_packed_index is set to zero when we launch
 //                  int first = 0;// + copy_index;
 //                  int last = n_daughters_left;//n_leaves_found;
@@ -1344,9 +1286,6 @@ void *runner_main2(void *data) {
             pack_vars_pair_dens->launch = 0;
             cell_unlocktree(ci);
             cell_unlocktree(cj);
-            message("tops packed %i tasks in last top %i daughters left in last top %i", pack_vars_pair_dens->top_tasks_packed,
-            		pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].n_leaves,
-            		pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].n_packed - pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].lpdt);
 //            enqueue_dependencies(sched, t);
 //            pthread_mutex_lock(&sched->sleep_mutex);
 //            atomic_dec(&sched->waiting);
