@@ -1160,7 +1160,8 @@ void *runner_main2(void *data) {
             int copy_index = n_daughters_packed_index;
             int index_start_packing = n_daughters_packed_index;
             int index_end_packing = n_daughters_total;
-            int index_start_unpacking = 0;
+            int index_start_unpacking = first_and_last_daughters[0][0];
+            int index_end_unpacking = index_start_unpacking + target_n_tasks);
             //not strictly true!!! Could be that we packed and moved on without launching
 //            last_launched = n_daughters_packed_index;
             int n_p_current_task = 0;
