@@ -1132,6 +1132,8 @@ void *runner_main2(void *data) {
 //            message("Found %i daughter tasks", n_leaves_found);
 
             n_leafs_total += n_leaves_found;
+            int first_cell_to_move = n_daughters_packed_index;
+            int n_daughters_left = n_daughters_total;
             int cid = 0;
 
             /*Get pointer to top level task. Needed to enqueue deps*/
@@ -1161,7 +1163,7 @@ void *runner_main2(void *data) {
             int index_start_packing = n_daughters_packed_index;
             int index_end_packing = n_daughters_total;
             int index_start_unpacking = first_and_last_daughters[0][0];
-            int index_end_unpacking = index_start_unpacking + target_n_tasks);
+            int index_end_unpacking = index_start_unpacking + target_n_tasks;
             //not strictly true!!! Could be that we packed and moved on without launching
 //            last_launched = n_daughters_packed_index;
             int n_p_current_task = 0;
@@ -1171,13 +1173,14 @@ void *runner_main2(void *data) {
             while(npacked < n_leaves_found){
               top_tasks_packed = pack_vars_pair_dens->top_tasks_packed;
 
-              struct leaf_cell_list * ll_current = &pack_vars_pair_dens->leaf_list[top_tasks_packed - 1];
+//              struct leaf_cell_list * ll_current = &pack_vars_pair_dens->leaf_list[top_tasks_packed - 1];
               tic_cpu_pack = getticks();
               int launch = 0;
 
               struct cell * cii = ci_d[copy_index];
               struct cell * cjj = cj_d[copy_index];
 //              message("Packing cell with no parts ci index %i cj index %i copy_index % i", cii->index, cjj->index, copy_index);
+              message("packed %i copy_index %i",  npacked, copy_index);
               if(cii->hydro.count == 0 || cjj->hydro.count == 0){
             	  message("Packing cell with no parts ci index %i cj index %i", cii->index, cjj->index);
             	  error("Stop");
@@ -1194,8 +1197,9 @@ void *runner_main2(void *data) {
               n_p_current_task++;
 
               //Record how many daughters we've packed in total for while loop
-              ll_current->n_packed++;// = npacked;
+//              ll_current->n_packed++;// = npacked;
               npacked++;
+              first_cell_to_move++;
 
               if(had_prev_task)
                 first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index - n_daughters_packed_index;
@@ -1248,7 +1252,7 @@ void *runner_main2(void *data) {
 
                   n_daughters_total = 0;
                   pack_vars_pair_dens->top_tasks_packed = 0;
-                  ll_current = NULL;
+//                  ll_current = NULL;
                   message("packed all leaves");
                 }
                 //Special treatment required here. Launched but have not packed all tasks
@@ -1256,18 +1260,19 @@ void *runner_main2(void *data) {
                   //If we launch but still have daughters left re-set this task to be the first in the list
                   //so that we can continue packing correctly
                   pack_vars_pair_dens->top_task_list[0] = t;
-                  pack_vars_pair_dens->leaf_list = ll_current;
+//                  pack_vars_pair_dens->leaf_list = ll_current;
 
                   //Move all tasks forward in list so that the first next task will be packed to index 0
                   //This seems iffy
-                  int first_move_index = n_daughters_packed_index + npacked;
-                  int last_move_index = n_daughters_total;
-                  int n_left = last_move_index - first_move_index;
-                  last_launched = first_move_index;
+//                  int first_move_index = first_cell_to_move;
+//                  int last_move_index = n_daughters_left;
+//                  int n_left = last_move_index - first_move_index;
+                  last_launched = 0;//first_cell_to_move;
 
-                  for(int i = first_move_index; i < last_move_index; i++){
-                    int shuffle = i - first_move_index;
-                    message("Moving cell %i to index %i last %i n_d_p_i % i", i, shuffle, last_move_index, n_daughters_packed_index);
+                  //Move remaining cell indices so that their indexing starts from zero and ends in n_daughters_left
+                  for(int i = first_cell_to_move; i < n_daughters_left; i++){
+                    int shuffle = i - first_cell_to_move;
+                    message("Moving cell %i to index %i last %i n_d_p_i % i n_d_T %i", i, shuffle, n_daughters_left, n_daughters_packed_index, n_daughters_total);
                     ci_d[shuffle] = ci_d[i];
                     cj_d[shuffle] = cj_d[i];
 //                    message("ci %i cj %i i %i", ci_d[i]->hydro.count, cj_d[i]->hydro.count, i);
@@ -1276,11 +1281,14 @@ void *runner_main2(void *data) {
                   }
                   copy_index = 0;
                   first_and_last_daughters[0][0] = 0;
-                  first_and_last_daughters[0][1] = last_move_index - first_move_index;
+                  first_and_last_daughters[0][1] = n_daughters_left - first_cell_to_move;
 
-                  ll_current = pack_vars_pair_dens->leaf_list;
+                  n_daughters_left -= first_cell_to_move;
+                  first_cell_to_move = 0;
+
+//                  ll_current = pack_vars_pair_dens->leaf_list;
             	  pack_vars_pair_dens->top_tasks_packed = 1;
-                  ll_current->lpdt = npacked;
+//                  ll_current->lpdt = npacked;
                   had_prev_task = 0;
                 }
           	    pack_vars_pair_dens->tasks_packed = 0;
@@ -1291,24 +1299,25 @@ void *runner_main2(void *data) {
               else if(npacked == n_leaves_found){
                 if(launched == 1){
 
-                  pack_vars_pair_dens->leaf_list = ll_current;
-                  ll_current = pack_vars_pair_dens->leaf_list;
-                  //Unnecessary as n_daughters_packed_index is set to zero when we launch
-                  int first = last_launched;// + copy_index;
-                  int last = n_daughters_total;//n_leaves_found;
-                  for(int i = first; i < last; i++){
-                    int shuffle = i - first;
-                    ci_d[shuffle] = ci_d[i];
-                    cj_d[shuffle] = cj_d[i];
-                    message("leftovers Moving cell %i to index %i last %i n_d_p_i %i", i, shuffle, last, n_daughters_packed_index);
-                  }
-//                  last_launched = 0;
-                  n_daughters_total = last - first;
-                  if(n_daughters_total <= 0)
-                    error("n_d_t %i", n_daughters_total);
-                  n_daughters_packed_index = 0;
+//                  pack_vars_pair_dens->leaf_list = ll_current;
+//                  ll_current = pack_vars_pair_dens->leaf_list;
+//                  //Unnecessary as n_daughters_packed_index is set to zero when we launch
+//                  int first = 0;// + copy_index;
+//                  int last = n_daughters_left;//n_leaves_found;
+//                  for(int i = first; i < last; i++){
+//                    int shuffle = i - first;
+//                    ci_d[shuffle] = ci_d[i];
+//                    cj_d[shuffle] = cj_d[i];
+                    message("LEFTOVERS %i", n_daughters_left);
+//                  }
+////                  last_launched = 0;
+//                  n_daughters_left -= first_cell_to_move;
+                  n_daughters_total = n_daughters_left;
+//                  if(n_daughters_total < 0)
+//                    error("n_d_t %i", n_daughters_total);
+//                  n_daughters_packed_index = 0;
                   first_and_last_daughters[0][0] = 0;
-                  first_and_last_daughters[0][1] = n_daughters_total;
+                  first_and_last_daughters[0][1] = n_daughters_left;
                   pack_vars_pair_dens->top_tasks_packed = 1;
                   launched = 0;
                 }
@@ -1322,6 +1331,7 @@ void *runner_main2(void *data) {
 //                  first_and_last_daughters[0][1] = n_daughters_total;//last - first;
 //                }
                 }
+                pack_vars_pair_dens->launch = 0;
               }
 
               pack_vars_pair_dens->launch = 0;
