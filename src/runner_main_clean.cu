@@ -572,7 +572,7 @@ void *runner_main2(void *data) {
   }
   //chanege above declaration to the assignment below
 //  pack_vars_pair_dens->leaf_list = &l_list;
-  for (int i = 0; i < target_n_tasks; i++){
+  for (int i = 0; i < 2 * target_n_tasks; i++){
 	  first_and_last_daughters[i] = malloc(2 * sizeof(int));
 //	  for(int j = 0; j < n_leaves_max; j++){
 //		ci_d[i][j] = malloc(sizeof(struct cell *));
@@ -1109,14 +1109,14 @@ void *runner_main2(void *data) {
             int top_tasks_packed = pack_vars_pair_dens->top_tasks_packed;
             int depth = 0;
 
-            struct leaf_cell_list * ll_fresh = &pack_vars_pair_dens->leaf_list[top_tasks_packed];
-            ll_fresh->n_leaves = 0;
-            ll_fresh->n_offload = 0;
-            ll_fresh->n_packed = 0;
-            ll_fresh->lpdt = 0;
-            ll_fresh->n_end = 0;
-            ll_fresh->citop = ci->top->cellID;
-            ll_fresh->cjtop = cj->top->cellID;
+//            struct leaf_cell_list * ll_fresh = &pack_vars_pair_dens->leaf_list[top_tasks_packed];
+//            ll_fresh->n_leaves = 0;
+//            ll_fresh->n_offload = 0;
+//            ll_fresh->n_packed = 0;
+//            ll_fresh->lpdt = 0;
+//            ll_fresh->n_end = 0;
+//            ll_fresh->citop = ci->top->cellID;
+//            ll_fresh->cjtop = cj->top->cellID;
 
             int n_daughters_packed_index = n_daughters_total;
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
