@@ -368,7 +368,7 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
     //	pack_vars->leaf_list[tt_packed].shiftx[leafs_found] = shift[0];
     //	pack_vars->leaf_list[tt_packed].shifty[leafs_found] = shift[1];
     //	pack_vars->leaf_list[tt_packed].shiftz[leafs_found] = shift[2];
-    pack_vars->leaf_list[tt_packed].n_leaves++;
+//    pack_vars->leaf_list[tt_packed].n_leaves++;
 //    message("leaves found %i", pack_vars->leaf_list[tt_packed].n_leaves++);
 //    if (ci != pack_vars->leaf_list[tt_packed].ci[leafs_found]) error("stop");
     (*n_leafs_found)++;  //= leafs_found + 1;
@@ -407,7 +407,7 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   /*Get the id for the parent task*/
   const int current_tt = pack_vars->top_tasks_packed - 1;
   /*How many tasks have we packed so far?*/
-  int npacked = pack_vars->leaf_list[current_tt].n_packed;
+//  int npacked = pack_vars->leaf_list[current_tt].n_packed;
 
   /* Get the relative distance between the pairs, wrapping (For M. S.: what does
    * we mean by wrapping??). */
@@ -461,7 +461,7 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   /* Record that we have now done a pair pack task & increment number of tasks
    * to offload*/
   pack_vars->tasks_packed++;
-  pack_vars->leaf_list[current_tt].n_offload++;
+//  pack_vars->leaf_list[current_tt].n_offload++;
 
   /*Add time to packing_time. Timer for end of GPU work after the if(launch ||
    * launch_leftovers statement)*/
@@ -1926,7 +1926,7 @@ void runner_dopair1_unpack_f4(
   /*Loop over top level tasks*/
   for (int topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
     const ticks tic = getticks();
-    struct leaf_cell_list *ll_current = &pack_vars->leaf_list[topid];
+//    struct leaf_cell_list *ll_current = &pack_vars->leaf_list[topid];
     /* Loop through each daughter task */
 //    for (int tid = ll_current->lpdt; tid < ll_current->n_packed; tid++) {
     for (int tid = f_l_daughters[topid][0]; tid < f_l_daughters[topid][1]; tid++){
