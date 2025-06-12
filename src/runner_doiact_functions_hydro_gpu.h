@@ -1888,7 +1888,7 @@ void runner_dopair1_unpack_f4(
     struct part_aos_f4_recv *d_parts_recv, cudaStream_t *stream, float d_a,
     float d_H, struct engine *e, double *packing_time, double *gpu_time,
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
-    cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters) {
+    cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters, struct cell ** ci_top, struct cell ** cj_top) {
 
 //  int topid;
   /////////////////////////////////
@@ -1899,6 +1899,18 @@ void runner_dopair1_unpack_f4(
   /*Loop over top level tasks*/
   for (int topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
     const ticks tic = getticks();
+	struct cell *cii_top = ci_top[topid];
+	struct cell *cjj_top = cj_top[topid];
+    if(topid < pack_vars->top_tasks_packed - 1){
+      message("topid %i tops packed %i", topid, pack_vars->top_tasks_packed);
+      while (cell_locktree(cii_top)) {
+        ; /* spin until we acquire the lock */
+      }
+      while (cell_locktree(cjj_top)) {
+        ; /* spin until we acquire the lock */
+      }
+    }
+
     /* Loop through each daughter task */
     for (int tid = f_l_daughters[topid][0]; tid < f_l_daughters[topid][1]; tid++){
       /*Get pointers to the leaf cells*/
@@ -1917,6 +1929,14 @@ void runner_dopair1_unpack_f4(
       runner_do_ci_cj_gpu_unpack_neat_aos_f4(r, cii_l, cjj_l, parts_recv, 0,
                                              &pack_length_unpack, tid,
                                              2 * pack_vars->count_max_parts, e);
+    }
+    if(topid < pack_vars->top_tasks_packed - 1){
+//      pthread_mutex_lock(&s->sleep_mutex);
+//      atomic_dec(&s->waiting);
+//      pthread_cond_broadcast(&s->sleep_cond);
+//      pthread_mutex_unlock(&s->sleep_mutex);
+      cell_unlocktree(cii_top);
+      cell_unlocktree(cjj_top);
     }
 
     const ticks toc = getticks();
