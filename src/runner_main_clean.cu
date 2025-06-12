@@ -568,6 +568,12 @@ void *runner_main2(void *data) {
 	  cj_d[i] = malloc(sizeof(struct cell *));
   }
   first_and_last_daughters = malloc(target_n_tasks * n_leaves_max * sizeof(int *));
+  struct cell **ci_top = malloc(max_length * sizeof(struct cell *));
+  struct cell **cj_top = malloc(max_length * sizeof(struct cell *));
+  for(int i = 0; i < max_length; i++){
+	  ci_top[i] = malloc(sizeof(struct cell *));
+	  cj_top[i] = malloc(sizeof(struct cell *));
+  }
   //change above declaration to the assignment below
   for (int i = 0; i < target_n_tasks * n_leaves_max; i++){
 	  first_and_last_daughters[i] = malloc(2 * sizeof(int));
@@ -1083,10 +1089,12 @@ void *runner_main2(void *data) {
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
                       parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_d, cj_d, n_daughters_total);
 
-//            message("ndaughters prev %i, nfound %i, ntotal %i", n_daughters_total, n_leaves_found, n_daughters_total + n_leaves_found);
+            message("ndaughters prev %i, nfound %i, ntotal %i tops_packed %i", n_daughters_total, n_leaves_found, n_daughters_total + n_leaves_found, top_tasks_packed);
             n_daughters_total += n_leaves_found;
 
             first_and_last_daughters[top_tasks_packed][0] = n_daughters_packed_index;
+            ci_top[top_tasks_packed] = ci;
+            cj_top[top_tasks_packed] = cj;
 //            first_and_last_daughters[top_tasks_packed][1] = target_n_tasks - n_daughters_packed_index;
             tops_packed_in_step++;
             n_tops_reset++;
@@ -1195,7 +1203,7 @@ void *runner_main2(void *data) {
                       d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
                       &packing_time_pair, &time_for_density_gpu_pair,
                       &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-                      pair_end, npacked, n_leaves_found, ci_d, cj_d, first_and_last_daughters);
+                      pair_end, npacked, n_leaves_found, ci_d, cj_d, first_and_last_daughters, ci_top, cj_top);
 
 //                message("launch count %i leftover count %i", launch_count, leftover_launch_count);
                 //We have magically launched after packing all the daughter tasks in this parent task.
@@ -1233,6 +1241,9 @@ void *runner_main2(void *data) {
                   copy_index = 0;
                   first_and_last_daughters[0][0] = 0;
                   first_and_last_daughters[0][1] = n_daughters_left - first_cell_to_move;
+
+                  cj_top[0] = cj;
+                  ci_top[0] = ci;
 
                   n_daughters_left -= first_cell_to_move;
                   first_cell_to_move = 0;
