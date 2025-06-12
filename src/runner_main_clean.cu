@@ -1166,7 +1166,7 @@ void *runner_main2(void *data) {
                 first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index;
               if(pack_vars_pair_dens->tasks_packed == target_n_tasks)
             	  pack_vars_pair_dens->launch = 1;
-              if(pack_vars_pair_dens->launch){
+              if(pack_vars_pair_dens->launch || (pack_vars_pair_dens->launch_leftovers && npacked == n_leaves_found)){
                 last_launched = first_and_last_daughters[top_tasks_packed - 1][1];
 //                if(had_prev_task)
 //                  first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index - n_daughters_packed_index;

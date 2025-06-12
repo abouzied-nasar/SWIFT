@@ -90,7 +90,7 @@ TASKTYPES = [
     "rt_transport_out",
     "rt_tchem",
     "rt_advance_cell_time",
-    "rt_sort",
+    "rt_sorts",
     "rt_collect_times",
     #  "count",
 ]
@@ -129,6 +129,13 @@ SUBTYPES = [
     "sink_do_gas_swallow",
     "rt_gradient",
     "rt_transport",
+    "gpu_pack",
+    "gpu_pack_g",
+    "gpu_pack_f",
+    "gpu_unpack",
+    "gpu_unpack_g",
+    "gpu_unpack_f",    
+    
     #  "count",
 ]
 
