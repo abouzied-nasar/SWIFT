@@ -1007,7 +1007,7 @@ void *runner_main2(void *data) {
 //              fprintf(fgpu_steps, "x, y, z, "
 //            		"rho, rhodh, v_sig, lap_u, a_visc_max, ax, ay, az\n");
             /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
-            packing_time_pair_f +=
+            packing_time_pair +=
                 runner_dopair1_pack_f4_d(r, sched, pack_vars_pair_dens, ci,
                                          cj, t, parts_aos_pair_f4_send, e,
                                          fparti_fpartj_lparti_lpartj_dens);
@@ -1112,7 +1112,7 @@ void *runner_main2(void *data) {
             lock_lock(&sched->queues[qid].lock);
             sched->queues[qid].n_packs_pair_left_d--;
 //            message("tasks left %i", sched->queues[qid].n_packs_pair_left_d);
-//            if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
+            if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
             lock_unlock(&sched->queues[qid].lock);
             /*Counter for how many tasks we've packed*/
             int npacked = 0;
