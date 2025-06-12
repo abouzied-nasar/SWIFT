@@ -260,7 +260,7 @@ void *runner_main2(void *data) {
   const int target_n_tasks = sched->pack_size;
   const int target_n_tasks_pair = sched->pack_size_pair;
   pack_vars_self_dens->target_n_tasks = target_n_tasks;
-  pack_vars_pair_dens->target_n_tasks = target_n_tasks_pair;
+  pack_vars_pair_dens->target_n_tasks = target_n_tasks_pair * 16; //Accounting for one level of recursion
   pack_vars_self_forc->target_n_tasks = target_n_tasks;
   pack_vars_pair_forc->target_n_tasks = target_n_tasks_pair;
   pack_vars_self_grad->target_n_tasks = target_n_tasks;
@@ -270,7 +270,7 @@ void *runner_main2(void *data) {
   const int bundle_size = N_TASKS_BUNDLE_SELF;
   const int bundle_size_pair = N_TASKS_BUNDLE_PAIR;
   pack_vars_self_dens->bundle_size = bundle_size;
-  pack_vars_pair_dens->bundle_size = bundle_size_pair;
+  pack_vars_pair_dens->bundle_size = target_n_tasks_pair * 4; //Trying to make it so that we have 4 bundles
   pack_vars_self_forc->bundle_size = bundle_size;
   pack_vars_pair_forc->bundle_size = bundle_size_pair;
   pack_vars_self_grad->bundle_size = bundle_size;
@@ -299,11 +299,11 @@ void *runner_main2(void *data) {
   int4 *fparti_fpartj_lparti_lpartj_forc;
   int4 *fparti_fpartj_lparti_lpartj_grad;
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_dens,
-                 target_n_tasks * sizeof(int4));
+		  target_n_tasks * 16 * sizeof(int4));
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_forc,
-                 target_n_tasks * sizeof(int4));
+		  target_n_tasks * sizeof(int4));
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_grad,
-                 target_n_tasks * sizeof(int4));
+		  target_n_tasks * sizeof(int4));
 
   /* nBundles is the number of task bundles each
   thread has ==> Used to loop through bundles */
@@ -395,7 +395,7 @@ void *runner_main2(void *data) {
       (target_n_tasks_pair + nBundles_pair - 1) / nBundles_pair;
 
   pack_vars_self_dens->tasksperbundle = tasksperbundle;
-  pack_vars_pair_dens->tasksperbundle = tasksperbundle_pair;
+  pack_vars_pair_dens->tasksperbundle = tasksperbundle_pair * 16;
   pack_vars_self_forc->tasksperbundle = tasksperbundle;
   pack_vars_pair_forc->tasksperbundle = tasksperbundle_pair;
   pack_vars_self_grad->tasksperbundle = tasksperbundle;
@@ -552,10 +552,10 @@ void *runner_main2(void *data) {
       (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
 
   pack_vars_pair_dens->task_list =
-      (struct task **)calloc(target_n_tasks, sizeof(struct task *));
+      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
   pack_vars_pair_dens->top_task_list =
       (struct task **)calloc(target_n_tasks, sizeof(struct task *));
-  int n_leaves_max = 2 * 128;
+  int n_leaves_max = 128;
   /*Allocate target_n_tasks for top level tasks. This is a 2D array with length target_n_tasks and width n_leaves_max*/
   int max_length = 2 * target_n_tasks * n_leaves_max;
   struct cell **ci_d = malloc(max_length * sizeof(struct cell *));
@@ -563,21 +563,21 @@ void *runner_main2(void *data) {
   int **first_and_last_daughters;
   int launch_count = 0;
 
-  first_and_last_daughters = malloc(2 * target_n_tasks * sizeof(int *));
   for(int i = 0; i < max_length; i++){
 	  ci_d[i] = malloc(sizeof(struct cell *));
 	  cj_d[i] = malloc(sizeof(struct cell *));
   }
-  //chanege above declaration to the assignment below
-  for (int i = 0; i < 2 * target_n_tasks; i++){
+  first_and_last_daughters = malloc(target_n_tasks * n_leaves_max * sizeof(int *));
+  //change above declaration to the assignment below
+  for (int i = 0; i < target_n_tasks * n_leaves_max; i++){
 	  first_and_last_daughters[i] = malloc(2 * sizeof(int));
   }
   /*Allocate memory for n_leaves_max task pointers per top level task*/
 
   pack_vars_pair_dens->ci_list =
-      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
+      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
   pack_vars_pair_dens->cj_list =
-      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
+      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
 
   pack_vars_self_forc->task_list =
       (struct task **)calloc(target_n_tasks, sizeof(struct task *));
@@ -1105,7 +1105,7 @@ void *runner_main2(void *data) {
             //A. Nasar: Remove this from struct as not needed. Was only used for de-bugging
 //            pack_vars_pair_dens->task_locked = 1;
             /*How many daughter tasks do we want to offload at once?*/
-            int target_n_tasks = pack_vars_pair_dens->target_n_tasks;
+            int target_n_tasks_tmp = pack_vars_pair_dens->target_n_tasks;
             t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
 
             // A. Nasar: Check to see if this is the last task in the queue.
@@ -1124,7 +1124,7 @@ void *runner_main2(void *data) {
             int index_start_packing = n_daughters_packed_index;
             int index_end_packing = n_daughters_total;
             int index_start_unpacking = first_and_last_daughters[0][0];
-            int index_end_unpacking = index_start_unpacking + target_n_tasks;
+            int index_end_unpacking = index_start_unpacking + target_n_tasks_tmp;
             //not strictly true!!! Could be that we packed and moved on without launching
 //            last_launched = n_daughters_packed_index;
             int n_p_current_task = 0;
@@ -1165,7 +1165,7 @@ void *runner_main2(void *data) {
                 first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index - n_daughters_packed_index;
               else
                 first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index;
-              if(pack_vars_pair_dens->tasks_packed == target_n_tasks)
+              if(pack_vars_pair_dens->tasks_packed == target_n_tasks_tmp)
             	  pack_vars_pair_dens->launch = 1;
               if(pack_vars_pair_dens->launch || (pack_vars_pair_dens->launch_leftovers && npacked == n_leaves_found)){
 
