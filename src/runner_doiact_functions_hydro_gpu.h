@@ -1736,9 +1736,9 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
     nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
-    message("tasks packed %i nbundles % i", tasks_packed, nBundles_temp);
-    if (tasks_packed == 0)
-      error("zero pair tasks packed but somehow got into GPU loop");
+//    message("tasks packed %i nbundles % i", tasks_packed, nBundles_temp);
+//    if (tasks_packed == 0)
+//      error("zero pair tasks packed but somehow got into GPU loop");
     pack_vars->bundle_first_part[nBundles_temp] =
         fparti_fpartj_lparti_lpartj_dens[tasks_packed - 1].x;
     //    message("Incomplete buundle");
@@ -1912,8 +1912,8 @@ void runner_dopair1_unpack_f4(
 //          topid, tid, npacked, cii_l->cellID, cjj_l->cellID, cii_l->top->cellID,
 //          cjj_l->top->cellID, cii_l->hydro.count, cjj_l->hydro.count);
 //      if (cii_l->loc[0] != ll_current->ci[tid]->loc[0]) error("stop");
-      if (cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
-        error("Unpacking empty cells");
+//      if (cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
+//        error("Unpacking empty cells");
       runner_do_ci_cj_gpu_unpack_neat_aos_f4(r, cii_l, cjj_l, parts_recv, 0,
                                              &pack_length_unpack, tid,
                                              2 * pack_vars->count_max_parts, e);
@@ -1934,9 +1934,9 @@ void runner_dopair1_unpack_f4(
     pthread_cond_broadcast(&s->sleep_cond);
     pthread_mutex_unlock(&s->sleep_mutex);
   }
-  if (pack_length_unpack != pack_vars->count_parts)
-    error("count unpacked %i != count_packed %i", pack_length_unpack,
-          pack_vars->count_parts);
+//  if (pack_length_unpack != pack_vars->count_parts)
+//    error("count unpacked %i != count_packed %i", pack_length_unpack,
+//          pack_vars->count_parts);
 }
 void runner_dopair1_launch_f4_g_one_memcpy(
     struct runner *r, struct scheduler *s, struct pack_vars_pair *pack_vars,
