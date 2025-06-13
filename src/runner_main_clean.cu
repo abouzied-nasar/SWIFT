@@ -1155,9 +1155,9 @@ void *runner_main2(void *data) {
 //            	  message("Packing cell with no parts ci index %i cj index %i", cii->index, cjj->index);
 //            	  error("Stop");
 //              }
-//              message("Packing ttid %i copy_index %i actual_index %i, ci %i, cj %i citop %i, cjtop %i, count i %i, count j %i",
-//                  top_tasks_packed - 1, copy_index, copy_index + n_daughters_packed_index,
-//                  cii->cellID, cjj->cellID, cii->top->cellID, cjj->top->cellID, cii->hydro.count, cjj->hydro.count);
+              message("Packing ttid %i copy_index %i actual_index %i, ci %i, cj %i citop %i, cjtop %i, count i %i, count j %i",
+                  top_tasks_packed - 1, copy_index, copy_index + n_daughters_packed_index,
+                  cii->cellID, cjj->cellID, cii->top->cellID, cjj->top->cellID, cii->hydro.count, cjj->hydro.count);
 
               packing_time_pair += runner_dopair1_pack_f4(
                   r, sched, pack_vars_pair_dens, cii, cjj, t,
@@ -1242,8 +1242,8 @@ void *runner_main2(void *data) {
                   first_and_last_daughters[0][0] = 0;
                   first_and_last_daughters[0][1] = n_daughters_left - first_cell_to_move;
 
-                  cj_top[0] = cj;
-                  ci_top[0] = ci;
+//                  cj_top[0] = cj;
+//                  ci_top[0] = ci;
 
                   n_daughters_left -= first_cell_to_move;
                   first_cell_to_move = 0;
@@ -1277,9 +1277,9 @@ void *runner_main2(void *data) {
 //                  n_daughters_packed_index = 0;
                   first_and_last_daughters[0][0] = 0;
                   first_and_last_daughters[0][1] = n_daughters_left;
-//                  for(int i = 0; i < n_daughters_left; i++){
-//              	    error("ci %i cj %i", ci_d[0]->hydro.count, cj_d[0]->hydro.count);
-//                  }
+                  for(int i = 0; i < n_daughters_left; i++){
+              	    message("ci %i cj %i", ci_d[0]->hydro.count, cj_d[0]->hydro.count);
+                  }
                   pack_vars_pair_dens->top_tasks_packed = 1;
                   launched = 0;
                 }
