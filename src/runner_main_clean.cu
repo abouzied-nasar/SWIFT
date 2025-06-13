@@ -1139,6 +1139,8 @@ void *runner_main2(void *data) {
             int had_prev_task = 0;
             if(n_daughters_packed_index > 0)
               had_prev_task = 1;
+            cell_unlocktree(ci);
+            cell_unlocktree(cj);
             while(npacked < n_leaves_found){
               top_tasks_packed = pack_vars_pair_dens->top_tasks_packed;
 
@@ -1300,8 +1302,6 @@ void *runner_main2(void *data) {
             //A. Nasar: Launch-leftovers counter re-set to zero and cells unlocked
             pack_vars_pair_dens->launch_leftovers = 0;
             pack_vars_pair_dens->launch = 0;
-            cell_unlocktree(ci);
-            cell_unlocktree(cj);
 //            enqueue_dependencies(sched, t);
 //            pthread_mutex_lock(&sched->sleep_mutex);
 //            atomic_dec(&sched->waiting);
