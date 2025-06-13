@@ -1888,7 +1888,7 @@ void runner_dopair1_unpack_f4(
     struct part_aos_f4_recv *d_parts_recv, cudaStream_t *stream, float d_a,
     float d_H, struct engine *e, double *packing_time, double *gpu_time,
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
-    cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters, struct cell ** ci_top, struct cell ** cj_top) {
+    cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters) {
 
 //  int topid;
   /////////////////////////////////
@@ -1903,7 +1903,7 @@ void runner_dopair1_unpack_f4(
 	struct cell *cii_top = ci_d[first_daughter_id];
 	struct cell *cjj_top = cj_d[first_daughter_id];
 //    if(topid < pack_vars->top_tasks_packed - 1){
-      message("topid %i tops packed %i citop %i cjtop %i", topid, pack_vars->top_tasks_packed, cii_top->top->cellID, cjj_top->top->cellID);
+      message("topid %i tops packed %i citop %i cjtop %i d_id %", topid, pack_vars->top_tasks_packed, cii_top->top->cellID, cjj_top->top->cellID, first_daughter_id);
       while (cell_locktree(cii_top)) {
         ; /* spin until we acquire the lock */
       }
