@@ -1,5 +1,8 @@
 #include "../config.h"
 
+#include "timeline.h"
+#include "runner.h"
+
 #ifdef HAVE_CUDA
 #pragma message "HAVE_CUDA"
 #include "cuda/part_gpu.h"
