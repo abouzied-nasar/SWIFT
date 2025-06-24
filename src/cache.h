@@ -961,8 +961,9 @@ cache_read_two_partial_cells_sorted_force(
     vy[i] = part_get_v_ind(&parts_i[idx], 1);
     vz[i] = part_get_v_ind(&parts_i[idx], 2);
 #ifdef GADGET2_SPH
-    m[i] = part_get_mass(&parts_i[idx]) rho[i] =
-        part_get_rho(&parts_i[idx]) grad_h[i] = part_get_force_f(&parts_i[idx]);
+    m[i] = part_get_mass(&parts_i[idx]);
+    rho[i] = part_get_rho(&parts_i[idx]);
+    grad_h[i] = part_get_force_f(&parts_i[idx]);
     pOrho2[i] = part_get_P_over_rho2(&parts_i[idx]);
     balsara[i] = part_get_balsara(&parts_i[idx]);
     soundspeed[i] = part_get_soundspeed(&parts_i[idx]);
