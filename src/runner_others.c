@@ -1228,14 +1228,12 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
       const double dt =
           rt_part_dt(ti_begin, ti_end, e->time_base, with_cosmology, cosmo);
 #ifdef SWIFT_DEBUG_CHECKS
-      const struct timestep_limiter_data *limiter_data =
-          part_get_limiter_data_p(p);
       if (ti_begin != ti_current_subcycle)
         error(
             "Particle in wrong time-bin, ti_end=%lld, ti_begin=%lld, "
             "ti_step=%lld time_bin=%d wakeup=%d ti_current=%lld",
             ti_end, ti_begin, ti_step, part_get_time_bin(p),
-            limiter_data->wakeup, ti_current_subcycle);
+            part_get_timestep_limiter_wakeup(p), ti_current_subcycle);
       if (dt < 0.)
         error("Got part with negative time-step: %lld, %.6g", part_get_id(p),
               dt);
