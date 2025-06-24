@@ -23,6 +23,8 @@
 #include <config.h>
 
 /* Local headers. */
+#include "active.h"
+#include "engine.h"
 #include "kick.h"
 
 /**
@@ -35,7 +37,8 @@ __attribute__((always_inline)) INLINE static void
 timestep_limiter_prepare_force(struct part *restrict p,
                                struct xpart *restrict xp) {
 
-  p->limiter_data.min_ngb_time_bin = num_time_bins + 1;
+  struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
+  limiter_data->min_ngb_time_bin = num_time_bins + 1;
 }
 
 /**
@@ -46,7 +49,8 @@ timestep_limiter_prepare_force(struct part *restrict p,
 __attribute__((always_inline)) INLINE static void timestep_limiter_end_force(
     struct part *restrict p) {
 #ifdef SWIFT_DEBUG_CHECKS
-  if (p->limiter_data.min_ngb_time_bin == 0)
+  struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
+  if (limiter_data->min_ngb_time_bin == 0)
     error("Minimal time-bin of neighbours is 0");
 #endif
 }
@@ -70,19 +74,20 @@ __attribute__((always_inline)) INLINE static integertime_t timestep_limit_part(
   const double time_base = e->time_base;
   const integertime_t ti_current = e->ti_current;
 
-  if (part_is_active(p, e)) {
+  struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
 
+  if (part_is_active(p, e)) {
     /* First case, the particle was active so we only need to update the length
        of its next time-step */
 
     /* New time-bin of this particle */
-    p->time_bin = -p->limiter_data.wakeup + 2;
+    part_set_time_bin(p, -limiter_data->wakeup + 2);
 
     /* Mark the particle as being rady to be time integrated */
-    p->limiter_data.wakeup = time_bin_not_awake;
+    limiter_data->wakeup = time_bin_not_awake;
 
     /* Return the new end-of-step for this particle */
-    return ti_current + get_integer_timestep(p->time_bin);
+    return ti_current + get_integer_timestep(part_get_time_bin(p));
 
   } else {
 
@@ -90,8 +95,8 @@ __attribute__((always_inline)) INLINE static integertime_t timestep_limit_part(
        time-step, undo the "kick" operator and assign a new time-step size */
 
     /* The timebins to play with */
-    const timebin_t old_bin = p->time_bin;
-    const timebin_t new_bin = -p->limiter_data.wakeup + 2;
+    const timebin_t old_bin = part_get_time_bin(p);
+    const timebin_t new_bin = -limiter_data->wakeup + 2;
 
     /* Current start and end time of this particle */
     const integertime_t ti_beg_old =
@@ -134,8 +139,10 @@ __attribute__((always_inline)) INLINE static integertime_t timestep_limit_part(
     if (dti_new > dti_old) error("New time-step larger than old one");
 #endif
 
-    double dt_kick_grav = 0., dt_kick_hydro = 0., dt_kick_therm = 0.,
-           dt_kick_corr = 0.;
+    double dt_kick_grav = 0.;
+    double dt_kick_hydro = 0.;
+    double dt_kick_therm = 0.;
+    double dt_kick_corr = 0.;
 
     /* Now we need to reverse the kick1...
      * Note the minus sign! (the dt are negative here) */
@@ -176,10 +183,10 @@ __attribute__((always_inline)) INLINE static integertime_t timestep_limit_part(
     /* The particle has now been kicked to the current time */
 
     /* New time-bin of this particle */
-    p->time_bin = new_bin;
+    part_set_time_bin(p, new_bin);
 
     /* Mark the particle as being ready to be time integrated */
-    p->limiter_data.wakeup = time_bin_not_awake;
+    limiter_data->wakeup = time_bin_not_awake;
 
     /* Do we need to apply the mising kick1 or is this bin active and
        it will be done in the kick task? */
@@ -211,7 +218,7 @@ __attribute__((always_inline)) INLINE static integertime_t timestep_limit_part(
       /* No kick to do here */
 
       /* Return the new end-of-step for this particle */
-      return ti_current + get_integer_timestep(p->time_bin);
+      return ti_current + get_integer_timestep(part_get_time_bin(p));
     }
   }
 }

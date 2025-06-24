@@ -54,7 +54,7 @@ void space_init_parts_mapper(void *restrict map_data, int count,
     hydro_init_part(&parts[k], hs);
     adaptive_softening_init_part(&parts[k]);
     mhd_init_part(&parts[k]);
-    black_holes_init_potential(&parts[k].black_holes_data);
+    black_holes_init_potential(part_get_black_holes_data_p(&parts[k]));
     chemistry_init_part(&parts[k], e->chemistry);
     rt_init_part(&parts[k]);
     rt_reset_part(&parts[k], e->cosmology);

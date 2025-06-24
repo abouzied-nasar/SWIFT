@@ -171,8 +171,10 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
   struct part *const parts = c->hydro.parts;
   struct xpart *const xparts = c->hydro.xparts;
 
-  float dx_max = 0.f, dx2_max = 0.f;
-  float dx_max_sort = 0.0f, dx2_max_sort = 0.f;
+  float dx_max = 0.f;
+  float dx2_max = 0.f;
+  float dx_max_sort = 0.0f;
+  float dx2_max_sort = 0.f;
   float cell_h_max = 0.f;
   float cell_h_max_active = 0.f;
 
@@ -238,7 +240,10 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
 
   } else if (!c->split && force && ti_current > ti_old_part) {
     /* Drift from the last time the cell was drifted to the current time */
-    double dt_drift, dt_kick_grav, dt_kick_hydro, dt_therm;
+    double dt_drift;
+    double dt_kick_grav;
+    double dt_kick_hydro;
+    double dt_therm;
     if (with_cosmology) {
       dt_drift =
           cosmology_get_drift_factor(e->cosmology, ti_old_part, ti_current);
@@ -287,8 +292,8 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
         error(
             "Particle drifts by more than a box length! id %llu xp->v_full "
             "%.5e %.5e %.5e p->v %.5e %.5e %.5e",
-            p->id, xp->v_full[0], xp->v_full[1], xp->v_full[2], p->v[0],
-            p->v[1], p->v[2]);
+            part_get_id(p), xp->v_full[0], xp->v_full[1], xp->v_full[2],
+            part_get_v_ind(p, 0), part_get_v_ind(p, 1), part_get_v_ind(p, 2));
       }
 #endif
 
@@ -296,9 +301,10 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
       if (!periodic) {
 
         /* Did the particle leave the box?  */
-        if ((p->x[0] > dim[0]) || (p->x[0] < 0.) ||  // x
-            (p->x[1] > dim[1]) || (p->x[1] < 0.) ||  // y
-            (p->x[2] > dim[2]) || (p->x[2] < 0.)) {  // z
+        const double *x = part_get_x(p);
+        if ((x[0] > dim[0]) || (x[0] < 0.) ||  // x
+            (x[1] > dim[1]) || (x[1] < 0.) ||  // y
+            (x[2] > dim[2]) || (x[2] < 0.)) {  // z
 
           lock_lock(&e->s->lock);
 
@@ -329,8 +335,8 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
       }
 
       /* Limit h to within the allowed range */
-      p->h = min(p->h, hydro_h_max);
-      p->h = max(p->h, hydro_h_min);
+      part_set_h(p, min(part_get_h(p), hydro_h_max));
+      part_set_h(p, max(part_get_h(p), hydro_h_min));
 
       /* Set the appropriate depth level for this particle */
       cell_set_part_h_depth(p, c);
@@ -346,13 +352,13 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
       dx2_max_sort = max(dx2_max_sort, dx2_sort);
 
       /* Update the maximal smoothing length in the cell */
-      cell_h_max = max(cell_h_max, p->h);
+      cell_h_max = max(cell_h_max, part_get_h(p));
 
       /* Mark the particle has not being swallowed */
-      black_holes_mark_part_as_not_swallowed(&p->black_holes_data);
+      black_holes_mark_part_as_not_swallowed(part_get_black_holes_data_p(p));
 
       /* Mark the particle has not being swallowed by a sink */
-      sink_mark_part_as_not_swallowed(&p->sink_data);
+      sink_mark_part_as_not_swallowed(part_get_sink_data_p(p));
 
       /* Reset the gas particle-carried feedback fields */
       feedback_reset_part(p, xp);
@@ -362,7 +368,7 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
         hydro_init_part(p, &e->s->hs);
         adaptive_softening_init_part(p);
         mhd_init_part(p);
-        black_holes_init_potential(&p->black_holes_data);
+        black_holes_init_potential(part_get_black_holes_data_p(p));
         chemistry_init_part(p, e->chemistry);
         star_formation_init_part(p, e->star_formation);
         tracers_after_init(p, xp, e->internal_units, e->physical_constants,
@@ -372,7 +378,7 @@ void cell_drift_part(struct cell *c, const struct engine *e, int force,
         rt_init_part(p);
 
         /* Update the maximal active smoothing length in the cell */
-        cell_h_max_active = max(cell_h_max_active, p->h);
+        cell_h_max_active = max(cell_h_max_active, part_get_h(p));
       }
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
@@ -595,8 +601,10 @@ void cell_drift_spart(struct cell *c, const struct engine *e, int force,
   const integertime_t ti_current = e->ti_current;
   struct spart *const sparts = c->stars.parts;
 
-  float dx_max = 0.f, dx2_max = 0.f;
-  float dx_max_sort = 0.0f, dx2_max_sort = 0.f;
+  float dx_max = 0.f;
+  float dx2_max = 0.f;
+  float dx_max_sort = 0.0f;
+  float dx2_max_sort = 0.f;
   float cell_h_max = 0.f;
   float cell_h_max_active = 0.f;
 
@@ -804,7 +812,8 @@ void cell_drift_bpart(struct cell *c, const struct engine *e, int force,
   const integertime_t ti_current = e->ti_current;
   struct bpart *const bparts = c->black_holes.parts;
 
-  float dx_max = 0.f, dx2_max = 0.f;
+  float dx_max = 0.f;
+  float dx2_max = 0.f;
   float cell_h_max = 0.f;
   float cell_h_max_active = 0.f;
 
@@ -1003,7 +1012,8 @@ void cell_drift_sink(struct cell *c, const struct engine *e, int force) {
   const integertime_t ti_current = e->ti_current;
   struct sink *const sinks = c->sinks.parts;
 
-  float dx_max = 0.f, dx2_max = 0.f;
+  float dx_max = 0.f;
+  float dx2_max = 0.f;
   float cell_h_max = 0.f;
   float cell_h_max_active = 0.f;
 

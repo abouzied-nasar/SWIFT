@@ -63,11 +63,9 @@
  *  Factorize a given integer, attempts to keep larger pair of factors.
  */
 void factor(int value, int *f1, int *f2) {
-  int j;
-  int i;
 
-  j = (int)sqrt(value);
-  for (i = j; i > 0; i--) {
+  int j = (int)sqrt(value);
+  for (int i = j; i > 0; i--) {
     if ((value % i) == 0) {
       *f1 = i;
       *f2 = value / i;
@@ -86,12 +84,18 @@ void factor(int value, int *f1, int *f2) {
  * @param periodic Periodic boundary conditions flag.
  */
 void pairs_n2(double *dim, struct part *restrict parts, int N, int periodic) {
-  int i, j, k, count = 0;
+  int i;
+  int j;
+  int k;
+  int count = 0;
   // int mj, mk;
   // double maxratio = 1.0;
-  double r2, rho = 0.0;
-  double rho_max = 0.0, rho_min = 100;
-  float a = 1.f, H = 0.f;
+  double r2;
+  double rho = 0.0;
+  double rho_max = 0.0;
+  double rho_min = 100;
+  float a = 1.f;
+  float H = 0.f;
   float dx[3];
 
   /* Loop over all particle pairs. */
@@ -100,9 +104,13 @@ void pairs_n2(double *dim, struct part *restrict parts, int N, int periodic) {
       printf("pairs_n2: j=%i.\n", j);
       fflush(stdout);
     }
+    const double *const xj = part_get_const_x(&parts[j]);
+    const float hj = part_get_h(&parts[j]);
     for (k = j + 1; k < N; k++) {
+      const double *const xk = part_get_const_x(&parts[k]);
+      const float hk = part_get_h(&parts[k]);
       for (i = 0; i < 3; i++) {
-        dx[i] = parts[j].x[i] - parts[k].x[i];
+        dx[i] = xj[i] - xk[i];
         if (periodic) {
           if (dx[i] < -dim[i] / 2)
             dx[i] += dim[i];
@@ -111,17 +119,16 @@ void pairs_n2(double *dim, struct part *restrict parts, int N, int periodic) {
         }
       }
       r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
-      if (r2 < parts[j].h * parts[j].h || r2 < parts[k].h * parts[k].h) {
-        runner_iact_density(r2, dx, parts[j].h, parts[k].h, &parts[j],
-                            &parts[k], a, H);
-        /* if ( parts[j].h / parts[k].h > maxratio )
+      if (r2 < hj * hj || r2 < hk * hk) {
+        runner_iact_density(r2, dx, hj, hk, &parts[j], &parts[k], a, H);
+        /* if ( hj / hk > maxratio )
             {
-            maxratio = parts[j].h / parts[k].h;
+            maxratio = hj / hk;
             mj = j; mk = k;
             }
-        else if ( parts[k].h / parts[j].h > maxratio )
+        else if ( hk / hj > maxratio )
             {
-            maxratio = parts[k].h / parts[j].h;
+            maxratio = hk / hj;
             mj = j; mk = k;
             } */
       }
@@ -131,9 +138,10 @@ void pairs_n2(double *dim, struct part *restrict parts, int N, int periodic) {
   /* Aggregate the results. */
   for (k = 0; k < N; k++) {
     // count += parts[k].icount;
-    rho += parts[k].density.wcount;
-    rho_min = fmin(parts[k].density.wcount, rho_min);
-    rho_max = fmax(parts[k].density.wcount, rho_max);
+    const float wcount = part_get_wcount(&parts[k]);
+    rho += wcount;
+    rho_min = fmin(wcount, rho_min);
+    rho_max = fmax(wcount, rho_max);
   }
 
   /* Dump the result. */
@@ -156,7 +164,7 @@ void pairs_single_density(double *dim, long long int pid,
 
   /* Find "our" part. */
   int k;
-  for (k = 0; k < N && parts[k].id != pid; k++) {
+  for (k = 0; k < N && part_get_id(&parts[k]) != pid; k++) {
     /* Nothing to do here */
   }
 
@@ -168,16 +176,19 @@ void pairs_single_density(double *dim, long long int pid,
   hydro_init_part(&p, NULL);
   adaptive_softening_init_part(&p);
   mhd_init_part(&p);
+  const double *xp = part_get_const_x(&p);
+  const float hp = part_get_h(&p);
 
   /* Loop over all particle pairs. */
   for (k = 0; k < N; k++) {
-    if (parts[k].id == p.id) continue;
+    if (part_get_id(&parts[k]) == part_get_id(&p)) continue;
 
     double dx[3];
     float fdx[3];
 
+    const double *xk = part_get_const_x(&parts[k]);
     for (int i = 0; i < 3; i++) {
-      dx[i] = p.x[i] - parts[k].x[i];
+      dx[i] = xp[i] - xk[i];
       if (periodic) {
         if (dx[i] < -dim[i] / 2)
           dx[i] += dim[i];
@@ -187,27 +198,29 @@ void pairs_single_density(double *dim, long long int pid,
       fdx[i] = dx[i];
     }
     const float r2 = fdx[0] * fdx[0] + fdx[1] * fdx[1] + fdx[2] * fdx[2];
-    if (r2 < p.h * p.h) {
-      runner_iact_nonsym_density(r2, fdx, p.h, parts[k].h, &p, &parts[k], a, H);
+    if (r2 < hp * hp) {
+      runner_iact_nonsym_density(r2, fdx, hp, part_get_h(&parts[k]), &p,
+                                 &parts[k], a, H);
       /* printf( "pairs_simple: interacting particles %lli [%i,%i,%i] and %lli
          [%i,%i,%i], r=%e.\n" ,
-          pid , (int)(p.x[0]*ih) , (int)(p.x[1]*ih) , (int)(p.x[2]*ih) ,
-          parts[k].id , (int)(parts[k].x[0]*ih) , (int)(parts[k].x[1]*ih) ,
-         (int)(parts[k].x[2]*ih) ,
+          pid , (int)(xp[0]*ih) , (int)(xp[1]*ih) , (int)(xp[2]*ih) ,
+          part_get_id(&parts[k]) , (int)(part_get_x_ind(&parts[k], 0)*ih),
+          (int)(part_get_x_ind(&parts[k], 1)*ih),
+          (int)(part_get_x_ind(&parts[k], 2)*ih),
           sqrtf(r2) ); */
     }
   }
 
   /* Dump the result. */
-  printf("pairs_single: wcount of part %lli (h=%e) is %f.\n", p.id, p.h,
-         p.density.wcount + 32.0 / 3);
+  printf("pairs_single: wcount of part %lli (h=%e) is %f.\n", part_get_id(&p),
+         part_get_h(&p), part_get_wcount(&p) + 32.0 / 3);
   fflush(stdout);
 }
 
 void pairs_all_density(struct runner *r, struct cell *ci, struct cell *cj) {
 
-  float hi, hj, hig2, hjg2;
-  struct part *pi, *pj;
+  struct part *pi;
+  struct part *pj;
   const double dim[3] = {r->e->s->dim[0], r->e->s->dim[1], r->e->s->dim[2]};
   const struct engine *e = r->e;
   const struct cosmology *cosmo = e->cosmology;
@@ -223,39 +236,42 @@ void pairs_all_density(struct runner *r, struct cell *ci, struct cell *cj) {
   for (int i = 0; i < ci->hydro.count; ++i) {
 
     pi = &ci->hydro.parts[i];
-    hi = pi->h;
-    hig2 = hi * hi * kernel_gamma2;
+    const float hi = part_get_h(pi);
+    const float hig2 = hi * hi * kernel_gamma2;
 
     /* Skip inactive particles. */
     if (!part_is_active(pi, e)) continue;
 
-    const float pix = pi->x[0] - shift_i[0];
-    const float piy = pi->x[1] - shift_i[1];
-    const float piz = pi->x[2] - shift_i[2];
+    const double *xi = part_get_const_x(pi);
+    const float pix = xi[0] - shift_i[0];
+    const float piy = xi[1] - shift_i[1];
+    const float piz = xi[2] - shift_i[2];
 
     for (int j = 0; j < cj->hydro.count; ++j) {
 
       pj = &cj->hydro.parts[j];
 
-      const float pjx = pj->x[0] - shift_j[0];
-      const float pjy = pj->x[1] - shift_j[1];
-      const float pjz = pj->x[2] - shift_j[2];
+      const double *xj = part_get_const_x(pj);
+      const float pjx = xj[0] - shift_j[0];
+      const float pjy = xj[1] - shift_j[1];
+      const float pjz = xj[2] - shift_j[2];
 
       /* Pairwise distance */
       const float dx[3] = {nearest(pix - pjx, dim[0]),
                            nearest(piy - pjy, dim[1]),
                            nearest(piz - pjz, dim[2])};
       const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+      const float hj = part_get_h(pj);
 
       /* Hit or miss? */
       if (r2 < hig2 && !part_is_inhibited(pj, e)) {
 
         /* Interact */
-        runner_iact_nonsym_density(r2, dx, hi, pj->h, pi, pj, a, H);
-        runner_iact_nonsym_chemistry(r2, dx, hi, pj->h, pi, pj, a, H);
-        runner_iact_nonsym_pressure_floor(r2, dx, hi, pj->h, pi, pj, a, H);
-        runner_iact_nonsym_star_formation(r2, dx, hi, pj->h, pi, pj, a, H);
-        runner_iact_nonsym_sink(r2, dx, hi, pj->h, pi, pj, a, H);
+        runner_iact_nonsym_density(r2, dx, hi, hj, pi, pj, a, H);
+        runner_iact_nonsym_chemistry(r2, dx, hi, hj, pi, pj, a, H);
+        runner_iact_nonsym_pressure_floor(r2, dx, hi, hj, pi, pj, a, H);
+        runner_iact_nonsym_star_formation(r2, dx, hi, hj, pi, pj, a, H);
+        runner_iact_nonsym_sink(r2, dx, hi, hj, pi, pj, a, H);
       }
     }
   }
@@ -264,39 +280,42 @@ void pairs_all_density(struct runner *r, struct cell *ci, struct cell *cj) {
   for (int j = 0; j < cj->hydro.count; ++j) {
 
     pj = &cj->hydro.parts[j];
-    hj = pj->h;
-    hjg2 = hj * hj * kernel_gamma2;
+    const float hj = part_get_h(pj);
+    const float hjg2 = hj * hj * kernel_gamma2;
 
     /* Skip inactive particles. */
     if (!part_is_active(pj, e)) continue;
 
-    const float pjx = pj->x[0] - shift_j[0];
-    const float pjy = pj->x[1] - shift_j[1];
-    const float pjz = pj->x[2] - shift_j[2];
+    const double *xj = part_get_const_x(pj);
+    const float pjx = xj[0] - shift_j[0];
+    const float pjy = xj[1] - shift_j[1];
+    const float pjz = xj[2] - shift_j[2];
 
     for (int i = 0; i < ci->hydro.count; ++i) {
 
       pi = &ci->hydro.parts[i];
 
-      const float pix = pi->x[0] - shift_i[0];
-      const float piy = pi->x[1] - shift_i[1];
-      const float piz = pi->x[2] - shift_i[2];
+      const double *xi = part_get_const_x(pi);
+      const float pix = xi[0] - shift_i[0];
+      const float piy = xi[1] - shift_i[1];
+      const float piz = xi[2] - shift_i[2];
 
       /* Pairwise distance */
       const float dx[3] = {nearest(pjx - pix, dim[0]),
                            nearest(pjy - piy, dim[1]),
                            nearest(pjz - piz, dim[2])};
       const float r2 = dx[0] * dx[0] + dx[1] * dx[1] + dx[2] * dx[2];
+      const float hi = part_get_h(pi);
 
       /* Hit or miss? */
       if (r2 < hjg2 && !part_is_inhibited(pi, e)) {
 
         /* Interact */
-        runner_iact_nonsym_density(r2, dx, hj, pi->h, pj, pi, a, H);
-        runner_iact_nonsym_chemistry(r2, dx, hj, pi->h, pj, pi, a, H);
-        runner_iact_nonsym_pressure_floor(r2, dx, hj, pi->h, pj, pi, a, H);
-        runner_iact_nonsym_star_formation(r2, dx, hj, pi->h, pj, pi, a, H);
-        runner_iact_nonsym_sink(r2, dx, hj, pi->h, pj, pi, a, H);
+        runner_iact_nonsym_density(r2, dx, hj, hi, pj, pi, a, H);
+        runner_iact_nonsym_chemistry(r2, dx, hj, hi, pj, pi, a, H);
+        runner_iact_nonsym_pressure_floor(r2, dx, hj, hi, pj, pi, a, H);
+        runner_iact_nonsym_star_formation(r2, dx, hj, hi, pj, pi, a, H);
+        runner_iact_nonsym_sink(r2, dx, hj, hi, pj, pi, a, H);
       }
     }
   }
@@ -305,8 +324,11 @@ void pairs_all_density(struct runner *r, struct cell *ci, struct cell *cj) {
 #ifdef EXTRA_HYDRO_LOOP
 void pairs_all_gradient(struct runner *r, struct cell *ci, struct cell *cj) {
 
-  float hi, hj, hig2, hjg2;
-  struct part *pi, *pj;
+  // Keepig hig2, hjg2 here to disable -Wunused-variable warnings
+  float hig2 = 0.f;
+  float hjg2 = 0.f;
+  struct part *pi;
+  struct part *pj;
   const double dim[3] = {r->e->s->dim[0], r->e->s->dim[1], r->e->s->dim[2]};
   const struct engine *e = r->e;
   const struct cosmology *cosmo = e->cosmology;
@@ -322,25 +344,27 @@ void pairs_all_gradient(struct runner *r, struct cell *ci, struct cell *cj) {
   for (int i = 0; i < ci->hydro.count; ++i) {
 
     pi = &ci->hydro.parts[i];
-    hi = pi->h;
+    const float hi = part_get_h(pi);
     hig2 = hi * hi * kernel_gamma2;
 
     /* Skip inactive particles. */
     if (!part_is_active(pi, e)) continue;
 
-    const float pix = pi->x[0] - shift_i[0];
-    const float piy = pi->x[1] - shift_i[1];
-    const float piz = pi->x[2] - shift_i[2];
+    const double *xi = part_get_const_x(pi);
+    const float pix = xi[0] - shift_i[0];
+    const float piy = xi[1] - shift_i[1];
+    const float piz = xi[2] - shift_i[2];
 
     for (int j = 0; j < cj->hydro.count; ++j) {
 
       pj = &cj->hydro.parts[j];
-      hj = pj->h;
+      const float hj = part_get_h(pj);
       hjg2 = hj * hj * kernel_gamma2;
 
-      const float pjx = pj->x[0] - shift_j[0];
-      const float pjy = pj->x[1] - shift_j[1];
-      const float pjz = pj->x[2] - shift_j[2];
+      const double *xj = part_get_const_x(pj);
+      const float pjx = xj[0] - shift_j[0];
+      const float pjy = xj[1] - shift_j[1];
+      const float pjz = xj[2] - shift_j[2];
 
       /* Pairwise distance */
       const float dx[3] = {nearest(pix - pjx, dim[0]),
@@ -369,25 +393,27 @@ void pairs_all_gradient(struct runner *r, struct cell *ci, struct cell *cj) {
   for (int j = 0; j < cj->hydro.count; ++j) {
 
     pj = &cj->hydro.parts[j];
-    hj = pj->h;
+    const float hj = part_get_h(pj);
     hjg2 = hj * hj * kernel_gamma2;
 
     /* Skip inactive particles. */
     if (!part_is_active(pj, e)) continue;
 
-    const float pjx = pj->x[0] - shift_j[0];
-    const float pjy = pj->x[1] - shift_j[1];
-    const float pjz = pj->x[2] - shift_j[2];
+    const double *xj = part_get_const_x(pj);
+    const float pjx = xj[0] - shift_j[0];
+    const float pjy = xj[1] - shift_j[1];
+    const float pjz = xj[2] - shift_j[2];
 
     for (int i = 0; i < ci->hydro.count; ++i) {
 
       pi = &ci->hydro.parts[i];
-      hi = pi->h;
+      const float hi = part_get_h(pi);
       hig2 = hi * hi * kernel_gamma2;
 
-      const float pix = pi->x[0] - shift_i[0];
-      const float piy = pi->x[1] - shift_i[1];
-      const float piz = pi->x[2] - shift_i[2];
+      const double *xi = part_get_const_x(pi);
+      const float pix = xi[0] - shift_i[0];
+      const float piy = xi[1] - shift_i[1];
+      const float piz = xi[2] - shift_i[2];
 
       /* Pairwise distance */
       const float dx[3] = {nearest(pjx - pix, dim[0]),
@@ -400,12 +426,12 @@ void pairs_all_gradient(struct runner *r, struct cell *ci, struct cell *cj) {
 #ifdef EXTRA_HYDRO_LOOP_TYPE2
         if (r2 < hig2 || r2 < hjg2) {
           /* Interact */
-          runner_iact_nonsym_gradient(r2, dx, hj, pi->h, pj, pi, a, H);
+          runner_iact_nonsym_gradient(r2, dx, hj, hi, pj, pi, a, H);
         }
 #else
         if (r2 < hjg2) {
           /* Interact */
-          runner_iact_nonsym_gradient(r2, dx, hj, pi->h, pj, pi, a, H);
+          runner_iact_nonsym_gradient(r2, dx, hj, hi, pj, pi, a, H);
         }
 #endif /* EXTRA_HYDRO_LOOP_TYPE2 */
       }
@@ -416,8 +442,8 @@ void pairs_all_gradient(struct runner *r, struct cell *ci, struct cell *cj) {
 
 void pairs_all_force(struct runner *r, struct cell *ci, struct cell *cj) {
 
-  float hi, hj, hig2, hjg2;
-  struct part *pi, *pj;
+  struct part *pi;
+  struct part *pj;
   const double dim[3] = {r->e->s->dim[0], r->e->s->dim[1], r->e->s->dim[2]};
   const struct engine *e = r->e;
   const struct cosmology *cosmo = e->cosmology;
@@ -433,25 +459,27 @@ void pairs_all_force(struct runner *r, struct cell *ci, struct cell *cj) {
   for (int i = 0; i < ci->hydro.count; ++i) {
 
     pi = &ci->hydro.parts[i];
-    hi = pi->h;
-    hig2 = hi * hi * kernel_gamma2;
+    const float hi = part_get_h(pi);
+    const float hig2 = hi * hi * kernel_gamma2;
 
     /* Skip inactive particles. */
     if (!part_is_active(pi, e)) continue;
 
-    const float pix = pi->x[0] - shift_i[0];
-    const float piy = pi->x[1] - shift_i[1];
-    const float piz = pi->x[2] - shift_i[2];
+    const double *xi = part_get_const_x(pi);
+    const float pix = xi[0] - shift_i[0];
+    const float piy = xi[1] - shift_i[1];
+    const float piz = xi[2] - shift_i[2];
 
     for (int j = 0; j < cj->hydro.count; ++j) {
 
       pj = &cj->hydro.parts[j];
-      hj = pj->h;
-      hjg2 = hj * hj * kernel_gamma2;
+      const float hj = part_get_h(pj);
+      const float hjg2 = hj * hj * kernel_gamma2;
 
-      const float pjx = pj->x[0] - shift_j[0];
-      const float pjy = pj->x[1] - shift_j[1];
-      const float pjz = pj->x[2] - shift_j[2];
+      const double *xj = part_get_const_x(pj);
+      const float pjx = xj[0] - shift_j[0];
+      const float pjy = xj[1] - shift_j[1];
+      const float pjz = xj[2] - shift_j[2];
 
       /* Pairwise distance */
       const float dx[3] = {nearest(pix - pjx, dim[0]),
@@ -472,25 +500,27 @@ void pairs_all_force(struct runner *r, struct cell *ci, struct cell *cj) {
   for (int j = 0; j < cj->hydro.count; ++j) {
 
     pj = &cj->hydro.parts[j];
-    hj = pj->h;
-    hjg2 = hj * hj * kernel_gamma2;
+    const float hj = part_get_h(pj);
+    const float hjg2 = hj * hj * kernel_gamma2;
 
     /* Skip inactive particles. */
     if (!part_is_active(pj, e)) continue;
 
-    const float pjx = pj->x[0] - shift_j[0];
-    const float pjy = pj->x[1] - shift_j[1];
-    const float pjz = pj->x[2] - shift_j[2];
+    const double *xj = part_get_const_x(pj);
+    const float pjx = xj[0] - shift_j[0];
+    const float pjy = xj[1] - shift_j[1];
+    const float pjz = xj[2] - shift_j[2];
 
     for (int i = 0; i < ci->hydro.count; ++i) {
 
       pi = &ci->hydro.parts[i];
-      hi = pi->h;
-      hig2 = hi * hi * kernel_gamma2;
+      const float hi = part_get_h(pi);
+      const float hig2 = hi * hi * kernel_gamma2;
 
-      const float pix = pi->x[0] - shift_i[0];
-      const float piy = pi->x[1] - shift_i[1];
-      const float piz = pi->x[2] - shift_i[2];
+      const double *xi = part_get_const_x(pi);
+      const float pix = xi[0] - shift_i[0];
+      const float piy = xi[1] - shift_i[1];
+      const float piz = xi[2] - shift_i[2];
 
       /* Pairwise distance */
       const float dx[3] = {nearest(pjx - pix, dim[0]),
@@ -502,7 +532,7 @@ void pairs_all_force(struct runner *r, struct cell *ci, struct cell *cj) {
       if (r2 < hjg2 || r2 < hig2) {
 
         /* Interact */
-        runner_iact_nonsym_force(r2, dx, hj, pi->h, pj, pi, a, H);
+        runner_iact_nonsym_force(r2, dx, hj, hi, pj, pi, a, H);
       }
     }
   }
@@ -539,7 +569,7 @@ void pairs_all_stars_density(struct runner *r, struct cell *ci,
       /* Pairwise distance */
       r2 = 0.0f;
       for (int k = 0; k < 3; k++) {
-        dx[k] = spi->x[k] - pj->x[k];
+        dx[k] = spi->x[k] - part_get_x_ind(pj, k);
         dx[k] = nearest(dx[k], dim[k]);
         r2 += dx[k] * dx[k];
       }
@@ -547,7 +577,8 @@ void pairs_all_stars_density(struct runner *r, struct cell *ci,
       /* Hit or miss? */
       if (r2 < hig2) {
         /* Interact */
-        runner_iact_nonsym_stars_density(r2, dx, hi, pj->h, spi, pj, a, H);
+        runner_iact_nonsym_stars_density(r2, dx, hi, part_get_h(pj), spi, pj, a,
+                                         H);
       }
     }
   }
@@ -573,7 +604,7 @@ void pairs_all_stars_density(struct runner *r, struct cell *ci,
       /* Pairwise distance */
       r2 = 0.0f;
       for (int k = 0; k < 3; k++) {
-        dx[k] = spj->x[k] - pi->x[k];
+        dx[k] = spj->x[k] - part_get_x_ind(pi, k);
         dx[k] = nearest(dx[k], dim[k]);
         r2 += dx[k] * dx[k];
       }
@@ -581,7 +612,8 @@ void pairs_all_stars_density(struct runner *r, struct cell *ci,
       /* Hit or miss? */
       if (r2 < hjg2) {
         /* Interact */
-        runner_iact_nonsym_stars_density(r2, dx, hj, pi->h, spj, pi, a, H);
+        runner_iact_nonsym_stars_density(r2, dx, hj, part_get_h(pi), spj, pi, a,
+                                         H);
       }
     }
   }
@@ -599,20 +631,20 @@ void self_all_density(struct runner *r, struct cell *ci) {
   for (int i = 0; i < ci->hydro.count; ++i) {
 
     pi = &ci->hydro.parts[i];
-    hi = pi->h;
+    hi = part_get_h(pi);
     hig2 = hi * hi * kernel_gamma2;
 
-    const double pix[3] = {pi->x[0], pi->x[1], pi->x[2]};
+    const double *pix = part_get_const_x(pi);
 
     for (int j = i + 1; j < ci->hydro.count; ++j) {
 
       pj = &ci->hydro.parts[j];
-      hj = pj->h;
+      hj = part_get_h(pj);
       hjg2 = hj * hj * kernel_gamma2;
 
       if (pi == pj) continue;
 
-      const double pjx[3] = {pj->x[0], pj->x[1], pj->x[2]};
+      const double *pjx = part_get_const_x(pj);
 
       /* Pairwise distance */
       float dx[3] = {(float)(pix[0] - pjx[0]), (float)(pix[1] - pjx[1]),
@@ -661,20 +693,20 @@ void self_all_gradient(struct runner *r, struct cell *ci) {
   for (int i = 0; i < ci->hydro.count; ++i) {
 
     pi = &ci->hydro.parts[i];
-    hi = pi->h;
+    hi = part_get_h(pi);
     hig2 = hi * hi * kernel_gamma2;
 
-    const double pix[3] = {pi->x[0], pi->x[1], pi->x[2]};
+    const double *pix = part_get_const_x(pi);
 
     for (int j = i + 1; j < ci->hydro.count; ++j) {
 
       pj = &ci->hydro.parts[j];
-      hj = pj->h;
+      hj = part_get_h(pj);
       hjg2 = hj * hj * kernel_gamma2;
 
       if (pi == pj) continue;
 
-      const double pjx[3] = {pj->x[0], pj->x[1], pj->x[2]};
+      const double *pjx = part_get_const_x(pj);
 
       /* Pairwise distance */
       float dx[3] = {(float)(pix[0] - pjx[0]), (float)(pix[1] - pjx[1]),
@@ -732,20 +764,20 @@ void self_all_force(struct runner *r, struct cell *ci) {
   for (int i = 0; i < ci->hydro.count; ++i) {
 
     pi = &ci->hydro.parts[i];
-    hi = pi->h;
+    hi = part_get_h(pi);
     hig2 = hi * hi * kernel_gamma2;
 
-    const double pix[3] = {pi->x[0], pi->x[1], pi->x[2]};
+    const double *pix = part_get_const_x(pi);
 
     for (int j = i + 1; j < ci->hydro.count; ++j) {
 
       pj = &ci->hydro.parts[j];
-      hj = pj->h;
+      hj = part_get_h(pj);
       hjg2 = hj * hj * kernel_gamma2;
 
       if (pi == pj) continue;
 
-      const double pjx[3] = {pj->x[0], pj->x[1], pj->x[2]};
+      const double *pjx = part_get_const_x(pj);
 
       /* Pairwise distance */
       float dx[3] = {(float)(pix[0] - pjx[0]), (float)(pix[1] - pjx[1]),
@@ -785,7 +817,7 @@ void self_all_stars_density(struct runner *r, struct cell *ci) {
     for (int j = 0; j < ci->hydro.count; ++j) {
 
       pj = &ci->hydro.parts[j];
-      hj = pj->h;
+      hj = part_get_h(pj);
 
       /* Early abort? */
       if (part_is_inhibited(pj, e)) continue;
@@ -793,7 +825,7 @@ void self_all_stars_density(struct runner *r, struct cell *ci) {
       /* Pairwise distance */
       r2 = 0.0f;
       for (int k = 0; k < 3; k++) {
-        dxi[k] = spi->x[k] - pj->x[k];
+        dxi[k] = spi->x[k] - part_get_x_ind(pj, k);
         r2 += dxi[k] * dxi[k];
       }
 
@@ -818,7 +850,7 @@ void engine_single_density(const double dim[3], const long long int pid,
 
   /* Find "our" part. */
   int k;
-  for (k = 0; k < N && parts[k].id != pid; k++) {
+  for (k = 0; k < N && part_get_id(&parts[k]) != pid; k++) {
     /* Nothing to do here */
   }
 
@@ -832,13 +864,13 @@ void engine_single_density(const double dim[3], const long long int pid,
 
   /* Loop over all particle pairs (density). */
   for (k = 0; k < N; k++) {
-    if (parts[k].id == p.id) continue;
+    if (part_get_id(&parts[k]) == part_get_id(&p)) continue;
 
     double dx[3];
     float fdx[3];
 
     for (int i = 0; i < 3; i++) {
-      dx[i] = p.x[i] - parts[k].x[i];
+      dx[i] = part_get_x_ind(&p, i) - part_get_x_ind(&parts[k], i);
       if (periodic) {
         if (dx[i] < -dim[i] / 2)
           dx[i] += dim[i];
@@ -849,8 +881,10 @@ void engine_single_density(const double dim[3], const long long int pid,
     }
 
     const float r2 = fdx[0] * fdx[0] + fdx[1] * fdx[1] + fdx[2] * fdx[2];
-    if (r2 < p.h * p.h * kernel_gamma2) {
-      runner_iact_nonsym_density(r2, fdx, p.h, parts[k].h, &p, &parts[k], a, H);
+    const float hp = part_get_h(&p);
+    if (r2 < hp * hp * kernel_gamma2) {
+      runner_iact_nonsym_density(r2, fdx, hp, part_get_h(&parts[k]), &p,
+                                 &parts[k], a, H);
     }
   }
 
@@ -858,21 +892,24 @@ void engine_single_density(const double dim[3], const long long int pid,
   hydro_end_density(&p, cosmo);
   adaptive_softening_end_density(&p, grav_props);
   mhd_end_density(&p, cosmo);
-  message("part %lli (h=%e) has wcount=%e, rho=%e.", p.id, p.h,
-          p.density.wcount, hydro_get_comoving_density(&p));
+  message("part %lli (h=%e) has wcount=%e, rho=%e.", part_get_id(&p),
+          part_get_h(&p), part_get_wcount(&p), hydro_get_comoving_density(&p));
   fflush(stdout);
 }
 
 void engine_single_force(double *dim, long long int pid,
                          struct part *restrict parts, int N, int periodic) {
-  int i, k;
-  double r2, dx[3];
+  int i;
+  int k;
+  double r2;
+  double dx[3];
   float fdx[3];
   struct part p;
-  float a = 1.f, H = 0.f;
+  float a = 1.f;
+  float H = 0.f;
 
   /* Find "our" part. */
-  for (k = 0; k < N && parts[k].id != pid; k++) {
+  for (k = 0; k < N && part_get_id(&parts[k]) != pid; k++) {
     /* Nothing to do here */
   }
 
@@ -886,9 +923,9 @@ void engine_single_force(double *dim, long long int pid,
   /* Loop over all particle pairs (force). */
   for (k = 0; k < N; k++) {
     // for ( k = N-1 ; k >= 0 ; k-- ) {
-    if (parts[k].id == p.id) continue;
+    if (part_get_id(&parts[k]) == part_get_id(&p)) continue;
     for (i = 0; i < 3; i++) {
-      dx[i] = p.x[i] - parts[k].x[i];
+      dx[i] = part_get_x_ind(&p, i) - part_get_x_ind(&parts[k], i);
       if (periodic) {
         if (dx[i] < -dim[i] / 2)
           dx[i] += dim[i];
@@ -898,17 +935,19 @@ void engine_single_force(double *dim, long long int pid,
       fdx[i] = dx[i];
     }
     r2 = fdx[0] * fdx[0] + fdx[1] * fdx[1] + fdx[2] * fdx[2];
-    if (r2 < p.h * p.h * kernel_gamma2 ||
-        r2 < parts[k].h * parts[k].h * kernel_gamma2) {
+    const float hp = part_get_h(&p);
+    const float hk = part_get_h(&parts[k]);
+    if (r2 < hp * hp * kernel_gamma2 || r2 < hk * hk * kernel_gamma2) {
       hydro_reset_acceleration(&p);
       mhd_reset_acceleration(&p);
-      runner_iact_nonsym_force(r2, fdx, p.h, parts[k].h, &p, &parts[k], a, H);
+      runner_iact_nonsym_force(r2, fdx, hp, hk, &p, &parts[k], a, H);
     }
   }
 
   /* Dump the result. */
-  message("part %lli (h=%e) has a=[%.3e,%.3e,%.3e]", p.id, p.h, p.a_hydro[0],
-          p.a_hydro[1], p.a_hydro[2]);
+  message("part %lli (h=%e) has a=[%.3e,%.3e,%.3e]", part_get_id(&p),
+          part_get_h(&p), part_get_a_hydro_ind(&p, 0),
+          part_get_a_hydro_ind(&p, 1), part_get_a_hydro_ind(&p, 2));
   fflush(stdout);
 }
 

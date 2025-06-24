@@ -178,7 +178,6 @@ void queue_insert(struct queue *q, struct task *t) {
       }
     }
   }
-
   /* Increase the incoming count. */
   atomic_inc(&q->count_incoming);
 }

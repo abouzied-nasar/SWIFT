@@ -28,8 +28,13 @@
 
 int main(int argc, char *argv[]) {
 
-  size_t Ngas = 0, Ngpart = 0, Ngpart_background = 0, Nspart = 0, Nbpart = 0,
-         Nsink = 0, Nnupart = 0;
+  size_t Ngas = 0;
+  size_t Ngpart = 0;
+  size_t Ngpart_background = 0;
+  size_t Nspart = 0;
+  size_t Nbpart = 0;
+  size_t Nsink = 0;
+  size_t Nnupart = 0;
   int flag_entropy_ICs = -1;
   int i, j, k;
   double dim[3];
@@ -79,7 +84,7 @@ int main(int argc, char *argv[]) {
   for (size_t n = 0; n < Ngas; ++n) {
 
     /* Check that indices are in a reasonable range */
-    unsigned long long index = parts[n].id;
+    unsigned long long index = part_get_id(&parts[n]);
     assert(index < Ngas);
 
     /* Check masses */
@@ -88,14 +93,14 @@ int main(int argc, char *argv[]) {
     assert(mass == correct_mass);
 
     /* Check smoothing length */
-    float h = parts[n].h;
+    float h = part_get_h(&parts[n]);
     float correct_h = 2.251 * boxSize / L;
     assert(h == correct_h);
 
     /* Check velocity */
-    assert(parts[n].v[0] == 0.);
-    assert(parts[n].v[1] == 0.);
-    assert(parts[n].v[2] == 0.);
+    assert(part_get_v_ind(&parts[n], 0) == 0.);
+    assert(part_get_v_ind(&parts[n], 1) == 0.);
+    assert(part_get_v_ind(&parts[n], 2) == 0.);
 
     /* Check positions */
     k = index % 4;
@@ -104,14 +109,14 @@ int main(int argc, char *argv[]) {
     double correct_x = i * boxSize / L + boxSize / (2 * L);
     double correct_y = j * boxSize / L + boxSize / (2 * L);
     double correct_z = k * boxSize / L + boxSize / (2 * L);
-    assert(parts[n].x[0] == correct_x);
-    assert(parts[n].x[1] == correct_y);
-    assert(parts[n].x[2] == correct_z);
+    assert(part_get_x_ind(&parts[n], 0) == correct_x);
+    assert(part_get_x_ind(&parts[n], 1) == correct_y);
+    assert(part_get_x_ind(&parts[n], 2) == correct_z);
 
     /* Check accelerations */
-    assert(parts[n].a_hydro[0] == 0.);
-    assert(parts[n].a_hydro[1] == 0.);
-    assert(parts[n].a_hydro[2] == 0.);
+    assert(part_get_a_hydro_ind(&parts[n], 0) == 0.);
+    assert(part_get_a_hydro_ind(&parts[n], 1) == 0.);
+    assert(part_get_a_hydro_ind(&parts[n], 2) == 0.);
 
 #ifdef CHEMISTRY_GRACKLE
     assert(parts[n].chemistry_data.he_density == he_density);

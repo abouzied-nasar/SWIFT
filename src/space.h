@@ -48,7 +48,7 @@ struct hydro_props;
 #define space_cellallocchunk 1000
 #define space_splitsize_default 400
 #define space_maxsize_default 8000000
-#define space_grid_split_threshold_default 400
+#define space_grid_split_threshold_default 100
 #define space_extra_parts_default 0
 #define space_extra_gparts_default 200
 #define space_extra_sparts_default 200
@@ -109,6 +109,9 @@ extern double engine_foreign_alloc_margin;
  * @brief The space in which the cells and particles reside.
  */
 struct space {
+
+  /*Used to define GPU task memory allocation*/
+  float eta_neighbours;
 
   /*! Spatial extent. */
   double dim[3];

@@ -115,65 +115,69 @@ struct cell *make_cell(size_t n, double *offset, double size, double h,
   for (size_t x = 0; x < n; ++x) {
     for (size_t y = 0; y < n; ++y) {
       for (size_t z = 0; z < n; ++z) {
-        part->x[0] =
+        part_set_x_ind(
+            part, 0,
             offset[0] +
-            size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
-        part->x[1] =
+                size * (x + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 1,
             offset[1] +
-            size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
-        part->x[2] =
+                size * (y + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
+        part_set_x_ind(
+            part, 2,
             offset[2] +
-            size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n;
+                size * (z + 0.5 + random_uniform(-0.5, 0.5) * pert) / (float)n);
         switch (vel) {
           case velocity_zero:
-            part->v[0] = 0.f;
-            part->v[1] = 0.f;
-            part->v[2] = 0.f;
+            part_set_v_ind(part, 0, 0.f);
+            part_set_v_ind(part, 1, 0.f);
+            part_set_v_ind(part, 2, 0.f);
             break;
           case velocity_random:
-            part->v[0] = random_uniform(-0.05, 0.05);
-            part->v[1] = random_uniform(-0.05, 0.05);
-            part->v[2] = random_uniform(-0.05, 0.05);
+            part_set_v_ind(part, 0, random_uniform(-0.05, 0.05));
+            part_set_v_ind(part, 1, random_uniform(-0.05, 0.05));
+            part_set_v_ind(part, 2, random_uniform(-0.05, 0.05));
             break;
           case velocity_divergent:
-            part->v[0] = part->x[0] - 1.5 * size;
-            part->v[1] = part->x[1] - 1.5 * size;
-            part->v[2] = part->x[2] - 1.5 * size;
+            part_set_v_ind(part, 0, part_get_x_ind(part, 0) - 1.5 * size);
+            part_set_v_ind(part, 1, part_get_x_ind(part, 1) - 1.5 * size);
+            part_set_v_ind(part, 2, part_get_x_ind(part, 2) - 1.5 * size);
             break;
           case velocity_rotating:
-            part->v[0] = part->x[1];
-            part->v[1] = -part->x[0];
-            part->v[2] = 0.f;
+            part_set_v_ind(part, 0, part_get_x_ind(part, 1));
+            part_set_v_ind(part, 1, -part_get_x_ind(part, 0));
+            part_set_v_ind(part, 2, 0.f);
             break;
         }
-        if (h_pert)
-          part->h = size * h * random_uniform(1.f, h_pert) / (float)n;
-        else
-          part->h = size * h / (float)n;
-        h_max = fmaxf(h_max, part->h);
-        part->id = ++(*partId);
-        part->depth_h = 0;
+        if (h_pert) {
+          part_set_h(part, size * h * random_uniform(1.f, h_pert) / (float)n);
+        } else {
+          part_set_h(part, size * h / (float)n);
+        }
+        h_max = fmaxf(h_max, part_get_h(part));
+        part_set_id(part, ++(*partId));
+        part_set_depth_h(part, 0);
 
 #if defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
-        part->conserved.mass = density * volume / count;
+        part_set_conserved_mass(part, density * volume / count);
 
 #else
-        part->mass = density * volume / count;
+        part_set_mass(part, density * volume / count);
 #endif
 #if defined(REMIX_SPH)
-        part->rho_evol = density;
+        part_set_rho_evol(part, density);
 #endif
 
 #if defined(HOPKINS_PE_SPH)
-        part->entropy = 1.f;
-        part->entropy_one_over_gamma = 1.f;
+        part_set_entropy(part, 1.f);
+        part_set_entropy_one_over_gamma(part, 1.f);
 #endif
 
-        part->time_bin = 1;
+        part_set_time_bin(part, 1);
 
 #ifdef SWIFT_DEBUG_CHECKS
-        part->ti_drift = 8;
-        part->ti_kick = 8;
+        part_set_ti_drift(part, 8);
+        part_set_ti_kick(part, 8);
 #endif
 
         ++part;
@@ -243,8 +247,10 @@ void end_calculation(struct cell *c, const struct cosmology *cosmo,
     mhd_end_density(&c->hydro.parts[pid], cosmo);
 
     /* Recover the common "Neighbour number" definition */
-    c->hydro.parts[pid].density.wcount *= pow_dimension(c->hydro.parts[pid].h);
-    c->hydro.parts[pid].density.wcount *= kernel_norm;
+    float wcount = part_get_wcount(&c->hydro.parts[pid]);
+    wcount *= pow_dimension(part_get_h(&c->hydro.parts[pid]));
+    wcount *= kernel_norm;
+    part_set_wcount(&c->hydro.parts[pid], wcount);
   }
 }
 
@@ -266,36 +272,30 @@ void dump_particle_fields(char *fileName, struct cell *main_cell,
 
   /* Write main cell */
   for (int pid = 0; pid < main_cell->hydro.count; pid++) {
+    const struct part *pi = &main_cell->hydro.parts[pid];
     fprintf(file,
             "%6llu %10f %10f %10f %10f %10f %10f %13e %13e %13e %13e %13e "
             "%13e %13e %13e\n",
-            main_cell->hydro.parts[pid].id, main_cell->hydro.parts[pid].x[0],
-            main_cell->hydro.parts[pid].x[1], main_cell->hydro.parts[pid].x[2],
-            main_cell->hydro.parts[pid].v[0], main_cell->hydro.parts[pid].v[1],
-            main_cell->hydro.parts[pid].v[2],
-            hydro_get_comoving_density(&main_cell->hydro.parts[pid]),
+            part_get_id(pi), part_get_x_ind(pi, 0), part_get_x_ind(pi, 1),
+            part_get_x_ind(pi, 2), part_get_v_ind(pi, 0), part_get_v_ind(pi, 1),
+            part_get_v_ind(pi, 2), hydro_get_comoving_density(pi),
 #if defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
             0.f,
 #elif defined(HOPKINS_PU_SPH) || defined(HOPKINS_PU_SPH_MONAGHAN) || \
     defined(ANARCHY_PU_SPH)
-            main_cell->hydro.parts[pid].density.pressure_bar_dh,
+            part_get_pressure_bar_dh(pi),
 #else
-            main_cell->hydro.parts[pid].density.rho_dh,
+            part_get_rho_dh(pi),
 #endif
-            main_cell->hydro.parts[pid].density.wcount,
-            main_cell->hydro.parts[pid].density.wcount_dh,
+            part_get_wcount(pi), part_get_wcount_dh(pi),
 #if defined(GADGET2_SPH) || defined(HOPKINS_PE_SPH) || \
     defined(HOPKINS_PU_SPH) || defined(HOPKINS_PU_SPH_MONAGHAN)
-            main_cell->hydro.parts[pid].density.div_v,
-            main_cell->hydro.parts[pid].density.rot_v[0],
-            main_cell->hydro.parts[pid].density.rot_v[1],
-            main_cell->hydro.parts[pid].density.rot_v[2]
+            part_get_div_v(pi), part_get_rot_v_ind(pi, 0),
+            part_get_rot_v_ind(pi, 1), part_get_rot_v_ind(pi, 2)
 #elif defined(ANARCHY_PU_SPH) || defined(SPHENIX_SPH) || defined(PHANTOM_SPH)
             /* this is required because of the variable AV scheme */
-            main_cell->hydro.parts[pid].viscosity.div_v,
-            main_cell->hydro.parts[pid].density.rot_v[0],
-            main_cell->hydro.parts[pid].density.rot_v[1],
-            main_cell->hydro.parts[pid].density.rot_v[2]
+            part_get_div_v(pi), part_get_rot_v_ind(pi, 0),
+            part_get_rot_v_ind(pi, 1), part_get_rot_v_ind(pi, 2)
 #else
             0., 0., 0., 0.
 #endif
@@ -314,33 +314,31 @@ void dump_particle_fields(char *fileName, struct cell *main_cell,
                 i - 1, j - 1, k - 1);
 
         for (int pjd = 0; pjd < cj->hydro.count; pjd++) {
+          const struct part *pj = &cj->hydro.parts[pjd];
           fprintf(
               file,
               "%6llu %10f %10f %10f %10f %10f %10f %13e %13e %13e %13e %13e "
               "%13e %13e %13e\n",
-              cj->hydro.parts[pjd].id, cj->hydro.parts[pjd].x[0],
-              cj->hydro.parts[pjd].x[1], cj->hydro.parts[pjd].x[2],
-              cj->hydro.parts[pjd].v[0], cj->hydro.parts[pjd].v[1],
-              cj->hydro.parts[pjd].v[2],
-              hydro_get_comoving_density(&cj->hydro.parts[pjd]),
+              part_get_id(pj), part_get_x_ind(pj, 0), part_get_x_ind(pj, 1),
+              part_get_x_ind(pj, 2), part_get_v_ind(pj, 0),
+              part_get_v_ind(pj, 1), part_get_v_ind(pj, 2),
+              hydro_get_comoving_density(pj),
 #if defined(GIZMO_MFV_SPH) || defined(GIZMO_MFM_SPH)
               0.f,
 #else
-              main_cell->hydro.parts[pjd].density.rho_dh,
+              // TODO: This was main_cell-> pointer, all the others were cj->
+              // pointers. Is this intentional?
+              /* main_cell->hydro.parts[pjd].density.rho_dh, */
+              part_get_rho_dh(pj),
 #endif
-              cj->hydro.parts[pjd].density.wcount,
-              cj->hydro.parts[pjd].density.wcount_dh,
+              part_get_wcount(pj), part_get_wcount_dh(pj),
 #if defined(GADGET2_SPH) || defined(HOPKINS_PE_SPH)
-              cj->hydro.parts[pjd].density.div_v,
-              cj->hydro.parts[pjd].density.rot_v[0],
-              cj->hydro.parts[pjd].density.rot_v[1],
-              cj->hydro.parts[pjd].density.rot_v[2]
+              part_get_div_v(pj), part_get_rot_v_ind(pj, 0),
+              part_get_rot_v_ind(pj, 1), part_get_rot_v_ind(pj, 2)
 #elif defined(ANARCHY_PU_SPH) || defined(SPHENIX_SPH) || defined(PHANTOM_SPH)
               /* this is required because of the variable AV scheme */
-              cj->hydro.parts[pjd].viscosity.div_v,
-              cj->hydro.parts[pjd].density.rot_v[0],
-              cj->hydro.parts[pjd].density.rot_v[1],
-              cj->hydro.parts[pjd].density.rot_v[2]
+              part_get_div_v(pj), part_get_rot_v_ind(pj, 0),
+              part_get_rot_v_ind(pj, 1), part_get_rot_v_ind(pj, 2)
 #else
               0., 0., 0., 0.
 #endif
@@ -375,9 +373,13 @@ int main(int argc, char *argv[]) {
   engine_pin();
 #endif
 
-  size_t runs = 0, particles = 0;
-  double h = 1.23485, size = 1., rho = 1.;
-  double perturbation = 0., h_pert = 0.;
+  size_t runs = 0;
+  size_t particles = 0;
+  double h = 1.23485;
+  double size = 1.;
+  double rho = 1.;
+  double perturbation = 0.;
+  double h_pert = 0.;
   char outputFileNameExtension[100] = "";
   char outputFileName[200] = "";
   enum velocity_types vel = velocity_zero;

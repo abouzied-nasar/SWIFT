@@ -616,23 +616,24 @@ void space_synchronize_part_positions_mapper(void *map_data, int nr_parts,
     /* Get the particle */
     const struct part *p = &parts[k];
     const struct xpart *xp = &xparts[k];
+    const timebin_t time_bin = part_get_time_bin(p);
 
     /* Skip unimportant particles */
-    if (p->time_bin == time_bin_not_created ||
-        p->time_bin == time_bin_inhibited)
+    if (time_bin == time_bin_not_created || time_bin == time_bin_inhibited)
       continue;
 
     /* Get its gravity friend */
-    struct gpart *gp = p->gpart;
+    struct gpart *gp = part_get_gpart(p);
 
 #ifdef SWIFT_DEBUG_CHECKS
     if (gp == NULL) error("Unlinked particle!");
 #endif
 
     /* Synchronize positions, velocities and masses */
-    gp->x[0] = p->x[0];
-    gp->x[1] = p->x[1];
-    gp->x[2] = p->x[2];
+    const double *x = part_get_const_x(p);
+    gp->x[0] = x[0];
+    gp->x[1] = x[1];
+    gp->x[2] = x[2];
 
     gp->v_full[0] = xp->v_full[0];
     gp->v_full[1] = xp->v_full[1];
@@ -797,7 +798,7 @@ void space_convert_quantities_mapper(void *restrict map_data, int count,
   /* Loop over all the particles ignoring the extra buffer ones for on-the-fly
    * creation */
   for (int k = 0; k < count; k++) {
-    if (parts[k].time_bin <= num_time_bins) {
+    if (part_get_time_bin(&parts[k]) <= num_time_bins) {
       hydro_convert_quantities(&parts[k], &xparts[k], cosmo, hydro_props,
                                floor);
       mhd_convert_quantities(&parts[k], &xparts[k], cosmo, hydro_props);
@@ -844,7 +845,7 @@ void space_convert_rt_quantities_mapper(void *restrict map_data, int count,
   /* Loop over all the particles ignoring the extra buffer ones for on-the-fly
    * creation */
   for (int k = 0; k < count; k++) {
-    if (parts[k].time_bin <= num_time_bins)
+    if (part_get_time_bin(&parts[k]) <= num_time_bins)
       rt_convert_quantities(&parts[k], rt_props, hydro_props, phys_const, iu,
                             cosmo);
   }
@@ -1346,7 +1347,8 @@ void space_init(struct space *s, struct swift_params *params,
       params, "InitialConditions:smoothing_length_scaling", 1.0);
   if (scaling != 1.0 && !dry_run) {
     message("Re-scaling smoothing lengths by a factor %e", scaling);
-    for (size_t k = 0; k < Npart; k++) parts[k].h *= scaling;
+    for (size_t k = 0; k < Npart; k++)
+      part_set_h(&parts[k], part_get_h(&parts[k]) * scaling);
   }
 
   /* Read in imposed star smoothing length */
@@ -1370,9 +1372,10 @@ void space_init(struct space *s, struct swift_params *params,
   if ((shift[0] != 0. || shift[1] != 0. || shift[2] != 0.) && !dry_run) {
     message("Shifting particles by [%e %e %e]", shift[0], shift[1], shift[2]);
     for (size_t k = 0; k < Npart; k++) {
-      parts[k].x[0] += shift[0];
-      parts[k].x[1] += shift[1];
-      parts[k].x[2] += shift[2];
+      double *x = part_get_x(&parts[k]);
+      x[0] += shift[0];
+      x[1] += shift[1];
+      x[2] += shift[2];
     }
     for (size_t k = 0; k < Ngpart; k++) {
       gparts[k].x[0] += shift[0];
@@ -1400,16 +1403,20 @@ void space_init(struct space *s, struct swift_params *params,
 
     /* Check that all the part positions are reasonable, wrap if periodic. */
     if (periodic) {
-      for (size_t k = 0; k < Npart; k++)
+      for (size_t k = 0; k < Npart; k++) {
+        double *x = part_get_x(&parts[k]);
         for (int j = 0; j < 3; j++) {
-          while (parts[k].x[j] < 0) parts[k].x[j] += s->dim[j];
-          while (parts[k].x[j] >= s->dim[j]) parts[k].x[j] -= s->dim[j];
+          while (x[j] < 0) x[j] += s->dim[j];
+          while (x[j] >= s->dim[j]) x[j] -= s->dim[j];
         }
+      }
     } else {
-      for (size_t k = 0; k < Npart; k++)
+      for (size_t k = 0; k < Npart; k++) {
+        double *x = part_get_x(&parts[k]);
         for (int j = 0; j < 3; j++)
-          if (parts[k].x[j] < 0 || parts[k].x[j] >= s->dim[j])
+          if (x[j] < 0. || x[j] >= s->dim[j])
             error("Not all particles are within the specified domain.");
+      }
     }
 
     /* Same for the gparts */
@@ -1608,9 +1615,10 @@ void space_replicate(struct space *s, int replicate, int verbose) {
         const double shift[3] = {i * s->dim[0], j * s->dim[1], k * s->dim[2]};
 
         for (size_t n = offset * nr_parts; n < (offset + 1) * nr_parts; ++n) {
-          parts[n].x[0] += shift[0];
-          parts[n].x[1] += shift[1];
-          parts[n].x[2] += shift[2];
+          double *x = part_get_x(&parts[n]);
+          x[0] += shift[0];
+          x[1] += shift[1];
+          x[2] += shift[2];
         }
         for (size_t n = offset * nr_gparts; n < (offset + 1) * nr_gparts; ++n) {
           gparts[n].x[0] += shift[0];
@@ -1640,7 +1648,7 @@ void space_replicate(struct space *s, int replicate, int verbose) {
           const size_t offset_gpart = offset * nr_gparts + nr_dm;
 
           for (size_t n = 0; n < nr_parts; ++n) {
-            parts[offset_part + n].gpart = &gparts[offset_gpart + n];
+            part_set_gpart(&parts[offset_part + n], &gparts[offset_gpart + n]);
             gparts[offset_gpart + n].id_or_neg_offset = -(offset_part + n);
           }
         }
@@ -1803,7 +1811,7 @@ void space_remap_ids(struct space *s, int nr_nodes, int verbose) {
 
   /* We can now remap the IDs in the range [offset offset + local_nr] */
   for (long long i = 0; i < local_nr_parts; ++i) {
-    s->parts[i].id = offset_parts + i;
+    part_set_id(&s->parts[i], offset_parts + i);
   }
   for (long long i = 0; i < local_nr_sinks; ++i) {
     s->sinks[i].id = offset_sinks + i;
@@ -1973,17 +1981,18 @@ void space_generate_gas(struct space *s, const struct cosmology *cosmo,
       memcpy(gp_dm, &s->gparts[i], sizeof(struct gpart));
 
       /* Set the IDs */
-      p->id = gp_gas->id_or_neg_offset * 2 + 1;
+      long long pid = gp_gas->id_or_neg_offset * 2 + 1;
+      part_set_id(p, pid);
       gp_dm->id_or_neg_offset *= 2;
 
       if (gp_dm->id_or_neg_offset < 0)
         error("DM particle ID overflowd (DM id=%lld gas id=%lld)",
-              gp_dm->id_or_neg_offset, p->id);
+              gp_dm->id_or_neg_offset, pid);
 
-      if (p->id < 0) error("gas particle ID overflowd (id=%lld)", p->id);
+      if (pid < 0) error("gas particle ID overflowed (id=%lld)", pid);
 
       /* Set the links correctly */
-      p->gpart = gp_gas;
+      part_set_gpart(p, gp_gas);
       gp_gas->id_or_neg_offset = -j;
       gp_gas->type = swift_type_gas;
 
@@ -2011,9 +2020,10 @@ void space_generate_gas(struct space *s, const struct cosmology *cosmo,
       gp_gas->x[2] -= shift_gas;
 
       /* Make sure the positions are identical between linked particles */
-      p->x[0] = gp_gas->x[0];
-      p->x[1] = gp_gas->x[1];
-      p->x[2] = gp_gas->x[2];
+      double *px = part_get_x(p);
+      px[0] = gp_gas->x[0];
+      px[1] = gp_gas->x[1];
+      px[2] = gp_gas->x[2];
 
       /* Box-wrap the whole thing to be safe */
       if (periodic) {
@@ -2023,18 +2033,19 @@ void space_generate_gas(struct space *s, const struct cosmology *cosmo,
         gp_gas->x[0] = box_wrap(gp_gas->x[0], 0., dim[0]);
         gp_gas->x[1] = box_wrap(gp_gas->x[1], 0., dim[1]);
         gp_gas->x[2] = box_wrap(gp_gas->x[2], 0., dim[2]);
-        p->x[0] = box_wrap(p->x[0], 0., dim[0]);
-        p->x[1] = box_wrap(p->x[1], 0., dim[1]);
-        p->x[2] = box_wrap(p->x[2], 0., dim[2]);
+        px[0] = box_wrap(px[0], 0., dim[0]);
+        px[1] = box_wrap(px[1], 0., dim[1]);
+        px[2] = box_wrap(px[2], 0., dim[2]);
       }
 
       /* Also copy the velocities */
-      p->v[0] = gp_gas->v_full[0];
-      p->v[1] = gp_gas->v_full[1];
-      p->v[2] = gp_gas->v_full[2];
+      float *pv = part_get_v(p);
+      pv[0] = gp_gas->v_full[0];
+      pv[1] = gp_gas->v_full[1];
+      pv[2] = gp_gas->v_full[2];
 
       /* Set the smoothing length to the mean inter-particle separation */
-      p->h = d;
+      part_set_h(p, d);
 
       /* Note that the thermodynamic properties (u, S, ...) will be set later */
 
@@ -2180,7 +2191,8 @@ void space_check_cosmology(struct space *s, const struct cosmology *cosmo,
 long long space_get_max_parts_id(struct space *s) {
 
   long long max_id = -1;
-  for (size_t i = 0; i < s->nr_parts; ++i) max_id = max(max_id, s->parts[i].id);
+  for (size_t i = 0; i < s->nr_parts; ++i)
+    max_id = max(max_id, part_get_id(&s->parts[i]));
   for (size_t i = 0; i < s->nr_sinks; ++i) max_id = max(max_id, s->sinks[i].id);
   for (size_t i = 0; i < s->nr_sparts; ++i)
     max_id = max(max_id, s->sparts[i].id);
@@ -2279,24 +2291,27 @@ void space_check_limiter_mapper(void *map_data, int nr_parts,
 
   /* Verify that all limited particles have been treated */
   for (int k = 0; k < nr_parts; k++) {
+    const timebin_t time_bin = part_get_time_bin(&parts[k]);
+    const struct timestep_limiter_data *limiter_data =
+        part_get_limiter_data_p(&parts[k]);
 
-    if (parts[k].time_bin == time_bin_inhibited) continue;
+    if (time_bin == time_bin_inhibited) continue;
 
-    if (parts[k].time_bin < 0) error("Particle has negative time-bin!");
+    if (time_bin < 0) error("Particle has negative time-bin!");
 
-    if (with_timestep_limiter &&
-        parts[k].limiter_data.wakeup != time_bin_not_awake)
-      error("Particle still woken up! id=%lld wakeup=%d", parts[k].id,
-            parts[k].limiter_data.wakeup);
+    if (with_timestep_limiter && limiter_data->wakeup != time_bin_not_awake)
+      error("Particle still woken up! id=%lld wakeup=%d",
+            part_get_id(&parts[k]), limiter_data->wakeup);
 
-    if (with_timestep_sync && parts[k].limiter_data.to_be_synchronized != 0)
+    if (with_timestep_sync && limiter_data->to_be_synchronized != 0)
       error("Synchronized particle not treated! id=%lld synchronized=%d",
-            parts[k].id, parts[k].limiter_data.to_be_synchronized);
+            part_get_id(&parts[k]), limiter_data->to_be_synchronized);
 
-    if (parts[k].gpart != NULL) {
-      if (parts[k].time_bin != parts[k].gpart->time_bin) {
-        error("Gpart not on the same time-bin as part %i %i", parts[k].time_bin,
-              parts[k].gpart->time_bin);
+    const struct gpart *gp = part_get_gpart(&parts[k]);
+    if (gp != NULL) {
+      if (time_bin != gp->time_bin) {
+        error("Gpart not on the same time-bin as part %i %i", time_bin,
+              gp->time_bin);
       }
     }
   }
@@ -2334,13 +2349,13 @@ void space_check_part_swallow_mapper(void *map_data, int nr_parts,
   /* Verify that all particles have been swallowed or are untouched */
   for (int k = 0; k < nr_parts; k++) {
 
-    if (parts[k].time_bin == time_bin_inhibited) continue;
+    if (part_get_time_bin(&parts[k]) == time_bin_inhibited) continue;
 
     const long long swallow_id =
-        black_holes_get_part_swallow_id(&parts[k].black_holes_data);
+        black_holes_get_part_swallow_id(part_get_black_holes_data_p(&parts[k]));
 
     if (swallow_id != -1)
-      error("Particle has not been swallowed! id=%lld", parts[k].id);
+      error("Particle has not been swallowed! id=%lld", part_get_id(&parts[k]));
   }
 #else
   error("Calling debugging code without debugging flag activated.");
@@ -2384,12 +2399,13 @@ void space_check_part_sink_swallow_mapper(void *map_data, int nr_parts,
   /* Verify that all particles have been swallowed or are untouched */
   for (int k = 0; k < nr_parts; k++) {
 
-    if (parts[k].time_bin == time_bin_inhibited) continue;
+    if (part_get_time_bin(&parts[k]) == time_bin_inhibited) continue;
 
-    const long long swallow_id = sink_get_part_swallow_id(&parts[k].sink_data);
+    const long long swallow_id =
+        sink_get_part_swallow_id(part_get_sink_data_p(&parts[k]));
 
     if (swallow_id != -1)
-      error("Particle has not been swallowed! id=%lld", parts[k].id);
+      error("Particle has not been swallowed! id=%lld", part_get_id(&parts[k]));
   }
 #else
   error("Calling debugging code without debugging flag activated.");

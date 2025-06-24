@@ -253,6 +253,44 @@ struct redist_mapper_data {
 
 /* Generic function for accumulating counts for TYPE parts. Note
  * we use a local counts array to avoid the atomic_add in the parts
+ * loop.
+ * This version uses getter/setter functions instead of direct access.
+ * */
+#define ENGINE_REDISTRIBUTE_DEST_GETTERS_MAPPER(TYPE)                         \
+  engine_redistribute_dest_mapper_##TYPE(void *map_data, int num_elements,    \
+                                         void *extra_data) {                  \
+    struct TYPE *parts = (struct TYPE *)map_data;                             \
+    struct redist_mapper_data *mydata =                                       \
+        (struct redist_mapper_data *)extra_data;                              \
+    struct space *s = mydata->s;                                              \
+    int *dest =                                                               \
+        mydata->dest + (ptrdiff_t)(parts - (struct TYPE *)mydata->base);      \
+    int *lcounts = NULL;                                                      \
+    if ((lcounts = (int *)calloc(mydata->nr_nodes * mydata->nr_nodes,         \
+                                 sizeof(int))) == NULL)                       \
+      error("Failed to allocate counts thread-specific buffer");              \
+    for (int k = 0; k < num_elements; k++) {                                  \
+      double *xk = TYPE##_get_x(&parts[k]);                                   \
+      for (int j = 0; j < 3; j++) {                                           \
+        if (xk[j] < 0.0)                                                      \
+          xk[j] += s->dim[j];                                                 \
+        else if (xk[j] >= s->dim[j])                                          \
+          xk[j] -= s->dim[j];                                                 \
+        if (xk[j] == s->dim[j]) xk[j] = 0.0;                                  \
+      }                                                                       \
+      const int cid = cell_getid(s->cdim, xk[0] * s->iwidth[0],               \
+                                 xk[1] * s->iwidth[1], xk[2] * s->iwidth[2]); \
+      dest[k] = s->cells_top[cid].nodeID;                                     \
+      size_t ind = mydata->nodeID * mydata->nr_nodes + dest[k];               \
+      lcounts[ind] += 1;                                                      \
+    }                                                                         \
+    for (int k = 0; k < (mydata->nr_nodes * mydata->nr_nodes); k++)           \
+      atomic_add(&mydata->counts[k], lcounts[k]);                             \
+    free(lcounts);                                                            \
+  }
+
+/* Generic function for accumulating counts for TYPE parts. Note
+ * we use a local counts array to avoid the atomic_add in the parts
  * loop. */
 #define ENGINE_REDISTRIBUTE_DEST_MAPPER(TYPE)                              \
   engine_redistribute_dest_mapper_##TYPE(void *map_data, int num_elements, \
@@ -293,7 +331,7 @@ struct redist_mapper_data {
  *
  * part version.
  */
-void ENGINE_REDISTRIBUTE_DEST_MAPPER(part);
+void ENGINE_REDISTRIBUTE_DEST_GETTERS_MAPPER(part);
 
 /**
  * @brief Accumulate the counts of star particles per cell.
@@ -347,6 +385,49 @@ struct savelink_mapper_data {
  * These offsets are used to restore the pointers on the receiving node.
  *
  * CHECKS should be eliminated as dead code when optimizing.
+ *
+ * This version uses getter/setter functions instead of direct access.
+ */
+#define ENGINE_REDISTRIBUTE_SAVELINK_GETTERS_MAPPER(TYPE, CHECKS)              \
+  engine_redistribute_savelink_mapper_##TYPE(void *map_data, int num_elements, \
+                                             void *extra_data) {               \
+    int *nodes = (int *)map_data;                                              \
+    struct savelink_mapper_data *mydata =                                      \
+        (struct savelink_mapper_data *)extra_data;                             \
+    int nodeID = mydata->nodeID;                                               \
+    int nr_nodes = mydata->nr_nodes;                                           \
+    int *counts = mydata->counts;                                              \
+    struct TYPE *parts = (struct TYPE *)mydata->parts;                         \
+                                                                               \
+    for (int j = 0; j < num_elements; j++) {                                   \
+      int node = nodes[j];                                                     \
+      int count = 0;                                                           \
+      size_t offset = 0;                                                       \
+      for (int i = 0; i < node; i++) offset += counts[nodeID * nr_nodes + i];  \
+                                                                               \
+      for (int k = 0; k < counts[nodeID * nr_nodes + node]; k++) {             \
+        struct gpart *gp = TYPE##_get_gpart(&parts[k + offset]);               \
+        if (gp != NULL) {                                                      \
+          if (CHECKS) {                                                        \
+            if (gp->id_or_neg_offset > 0) {                                    \
+              error("Trying to link a partnerless " #TYPE "!");                \
+            }                                                                  \
+          }                                                                    \
+          gp->id_or_neg_offset = -count;                                       \
+          count++;                                                             \
+        }                                                                      \
+      }                                                                        \
+    }                                                                          \
+  }
+
+/**
+ * @brief Save the offset of each gravity partner of a part or spart.
+ *
+ * The offset is from the start of the sorted particles to be sent to a node.
+ * This is possible as parts without gravity partners have a positive id.
+ * These offsets are used to restore the pointers on the receiving node.
+ *
+ * CHECKS should be eliminated as dead code when optimizing.
  */
 #define ENGINE_REDISTRIBUTE_SAVELINK_MAPPER(TYPE, CHECKS)                      \
   engine_redistribute_savelink_mapper_##TYPE(void *map_data, int num_elements, \
@@ -382,7 +463,7 @@ struct savelink_mapper_data {
  * Threadpool helper for accumulating the counts of particles per cell.
  */
 #ifdef SWIFT_DEBUG_CHECKS
-void ENGINE_REDISTRIBUTE_SAVELINK_MAPPER(part, 1);
+void ENGINE_REDISTRIBUTE_SAVELINK_GETTERS_MAPPER(part, 1);
 #else
 void ENGINE_REDISTRIBUTE_SAVELINK_MAPPER(part, 0);
 #endif
@@ -491,7 +572,7 @@ void engine_redistribute_relink_mapper(void *map_data, int num_elements,
 
         /* Re-link */
         s->gparts[k].id_or_neg_offset = -partner_index;
-        s->parts[partner_index].gpart = &s->gparts[k];
+        part_set_gpart(&s->parts[partner_index], &s->gparts[k]);
       }
 
       /* Does this gpart have a star partner ? */
@@ -573,8 +654,8 @@ void engine_redistribute(struct engine *e) {
 
   /* Start by moving inhibited particles to the end of the arrays */
   for (size_t k = 0; k < nr_parts; /* void */) {
-    if (parts[k].time_bin == time_bin_inhibited ||
-        parts[k].time_bin == time_bin_not_created) {
+    if (part_get_time_bin(&parts[k]) == time_bin_inhibited ||
+        part_get_time_bin(&parts[k]) == time_bin_not_created) {
       nr_parts -= 1;
 
       /* Swap the particle */
@@ -584,11 +665,13 @@ void engine_redistribute(struct engine *e) {
       memswap(&xparts[k], &xparts[nr_parts], sizeof(struct xpart));
 
       /* Swap the link with the gpart */
-      if (parts[k].gpart != NULL) {
-        parts[k].gpart->id_or_neg_offset = -k;
+      struct gpart *gp = part_get_gpart(&parts[k]);
+      if (gp != NULL) {
+        gp->id_or_neg_offset = -k;
       }
-      if (parts[nr_parts].gpart != NULL) {
-        parts[nr_parts].gpart->id_or_neg_offset = -nr_parts;
+      struct gpart *gp_nr_parts = part_get_gpart(&parts[nr_parts]);
+      if (gp_nr_parts != NULL) {
+        gp_nr_parts->id_or_neg_offset = -nr_parts;
       }
     } else {
       k++;
@@ -670,7 +753,8 @@ void engine_redistribute(struct engine *e) {
 
       /* Swap the link with part/spart */
       if (s->gparts[k].type == swift_type_gas) {
-        s->parts[-s->gparts[k].id_or_neg_offset].gpart = &s->gparts[k];
+        struct part *p = &s->parts[-s->gparts[k].id_or_neg_offset];
+        part_set_gpart(p, &s->gparts[k]);
       } else if (s->gparts[k].type == swift_type_stars) {
         s->sparts[-s->gparts[k].id_or_neg_offset].gpart = &s->gparts[k];
       } else if (s->gparts[k].type == swift_type_black_hole) {
@@ -680,8 +764,8 @@ void engine_redistribute(struct engine *e) {
       }
 
       if (s->gparts[nr_gparts].type == swift_type_gas) {
-        s->parts[-s->gparts[nr_gparts].id_or_neg_offset].gpart =
-            &s->gparts[nr_gparts];
+        struct part *p = &s->parts[-s->gparts[nr_gparts].id_or_neg_offset];
+        part_set_gpart(p, &s->gparts[nr_gparts]);
       } else if (s->gparts[nr_gparts].type == swift_type_stars) {
         s->sparts[-s->gparts[nr_gparts].id_or_neg_offset].gpart =
             &s->gparts[nr_gparts];
@@ -739,16 +823,16 @@ void engine_redistribute(struct engine *e) {
   for (size_t k = 0; k < nr_parts; k++) {
     const struct part *p = &s->parts[k];
 
-    if (p->time_bin == time_bin_inhibited)
+    if (part_get_time_bin(p) == time_bin_inhibited)
       error("Inhibited particle found after sorting!");
 
-    if (p->time_bin == time_bin_not_created)
+    if (part_get_time_bin(p) == time_bin_not_created)
       error("Inhibited particle found after sorting!");
 
     /* New cell index */
-    const int new_cid =
-        cell_getid(s->cdim, p->x[0] * s->iwidth[0], p->x[1] * s->iwidth[1],
-                   p->x[2] * s->iwidth[2]);
+    const double *x = part_get_const_x(p);
+    const int new_cid = cell_getid(s->cdim, x[0] * s->iwidth[0],
+                                   x[1] * s->iwidth[1], x[2] * s->iwidth[2]);
 
     /* New cell of this part */
     const struct cell *c = &s->cells_top[new_cid];
@@ -757,9 +841,9 @@ void engine_redistribute(struct engine *e) {
     if (dest[k] != new_node)
       error("part's new node index not matching sorted index.");
 
-    if (p->x[0] < c->loc[0] || p->x[0] > c->loc[0] + c->width[0] ||
-        p->x[1] < c->loc[1] || p->x[1] > c->loc[1] + c->width[1] ||
-        p->x[2] < c->loc[2] || p->x[2] > c->loc[2] + c->width[2])
+    if (x[0] < c->loc[0] || x[0] > c->loc[0] + c->width[0] ||
+        x[1] < c->loc[1] || x[1] > c->loc[1] + c->width[1] ||
+        x[2] < c->loc[2] || x[2] > c->loc[2] + c->width[2])
       error("part not sorted into the right top-level cell!");
   }
 #endif
@@ -1318,9 +1402,10 @@ void engine_redistribute(struct engine *e) {
 #ifdef SWIFT_DEBUG_CHECKS
   /* Verify that all parts are in the right place. */
   for (size_t k = 0; k < nr_parts_new; k++) {
-    const int cid = cell_getid(s->cdim, s->parts[k].x[0] * s->iwidth[0],
-                               s->parts[k].x[1] * s->iwidth[1],
-                               s->parts[k].x[2] * s->iwidth[2]);
+    const struct part *p = &s->parts[k];
+    const int cid = cell_getid(s->cdim, part_get_x_ind(p, 0) * s->iwidth[0],
+                               part_get_x_ind(p, 1) * s->iwidth[1],
+                               part_get_x_ind(p, 2) * s->iwidth[2]);
     if (cells[cid].nodeID != nodeID)
       error("Received particle (%zu) that does not belong here (nodeID=%i).", k,
             cells[cid].nodeID);
@@ -1341,6 +1426,7 @@ void engine_redistribute(struct engine *e) {
       error("Received s-particle (%zu) that does not belong here (nodeID=%i).",
             k, cells[cid].nodeID);
   }
+
   for (size_t k = 0; k < nr_bparts_new; k++) {
     const int cid = cell_getid(s->cdim, s->bparts[k].x[0] * s->iwidth[0],
                                s->bparts[k].x[1] * s->iwidth[1],

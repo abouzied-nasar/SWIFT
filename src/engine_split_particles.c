@@ -92,7 +92,7 @@ void engine_split_gas_particle_count_mapper(void *restrict map_data, int count,
     if (gas_mass > mass_threshold) ++counter;
 
     /* Get the maximal id */
-    max_id = max(max_id, p->id);
+    max_id = max(max_id, part_get_id(p));
   }
 
   /* Increment the global counter */
@@ -140,7 +140,7 @@ void engine_split_gas_particle_split_mapper(void *restrict map_data, int count,
     if (part_is_inhibited(p, e)) continue;
 
     const float gas_mass = hydro_get_mass(p);
-    const float h = p->h;
+    const float h = part_get_h(p);
 
     /* Found a particle to split */
     if (gas_mass > mass_threshold) {
@@ -164,7 +164,7 @@ void engine_split_gas_particle_split_mapper(void *restrict map_data, int count,
 
       /* Current other fields associated to this particle */
       struct xpart *xp = &xparts[i];
-      struct gpart *gp = p->gpart;
+      struct gpart *gp = part_get_gpart(p);
 
       /* Start by copying over the particles */
       memcpy(&global_parts[k_parts], p, sizeof(struct part));
@@ -178,34 +178,38 @@ void engine_split_gas_particle_split_mapper(void *restrict map_data, int count,
       if (generate_random_ids) {
         /* The gas IDs are always odd, so we multiply by two here to
          * respect the parity. */
-        global_parts[k_parts].id += 2 * (long long)rand_r(&seedp);
+        long long id = part_get_id(&global_parts[k_parts]);
+        part_set_id(&global_parts[k_parts], id + 2 * (long long)rand_r(&seedp));
       } else {
-        global_parts[k_parts].id = offset_id + 2 * atomic_inc(count_id);
+        part_set_id(&global_parts[k_parts],
+                    offset_id + 2 * atomic_inc(count_id));
       }
 
       /* Update splitting tree */
       particle_splitting_update_binary_tree(
-          &xp->split_data, &global_xparts[k_parts].split_data, p->id,
-          global_parts[k_parts].id, data->extra_split_logger, &data->lock);
+          &xp->split_data, &global_xparts[k_parts].split_data, part_get_id(p),
+          part_get_id(&global_parts[k_parts]), data->extra_split_logger,
+          &data->lock);
 
       /* Re-link everything */
       if (with_gravity) {
-        global_parts[k_parts].gpart = &global_gparts[k_gparts];
+        part_set_gpart(&global_parts[k_parts], &global_gparts[k_gparts]);
         global_gparts[k_gparts].id_or_neg_offset = -k_parts;
       }
 
       /* Displacement unit vector */
-      const double delta_x = random_unit_interval(p->id, e->ti_current,
+      const double delta_x = random_unit_interval(part_get_id(p), e->ti_current,
                                                   (enum random_number_type)0);
-      const double delta_y = random_unit_interval(p->id, e->ti_current,
+      const double delta_y = random_unit_interval(part_get_id(p), e->ti_current,
                                                   (enum random_number_type)1);
-      const double delta_z = random_unit_interval(p->id, e->ti_current,
+      const double delta_z = random_unit_interval(part_get_id(p), e->ti_current,
                                                   (enum random_number_type)2);
 
       /* Displace the old particle */
-      p->x[0] += delta_x * displacement_factor * h;
-      p->x[1] += delta_y * displacement_factor * h;
-      p->x[2] += delta_z * displacement_factor * h;
+      double *x = part_get_x(p);
+      x[0] += delta_x * displacement_factor * h;
+      x[1] += delta_y * displacement_factor * h;
+      x[2] += delta_z * displacement_factor * h;
 
       if (with_gravity) {
         gp->x[0] += delta_x * displacement_factor * h;
@@ -214,9 +218,10 @@ void engine_split_gas_particle_split_mapper(void *restrict map_data, int count,
       }
 
       /* Displace the new particle */
-      global_parts[k_parts].x[0] -= delta_x * displacement_factor * h;
-      global_parts[k_parts].x[1] -= delta_y * displacement_factor * h;
-      global_parts[k_parts].x[2] -= delta_z * displacement_factor * h;
+      double *xk = part_get_x(&global_parts[k_parts]);
+      xk[0] -= delta_x * displacement_factor * h;
+      xk[1] -= delta_y * displacement_factor * h;
+      xk[2] -= delta_z * displacement_factor * h;
 
       if (with_gravity) {
         global_gparts[k_gparts].x[0] -= delta_x * displacement_factor * h;
@@ -258,13 +263,14 @@ void engine_split_gas_particle_split_mapper(void *restrict map_data, int count,
       rt_split_part(&global_parts[k_parts], particle_split_factor);
 
       /* Mark the particles as not having been swallowed */
-      black_holes_mark_part_as_not_swallowed(&p->black_holes_data);
+      black_holes_mark_part_as_not_swallowed(part_get_black_holes_data_p(p));
       black_holes_mark_part_as_not_swallowed(
-          &global_parts[k_parts].black_holes_data);
+          part_get_black_holes_data_p(&global_parts[k_parts]));
 
       /* Mark the particles as not having been swallowed by a sink */
-      sink_mark_part_as_not_swallowed(&p->sink_data);
-      sink_mark_part_as_not_swallowed(&global_parts[k_parts].sink_data);
+      sink_mark_part_as_not_swallowed(part_get_sink_data_p(p));
+      sink_mark_part_as_not_swallowed(
+          part_get_sink_data_p(&global_parts[k_parts]));
     }
   }
 }

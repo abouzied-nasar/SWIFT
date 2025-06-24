@@ -27,6 +27,7 @@
 #include "chemistry_additions.h"
 #include "const.h"
 #include "debug.h"
+#include "gravity.h"
 #include "mhd.h"
 #include "rt.h"
 #include "sink.h"
@@ -74,9 +75,8 @@ __attribute__((always_inline)) INLINE static double kick_get_hydro_kick_dt(
 
   if (with_cosmology) {
     return cosmology_get_hydro_kick_factor(cosmo, ti_beg, ti_end);
-  } else {
-    return (ti_end - ti_beg) * time_base;
   }
+  return (ti_end - ti_beg) * time_base;
 }
 
 /**
@@ -97,9 +97,8 @@ __attribute__((always_inline)) INLINE static double kick_get_therm_kick_dt(
 
   if (with_cosmology) {
     return cosmology_get_therm_kick_factor(cosmo, ti_beg, ti_end);
-  } else {
-    return (ti_end - ti_beg) * time_base;
   }
+  return (ti_end - ti_beg) * time_base;
 }
 
 /**
@@ -120,9 +119,8 @@ __attribute__((always_inline)) INLINE static double kick_get_corr_kick_dt(
 
   if (with_cosmology) {
     return cosmology_get_corr_kick_factor(cosmo, ti_beg, ti_end);
-  } else {
-    return (ti_end - ti_beg) * time_base;
   }
+  return (ti_end - ti_beg) * time_base;
 }
 
 /**
@@ -223,14 +221,17 @@ __attribute__((always_inline)) INLINE static void kick_part(
     const integertime_t ti_start_mesh, const integertime_t ti_end_mesh) {
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (p->ti_kick != ti_start)
+  integertime_t ti_kick = part_get_ti_kick(p);
+  if (ti_kick != ti_start) {
+    struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
     error(
         "particle has not been kicked to the current time p->ti_kick=%lld, "
         "ti_start=%lld, ti_end=%lld id=%lld time_bin=%d wakeup=%d",
-        p->ti_kick, ti_start, ti_end, p->id, p->time_bin,
-        p->limiter_data.wakeup);
+        ti_kick, ti_start, ti_end, part_get_id(p), part_get_time_bin(p),
+        limiter_data->wakeup);
+  }
 
-  p->ti_kick = ti_end;
+  part_set_ti_kick(p, ti_end);
 
   if (ti_start_mesh == -1 && dt_kick_mesh_grav != 0.)
     error("Incorrect dt_kick for the mesh! %e (should be 0)",
@@ -242,29 +243,30 @@ __attribute__((always_inline)) INLINE static void kick_part(
 #endif
 
   /* Kick particles in momentum space (hydro acc.) */
-  xp->v_full[0] += p->a_hydro[0] * dt_kick_hydro;
-  xp->v_full[1] += p->a_hydro[1] * dt_kick_hydro;
-  xp->v_full[2] += p->a_hydro[2] * dt_kick_hydro;
+  xp->v_full[0] += part_get_a_hydro_ind(p, 0) * dt_kick_hydro;
+  xp->v_full[1] += part_get_a_hydro_ind(p, 1) * dt_kick_hydro;
+  xp->v_full[2] += part_get_a_hydro_ind(p, 2) * dt_kick_hydro;
 
   /* Kick particles in momentum space (grav acc.) */
-  if (p->gpart != NULL) {
-    xp->v_full[0] += p->gpart->a_grav[0] * dt_kick_grav;
-    xp->v_full[1] += p->gpart->a_grav[1] * dt_kick_grav;
-    xp->v_full[2] += p->gpart->a_grav[2] * dt_kick_grav;
+  struct gpart *gp = part_get_gpart(p);
+  if (gp != NULL) {
+    xp->v_full[0] += gp->a_grav[0] * dt_kick_grav;
+    xp->v_full[1] += gp->a_grav[1] * dt_kick_grav;
+    xp->v_full[2] += gp->a_grav[2] * dt_kick_grav;
   }
 
   /* Kick particles in momentum space (mesh grav acc.) */
-  if (p->gpart != NULL) {
-    xp->v_full[0] += p->gpart->a_grav_mesh[0] * dt_kick_mesh_grav;
-    xp->v_full[1] += p->gpart->a_grav_mesh[1] * dt_kick_mesh_grav;
-    xp->v_full[2] += p->gpart->a_grav_mesh[2] * dt_kick_mesh_grav;
+  if (gp != NULL) {
+    xp->v_full[0] += gp->a_grav_mesh[0] * dt_kick_mesh_grav;
+    xp->v_full[1] += gp->a_grav_mesh[1] * dt_kick_mesh_grav;
+    xp->v_full[2] += gp->a_grav_mesh[2] * dt_kick_mesh_grav;
   }
 
   /* Give the gpart friend the same velocity */
-  if (p->gpart != NULL) {
-    p->gpart->v_full[0] = xp->v_full[0];
-    p->gpart->v_full[1] = xp->v_full[1];
-    p->gpart->v_full[2] = xp->v_full[2];
+  if (gp != NULL) {
+    gp->v_full[0] = xp->v_full[0];
+    gp->v_full[1] = xp->v_full[1];
+    gp->v_full[2] = xp->v_full[2];
   }
 
   /* Extra kick work (thermal quantities etc.) */
@@ -281,7 +283,7 @@ __attribute__((always_inline)) INLINE static void kick_part(
                    floor_props);
   mhd_kick_extra(p, xp, dt_kick_therm, dt_kick_grav, dt_kick_hydro,
                  dt_kick_corr, cosmo, hydro_props, floor_props);
-  if (p->gpart != NULL) gravity_kick_extra(p->gpart, dt_kick_grav);
+  if (gp != NULL) gravity_kick_extra(gp, dt_kick_grav);
 }
 
 /**

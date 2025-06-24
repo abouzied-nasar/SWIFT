@@ -71,31 +71,32 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
 
   /* Check that the smoothing lengths are non-zero */
   for (int k = 0; k < count; k++) {
-    if (p[k].h <= 0.)
-      error("Invalid value of smoothing length for part %lld h=%e", p[k].id,
-            p[k].h);
+    if (part_get_h(&p[k]) <= 0.)
+      error("Invalid value of smoothing length for part %lld h=%e",
+            part_get_id(&p[k]), part_get_h(&p[k]));
 
     if (with_gravity) {
-      const struct gpart *gp = p[k].gpart;
+      const struct gpart *gp = part_get_gpart(&p[k]);
       const float softening = gravity_get_softening(gp, grav_props);
-      p->h = max(p->h, softening * hydro_h_min_ratio);
+      part_set_h(p, max(part_get_h(p), softening * hydro_h_min_ratio));
     }
   }
 
   /* Convert velocities to internal units */
   for (int k = 0; k < count; k++) {
-    p[k].v[0] *= a_factor_vel;
-    p[k].v[1] *= a_factor_vel;
-    p[k].v[2] *= a_factor_vel;
+    float *v = part_get_v(&p[k]);
+    v[0] *= a_factor_vel;
+    v[1] *= a_factor_vel;
+    v[2] *= a_factor_vel;
 
 #ifdef HYDRO_DIMENSION_2D
-    p[k].x[2] = 0.f;
-    p[k].v[2] = 0.f;
+    double *x = part_get_x(&p[k]) x[2] = 0.f;
+    v[2] = 0.f;
 #endif
 
 #ifdef HYDRO_DIMENSION_1D
-    p[k].x[1] = p[k].x[2] = 0.f;
-    p[k].v[1] = p[k].v[2] = 0.f;
+    double *x = part_get_x(&p[k]) x[1] = x[2] = 0.;
+    v[1] = v[2] = 0.f;
 #endif
   }
 
@@ -111,9 +112,10 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
 
     hydro_first_init_part(&p[k], &xp[k]);
     mhd_first_init_part(&p[k], &xp[k], &hydro_props->mhd, s->dim[0]);
-    p[k].limiter_data.min_ngb_time_bin = num_time_bins + 1;
-    p[k].limiter_data.wakeup = time_bin_not_awake;
-    p[k].limiter_data.to_be_synchronized = 0;
+    struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(&p[k]);
+    limiter_data->min_ngb_time_bin = num_time_bins + 1;
+    limiter_data->wakeup = time_bin_not_awake;
+    limiter_data->to_be_synchronized = 0;
 
 #ifdef WITH_CSDS
     csds_part_data_init(&xp[k].csds_data);
@@ -135,13 +137,14 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
                              cool_func);
 
     /* And the black hole markers */
-    black_holes_mark_part_as_not_swallowed(&p[k].black_holes_data);
+    black_holes_mark_part_as_not_swallowed(part_get_black_holes_data_p(&p[k]));
 
     /* And the sink markers */
-    sink_mark_part_as_not_swallowed(&p[k].sink_data);
+    sink_mark_part_as_not_swallowed(part_get_sink_data_p(&p[k]));
 
     /* Also initialise the splitting data */
-    particle_splitting_mark_part_as_not_split(&xp[k].split_data, p[k].id);
+    particle_splitting_mark_part_as_not_split(&xp[k].split_data,
+                                              part_get_id(&p[k]));
 
     /* And the radiative transfer */
     rt_first_init_timestep_data(&p[k]);
@@ -149,12 +152,13 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
 
 #ifdef SWIFT_DEBUG_CHECKS
     /* Check part->gpart->part linkeage. */
-    if (p[k].gpart && p[k].gpart->id_or_neg_offset != -(k + delta))
+    const struct gpart *gp = part_get_gpart(&p[k]);
+    if (gp && gp->id_or_neg_offset != -(k + delta))
       error("Invalid gpart -> part link");
 
     /* Initialise the time-integration check variables */
-    p[k].ti_drift = 0;
-    p[k].ti_kick = 0;
+    part_set_ti_drift(&p[k], 0);
+    part_set_ti_kick(&p[k], 0);
 #endif
   }
 }

@@ -367,6 +367,38 @@ enum cell_flags {
  */
 struct cell {
 
+  /*Marks a cell for GPU execution A. Nasar */
+
+  int unpacker_cell;
+
+  /*Marks a cell as having done its pack task 0->not 1-> yes*/
+  int pack_done;
+  /*Marks a cell as having done its pack task 0->not 1-> yes*/
+  int pack_done_g;
+  /*Marks a cell as having done its pack task 0->not 1-> yes*/
+  int pack_done_f;
+
+  /*Has the task run on the GPU? 0->No, 1-> Yes*/
+  int gpu_done;
+  /*Has the task run on the GPU? 0->No, 1-> Yes*/
+  int gpu_done_g;
+  /*Has the task run on the GPU? 0->No, 1-> Yes*/
+  int gpu_done_f;
+
+  /*Has the task run on the GPU? 0->No, 1-> Yes*/
+  int unpack_done;
+  /*Has the task run on the GPU? 0->No, 1-> Yes*/
+  int unpack_done_g;
+  /*Has the task run on the GPU? 0->No, 1-> Yes*/
+  int unpack_done_f;
+
+  /*Has the pair task run on the GPU? 0->No, 1-> Yes*/
+  int gpu_done_pair;
+  /*Has the pair task run on the GPU? 0->No, 1-> Yes*/
+  int gpu_done_pair_g;
+  /*Has the pair task run on the GPU? 0->No, 1-> Yes*/
+  int gpu_done_pair_f;
+
   /*! The cell location on the grid (corner nearest to the origin). */
   double loc[3];
 
@@ -1656,7 +1688,7 @@ __attribute__((always_inline)) INLINE void cell_assign_cell_index(
 __attribute__((always_inline)) static INLINE void cell_set_part_h_depth(
     struct part *p, const struct cell *leaf_cell) {
 
-  const float h = p->h;
+  const float h = part_get_h(p);
   const struct cell *c = leaf_cell;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -1665,14 +1697,14 @@ __attribute__((always_inline)) static INLINE void cell_set_part_h_depth(
 
   /* Case where h is much smaller than the leaf cell itself */
   if (h < c->h_min_allowed) {
-    p->depth_h = c->depth;
+    part_set_depth_h(p, c->depth);
     return;
   }
 
   /* Climb the tree to find the correct level */
   while (c != NULL) {
     if (h >= c->h_min_allowed && h < c->h_max_allowed) {
-      p->depth_h = c->depth;
+      part_set_depth_h(p, c->depth);
       return;
     }
     c = c->parent;

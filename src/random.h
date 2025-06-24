@@ -30,7 +30,9 @@
 #include <sys/types.h>
 
 /* Local headers */
+#include "minmax.h"
 #include "sincos.h"
+#include "timeline.h"
 
 /**
  * @brief The categories of random number generated.

@@ -56,6 +56,35 @@
 
 /* Data of a scheduler. */
 struct scheduler {
+
+  int nr_packs_self_dens_done;  // A. Nasar
+  int nr_packs_pair_dens_done;
+  int nr_packs_self_forc_done;
+  int nr_packs_pair_forc_done;
+  int nr_packs_self_grad_done;
+  int nr_packs_pair_grad_done;
+
+  volatile int *s_d_left;
+  volatile int *s_g_left;
+  volatile int *s_f_left;
+  volatile int *p_d_left;
+  volatile int *p_g_left;
+  volatile int *p_f_left;
+  /* Actual number of GPU tasks. */
+  int nr_gpu_tasks;
+  /* Number of tasks we want*/
+  int target_gpu_tasks;
+  /* Actual number of density pack tasks. */
+  int nr_self_pack_tasks_d, nr_pair_pack_tasks_d;
+  /* Actual number of force pack tasks. */
+  int nr_self_pack_tasks_f, nr_pair_pack_tasks_f;
+  /* Actual number of gradient pack tasks. */
+  int nr_self_pack_tasks_g, nr_pair_pack_tasks_g;
+
+  /*how many tasks we want to try and work on at once on the GPU*/
+  int pack_size;
+  int pack_size_pair;
+
   /* Scheduler flags. */
   unsigned int flags;
 
@@ -313,5 +342,8 @@ void scheduler_write_task_level(const struct scheduler *s, int step);
 void scheduler_dump_queues(struct engine *e);
 void scheduler_report_task_times(const struct scheduler *s,
                                  const int nr_threads);
+struct task *enqueue_dependencies(struct scheduler *s, struct task *t);
+struct task *signal_sleeping_runners(struct scheduler *s, struct task *t,
+                                     int tasks_packed);
 
 #endif /* SWIFT_SCHEDULER_H */
