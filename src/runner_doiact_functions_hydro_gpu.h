@@ -1927,11 +1927,6 @@ void runner_dopair1_unpack_f4(
       struct cell *cjj_l = ll_current->cj[tid];
       message("unpacking % i % i %i", cii_l->hydro.count, cjj_l->hydro.count,
               pack_vars->count_parts);
-      message(
-          "unpacking ttid %i tid %i npacked %i, ci %i, cj %i, citop %i, cjtop "
-          "%i",
-          topid, tid, npacked, cii_l->cellID, cjj_l->cellID, cii_l->top->cellID,
-          cjj_l->top->cellID);
       if (cii_l->loc[0] != ll_current->ci[tid]->loc[0]) error("stop");
       if (cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
         error("Unpacking empty cells");
