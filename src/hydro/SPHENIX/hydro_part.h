@@ -904,15 +904,17 @@ static __attribute__((always_inline)) INLINE void part_set_alpha_visc_max_ngb(
 /**
  * Use this for read-write access.
  */
-static __attribute__(( always_inline)) INLINE struct adaptive_softening_part_data *
-part_get_adaptive_softening_data_p(struct part *restrict p) {
+static
+    __attribute__((always_inline)) INLINE struct adaptive_softening_part_data *
+    part_get_adaptive_softening_data_p(struct part *restrict p) {
   return &p->_adaptive_softening_data;
 }
 
 /**
  * Use this for read-only access.
  */
-static __attribute__((always_inline)) INLINE const struct adaptive_softening_part_data *
+static __attribute__((
+    always_inline)) INLINE const struct adaptive_softening_part_data *
 part_get_const_adaptive_softening_data_p(const struct part *restrict p) {
   return &p->_adaptive_softening_data;
 }
@@ -1019,8 +1021,9 @@ part_get_black_holes_data_p(struct part *restrict p) {
 /**
  * Use this for read-only access.
  */
-static __attribute__((always_inline)) INLINE const struct black_holes_part_data *
-part_get_const_black_holes_data_p(const struct part *restrict p) {
+static
+    __attribute__((always_inline)) INLINE const struct black_holes_part_data *
+    part_get_const_black_holes_data_p(const struct part *restrict p) {
   return &p->_black_holes_data;
 }
 
@@ -1062,7 +1065,8 @@ part_get_pressure_floor_data_p(struct part *restrict p) {
 /**
  * Use this for read-only access.
  */
-static __attribute__((always_inline)) INLINE const struct pressure_floor_part_data *
+static __attribute__((
+    always_inline)) INLINE const struct pressure_floor_part_data *
 part_get_const_pressure_floor_data_p(const struct part *restrict p) {
   return &p->_pressure_floor_data;
 }
@@ -1125,8 +1129,8 @@ static __attribute__((always_inline)) INLINE void part_set_depth_h(
   p->_depth_h = depth_h;
 }
 
-static __attribute__((always_inline)) INLINE timebin_t part_get_time_bin(
-    const struct part *restrict p) {
+static __attribute__((always_inline)) INLINE timebin_t
+part_get_time_bin(const struct part *restrict p) {
   return p->_time_bin;
 }
 
@@ -1146,8 +1150,9 @@ part_get_limiter_data_p(struct part *restrict p) {
 /**
  * Use this for read-only access.
  */
-static __attribute__((always_inline)) INLINE const struct timestep_limiter_data *
-part_get_const_limiter_data_p(const struct part *restrict p) {
+static
+    __attribute__((always_inline)) INLINE const struct timestep_limiter_data *
+    part_get_const_limiter_data_p(const struct part *restrict p) {
   return &p->_limiter_data;
 }
 
@@ -1156,8 +1161,8 @@ static __attribute__((always_inline)) INLINE void part_set_limiter_data(
   p->_limiter_data = limiter_data;
 }
 
-static __attribute__((always_inline)) INLINE integertime_t part_get_ti_drift(
-    const struct part *restrict p) {
+static __attribute__((always_inline)) INLINE integertime_t
+part_get_ti_drift(const struct part *restrict p) {
 #ifdef SWIFT_DEBUG_CHECKS
   return p->_ti_drift;
 #else
@@ -1175,8 +1180,8 @@ static __attribute__((always_inline)) INLINE void part_set_ti_drift(
 #endif
 }
 
-static __attribute__((always_inline)) INLINE integertime_t part_get_ti_kick(
-    const struct part *restrict p) {
+static __attribute__((always_inline)) INLINE integertime_t
+part_get_ti_kick(const struct part *restrict p) {
 #ifdef SWIFT_DEBUG_CHECKS
   return p->_ti_kick;
 #else
