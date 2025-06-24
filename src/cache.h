@@ -119,12 +119,13 @@ struct c2_cache {
  * @param c The cache.
  * @param count Number of particles to allocate space for.
  */
-__attribute__((always_inline)) INLINE void cache_init(struct cache *c,
+static __attribute__((always_inline)) INLINE void cache_init(struct cache *c,
                                                       size_t count) {
 
   /* Align cache on correct byte boundary and pad cache size to be a multiple of
    * the vector size and include 2 vector lengths for remainder operations. */
-  size_t pad = 2 * VEC_SIZE, rem = count % VEC_SIZE;
+  size_t pad = 2 * VEC_SIZE;
+  size_t rem = count % VEC_SIZE;
   if (rem > 0) pad += VEC_SIZE - rem;
   size_t sizeBytes = (count + pad) * sizeof(float);
   size_t sizeIntBytes = (count + pad) * sizeof(int);
@@ -180,7 +181,7 @@ __attribute__((always_inline)) INLINE void cache_init(struct cache *c,
  * @param ci_cache The cache.
  * @return uninhibited_count The no. of uninhibited particles.
  */
-__attribute__((always_inline)) INLINE int cache_read_particles(
+static __attribute__((always_inline)) INLINE int cache_read_particles(
     const struct cell *restrict const ci,
     struct cache *restrict const ci_cache) {
 
@@ -261,7 +262,7 @@ __attribute__((always_inline)) INLINE int cache_read_particles(
  * @param ci_cache The cache.
  * @return uninhibited_count The no. of uninhibited particles.
  */
-__attribute__((always_inline)) INLINE int cache_read_particles_subset_self(
+static __attribute__((always_inline)) INLINE int cache_read_particles_subset_self(
     const struct cell *restrict const ci,
     struct cache *restrict const ci_cache) {
 
@@ -343,7 +344,7 @@ __attribute__((always_inline)) INLINE int cache_read_particles_subset_self(
  * @param loc The cell location to remove from the particle positions.
  * @param flipped Flag to check whether the cells have been flipped or not.
  */
-__attribute__((always_inline)) INLINE void cache_read_particles_subset_pair(
+static __attribute__((always_inline)) INLINE void cache_read_particles_subset_pair(
     const struct cell *restrict const ci, struct cache *restrict const ci_cache,
     const struct sort_entry *restrict sort_i, int *first_pi, int *last_pi,
     const double *loc, const int flipped) {
@@ -491,7 +492,7 @@ __attribute__((always_inline)) INLINE void cache_read_particles_subset_pair(
  * @param ci_cache The cache.
  * @return uninhibited_count The no. of uninhibited particles.
  */
-__attribute__((always_inline)) INLINE int cache_read_force_particles(
+static __attribute__((always_inline)) INLINE int cache_read_force_particles(
     const struct cell *restrict const ci,
     struct cache *restrict const ci_cache) {
 
@@ -604,7 +605,7 @@ __attribute__((always_inline)) INLINE int cache_read_force_particles(
  * @param first_pi The first particle in cell ci that is in range.
  * @param last_pj The last particle in cell cj that is in range.
  */
-__attribute__((always_inline)) INLINE void cache_read_two_partial_cells_sorted(
+static __attribute__((always_inline)) INLINE void cache_read_two_partial_cells_sorted(
     const struct cell *restrict const ci, const struct cell *restrict const cj,
     struct cache *restrict const ci_cache,
     struct cache *restrict const cj_cache,
@@ -856,7 +857,7 @@ __attribute__((always_inline)) INLINE void cache_read_two_partial_cells_sorted(
  * @param first_pi The first particle in cell ci that is in range.
  * @param last_pj The last particle in cell cj that is in range.
  */
-__attribute__((always_inline)) INLINE void
+static __attribute__((always_inline)) INLINE void
 cache_read_two_partial_cells_sorted_force(
     const struct cell *const ci, const struct cell *const cj,
     struct cache *const ci_cache, struct cache *const cj_cache,
