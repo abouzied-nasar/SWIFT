@@ -45,7 +45,6 @@ struct threadpool;
 #define bpart_align 128
 #define sink_align 128
 
-
 /* Import the right hydro particle definition */
 #include "hydro_part.h"
 /* Import the right gravity particle definition */

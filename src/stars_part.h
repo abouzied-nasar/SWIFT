@@ -35,9 +35,4 @@
 #error "Invalid choice of star particle"
 #endif
 
-
-
-
-
-
 #endif

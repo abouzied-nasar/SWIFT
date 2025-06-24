@@ -22,8 +22,6 @@
 /* Config parameters. */
 #include <config.h>
 
-
-
 /* Import the right gravity particle definition */
 #if defined(DEFAULT_GRAVITY)
 #include "./gravity/Default/gravity_part.h"
@@ -32,7 +30,5 @@
 #else
 #error "Invalid choice of gravity variant"
 #endif
-
-
 
 #endif
