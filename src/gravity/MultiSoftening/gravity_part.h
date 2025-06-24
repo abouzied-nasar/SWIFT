@@ -21,6 +21,8 @@
 
 #include "csds.h"
 #include "fof_struct.h"
+#include "part_type.h"
+#include "timeline.h"
 
 /* Gravity particle. */
 struct gpart {
