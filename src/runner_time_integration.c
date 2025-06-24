@@ -790,7 +790,8 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
 
         /* Same for RT */
         if (with_rt) {
-          struct rt_timestepping_data *rt_time_data = part_get_rt_time_data_p(p);
+          struct rt_timestepping_data *rt_time_data =
+              part_get_rt_time_data_p(p);
           rt_time_data->time_bin = get_time_bin(ti_rt_new_step);
           ti_rt_end_min =
               min(ti_current_subcycle + ti_rt_new_step, ti_rt_end_min);

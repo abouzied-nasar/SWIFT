@@ -120,7 +120,7 @@ struct c2_cache {
  * @param count Number of particles to allocate space for.
  */
 static __attribute__((always_inline)) INLINE void cache_init(struct cache *c,
-                                                      size_t count) {
+                                                             size_t count) {
 
   /* Align cache on correct byte boundary and pad cache size to be a multiple of
    * the vector size and include 2 vector lengths for remainder operations. */
@@ -262,9 +262,9 @@ static __attribute__((always_inline)) INLINE int cache_read_particles(
  * @param ci_cache The cache.
  * @return uninhibited_count The no. of uninhibited particles.
  */
-static __attribute__((always_inline)) INLINE int cache_read_particles_subset_self(
-    const struct cell *restrict const ci,
-    struct cache *restrict const ci_cache) {
+static __attribute__((always_inline)) INLINE int
+cache_read_particles_subset_self(const struct cell *restrict const ci,
+                                 struct cache *restrict const ci_cache) {
 
 #if defined(GADGET2_SPH)
 
@@ -344,10 +344,12 @@ static __attribute__((always_inline)) INLINE int cache_read_particles_subset_sel
  * @param loc The cell location to remove from the particle positions.
  * @param flipped Flag to check whether the cells have been flipped or not.
  */
-static __attribute__((always_inline)) INLINE void cache_read_particles_subset_pair(
-    const struct cell *restrict const ci, struct cache *restrict const ci_cache,
-    const struct sort_entry *restrict sort_i, int *first_pi, int *last_pi,
-    const double *loc, const int flipped) {
+static __attribute__((always_inline)) INLINE void
+cache_read_particles_subset_pair(const struct cell *restrict const ci,
+                                 struct cache *restrict const ci_cache,
+                                 const struct sort_entry *restrict sort_i,
+                                 int *first_pi, int *last_pi, const double *loc,
+                                 const int flipped) {
 
 #if defined(GADGET2_SPH)
 
@@ -605,13 +607,15 @@ static __attribute__((always_inline)) INLINE int cache_read_force_particles(
  * @param first_pi The first particle in cell ci that is in range.
  * @param last_pj The last particle in cell cj that is in range.
  */
-static __attribute__((always_inline)) INLINE void cache_read_two_partial_cells_sorted(
-    const struct cell *restrict const ci, const struct cell *restrict const cj,
-    struct cache *restrict const ci_cache,
-    struct cache *restrict const cj_cache,
-    const struct sort_entry *restrict sort_i,
-    const struct sort_entry *restrict sort_j,
-    const double *restrict const shift, int *first_pi, int *last_pj) {
+static __attribute__((always_inline)) INLINE void
+cache_read_two_partial_cells_sorted(const struct cell *restrict const ci,
+                                    const struct cell *restrict const cj,
+                                    struct cache *restrict const ci_cache,
+                                    struct cache *restrict const cj_cache,
+                                    const struct sort_entry *restrict sort_i,
+                                    const struct sort_entry *restrict sort_j,
+                                    const double *restrict const shift,
+                                    int *first_pi, int *last_pj) {
 
   /* Make the number of particles to be read a multiple of the vector size.
    * This eliminates serial remainder loops where possible when populating the
