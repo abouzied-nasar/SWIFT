@@ -36,27 +36,61 @@
 struct timestep_limiter_data {
 
   /* Need waking-up ? */
-  timebin_t wakeup;
+  timebin_t _wakeup;
 
   /*! Minimal time-bin across all neighbours */
-  timebin_t min_ngb_time_bin;
+  timebin_t _min_ngb_time_bin;
 
   /* Do we want this particle to be synched back on the time-line? */
-  char to_be_synchronized;
+  char _to_be_synchronized;
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
   /* Weighted number of neighbours in the limiter loop */
-  float n_limiter;
+  float _n_limiter;
 
   /* Exact weighted number of neighbours in the limiter loop */
-  float n_limiter_exact;
+  float _n_limiter_exact;
 
   /* Integer number of neighbours in the limiter loop */
-  int N_limiter;
+  int _N_limiter;
 
   /* Exact integer number of neighbours in the limiter loop */
-  int N_limiter_exact;
+  int _N_limiter_exact;
 #endif
 };
+
+
+static __attribute__((always_inline)) INLINE timebin_t timestep_limiter_get_wakeup(const struct timestep_limiter_data* d){
+  return d->_wakeup;
+}
+
+static __attribute__((always_inline)) INLINE void timestep_limiter_set_wakeup(struct timestep_limiter_data* d, const timebin_t wakeup){
+  d->_wakeup = wakeup;
+}
+
+
+static __attribute__((always_inline)) INLINE timebin_t timestep_limiter_get_min_ngb_time_bin(const struct timestep_limiter_data* d){
+  return d->_min_ngb_time_bin;
+}
+
+static __attribute__((always_inline)) INLINE void timestep_limiter_set_min_ngb_time_bin(struct timestep_limiter_data* d, const timebin_t min_ngb_time_bin){
+  d->_min_ngb_time_bin = min_ngb_time_bin;
+}
+
+
+static __attribute__((always_inline)) INLINE char timestep_limiter_get_to_be_synchronized(const struct timestep_limiter_data* d){
+  return d->_to_be_synchronized;
+}
+
+static __attribute__((always_inline)) INLINE void timestep_limiter_set_to_be_synchronized(struct timestep_limiter_data* d, const char to_be_synchronized){
+  d->_to_be_synchronized = to_be_synchronized;
+}
+
+
+
+
+
+
+
 
 #endif /* SWIFT_TIMESTEP_LIMITER_STRUCT_H */
