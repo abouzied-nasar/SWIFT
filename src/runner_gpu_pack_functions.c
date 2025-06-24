@@ -133,7 +133,9 @@ void pack_neat_aos_f4(struct cell *__restrict__ c,
   struct part ptmps[count];
   memcpy(ptmps, (c->hydro.parts), count * sizeof(struct part));
   //  ptmps = c->hydro.parts;
-  const float cellx = c->loc[0], celly = c->loc[1], cellz = c->loc[2];
+  const float cellx = c->loc[0];
+  const float celly = c->loc[1];
+  const float cellz = c->loc[2];
   for (int i = 0; i < count; i++) {
     const int id_in_pack = i + local_pack_position;
     //    const struct part p = ptmps[i];
@@ -159,9 +161,10 @@ void pack_neat_aos_f4_g(struct cell *c,
                         struct part_aos_f4_g_send *parts_aos_buffer, int tid,
                         int local_pack_position, int count) {
 
-  const struct part *ptmps;
-  ptmps = c->hydro.parts;
-  const float cellx = c->loc[0], celly = c->loc[1], cellz = c->loc[2];
+  const struct part *ptmps = c->hydro.parts;
+  const float cellx = c->loc[0];
+  const float celly = c->loc[1];
+  const float cellz = c->loc[2];
   for (int i = 0; i < count; i++) {
     int id_in_pack = i + local_pack_position;
     const struct part *p = &ptmps[i];
@@ -190,8 +193,7 @@ extern inline void pack_neat_pair_aos_f4_g(
     const int local_pack_position, const int count, const float3 shift,
     const int2 cstarts) {
   /*Data to be copied to GPU*/
-  const struct part *ptmps;
-  ptmps = c->hydro.parts;
+  const struct part *ptmps = c->hydro.parts;
   for (int i = 0; i < count; i++) {
     const int id_in_pack = i + local_pack_position;
     const struct part *p = &ptmps[i];
@@ -226,8 +228,7 @@ void pack_neat_aos_f4_f(const struct cell *restrict c,
   const float celly = c->loc[1];
   const float cellz = c->loc[2];
   /*Data to be copied to GPU local memory*/
-  const struct part *ptmps;
-  ptmps = c->hydro.parts;
+  const struct part *ptmps = c->hydro.parts;
   for (int i = 0; i < count; i++) {
 	const struct part *p = &ptmps[i];
     const double *x = part_get_const_x(p);
@@ -248,7 +249,8 @@ void pack_neat_aos_f4_f(const struct cell *restrict c,
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.z = part_get_time_bin(p);
-    struct timestep_limiter_data* limiter_data = part_get_limiter_data_p(p);
+
+    const struct timestep_limiter_data* limiter_data = part_get_const_limiter_data_p(p);
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.w = limiter_data->min_ngb_time_bin;
     parts_aos[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
     parts_aos[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
@@ -267,8 +269,7 @@ extern inline void pack_neat_pair_aos_f4_f(
   //  const struct part *restrict ptmps;
   //  ptmps = c->hydro.parts;
   const int pp = local_pack_position;
-  const struct part *ptmps;
-  ptmps = c->hydro.parts;
+  const struct part *ptmps = c->hydro.parts;
   /*Data to be copied to GPU local memory*/
   for (int i = 0; i < count; i++) {
     const struct part *p = &ptmps[i];
@@ -291,7 +292,7 @@ extern inline void pack_neat_pair_aos_f4_f(
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.z = part_get_time_bin(p);
-    struct timestep_limiter_data* limiter_data = part_get_limiter_data_p(p);
+    const struct timestep_limiter_data* limiter_data = part_get_const_limiter_data_p(p);
     parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.w = limiter_data->min_ngb_time_bin;
     parts_aos[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
     parts_aos[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
@@ -449,7 +450,7 @@ void unpack_neat_aos_f4_f(struct cell *restrict c,
                           struct part_aos_f4_f_recv *restrict parts_aos_buffer,
                           int tid, int local_pack_position, int count,
                           struct engine *e) {
-  int pp = local_pack_position;
+  /* int pp = local_pack_position; */
   struct part_aos_f4_f_recv *parts_tmp = &parts_aos_buffer[local_pack_position];
   for (int i = 0; i < count; i++) {
 	struct part_aos_f4_f_recv p_tmp = parts_tmp[i];
@@ -560,7 +561,7 @@ void unpack_neat_pair_aos_f4_f(
   struct part_aos_f4_f_recv *restrict parts_tmp =
     &parts_aos_buffer[local_pack_position];
   if (cell_is_active_hydro(c, e)) {
-    int pp = local_pack_position;
+    /* int pp = local_pack_position; */
     for (int i = 0; i < count; i++) {
       struct part_aos_f4_f_recv p_tmp = parts_tmp[i];
       struct part *restrict p = &c->hydro.parts[i];
@@ -594,7 +595,6 @@ void unpack_neat_pair_aos_f4_f(
 //          (int)(parts_aos_buffer[j].udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
       struct timestep_limiter_data* limiter_data = part_get_limiter_data_p(p);
       limiter_data->min_ngb_time_bin = (int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
-
 
     }
   }
