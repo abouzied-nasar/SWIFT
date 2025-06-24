@@ -163,8 +163,8 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
           error(
               "Particle in wrong time-bin, ti_end=%lld, ti_begin=%lld, "
               "ti_step=%lld time_bin=%d wakeup=%d ti_current=%lld",
-              ti_end, ti_begin, ti_step, time_bin, part_get_timestep_limiter_wakeup(p),
-              ti_current);
+              ti_end, ti_begin, ti_step, time_bin,
+              part_get_timestep_limiter_wakeup(p), ti_current);
 #endif
 
         /* Time intervals for this half-kick */
@@ -438,7 +438,8 @@ void runner_do_kick2(struct runner *r, struct cell *c, const int timer) {
           error(
               "Particle in wrong time-bin, ti_begin=%lld, ti_step=%lld "
               "time_bin=%d wakeup=%d ti_current=%lld",
-              ti_begin, ti_step, time_bin, part_get_timestep_limiter_wakeup(p), ti_current);
+              ti_begin, ti_step, time_bin, part_get_timestep_limiter_wakeup(p),
+              ti_current);
 #endif
 
         /* Time intervals for this half-kick */
@@ -1419,7 +1420,8 @@ void runner_do_limiter(struct runner *r, struct cell *c, int force,
       /* Bip, bip, bip... wake-up time */
       if (part_get_timestep_limiter_wakeup(p) != time_bin_not_awake) {
 
-        if (!part_is_active(p, e) && part_get_timestep_limiter_to_be_synchronized(p)) {
+        if (!part_is_active(p, e) &&
+            part_get_timestep_limiter_to_be_synchronized(p)) {
           warning(
               "Not limiting particle with id %lld because it needs to be "
               "synced.",
@@ -1436,7 +1438,7 @@ void runner_do_limiter(struct runner *r, struct cell *c, int force,
             ti_end_new - get_integer_timestep(new_bin);
 
         /* Mark this particle has not needing synchronization */
-        part_set_timestep_limiter_to_be_synchronized(p,0);
+        part_set_timestep_limiter_to_be_synchronized(p, 0);
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
         p->limited_part = 1;
@@ -1568,7 +1570,8 @@ void runner_do_sync(struct runner *r, struct cell *c, int force,
       if (part_is_inhibited(p, e)) continue;
 
       /* If the particle is active no need to sync it */
-      if (part_is_active(p, e) && part_get_timestep_limiter_to_be_synchronized(p)) {
+      if (part_is_active(p, e) &&
+          part_get_timestep_limiter_to_be_synchronized(p)) {
         part_set_timestep_limiter_to_be_synchronized(p, 0);
       }
 
@@ -1590,7 +1593,8 @@ void runner_do_sync(struct runner *r, struct cell *c, int force,
 
         /* Apply the limiter if necessary */
         if (part_get_timestep_limiter_wakeup(p) != time_bin_not_awake) {
-          new_time_bin = min(new_time_bin, -part_get_timestep_limiter_wakeup(p) + 2);
+          new_time_bin =
+              min(new_time_bin, -part_get_timestep_limiter_wakeup(p) + 2);
           part_set_timestep_limiter_wakeup(p, time_bin_not_awake);
         }
 

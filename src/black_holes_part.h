@@ -33,8 +33,4 @@
 #error "Invalid choice of black hole particle"
 #endif
 
-
-
-
-
 #endif

@@ -33,9 +33,4 @@
 #error "Invalid choice of sink particle"
 #endif
 
-
-
-
-
-
 #endif

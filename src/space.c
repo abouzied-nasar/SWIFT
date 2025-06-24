@@ -2297,13 +2297,17 @@ void space_check_limiter_mapper(void *map_data, int nr_parts,
 
     if (time_bin < 0) error("Particle has negative time-bin!");
 
-    if (with_timestep_limiter && part_get_timestep_limiter_wakeup(&parts[k]) != time_bin_not_awake)
+    if (with_timestep_limiter &&
+        part_get_timestep_limiter_wakeup(&parts[k]) != time_bin_not_awake)
       error("Particle still woken up! id=%lld wakeup=%d",
-            part_get_id(&parts[k]), part_get_timestep_limiter_wakeup(&parts[k]));
+            part_get_id(&parts[k]),
+            part_get_timestep_limiter_wakeup(&parts[k]));
 
-    if (with_timestep_sync && part_get_timestep_limiter_to_be_synchronized(&parts[k]) != 0)
+    if (with_timestep_sync &&
+        part_get_timestep_limiter_to_be_synchronized(&parts[k]) != 0)
       error("Synchronized particle not treated! id=%lld synchronized=%d",
-            part_get_id(&parts[k]), part_get_timestep_limiter_to_be_synchronized(&parts[k]));
+            part_get_id(&parts[k]),
+            part_get_timestep_limiter_to_be_synchronized(&parts[k]));
 
     const struct gpart *gp = part_get_gpart(&parts[k]);
     if (gp != NULL) {
