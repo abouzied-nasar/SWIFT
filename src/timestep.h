@@ -216,11 +216,8 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_timestep(
           part_get_id(p), new_dt, e->dt_min);
 
   /* Convert to integer time */
-  const struct timestep_limiter_data *limiter_data =
-      part_get_const_limiter_data_p(p);
   integertime_t new_dti = make_integer_timestep(
-      new_dt, part_get_time_bin(p), limiter_data->min_ngb_time_bin,
-      e->ti_current, e->time_base_inv);
+      new_dt, part_get_time_bin(p), part_get_timestep_limiter_min_ngb_time_bin(p), e->ti_current, e->time_base_inv);
 
   if (e->policy & engine_policy_rt) {
     if (new_dti_rt <= new_dti) {

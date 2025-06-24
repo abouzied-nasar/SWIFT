@@ -148,8 +148,7 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
       if (part_is_starting(p, e)) {
 
 #ifdef SWIFT_DEBUG_CHECKS
-        struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
-        if (limiter_data->wakeup != time_bin_not_awake)
+        if (part_get_timestep_limiter_wakeup(p) != time_bin_not_awake)
           error("Woken-up particle that has not been processed in kick1");
 #endif
 
@@ -164,7 +163,7 @@ void runner_do_kick1(struct runner *r, struct cell *c, const int timer) {
           error(
               "Particle in wrong time-bin, ti_end=%lld, ti_begin=%lld, "
               "ti_step=%lld time_bin=%d wakeup=%d ti_current=%lld",
-              ti_end, ti_begin, ti_step, time_bin, limiter_data->wakeup,
+              ti_end, ti_begin, ti_step, time_bin, part_get_timestep_limiter_wakeup(p),
               ti_current);
 #endif
 
@@ -424,8 +423,7 @@ void runner_do_kick2(struct runner *r, struct cell *c, const int timer) {
       if (part_is_active(p, e)) {
 
 #ifdef SWIFT_DEBUG_CHECKS
-        struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
-        if (limiter_data->wakeup != time_bin_not_awake)
+        if (part_get_timestep_limiter_wakeup(p) != time_bin_not_awake)
           error("Woken-up particle that has not been processed in kick1");
 #endif
         /* Time-step length on the integer timeline */
@@ -440,7 +438,7 @@ void runner_do_kick2(struct runner *r, struct cell *c, const int timer) {
           error(
               "Particle in wrong time-bin, ti_begin=%lld, ti_step=%lld "
               "time_bin=%d wakeup=%d ti_current=%lld",
-              ti_begin, ti_step, time_bin, limiter_data->wakeup, ti_current);
+              ti_begin, ti_step, time_bin, part_get_timestep_limiter_wakeup(p), ti_current);
 #endif
 
         /* Time intervals for this half-kick */
@@ -1418,11 +1416,10 @@ void runner_do_limiter(struct runner *r, struct cell *c, int force,
       /* Avoid inhibited particles */
       if (part_is_inhibited(p, e)) continue;
 
-      struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
       /* Bip, bip, bip... wake-up time */
-      if (limiter_data->wakeup != time_bin_not_awake) {
+      if (part_get_timestep_limiter_wakeup(p) != time_bin_not_awake) {
 
-        if (!part_is_active(p, e) && limiter_data->to_be_synchronized) {
+        if (!part_is_active(p, e) && part_get_timestep_limiter_to_be_synchronized(p)) {
           warning(
               "Not limiting particle with id %lld because it needs to be "
               "synced.",
@@ -1439,7 +1436,7 @@ void runner_do_limiter(struct runner *r, struct cell *c, int force,
             ti_end_new - get_integer_timestep(new_bin);
 
         /* Mark this particle has not needing synchronization */
-        limiter_data->to_be_synchronized = 0;
+        part_set_timestep_limiter_to_be_synchronized(p,0);
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS
         p->limited_part = 1;
@@ -1571,12 +1568,11 @@ void runner_do_sync(struct runner *r, struct cell *c, int force,
       if (part_is_inhibited(p, e)) continue;
 
       /* If the particle is active no need to sync it */
-      struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
-      if (part_is_active(p, e) && limiter_data->to_be_synchronized) {
-        limiter_data->to_be_synchronized = 0;
+      if (part_is_active(p, e) && part_get_timestep_limiter_to_be_synchronized(p)) {
+        part_set_timestep_limiter_to_be_synchronized(p, 0);
       }
 
-      if (limiter_data->to_be_synchronized) {
+      if (part_get_timestep_limiter_to_be_synchronized(p)) {
 
         /* Finish this particle's time-step */
         timestep_process_sync_part(p, xp, e, cosmo);
@@ -1593,9 +1589,9 @@ void runner_do_sync(struct runner *r, struct cell *c, int force,
         /* ti_rt_new_step = min(ti_new_step, ti_rt_new_step); */
 
         /* Apply the limiter if necessary */
-        if (limiter_data->wakeup != time_bin_not_awake) {
-          new_time_bin = min(new_time_bin, -limiter_data->wakeup + 2);
-          limiter_data->wakeup = time_bin_not_awake;
+        if (part_get_timestep_limiter_wakeup(p) != time_bin_not_awake) {
+          new_time_bin = min(new_time_bin, -part_get_timestep_limiter_wakeup(p) + 2);
+          part_set_timestep_limiter_wakeup(p, time_bin_not_awake);
         }
 
         /* Limit the time-bin to what is allowed in this step */
