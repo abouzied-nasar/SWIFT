@@ -961,6 +961,7 @@ cache_read_two_partial_cells_sorted_force(
     vy[i] = part_get_v_ind(&parts_i[idx], 1);
     vz[i] = part_get_v_ind(&parts_i[idx], 2);
 #ifdef GADGET2_SPH
+    error("Double-check this once getters/setters are implemented for gadget2 SPH.");
     m[i] = part_get_mass(&parts_i[idx]);
     rho[i] = part_get_rho(&parts_i[idx]);
     grad_h[i] = part_get_force_f(&parts_i[idx]);
