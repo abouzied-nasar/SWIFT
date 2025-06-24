@@ -99,13 +99,19 @@ static __attribute__((always_inline)) INLINE timebin_t part_get_timestep_limiter
   return d->_wakeup;
 }
 
+static __attribute__((always_inline)) INLINE timebin_t* part_get_timestep_limiter_wakeup_p(struct part* restrict p){
+  struct timestep_limiter_data* d = part_get_limiter_data_p(p);
+  return &d->_wakeup;
+}
+
+
 static __attribute__((always_inline)) INLINE void part_set_timestep_limiter_wakeup(struct part* restrict p, const timebin_t wakeup){
   struct timestep_limiter_data* d = part_get_limiter_data_p(p);
   d->_wakeup = wakeup;
 }
 
 
-static __attribute__((always_inline)) INLINE timebin_t part_get_timestep_limiter_get_min_ngb_time_bin(const struct part* restrict p){
+static __attribute__((always_inline)) INLINE timebin_t part_get_timestep_limiter_min_ngb_time_bin(const struct part* restrict p){
   const struct timestep_limiter_data* d = part_get_const_limiter_data_p(p);
   return d->_min_ngb_time_bin;
 }
