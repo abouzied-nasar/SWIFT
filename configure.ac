@@ -1026,17 +1026,21 @@ AC_ARG_WITH([cuda],
 )
 if test "x$with_cuda" != "xno"; then
    if test "x$with_cuda" != "xyes"; then
-      CUDA_CFLAGS="-I$with_cuda/include"
+      CUDA_CFLAGS="$CUDA_CFLAGS -I$with_cuda/include"
+      CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I$with_cuda/include"
       CUDA_LIBS="-L$with_cuda/lib -L$with_cuda/lib64 -lcudart"
       NVCC="$with_cuda/bin/nvcc"
+      NVCC_FLAGS="$NVCC_FLAGS"
       have_cuda="yes"
    else
       AC_PATH_PROG([NVCC],[nvcc])
       echo "Found nvcc = $NVCC"
       if test -n "$NVCC"; then
          CUDA_ROOT="`dirname $NVCC`/.."
-         CUDA_CFLAGS="-I${CUDA_ROOT}/include"
+         CUDA_CFLAGS="$CUDA_CFLAGS -I${CUDA_ROOT}/include"
+         CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I${CUDA_ROOT}/include"
          CUDA_LIBS="-L${CUDA_ROOT}/lib -L${CUDA_ROOT}/lib64 -lcudart"
+         NVCC_FLAGS="$NVCC_FLAGS"
          have_cuda="yes"
       fi
    fi
@@ -1046,8 +1050,10 @@ if test "x$with_cuda" != "xno"; then
    CFLAGS="${CFLAGS} "
 fi
 AC_SUBST(CUDA_CFLAGS)
+AC_SUBST(CUDA_CXXFLAGS)
 AC_SUBST(CUDA_LIBS)
 AC_SUBST(NVCC)
+AC_SUBST(NVCC_FLAGS)
 AM_CONDITIONAL([HAVECUDA],[test -n "$NVCC"])
 
 # Check for HIP
@@ -1061,9 +1067,10 @@ AC_ARG_WITH([hip],
 )
 if test "x$with_hip" != "xno"; then
    if test "x$with_hip" != "xyes"; then
-      HIP_CFLAGS="-I$with_hip/include"
-      HIP_LIBS="-L$with_hip/lib -L$with_hip/lib64"
+      HIP_CFLAGS="$HIP_CFLAGS -I$with_hip/include"
+      HIP_LIBS="$HIP_LIBS -L$with_hip/lib -L$with_hip/lib64"
       HIPCC="$with_hip/bin/hipcc"
+      HIPCC_FLAGS="$HIPCC_FLAGS"
       have_hip="yes"
    else
       AC_PATH_PROG([HIPCC],[hipcc])
@@ -1072,6 +1079,7 @@ if test "x$with_hip" != "xno"; then
          HIP_ROOT="`dirname $HIPCC`/.."
          HIP_CFLAGS="-I${HIP_ROOT}/include"
          HIP_LIBS="-L${HIP_ROOT}/lib -L${HIP_ROOT}/lib64"
+         HIPCC_FLAGS="$HIPCC_FLAGS"
          have_hip="yes"
       fi
    fi
@@ -1083,6 +1091,7 @@ fi
 AC_SUBST(HIP_CFLAGS)
 AC_SUBST(HIP_LIBS)
 AC_SUBST(HIPCC)
+AC_SUBST(HIPCC_FLAGS)
 AM_CONDITIONAL([HAVEHIP],[test -n "$HIPCC"])
 
 # Check for FFTW. We test for this in the standard directories by default,
