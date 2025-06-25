@@ -1155,6 +1155,8 @@ void *runner_main2(void *data) {
 //            	  message("Packing cell with no parts ci index %i cj index %i", cii->index, cjj->index);
 //            	  error("Stop");
 //              }
+              if(ci_d[copy_index]->pack_done > 1000 || cii->pack_done > 1000)
+                error("STOP packs_done %i", cii->pack_done);
               message("Packing ttid %i copy_index %i actual_index %i, ci %i, cj %i citop %i, cjtop %i, count i %i, count j %i",
                   top_tasks_packed - 1, copy_index, copy_index + n_daughters_packed_index,
                   cii->cellID, cjj->cellID, cii->top->cellID, cjj->top->cellID, cii->hydro.count, cjj->hydro.count);
@@ -1237,6 +1239,8 @@ void *runner_main2(void *data) {
 //                    message("Moving cell %i to index %i last %i n_d_p_i % i n_d_T %i", i, shuffle, n_daughters_left, n_daughters_packed_index, n_daughters_total);
                     ci_d[shuffle] = ci_d[i];
                     cj_d[shuffle] = cj_d[i];
+                    if(ci_d[shuffle]->pack_done > 1000 || cj_d[shuffle]->pack_done > 1000)
+                      error("STOP");
                   }
                   copy_index = 0;
                   first_and_last_daughters[0][0] = 0;
