@@ -1905,12 +1905,14 @@ void runner_dopair1_unpack_f4(
 	struct cell *cjj_top = cj_d[first_daughter_id]->top;
 //    if(topid < pack_vars->top_tasks_packed - 1){
 //      message("topid %i tops packed %i citop %i cjtop %i d_id %i", topid, pack_vars->top_tasks_packed, cii_top->top->cellID, cjj_top->top->cellID, first_daughter_id);
+	if(topid < pack_vars->top_tasks_packed - 1){
       while (cell_locktree(cii_top)) {
         ; /* spin until we acquire the lock */
       }
       while (cell_locktree(cjj_top)) {
         ; /* spin until we acquire the lock */
       }
+	}
 //    }
 
     /* Loop through each daughter task */
@@ -1932,14 +1934,14 @@ void runner_dopair1_unpack_f4(
                                              &pack_length_unpack, tid,
                                              2 * pack_vars->count_max_parts, e);
     }
-//    if(topid < pack_vars->top_tasks_packed - 1){
+    if(topid < pack_vars->top_tasks_packed - 1){
 //      pthread_mutex_lock(&s->sleep_mutex);
 //      atomic_dec(&s->waiting);
 //      pthread_cond_broadcast(&s->sleep_cond);
 //      pthread_mutex_unlock(&s->sleep_mutex);
       cell_unlocktree(cii_top);
       cell_unlocktree(cjj_top);
-//    }
+    }
 
     const ticks toc = getticks();
     total_cpu_unpack_ticks += toc - tic;
