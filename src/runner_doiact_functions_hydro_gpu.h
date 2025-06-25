@@ -1888,7 +1888,8 @@ void runner_dopair1_unpack_f4(
     struct part_aos_f4_recv *d_parts_recv, cudaStream_t *stream, float d_a,
     float d_H, struct engine *e, double *packing_time, double *gpu_time,
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
-    cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters) {
+    cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
+    , struct cell ** ci_top, struct cell ** cj_top) {
 
 //  int topid;
   /////////////////////////////////
@@ -1901,18 +1902,16 @@ void runner_dopair1_unpack_f4(
     const ticks tic = getticks();
 //    int first_daughter_id = f_l_daughters[topid][1] - 1;
     int first_daughter_id = f_l_daughters[topid][0];
-	struct cell *cii_top = ci_d[first_daughter_id]->top;
-	struct cell *cjj_top = cj_d[first_daughter_id]->top;
+	struct cell *cii_top = ci_d[first_daughter_id];
+	struct cell *cjj_top = cj_d[first_daughter_id];
 //    if(topid < pack_vars->top_tasks_packed - 1){
 //      message("topid %i tops packed %i citop %i cjtop %i d_id %i", topid, pack_vars->top_tasks_packed, cii_top->top->cellID, cjj_top->top->cellID, first_daughter_id);
-	if(topid < pack_vars->top_tasks_packed - 1){
-      while (cell_locktree(cii_top)) {
+      while (cell_locktree(ci_top[topid])) {
         ; /* spin until we acquire the lock */
       }
-      while (cell_locktree(cjj_top)) {
+      while (cell_locktree(cj_top[topid])) {
         ; /* spin until we acquire the lock */
       }
-	}
 //    }
 
     /* Loop through each daughter task */
@@ -1934,14 +1933,14 @@ void runner_dopair1_unpack_f4(
                                              &pack_length_unpack, tid,
                                              2 * pack_vars->count_max_parts, e);
     }
-    if(topid < pack_vars->top_tasks_packed - 1){
+//    if(topid < pack_vars->top_tasks_packed - 1){
 //      pthread_mutex_lock(&s->sleep_mutex);
 //      atomic_dec(&s->waiting);
 //      pthread_cond_broadcast(&s->sleep_cond);
 //      pthread_mutex_unlock(&s->sleep_mutex);
-      cell_unlocktree(cii_top);
-      cell_unlocktree(cjj_top);
-    }
+      cell_unlocktree(ci_top[topid]);
+      cell_unlocktree(cj_top[topid]);
+//    }
 
     const ticks toc = getticks();
     total_cpu_unpack_ticks += toc - tic;

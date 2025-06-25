@@ -557,7 +557,7 @@ void *runner_main2(void *data) {
       (struct task **)calloc(target_n_tasks, sizeof(struct task *));
   int n_leaves_max = 128;
   /*Allocate target_n_tasks for top level tasks. This is a 2D array with length target_n_tasks and width n_leaves_max*/
-  int max_length = 2 * target_n_tasks * n_leaves_max;
+  int max_length = 2 * target_n_tasks * 16 * n_leaves_max;
   struct cell **ci_d = malloc(max_length * sizeof(struct cell *));
   struct cell **cj_d = malloc(max_length * sizeof(struct cell *));
   int **first_and_last_daughters;
@@ -568,9 +568,9 @@ void *runner_main2(void *data) {
 	  cj_d[i] = malloc(sizeof(struct cell *));
   }
   first_and_last_daughters = malloc(target_n_tasks * n_leaves_max * sizeof(int *));
-  struct cell **ci_top = malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_top = malloc(max_length * sizeof(struct cell *));
-  for(int i = 0; i < max_length; i++){
+  struct cell **ci_top = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
+  struct cell **cj_top = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
+  for(int i = 0; i < 2 * target_n_tasks * 16; i++){
 	  ci_top[i] = malloc(sizeof(struct cell *));
 	  cj_top[i] = malloc(sizeof(struct cell *));
   }
@@ -1093,8 +1093,8 @@ void *runner_main2(void *data) {
             n_daughters_total += n_leaves_found;
 
             first_and_last_daughters[top_tasks_packed][0] = n_daughters_packed_index;
-//            ci_top[top_tasks_packed] = ci;
-//            cj_top[top_tasks_packed] = cj;
+            ci_top[top_tasks_packed] = ci;
+            cj_top[top_tasks_packed] = cj;
 //            first_and_last_daughters[top_tasks_packed][1] = target_n_tasks - n_daughters_packed_index;
             tops_packed_in_step++;
             n_tops_reset++;
@@ -1140,6 +1140,8 @@ void *runner_main2(void *data) {
             if(n_daughters_packed_index > 0)
               had_prev_task = 1;
 
+            cell_unlocktree(ci);
+            cell_unlocktree(cj);
             while(npacked < n_leaves_found){
               top_tasks_packed = pack_vars_pair_dens->top_tasks_packed;
 
@@ -1207,7 +1209,7 @@ void *runner_main2(void *data) {
                       d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
                       &packing_time_pair, &time_for_density_gpu_pair,
                       &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-                      pair_end, npacked, n_leaves_found, ci_d, cj_d, first_and_last_daughters);
+                      pair_end, npacked, n_leaves_found, ci_d, cj_d, first_and_last_daughters, ci_top, cj_top);
 
 //                message("launch count %i leftover count %i", launch_count, leftover_launch_count);
                 //We have magically launched after packing all the daughter tasks in this parent task.
@@ -1245,8 +1247,8 @@ void *runner_main2(void *data) {
                   first_and_last_daughters[0][0] = 0;
                   first_and_last_daughters[0][1] = n_daughters_left - first_cell_to_move;
 
-//                  cj_top[0] = cj;
-//                  ci_top[0] = ci;
+                  cj_top[0] = cj;
+                  ci_top[0] = ci;
 
                   n_daughters_left -= first_cell_to_move;
                   first_cell_to_move = 0;
@@ -1278,6 +1280,8 @@ void *runner_main2(void *data) {
 //                  if(n_daughters_total < 0)
 //                    error("n_d_t %i", n_daughters_total);
 //                  n_daughters_packed_index = 0;
+                  cj_top[0] = cj;
+                  ci_top[0] = ci;
                   first_and_last_daughters[0][0] = 0;
                   first_and_last_daughters[0][1] = n_daughters_left;
                   for(int i = 0; i < n_daughters_left; i++){
@@ -1304,8 +1308,6 @@ void *runner_main2(void *data) {
 //                error("Packed more parts than possible");
               t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
             }
-            cell_unlocktree(ci);
-            cell_unlocktree(cj);
             //A. Nasar: Launch-leftovers counter re-set to zero and cells unlocked
             pack_vars_pair_dens->launch_leftovers = 0;
             pack_vars_pair_dens->launch = 0;
