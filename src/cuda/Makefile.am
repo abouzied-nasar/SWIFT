@@ -24,9 +24,9 @@ AM_LDFLAGS = $(HDF5_LDFLAGS) $(FFTW_LIBS) -version-info 0:0:0
 
 # Rules to compile CUDA code.
 .cu.o:
-	$(NVCC) -c $(NVCCFLAGS) $(AM_CFLAGS) $(CUDA_CFLAGS) $(CUDA_MYFLAGS) $< -o $@
+	$(NVCC) -c $(NVCC_FLAGS) $(AM_CFLAGS) $(CUDA_CFLAGS) $(CUDA_MYFLAGS) $< -o $@
 .cu.lo:
-	PATH=$(top_srcdir):$(PATH) && cudalt.py $@ $(NVCC) -c $(NVCCFLAGS) $(AM_CFLAGS) $(CUDA_CFLAGS) $(CUDA_MYFLAGS) $<
+	PATH=$(top_srcdir):$(PATH) && cudalt.py $@ $(NVCC) -c $(NVCC_FLAGS) $(AM_CFLAGS) $(CUDA_CFLAGS) $(CUDA_MYFLAGS) $<
 
 # The library. Dummy C library so that we get libtool linking setup.
 lib_LTLIBRARIES = libswiftCUDA.la libswiftdummy.la
