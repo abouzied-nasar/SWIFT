@@ -1903,7 +1903,7 @@ void runner_dopair1_unpack_f4(
 	struct cell *cii_top = ci_d[first_daughter_id];
 	struct cell *cjj_top = cj_d[first_daughter_id];
 //    if(topid < pack_vars->top_tasks_packed - 1){
-      message("topid %i tops packed %i citop %i cjtop %i d_id %i", topid, pack_vars->top_tasks_packed, cii_top->top->cellID, cjj_top->top->cellID, first_daughter_id);
+//      message("topid %i tops packed %i citop %i cjtop %i d_id %i", topid, pack_vars->top_tasks_packed, cii_top->top->cellID, cjj_top->top->cellID, first_daughter_id);
       while (cell_locktree(cii_top)) {
         ; /* spin until we acquire the lock */
       }
