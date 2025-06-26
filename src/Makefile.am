@@ -180,11 +180,26 @@ SPHM1RT_RT_SOURCES += rt/SPHM1RT/rt_rate_equations.c
 SPHM1RT_RT_SOURCES += rt/SPHM1RT/rt_cooling.c
 endif
 
+GPU_SOURCES = 
+if HAVECUDA
+GPU_CUDA_SOURCES = 
+GPU_CUDA_SOURCES += runner_gpu_pack_functions.c
+GPU_SOURCES+=$(GPU_CUDA_SOURCES)
+endif
+
+if HAVEHIP 
+GPU_HIP_SOURCES =
+GPU_HIP_SOURCES += runner_gpu_pack_functions.c
+GPU_SOURCES+=$(GPU_HIP_SOURCES)
+endif
+
+
+
 # Common source files
 AM_SOURCES = space.c space_rebuild.c space_regrid.c space_unique_id.c 
 AM_SOURCES += space_sort.c space_split.c space_extras.c space_first_init.c space_init.c 
 AM_SOURCES += space_cell_index.c space_recycle.c 
-AM_SOURCES += runner_main.c runner_doiact_hydro.c runner_doiact_limiter.c runner_gpu_pack_functions.c
+AM_SOURCES += runner_main.c runner_doiact_hydro.c runner_doiact_limiter.c 
 AM_SOURCES += runner_doiact_stars.c runner_doiact_black_holes.c runner_doiact_sinks.c runner_ghost.c
 AM_SOURCES += runner_recv.c runner_pack.c
 AM_SOURCES += runner_sort.c runner_drift.c runner_black_holes.c runner_time_integration.c
@@ -229,6 +244,7 @@ AM_SOURCES += $(AGORA_FEEDBACK_SOURCES)
 AM_SOURCES += $(PS2020_COOLING_SOURCES)
 AM_SOURCES += $(SPHM1RT_RT_SOURCES)
 AM_SOURCES += $(GEAR_RT_SOURCES)
+AM_SOURCES += $(GPU_SOURCES)
 AM_SOURCES += swift_lustre_api.c
 
 # Include files for distribution, not installation.
