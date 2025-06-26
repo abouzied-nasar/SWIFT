@@ -1095,6 +1095,9 @@ void *runner_main2(void *data) {
             first_and_last_daughters[top_tasks_packed][0] = n_daughters_packed_index;
             ci_top[top_tasks_packed] = ci;
             cj_top[top_tasks_packed] = cj;
+
+            if(ci_d[0]->pack_done > 1000)
+            	error("Stop");
 //            first_and_last_daughters[top_tasks_packed][1] = target_n_tasks - n_daughters_packed_index;
             tops_packed_in_step++;
             n_tops_reset++;
@@ -1174,6 +1177,7 @@ void *runner_main2(void *data) {
               npacked++;
               first_cell_to_move++;
 
+              /*Re-think this. Probably not necessary to have this if statement and we can just use the form in the else statement*/
               if(had_prev_task)
                 first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index - n_daughters_packed_index;
               else
@@ -1219,6 +1223,8 @@ void *runner_main2(void *data) {
                 if(npacked == n_leaves_found){
                   n_daughters_total = 0;
                   pack_vars_pair_dens->top_tasks_packed = 0;
+                  if(ci_d[0]->pack_done > 1000)
+                  	error("Stop");
 //                  message("packed all leaves");
                 }
                 //Special treatment required here. Launched but have not packed all tasks
@@ -1255,6 +1261,8 @@ void *runner_main2(void *data) {
 
             	  pack_vars_pair_dens->top_tasks_packed = 1;
                   had_prev_task = 0;
+                  if(ci_d[0]->pack_done > 1000)
+                  	error("Stop");
                 }
           	    pack_vars_pair_dens->tasks_packed = 0;
                 pack_vars_pair_dens->count_parts = 0;
@@ -1263,7 +1271,6 @@ void *runner_main2(void *data) {
               //case when we have launched then gone back to pack but did not pack enough to launch again
               else if(npacked == n_leaves_found){
                 if(launched == 1){
-
 
 //                  //Unnecessary as n_daughters_packed_index is set to zero when we launch
 //                  int first = 0;// + copy_index;
@@ -1289,6 +1296,8 @@ void *runner_main2(void *data) {
                   }
                   pack_vars_pair_dens->top_tasks_packed = 1;
                   launched = 0;
+                  if(ci_d[0]->pack_done > 1000)
+                  	error("Stop");
                 }
                 else {
 //                if(had_prev_task){
@@ -1299,15 +1308,20 @@ void *runner_main2(void *data) {
 //                  first_and_last_daughters[0][0] = n_daughters_packed_index;
 //                  first_and_last_daughters[0][1] = n_daughters_total;//last - first;
 //                }
+                  if(ci_d[0]->pack_done > 1000)
+                  	error("Stop");
                 }
                 pack_vars_pair_dens->launch = 0;
               }
-
+              if(ci_d[0]->pack_done > 1000)
+              	error("Stop. Launched=%i ci_d count %i", launched, ci_d[0]->hydro.count);
               pack_vars_pair_dens->launch = 0;
 //              if(pack_vars_pair_dens->count_parts > count_max_parts_tmp)
 //                error("Packed more parts than possible");
               t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
             }
+            if(ci_d[0]->pack_done > 1000)
+            	error("Stop");
             //A. Nasar: Launch-leftovers counter re-set to zero and cells unlocked
             pack_vars_pair_dens->launch_leftovers = 0;
             pack_vars_pair_dens->launch = 0;
