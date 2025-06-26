@@ -554,7 +554,7 @@ void *runner_main2(void *data) {
   pack_vars_pair_dens->task_list =
       (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
   pack_vars_pair_dens->top_task_list =
-      (struct task **)calloc(target_n_tasks, sizeof(struct task *));
+      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
   int n_leaves_max = 128;
   /*Allocate target_n_tasks for top level tasks. This is a 2D array with length target_n_tasks and width n_leaves_max*/
   int max_length = 2 * target_n_tasks * 16 * n_leaves_max;
@@ -1088,26 +1088,19 @@ void *runner_main2(void *data) {
             int n_daughters_packed_index = n_daughters_total;
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
                       parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_d, cj_d, n_daughters_total);
-
-            message("ndaughters prev %i, nfound %i, ntotal %i tops_packed %i", n_daughters_total, n_leaves_found, n_daughters_total + n_leaves_found, top_tasks_packed);
+//            message("ndaughters prev %i, nfound %i, ntotal %i tops_packed %i", n_daughters_total, n_leaves_found, n_daughters_total + n_leaves_found, top_tasks_packed);
             n_daughters_total += n_leaves_found;
-
             first_and_last_daughters[top_tasks_packed][0] = n_daughters_packed_index;
             ci_top[top_tasks_packed] = ci;
             cj_top[top_tasks_packed] = cj;
 
-            if(ci_d[0]->pack_done > 1000)
-            	error("Stop");
 //            first_and_last_daughters[top_tasks_packed][1] = target_n_tasks - n_daughters_packed_index;
             tops_packed_in_step++;
             n_tops_reset++;
 //            message("Found %i daughter tasks", n_leaves_found);
-
             n_leafs_total += n_leaves_found;
             int first_cell_to_move = n_daughters_packed_index;
             int n_daughters_left = n_daughters_total;
-            int cid = 0;
-
             /*Get pointer to top level task. Needed to enqueue deps*/
             pack_vars_pair_dens->top_task_list[top_tasks_packed] = t;
             /*Increment how many top tasks we've packed*/
@@ -1118,7 +1111,6 @@ void *runner_main2(void *data) {
             /*How many daughter tasks do we want to offload at once?*/
             int target_n_tasks_tmp = pack_vars_pair_dens->target_n_tasks;
             t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
-
             // A. Nasar: Check to see if this is the last task in the queue.
             // If so, set launch_leftovers to 1 and recursively pack and launch daughter tasks on GPU
             lock_lock(&sched->queues[qid].lock);
@@ -1143,8 +1135,10 @@ void *runner_main2(void *data) {
             if(n_daughters_packed_index > 0)
               had_prev_task = 1;
 
+
             cell_unlocktree(ci);
             cell_unlocktree(cj);
+
             while(npacked < n_leaves_found){
               top_tasks_packed = pack_vars_pair_dens->top_tasks_packed;
 
@@ -1159,11 +1153,12 @@ void *runner_main2(void *data) {
 //            	  message("Packing cell with no parts ci index %i cj index %i", cii->index, cjj->index);
 //            	  error("Stop");
 //              }
+
               if(ci_d[copy_index]->pack_done > 1000 || cii->pack_done > 1000)
                 error("STOP packs_done %i", cii->pack_done);
-              message("Packing ttid %i copy_index %i actual_index %i, ci %i, cj %i citop %i, cjtop %i, count i %i, count j %i",
-                  top_tasks_packed - 1, copy_index, copy_index + n_daughters_packed_index,
-                  cii->cellID, cjj->cellID, cii->top->cellID, cjj->top->cellID, cii->hydro.count, cjj->hydro.count);
+//              message("Packing ttid %i copy_index %i actual_index %i, ci %i, cj %i citop %i, cjtop %i, count i %i, count j %i",
+//                  top_tasks_packed - 1, copy_index, copy_index + n_daughters_packed_index,
+//                  cii->cellID, cjj->cellID, cii->top->cellID, cjj->top->cellID, cii->hydro.count, cjj->hydro.count);
 
               packing_time_pair += runner_dopair1_pack_f4(
                   r, sched, pack_vars_pair_dens, cii, cjj, t,
@@ -1223,8 +1218,6 @@ void *runner_main2(void *data) {
                 if(npacked == n_leaves_found){
                   n_daughters_total = 0;
                   pack_vars_pair_dens->top_tasks_packed = 0;
-                  if(ci_d[0]->pack_done > 1000)
-                  	error("Stop");
 //                  message("packed all leaves");
                 }
                 //Special treatment required here. Launched but have not packed all tasks
@@ -1246,8 +1239,6 @@ void *runner_main2(void *data) {
 //                    message("Moving cell %i to index %i last %i n_d_p_i % i n_d_T %i", i, shuffle, n_daughters_left, n_daughters_packed_index, n_daughters_total);
                     ci_d[shuffle] = ci_d[i];
                     cj_d[shuffle] = cj_d[i];
-                    if(ci_d[shuffle]->pack_done > 1000 || cj_d[shuffle]->pack_done > 1000)
-                      error("STOP");
                   }
                   copy_index = 0;
                   first_and_last_daughters[0][0] = 0;
@@ -1261,8 +1252,6 @@ void *runner_main2(void *data) {
 
             	  pack_vars_pair_dens->top_tasks_packed = 1;
                   had_prev_task = 0;
-                  if(ci_d[0]->pack_done > 1000)
-                  	error("Stop");
                 }
           	    pack_vars_pair_dens->tasks_packed = 0;
                 pack_vars_pair_dens->count_parts = 0;
@@ -1291,13 +1280,13 @@ void *runner_main2(void *data) {
                   ci_top[0] = ci;
                   first_and_last_daughters[0][0] = 0;
                   first_and_last_daughters[0][1] = n_daughters_left;
-                  for(int i = 0; i < n_daughters_left; i++){
-              	    message("ci %i cj %i", ci_d[0]->hydro.count, cj_d[0]->hydro.count);
-                  }
+//                  for(int i = 0; i < n_daughters_left; i++){
+//              	    message("ci %i cj %i", ci_d[0]->hydro.count, cj_d[0]->hydro.count);
+//                  }
                   pack_vars_pair_dens->top_tasks_packed = 1;
+
+                  pack_vars_pair_dens->top_task_list[0] = t;
                   launched = 0;
-                  if(ci_d[0]->pack_done > 1000)
-                  	error("Stop");
                 }
                 else {
 //                if(had_prev_task){
@@ -1308,20 +1297,14 @@ void *runner_main2(void *data) {
 //                  first_and_last_daughters[0][0] = n_daughters_packed_index;
 //                  first_and_last_daughters[0][1] = n_daughters_total;//last - first;
 //                }
-                  if(ci_d[0]->pack_done > 1000)
-                  	error("Stop");
                 }
                 pack_vars_pair_dens->launch = 0;
               }
-              if(ci_d[0]->pack_done > 1000)
-              	error("Stop. Launched=%i ci_d count %i", launched, ci_d[0]->hydro.count);
               pack_vars_pair_dens->launch = 0;
 //              if(pack_vars_pair_dens->count_parts > count_max_parts_tmp)
 //                error("Packed more parts than possible");
               t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
             }
-            if(ci_d[0]->pack_done > 1000)
-            	error("Stop");
             //A. Nasar: Launch-leftovers counter re-set to zero and cells unlocked
             pack_vars_pair_dens->launch_leftovers = 0;
             pack_vars_pair_dens->launch = 0;
