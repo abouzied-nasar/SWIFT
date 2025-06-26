@@ -86,7 +86,17 @@ Then configure with
 
   CC=mpicc CXX=mpic++ ./configure --enable-compiler-warnings --with-cuda
 
+To use sanitizer configure with
 
+.. code-block:: bash
+
+   ./configure --enable-compiler-warnings --with-cuda LDFLAGS="-fsanitize=address" --enable-sanitizer 
+
+N.B CUDA and ASAN don't like each other so WHEN RUNNING CODE COMPILED WITH SANITIZER YOU MUST USE
+
+.. code-block:: bash
+
+   ASAN_OPTIONS=protect_shadow_gap=0 ../../../swift_cuda {runtime args here}
 
 
 
