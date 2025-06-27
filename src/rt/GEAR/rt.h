@@ -122,9 +122,10 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
 #ifdef SWIFT_RT_DEBUG_CHECKS
   /* reset this here as well as in the rt_debugging_checks_end_of_step()
    * routine to test task dependencies are done right */
-  p->rt_data.debug_iact_stars_inject = 0;
-  p->rt_data.debug_nsubcycles = 0;
-  p->rt_data.debug_kicked = 0;
+  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  rt_data->debug_iact_stars_inject = 0;
+  rt_data->debug_nsubcycles = 0;
+  rt_data->debug_kicked = 0;
 #endif
 }
 
@@ -147,7 +148,8 @@ __attribute__((always_inline)) INLINE static void rt_reset_part_each_subcycle(
    * so we're skipping it for now. */
   /* rt_slope_limit_cell_init(p); */
 
-  p->rt_data.flux_dt = dt;
+  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  rt_data->flux_dt = dt;
 }
 
 /**
@@ -169,7 +171,8 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
   rt_part_reset_fluxes(p);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
-  p->rt_data.debug_radiation_absorbed_tot = 0ULL;
+  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  rt_data->debug_radiation_absorbed_tot = 0ULL;
 #endif
 }
 
@@ -299,8 +302,9 @@ __attribute__((always_inline)) INLINE static void rt_convert_quantities(
    * it if necessary.
    * We only read in conserved quantities, so only check those. */
 
-  struct rt_part_data* rtd = &p->rt_data;
-  const float Vinv = 1.f / p->geometry.volume;
+  struct rt_part_data* rtd = part_get_rt_data_p(p);
+  const struct fvpm_geometry_struct* geometry = part_get_const_fvpm_geometry_p(p);
+  const float Vinv = 1.f / geometry->volume;
 
   /* If we read in radiation energy, we read in
    * total energy and store it as energy density.
@@ -347,9 +351,11 @@ __attribute__((always_inline)) INLINE static float rt_compute_timestep(
     const struct phys_const* restrict phys_const,
     const struct unit_system* restrict us) {
 
+  const struct fvpm_geometry_struct* geometry = part_get_const_fvpm_geometry_p(p);
+
   /* just mimic the gizmo particle "size" for now */
   const float psize = cosmo->a * cosmo->a *
-                      powf(p->geometry.volume / hydro_dimension_unit_sphere,
+                      powf(geometry->volume / hydro_dimension_unit_sphere,
                            hydro_dimension_inv);
   float dt = psize * rt_params.reduced_speed_of_light_inverse *
              rt_props->CFL_condition;
@@ -417,15 +423,17 @@ __attribute__((always_inline)) INLINE static double rt_part_dt(
 __attribute__((always_inline)) INLINE static void rt_finalise_injection(
     struct part* restrict p, struct rt_props* props) {
 
+  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 1, "rt_ghost1/rt_finalise_injection");
 
-  p->rt_data.debug_injection_done += 1;
+  rt_data->debug_injection_done += 1;
 #endif
 
   for (int g = 0; g < RT_NGROUPS; g++) {
-    rt_check_unphysical_state(&p->rt_data.radiation[g].energy_density,
-                              p->rt_data.radiation[g].flux, /*e_old=*/0.f,
+    rt_check_unphysical_state(&rt_data->radiation[g].energy_density,
+                              rt_data->radiation[g].flux, /*e_old=*/0.f,
                               /*callloc=*/3);
   }
 }
@@ -439,16 +447,18 @@ __attribute__((always_inline)) INLINE static void rt_finalise_injection(
 __attribute__((always_inline)) INLINE static void rt_end_gradient(
     struct part* restrict p, const struct cosmology* cosmo) {
 
+  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 2, __func__);
 
-  if (p->rt_data.debug_calls_iact_gradient_interaction == 0)
+  if (rt_data->debug_calls_iact_gradient_interaction == 0)
     message(
         "WARNING: Called finalise gradient on particle %lld"
         "with iact gradient count from rt_iact = %d",
-        p->id, p->rt_data.debug_calls_iact_gradient_interaction);
+        part_get_id(p), rt_data->debug_calls_iact_gradient_interaction);
 
-  p->rt_data.debug_gradients_done += 1;
+  rt_data->debug_gradients_done += 1;
 #endif
 
   rt_finalise_gradient_part(p);
@@ -465,20 +475,22 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
     struct part* restrict p, struct rt_props* rtp, const double dt,
     const struct cosmology* restrict cosmo) {
 
+  struct rt_part_data* restrict rtd = part_get_rt_data_p(p);
+  const struct fvpm_geometry_struct* restrict geometry = part_get_const_fvpm_geometry_p(p);
+
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 3, __func__);
 
-  if (p->rt_data.debug_calls_iact_transport_interaction == 0)
+  if (rtd->debug_calls_iact_transport_interaction == 0)
     message(
         "WARNING: Called finalise transport on particle %lld"
         "with iact transport count from rt_iact = %d",
-        p->id, p->rt_data.debug_calls_iact_transport_interaction);
+        part_get_id(p), rtd->debug_calls_iact_transport_interaction);
 
-  p->rt_data.debug_transport_done += 1;
+  rtd->debug_transport_done += 1;
 #endif
 
-  struct rt_part_data* restrict rtd = &p->rt_data;
-  const float Vinv = 1.f / p->geometry.volume;
+  const float Vinv = 1.f / geometry->volume;
 
   /* Do not redshift if we have a constant spectrum (type == 0) */
   const float redshift_factor =
@@ -543,7 +555,9 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 4, __func__);
-  p->rt_data.debug_thermochem_done += 1;
+
+  struct rt_part_data* restrict rt_data = part_get_rt_data_p(p);
+  rt_data->debug_thermochem_done += 1;
 #endif
 
   /* Note: Can't pass rt_props as const struct because of grackle
@@ -576,7 +590,8 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
       dt_kick_corr >= 0.f) {
 
     rt_debug_sequence_check(p, 0, __func__);
-    p->rt_data.debug_kicked += 1;
+    struct rt_part_data* restrict rt_data = part_get_rt_data_p(p);
+    rt_data->debug_kicked += 1;
   }
 #endif
 
@@ -682,16 +697,17 @@ __attribute__((always_inline)) INLINE static void rt_prepare_force(
 __attribute__((always_inline)) INLINE static void rt_predict_extra(
     struct part* p, struct xpart* xp, float dt_drift) {
 
+  struct rt_part_data* restrict rt_data = part_get_rt_data_p(p);
   float dx[3] = {xp->v_full[0] * dt_drift, xp->v_full[1] * dt_drift,
                  xp->v_full[2] * dt_drift};
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     float Unew[4];
     rt_gradients_predict_drift(p, Unew, g, dx);
-    p->rt_data.radiation[g].energy_density = Unew[0];
-    p->rt_data.radiation[g].flux[0] = Unew[1];
-    p->rt_data.radiation[g].flux[1] = Unew[2];
-    p->rt_data.radiation[g].flux[2] = Unew[3];
+    rt_data->radiation[g].energy_density = Unew[0];
+    rt_data->radiation[g].flux[0] = Unew[1];
+    rt_data->radiation[g].flux[1] = Unew[2];
+    rt_data->radiation[g].flux[2] = Unew[3];
   }
 }
 

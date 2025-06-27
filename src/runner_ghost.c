@@ -1648,13 +1648,11 @@ void runner_do_rt_ghost1(struct runner *r, struct cell *c, int timer) {
 
       /* First reset everything that needs to be reset for the following
        * subcycle */
-      const struct rt_timestepping_data *rt_time_data =
-          part_get_rt_time_data_p(p);
       const integertime_t ti_current_subcycle = e->ti_current_subcycle;
       const integertime_t ti_step =
-          get_integer_timestep(rt_time_data->time_bin);
+          get_integer_timestep(part_get_rt_time_bin(p));
       const integertime_t ti_begin = get_integer_time_begin(
-          ti_current_subcycle + 1, rt_time_data->time_bin);
+          ti_current_subcycle + 1, part_get_rt_time_bin(p));
       const integertime_t ti_end = ti_begin + ti_step;
 
       const float dt =

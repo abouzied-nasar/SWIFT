@@ -53,10 +53,10 @@
 struct rt_timestepping_data {
   union {
     /*! Time-bin this particle uses for RT interactions */
-    timebin_t time_bin;
+    timebin_t _time_bin;
 
     /*! Minimal time-bin across all neighbours */
-    timebin_t min_ngb_time_bin;
+    timebin_t _min_ngb_time_bin;
   };
 };
 
@@ -66,11 +66,37 @@ struct rt_timestepping_data {
 struct rt_timestepping_data {
 
   /*! Time-bin this particle uses for RT interactions */
-  timebin_t time_bin;
+  timebin_t _time_bin;
 
   /*! Minimal time-bin across all neighbours */
-  timebin_t min_ngb_time_bin;
+  timebin_t _min_ngb_time_bin;
 };
+
 #endif
+
+
+static __attribute__((always_inline)) INLINE timebin_t
+rt_timestepping_data_get_time_bin(const struct rt_timestepping_data* restrict rtd){
+  return rtd->_time_bin;
+}
+static __attribute__((always_inline)) INLINE void
+rt_timestepping_data_set_time_bin(struct rt_timestepping_data* restrict rtd, const timebin_t time_bin){
+  rtd->_time_bin = time_bin;
+}
+
+
+static __attribute__((always_inline)) INLINE timebin_t
+rt_timestepping_data_get_min_ngb_time_bin(const struct rt_timestepping_data* restrict rtd){
+  return rtd->_min_ngb_time_bin;
+}
+static __attribute__((always_inline)) INLINE void
+rt_timestepping_data_set_min_ngb_time_bin(struct rt_timestepping_data* restrict rtd, const timebin_t min_ngb_time_bin){
+  rtd->_min_ngb_time_bin = min_ngb_time_bin;
+}
+
+
+
+
+
 
 #endif /* SWIFT_RT_STRUCT_H */

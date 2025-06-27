@@ -719,10 +719,8 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
           error("Computing time-step of rogue particle.");
 
         if (with_rt) {
-          const struct rt_timestepping_data *rt_time_data =
-              part_get_const_rt_time_data_p(p);
           const integertime_t ti_rt_end =
-              get_integer_time_end(ti_current_subcycle, rt_time_data->time_bin);
+              get_integer_time_end(ti_current_subcycle, part_get_rt_time_bin(p));
           if (ti_rt_end != ti_current_subcycle)
             error("Computing RT time-step of rogue particle");
         }
@@ -789,9 +787,7 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
 
         /* Same for RT */
         if (with_rt) {
-          struct rt_timestepping_data *rt_time_data =
-              part_get_rt_time_data_p(p);
-          rt_time_data->time_bin = get_time_bin(ti_rt_new_step);
+          part_set_rt_time_bin(p, get_time_bin(ti_rt_new_step));
           ti_rt_end_min =
               min(ti_current_subcycle + ti_rt_new_step, ti_rt_end_min);
           ti_rt_beg_max =
@@ -824,19 +820,17 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
              * only changed while the particle is hydro active. This allows to
              * end up with results ti_rt_end == ti_current_subcyle, so we need
              * to pretend we're past ti_current_subcycle already. */
-            const struct rt_timestepping_data *rt_time_data =
-                part_get_const_rt_time_data_p(p);
             integertime_t ti_rt_end = get_integer_time_end(
-                ti_current_subcycle + 1, rt_time_data->time_bin);
+                ti_current_subcycle + 1, part_get_rt_time_bin(p));
 
             const integertime_t ti_rt_beg = get_integer_time_begin(
-                ti_current_subcycle + 1, rt_time_data->time_bin);
+                ti_current_subcycle + 1, part_get_rt_time_bin(p));
 
             ti_rt_end_min = min(ti_rt_end, ti_rt_end_min);
             ti_rt_beg_max = max(ti_rt_beg, ti_rt_beg_max);
 
             integertime_t ti_rt_step =
-                get_integer_timestep(rt_time_data->time_bin);
+                get_integer_timestep(part_get_rt_time_bin(p));
             ti_rt_min_step_size = min(ti_rt_min_step_size, ti_rt_step);
           }
 
