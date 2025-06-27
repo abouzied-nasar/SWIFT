@@ -46,8 +46,9 @@ __attribute__((always_inline)) INLINE static void rt_debugging_check_timestep(
     const integertime_t *dti_hydro, int max_nr_rt_subcycles, double time_base) {
 
   if (*dti_hydro < *dti_rt)
-    error("part %lld has hydro time (%lld/%g) < RT time step (%lld/%g", part_get_id(p),
-          *dti_hydro, *dti_hydro * time_base, *dti_rt, *dti_rt * time_base);
+    error("part %lld has hydro time (%lld/%g) < RT time step (%lld/%g",
+          part_get_id(p), *dti_hydro, *dti_hydro * time_base, *dti_rt,
+          *dti_rt * time_base);
 }
 
 /**
@@ -81,12 +82,10 @@ rt_debugging_check_nr_subcycles(struct part *restrict p,
    * (3) You can't do it during the timestep task, since between
    * the hydro and the timestep we already do an RT step. */
 
-
   /* skip initialization */
   if (part_get_time_bin(p) == 0) return;
   if (part_get_rt_time_bin(p) == 0)
     error("Got part %lld with RT time bin 0", part_get_id(p));
-
 
   const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
   timebin_t bindiff = part_get_time_bin(p) - part_get_rt_time_bin(p);
@@ -210,7 +209,8 @@ static void rt_debugging_end_of_step_hydro_mapper(void *restrict map_data,
 
     struct part *restrict p = &parts[k];
     struct rt_part_data *rt_data = part_get_rt_data_p(p);
-    const struct fvpm_geometry_struct *geometry = part_get_const_fvpm_geometry_p(p);
+    const struct fvpm_geometry_struct *geometry =
+        part_get_const_fvpm_geometry_p(p);
 
     absorption_sum_this_step += rt_data->debug_iact_stars_inject;
     absorption_sum_tot += rt_data->debug_radiation_absorbed_tot;
@@ -220,8 +220,7 @@ static void rt_debugging_end_of_step_hydro_mapper(void *restrict map_data,
 
     /* Sum up total energies for budget */
     for (int g = 0; g < RT_NGROUPS; g++) {
-      energy_sum[g] +=
-          rt_data->radiation[g].energy_density * geometry->volume;
+      energy_sum[g] += rt_data->radiation[g].energy_density * geometry->volume;
     }
   }
 
@@ -316,7 +315,7 @@ __attribute__((always_inline)) INLINE static void rt_debug_sequence_check(
    * compatible with subcycling. There is no reliable point where to
    * reset the counters and have sensible results. */
 
-  const struct rt_part_data* rt_data = part_get_const_rt_data_p(p);
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
 
   if (loc > 0) {
     /* Are kicks done? */

@@ -24,14 +24,14 @@
  * @brief Routines for checking for and correcting unphysical scenarios
  */
 
+#include "error.h"
+#include "hydro.h"
+#include "inline.h"
+#include "part.h"
+#include "rt_parameters.h"
+
 #include <float.h>
 #include <math.h>
-
-#include "error.h"
-#include "inline.h"
-#include "rt_parameters.h"
-#include "part.h"
-#include "hydro.h"
 
 /**
  * @brief check for and correct if needed unphysical

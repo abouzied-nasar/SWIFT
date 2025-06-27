@@ -45,7 +45,7 @@
 __attribute__((always_inline)) INLINE static void rt_part_reset_fluxes(
     struct part* restrict p) {
 
-  struct rt_part_data *rt_data = part_get_rt_data_p(p);
+  struct rt_part_data* rt_data = part_get_rt_data_p(p);
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     rt_data->flux[g].energy = 0.f;

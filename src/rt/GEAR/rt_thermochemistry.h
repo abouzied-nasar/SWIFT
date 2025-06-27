@@ -49,7 +49,7 @@ __attribute__((always_inline)) INLINE static void rt_tchem_first_init_part(
     const struct unit_system* restrict us,
     const struct cosmology* restrict cosmo) {
 
-  struct rt_part_data *rt_data = part_get_rt_data_p(p);
+  struct rt_part_data* rt_data = part_get_rt_data_p(p);
 
   if (rt_props->set_equilibrium_initial_ionization_mass_fractions) {
     float XHI, XHII, XHeI, XHeII, XHeIII;

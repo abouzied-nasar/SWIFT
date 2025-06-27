@@ -21,11 +21,11 @@
 #ifndef SWIFT_GEAR_RT_GETTERS_H
 #define SWIFT_GEAR_RT_GETTERS_H
 
-#include "rt_parameters.h"
 #include "cosmology.h"
 #include "inline.h"
 #include "minmax.h"
 #include "part.h"
+#include "rt_parameters.h"
 
 /**
  * @file src/rt/GEAR/rt_getters.h
@@ -42,7 +42,7 @@ __attribute__((always_inline)) INLINE static void
 rt_part_get_comoving_radiation_energy_density(const struct part *restrict p,
                                               float E[RT_NGROUPS]) {
 
-  const struct rt_part_data* rt_data = part_get_const_rt_data_p(p);
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
   for (int g = 0; g < RT_NGROUPS; g++) {
     E[g] = rt_data->radiation[g].energy_density;
   }
@@ -59,7 +59,7 @@ rt_part_get_physical_radiation_energy_density(const struct part *restrict p,
                                               float E[RT_NGROUPS],
                                               const struct cosmology *cosmo) {
 
-  const struct rt_part_data* rt_data = part_get_const_rt_data_p(p);
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     E[g] = cosmo->a3_inv * rt_data->radiation[g].energy_density;
@@ -78,7 +78,7 @@ __attribute__((always_inline)) INLINE static void
 rt_part_get_radiation_state_vector(const struct part *restrict p, int group,
                                    float U[4]) {
 
-  const struct rt_part_data* rt_data = part_get_const_rt_data_p(p);
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
 
   U[0] = rt_data->radiation[group].energy_density;
   U[1] = rt_data->radiation[group].flux[0];
@@ -101,7 +101,7 @@ __attribute__((always_inline)) INLINE static void rt_part_get_gradients(
     const struct part *restrict p, int group, float dE[3], float dFx[3],
     float dFy[3], float dFz[3]) {
 
-  const struct rt_part_data* rt_data = part_get_const_rt_data_p(p);
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
 
   dE[0] = rt_data->gradient[group].energy_density[0];
   dE[1] = rt_data->gradient[group].energy_density[1];

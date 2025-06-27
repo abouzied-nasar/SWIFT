@@ -105,7 +105,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
    * have nothing to do here. */
   if (si->density.wcount == 0.f) return;
 
-  struct rt_part_data* rt_data = part_get_rt_data_p(pj);
+  struct rt_part_data *rt_data = part_get_rt_data_p(pj);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
 
@@ -161,7 +161,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   /* We might end up in this scenario due to roundoff errors */
   if (psi == 0.f || octw == 0.f) return;
 
-  const struct fvpm_geometry_struct* geometry = part_get_const_fvpm_geometry_p(pj);
+  const struct fvpm_geometry_struct *geometry =
+      part_get_const_fvpm_geometry_p(pj);
 
   const float weight = psi / (nonempty_octants * octw);
   const float Vinv = 1.f / geometry->volume;
@@ -215,10 +216,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_flux_common(
     struct part *restrict pi, struct part *restrict pj, const float a,
     const float H, int mode) {
 
-  struct rt_part_data* rt_data_i = part_get_rt_data_p(pi);
-  struct rt_part_data* rt_data_j = part_get_rt_data_p(pj);
-  const struct fvpm_geometry_struct* geometry_i = part_get_const_fvpm_geometry_p(pi);
-  const struct fvpm_geometry_struct* geometry_j = part_get_const_fvpm_geometry_p(pj);
+  struct rt_part_data *rt_data_i = part_get_rt_data_p(pi);
+  struct rt_part_data *rt_data_j = part_get_rt_data_p(pj);
+  const struct fvpm_geometry_struct *geometry_i =
+      part_get_const_fvpm_geometry_p(pi);
+  const struct fvpm_geometry_struct *geometry_j =
+      part_get_const_fvpm_geometry_p(pj);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   const char *func_name = (mode == 1) ? "sym flux iact" : "nonsym flux iact";
@@ -339,8 +342,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_flux_common(
 
   /* Get the time step for the flux exchange. This is always the smallest time
    * step among the two particles. */
-  const float mindt =
-      (rt_data_j->flux_dt > 0.f) ? fminf(rt_data_i->flux_dt, rt_data_j->flux_dt) : rt_data_i->flux_dt;
+  const float mindt = (rt_data_j->flux_dt > 0.f)
+                          ? fminf(rt_data_i->flux_dt, rt_data_j->flux_dt)
+                          : rt_data_i->flux_dt;
 
   for (int g = 0; g < RT_NGROUPS; g++) {
 

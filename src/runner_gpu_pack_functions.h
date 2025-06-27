@@ -1,5 +1,4 @@
 #include "../config.h"
-
 #include "runner.h"
 #include "timeline.h"
 

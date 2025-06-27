@@ -719,8 +719,8 @@ void runner_do_timestep(struct runner *r, struct cell *c, const int timer) {
           error("Computing time-step of rogue particle.");
 
         if (with_rt) {
-          const integertime_t ti_rt_end =
-              get_integer_time_end(ti_current_subcycle, part_get_rt_time_bin(p));
+          const integertime_t ti_rt_end = get_integer_time_end(
+              ti_current_subcycle, part_get_rt_time_bin(p));
           if (ti_rt_end != ti_current_subcycle)
             error("Computing RT time-step of rogue particle");
         }
