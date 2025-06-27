@@ -367,6 +367,7 @@ nobase_noinst_HEADERS += rt/GEAR/rt_interaction_rates.h
 nobase_noinst_HEADERS += rt/GEAR/rt_io.h
 nobase_noinst_HEADERS += rt/GEAR/rt_ionization_equilibrium.h
 nobase_noinst_HEADERS += rt/GEAR/rt_parameters.h
+nobase_noinst_HEADERS += rt/GEAR/rt_part_api.h
 nobase_noinst_HEADERS += rt/GEAR/rt_properties.h
 nobase_noinst_HEADERS += rt/GEAR/rt_riemann_GLF.h
 nobase_noinst_HEADERS += rt/GEAR/rt_riemann_HLL_eigenvalues.h
