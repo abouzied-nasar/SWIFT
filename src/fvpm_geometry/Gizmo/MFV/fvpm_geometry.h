@@ -2,6 +2,9 @@
 #define SWIFT_FVPM_GEOMETRY_GIZMO_MFV_H
 
 #include "const.h"
+#include "hydro_part.h"
+#include "inline.h"
+#include "kernel_hydro.h"
 
 /**
  * @brief Reset the variables used to store the centroid; used for the velocity
@@ -10,9 +13,10 @@
 __attribute__((always_inline)) INLINE static void fvpm_reset_centroids(
     struct part* restrict p) {
 
-  p->geometry.centroid[0] = 0.0f;
-  p->geometry.centroid[1] = 0.0f;
-  p->geometry.centroid[2] = 0.0f;
+  struct fvpm_geometry_struct* geometry = part_get_fvpm_geometry_p(p);
+  geometry->centroid[0] = 0.0f;
+  geometry->centroid[1] = 0.0f;
+  geometry->centroid[2] = 0.0f;
 }
 
 /**
@@ -26,10 +30,11 @@ __attribute__((always_inline)) INLINE static void fvpm_reset_centroids(
 __attribute__((always_inline)) INLINE static void fvpm_normalise_centroid(
     struct part* restrict p, const float wcount) {
 
+  struct fvpm_geometry_struct* geometry = part_get_fvpm_geometry_p(p);
   const float norm = kernel_norm / wcount;
-  p->geometry.centroid[0] *= norm;
-  p->geometry.centroid[1] *= norm;
-  p->geometry.centroid[2] *= norm;
+  geometry->centroid[0] *= norm;
+  geometry->centroid[1] *= norm;
+  geometry->centroid[2] *= norm;
 }
 
 /**
@@ -44,9 +49,10 @@ __attribute__((always_inline)) INLINE static void fvpm_normalise_centroid(
 __attribute__((always_inline)) INLINE static void fvpm_update_centroid_left(
     struct part* restrict p, const float* dx, const float w) {
 
-  p->geometry.centroid[0] -= dx[0] * w;
-  p->geometry.centroid[1] -= dx[1] * w;
-  p->geometry.centroid[2] -= dx[2] * w;
+  struct fvpm_geometry_struct* geometry = part_get_fvpm_geometry_p(p);
+  geometry->centroid[0] -= dx[0] * w;
+  geometry->centroid[1] -= dx[1] * w;
+  geometry->centroid[2] -= dx[2] * w;
 }
 
 /**
@@ -61,9 +67,10 @@ __attribute__((always_inline)) INLINE static void fvpm_update_centroid_left(
 __attribute__((always_inline)) INLINE static void fvpm_update_centroid_right(
     struct part* restrict p, const float* dx, const float w) {
 
-  p->geometry.centroid[0] += dx[0] * w;
-  p->geometry.centroid[1] += dx[1] * w;
-  p->geometry.centroid[2] += dx[2] * w;
+  struct fvpm_geometry_struct* geometry = part_get_fvpm_geometry_p(p);
+  geometry->centroid[0] += dx[0] * w;
+  geometry->centroid[1] += dx[1] * w;
+  geometry->centroid[2] += dx[2] * w;
 }
 
 #endif /* SWIFT_FVPM_GEOMETRY_GIZMO_MFV_H */

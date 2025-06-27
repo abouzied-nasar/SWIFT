@@ -21,6 +21,10 @@
 #ifndef SWIFT_GEAR_RT_GETTERS_H
 #define SWIFT_GEAR_RT_GETTERS_H
 
+#include "cosmology.h"
+#include "inline.h"
+#include "minmax.h"
+#include "part.h"
 #include "rt_parameters.h"
 
 /**
@@ -38,8 +42,9 @@ __attribute__((always_inline)) INLINE static void
 rt_part_get_comoving_radiation_energy_density(const struct part *restrict p,
                                               float E[RT_NGROUPS]) {
 
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
   for (int g = 0; g < RT_NGROUPS; g++) {
-    E[g] = p->rt_data.radiation[g].energy_density;
+    E[g] = rt_data->radiation[g].energy_density;
   }
 }
 
@@ -53,8 +58,11 @@ __attribute__((always_inline)) INLINE static void
 rt_part_get_physical_radiation_energy_density(const struct part *restrict p,
                                               float E[RT_NGROUPS],
                                               const struct cosmology *cosmo) {
+
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
+
   for (int g = 0; g < RT_NGROUPS; g++) {
-    E[g] = cosmo->a3_inv * p->rt_data.radiation[g].energy_density;
+    E[g] = cosmo->a3_inv * rt_data->radiation[g].energy_density;
   }
 }
 
@@ -70,10 +78,12 @@ __attribute__((always_inline)) INLINE static void
 rt_part_get_radiation_state_vector(const struct part *restrict p, int group,
                                    float U[4]) {
 
-  U[0] = p->rt_data.radiation[group].energy_density;
-  U[1] = p->rt_data.radiation[group].flux[0];
-  U[2] = p->rt_data.radiation[group].flux[1];
-  U[3] = p->rt_data.radiation[group].flux[2];
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
+
+  U[0] = rt_data->radiation[group].energy_density;
+  U[1] = rt_data->radiation[group].flux[0];
+  U[2] = rt_data->radiation[group].flux[1];
+  U[3] = rt_data->radiation[group].flux[2];
 }
 
 /**
@@ -91,21 +101,23 @@ __attribute__((always_inline)) INLINE static void rt_part_get_gradients(
     const struct part *restrict p, int group, float dE[3], float dFx[3],
     float dFy[3], float dFz[3]) {
 
-  dE[0] = p->rt_data.gradient[group].energy_density[0];
-  dE[1] = p->rt_data.gradient[group].energy_density[1];
-  dE[2] = p->rt_data.gradient[group].energy_density[2];
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
 
-  dFx[0] = p->rt_data.gradient[group].flux[0][0];
-  dFx[1] = p->rt_data.gradient[group].flux[0][1];
-  dFx[2] = p->rt_data.gradient[group].flux[0][2];
+  dE[0] = rt_data->gradient[group].energy_density[0];
+  dE[1] = rt_data->gradient[group].energy_density[1];
+  dE[2] = rt_data->gradient[group].energy_density[2];
 
-  dFy[0] = p->rt_data.gradient[group].flux[1][0];
-  dFy[1] = p->rt_data.gradient[group].flux[1][1];
-  dFy[2] = p->rt_data.gradient[group].flux[1][2];
+  dFx[0] = rt_data->gradient[group].flux[0][0];
+  dFx[1] = rt_data->gradient[group].flux[0][1];
+  dFx[2] = rt_data->gradient[group].flux[0][2];
 
-  dFz[0] = p->rt_data.gradient[group].flux[2][0];
-  dFz[1] = p->rt_data.gradient[group].flux[2][1];
-  dFz[2] = p->rt_data.gradient[group].flux[2][2];
+  dFy[0] = rt_data->gradient[group].flux[1][0];
+  dFy[1] = rt_data->gradient[group].flux[1][1];
+  dFy[2] = rt_data->gradient[group].flux[1][2];
+
+  dFz[0] = rt_data->gradient[group].flux[2][0];
+  dFz[1] = rt_data->gradient[group].flux[2][1];
+  dFz[2] = rt_data->gradient[group].flux[2][2];
 }
 
 /**

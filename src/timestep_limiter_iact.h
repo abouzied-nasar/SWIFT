@@ -45,15 +45,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_timebin(
 
   /* Update the minimal time-bin */
   if (tj > 0) {
-    struct timestep_limiter_data *limiter_data_i = part_get_limiter_data_p(pi);
-    limiter_data_i->min_ngb_time_bin =
-        min(limiter_data_i->min_ngb_time_bin, tj);
+    timebin_t min_i = min(part_get_timestep_limiter_min_ngb_time_bin(pi), tj);
+    part_set_timestep_limiter_min_ngb_time_bin(pi, min_i);
   }
 
   if (ti > 0) {
-    struct timestep_limiter_data *limiter_data_j = part_get_limiter_data_p(pj);
-    limiter_data_j->min_ngb_time_bin =
-        min(limiter_data_j->min_ngb_time_bin, ti);
+    timebin_t min_j = min(part_get_timestep_limiter_min_ngb_time_bin(pj), ti);
+    part_set_timestep_limiter_min_ngb_time_bin(pj, min_j);
   }
 }
 
@@ -78,9 +76,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_timebin(
 
   /* Update the minimal time-bin */
   if (tj > 0) {
-    struct timestep_limiter_data *limiter_data_i = part_get_limiter_data_p(pi);
-    limiter_data_i->min_ngb_time_bin =
-        min(limiter_data_i->min_ngb_time_bin, tj);
+    timebin_t min_i = min(part_get_timestep_limiter_min_ngb_time_bin(pi), tj);
+    part_set_timestep_limiter_min_ngb_time_bin(pi, min_i);
   }
 }
 
@@ -129,8 +126,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_limiter(
   if (tj > ti + time_bin_neighbour_max_delta_bin) {
 
     /* Store the smallest time bin that woke up this particle */
-    struct timestep_limiter_data *limiter_data_j = part_get_limiter_data_p(pj);
-    accumulate_max_c(&limiter_data_j->wakeup, -ti);
+    accumulate_max_c(part_get_timestep_limiter_wakeup_p(pj), -ti);
   }
 
 #ifdef SWIFT_HYDRO_DENSITY_CHECKS

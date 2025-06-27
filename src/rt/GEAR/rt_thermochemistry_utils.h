@@ -24,7 +24,13 @@
  * @brief thermochemistry utilities and misc functions.
  * */
 
+#include "adiabatic_index.h"
+#include "cosmology.h"
+#include "grackle.h"
+#include "part.h"
+#include "physical_constants.h"
 #include "rt_species.h"
+#include "units.h"
 
 /**
  * @brief compute the mean molecular weight mu for given
@@ -113,11 +119,13 @@ __attribute__((always_inline)) INLINE static void
 rt_tchem_get_species_densities(const struct part* restrict p, gr_float rho,
                                gr_float species_densities[6]) {
 
-  species_densities[0] = p->rt_data.tchem.mass_fraction_HI * rho;
-  species_densities[1] = p->rt_data.tchem.mass_fraction_HII * rho;
-  species_densities[2] = p->rt_data.tchem.mass_fraction_HeI * rho;
-  species_densities[3] = p->rt_data.tchem.mass_fraction_HeII * rho;
-  species_densities[4] = p->rt_data.tchem.mass_fraction_HeIII * rho;
+  const struct rt_part_data* rt_data = part_get_const_rt_data_p(p);
+
+  species_densities[0] = rt_data->tchem.mass_fraction_HI * rho;
+  species_densities[1] = rt_data->tchem.mass_fraction_HII * rho;
+  species_densities[2] = rt_data->tchem.mass_fraction_HeI * rho;
+  species_densities[3] = rt_data->tchem.mass_fraction_HeII * rho;
+  species_densities[4] = rt_data->tchem.mass_fraction_HeIII * rho;
 
   /* nHII = rho_HII / m_p
    * nHeII = rho_HeII / 4 m_p
@@ -141,7 +149,8 @@ rt_tchem_get_species_densities(const struct part* restrict p, gr_float rho,
  **/
 __attribute__((always_inline)) INLINE static void
 rt_tchem_get_ionizing_species_number_densities(
-    double ns_cgs[rt_ionizing_species_count], gr_float species_densities[6],
+    double ns_cgs[rt_ionizing_species_count],
+    const gr_float species_densities[6],
     const struct phys_const* restrict phys_const,
     const struct unit_system* restrict us) {
 
@@ -170,11 +179,13 @@ rt_tchem_get_gas_temperature(const struct part* restrict p,
   const double kB = phys_const->const_boltzmann_k;
   const double mp = phys_const->const_proton_mass;
 
-  const float XHI = p->rt_data.tchem.mass_fraction_HI;
-  const float XHII = p->rt_data.tchem.mass_fraction_HII;
-  const float XHeI = p->rt_data.tchem.mass_fraction_HeI;
-  const float XHeII = p->rt_data.tchem.mass_fraction_HeII;
-  const float XHeIII = p->rt_data.tchem.mass_fraction_HeIII;
+  const struct rt_part_data* rt_data = part_get_const_rt_data_p(p);
+
+  const float XHI = rt_data->tchem.mass_fraction_HI;
+  const float XHII = rt_data->tchem.mass_fraction_HII;
+  const float XHeI = rt_data->tchem.mass_fraction_HeI;
+  const float XHeII = rt_data->tchem.mass_fraction_HeII;
+  const float XHeIII = rt_data->tchem.mass_fraction_HeIII;
 
   const double mu =
       rt_tchem_get_mean_molecular_weight(XHI, XHII, XHeI, XHeII, XHeIII);
@@ -253,7 +264,7 @@ rt_tchem_set_particle_radiation_field_for_test(
 
   if (t_Myr < 0.5) {
     /* Be vocal, just in case somebody forgets you exist. */
-    if (p->id == 1) message("Setting fixed radiation field.");
+    if (part_get_id(p) == 1) message("Setting fixed radiation field.");
     /* Set fixed radiation fields, in cgs*/
     fixed_fluxes[0] = 1.350e01;
     fixed_fluxes[1] = 2.779e01;
@@ -266,8 +277,10 @@ rt_tchem_set_particle_radiation_field_for_test(
 
   /* Note that we inject energy / time / surface, not identical to what */
   /* is in Iliev06 paper */
+
+  struct rt_part_data* rt_data = part_get_rt_data_p(p);
   for (int g = 0; g < RT_NGROUPS; g++) {
-    p->rt_data.radiation[g].energy_density = fixed_fluxes[g] * cf;
+    rt_data->radiation[g].energy_density = fixed_fluxes[g] * cf;
   }
 }
 
@@ -281,12 +294,13 @@ rt_tchem_set_particle_radiation_field_for_test(
 __attribute__((always_inline)) INLINE static void
 rt_tchem_set_boundary_particles_for_test(struct part* restrict p) {
 
-  if (p->id >= 1000000000) {
+  if (part_get_id(p) >= 1000000000) {
+    struct rt_part_data* rt_data = part_get_rt_data_p(p);
     for (int g = 0; g < RT_NGROUPS; g++) {
-      p->rt_data.radiation[g].energy_density = 0.f;
-      p->rt_data.radiation[g].flux[0] = 0.f;
-      p->rt_data.radiation[g].flux[1] = 0.f;
-      p->rt_data.radiation[g].flux[2] = 0.f;
+      rt_data->radiation[g].energy_density = 0.f;
+      rt_data->radiation[g].flux[0] = 0.f;
+      rt_data->radiation[g].flux[1] = 0.f;
+      rt_data->radiation[g].flux[2] = 0.f;
     }
   }
 }

@@ -223,12 +223,11 @@ __attribute__((always_inline)) INLINE static void kick_part(
 #ifdef SWIFT_DEBUG_CHECKS
   integertime_t ti_kick = part_get_ti_kick(p);
   if (ti_kick != ti_start) {
-    struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(p);
     error(
         "particle has not been kicked to the current time p->ti_kick=%lld, "
         "ti_start=%lld, ti_end=%lld id=%lld time_bin=%d wakeup=%d",
         ti_kick, ti_start, ti_end, part_get_id(p), part_get_time_bin(p),
-        limiter_data->wakeup);
+        part_get_timestep_limiter_wakeup(p));
   }
 
   part_set_ti_kick(p, ti_end);

@@ -21,6 +21,7 @@
 #define SWIFT_RT_GRADIENTS_GEAR_H
 
 #include "fvpm_geometry.h"
+#include "rt_debugging.h"
 #include "rt_getters.h"
 /* #include "rt_slope_limiters_cell.h" [> skipped for now <] */
 #include "rt_slope_limiters_face.h"
@@ -40,7 +41,7 @@
 __attribute__((always_inline)) INLINE static void rt_gradients_init(
     struct part *restrict p) {
 
-  struct rt_part_data *rtd = &p->rt_data;
+  struct rt_part_data *rtd = part_get_rt_data_p(p);
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     for (int i = 0; i < 3; i++) {
@@ -64,10 +65,10 @@ __attribute__((always_inline)) INLINE static void rt_gradients_init(
  * @param dFz gradient of the z direction flux component
  */
 __attribute__((always_inline)) INLINE static void rt_gradients_update_part(
-    struct part *restrict p, int g, float dE[3], float dFx[3], float dFy[3],
-    float dFz[3]) {
+    struct part *restrict p, int g, const float dE[3], const float dFx[3],
+    const float dFy[3], const float dFz[3]) {
 
-  struct rt_part_data *rtd = &p->rt_data;
+  struct rt_part_data *rtd = part_get_rt_data_p(p);
 
   rtd->gradient[g].energy_density[0] += dE[0];
   rtd->gradient[g].energy_density[1] += dE[1];
@@ -97,7 +98,7 @@ __attribute__((always_inline)) INLINE static void rt_finalise_gradient_part(
     struct part *restrict p) {
 
   /* add kernel normalization to gradients */
-  const float h = p->h;
+  const float h = part_get_h(p);
   const float h_inv = 1.0f / h;
 
   float norm;
@@ -106,11 +107,13 @@ __attribute__((always_inline)) INLINE static void rt_finalise_gradient_part(
     norm = hinvdim;
   } else {
     const float hinvdimp1 = pow_dimension_plus_one(h_inv);
-    const float volume = p->geometry.volume;
+    const struct fvpm_geometry_struct *geometry =
+        part_get_const_fvpm_geometry_p(p);
+    const float volume = geometry->volume;
     norm = hinvdimp1 * volume;
   }
 
-  struct rt_part_data *rtd = &p->rt_data;
+  struct rt_part_data *rtd = part_get_rt_data_p(p);
   for (int g = 0; g < RT_NGROUPS; g++) {
     rtd->gradient[g].energy_density[0] *= norm;
     rtd->gradient[g].energy_density[1] *= norm;
@@ -141,12 +144,20 @@ __attribute__((always_inline)) INLINE static void rt_gradients_collect(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part *restrict pi, struct part *restrict pj) {
 
+  struct rt_part_data *rt_data_i = part_get_rt_data_p(pi);
+  struct rt_part_data *rt_data_j = part_get_rt_data_p(pj);
+
+  const struct fvpm_geometry_struct *geometry_i =
+      part_get_const_fvpm_geometry_p(pi);
+  const struct fvpm_geometry_struct *geometry_j =
+      part_get_const_fvpm_geometry_p(pj);
+
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(pi, 2, __func__);
   rt_debug_sequence_check(pj, 2, __func__);
 
-  pi->rt_data.debug_calls_iact_gradient_interaction += 1;
-  pj->rt_data.debug_calls_iact_gradient_interaction += 1;
+  rt_data_i->debug_calls_iact_gradient_interaction += 1;
+  rt_data_j->debug_calls_iact_gradient_interaction += 1;
 #endif
 
   /* Get r and 1/r. */
@@ -158,20 +169,22 @@ __attribute__((always_inline)) INLINE static void rt_gradients_collect(
 
   for (int k = 0; k < 3; k++) {
     for (int l = 0; l < 3; l++) {
-      Bi[k][l] = pi->geometry.matrix_E[k][l];
-      Bj[k][l] = pj->geometry.matrix_E[k][l];
+      Bi[k][l] = geometry_i->matrix_E[k][l];
+      Bj[k][l] = geometry_j->matrix_E[k][l];
     }
   }
 
   /* Compute kernel of pi. */
-  float wi, wi_dx;
+  float wi;
+  float wi_dx;
   const float hi_inv = 1.0f / hi;
   const float qi = r * hi_inv;
   /* Note: factor 1/omega for psi is swallowed in matrix */
   kernel_deval(qi, &wi, &wi_dx);
 
   /* Compute kernel of pj */
-  float wj, wj_dx;
+  float wj;
+  float wj_dx;
   const float hj_inv = 1.0f / hj;
   const float qj = r * hj_inv;
   kernel_deval(qj, &wj, &wj_dx);
@@ -209,14 +222,18 @@ __attribute__((always_inline)) INLINE static void rt_gradients_collect(
 
   for (int g = 0; g < RT_NGROUPS; g++) {
 
-    float Ui[4], Uj[4];
+    float Ui[4];
+    float Uj[4];
     rt_part_get_radiation_state_vector(pi, g, Ui);
     rt_part_get_radiation_state_vector(pj, g, Uj);
     const float dU[4] = {Ui[0] - Uj[0], Ui[1] - Uj[1], Ui[2] - Uj[2],
                          Ui[3] - Uj[3]};
 
     /* First to the gradients of pi */
-    float dE_i[3], dFx_i[3], dFy_i[3], dFz_i[3];
+    float dE_i[3];
+    float dFx_i[3];
+    float dFy_i[3];
+    float dFz_i[3];
 
     /* Compute gradients for pi */
     /* there is a sign difference w.r.t. eqn. (6) because of the inverse
@@ -241,7 +258,10 @@ __attribute__((always_inline)) INLINE static void rt_gradients_collect(
     /* rt_slope_limit_cell_collect(pi, pj, g); */
 
     /* Now do the gradients of pj */
-    float dE_j[3], dFx_j[3], dFy_j[3], dFz_j[3];
+    float dE_j[3];
+    float dFx_j[3];
+    float dFy_j[3];
+    float dFz_j[3];
 
     /* We don't need a sign change here: both the dx and the dU
      * should switch their sign, resulting in no net change */
@@ -280,9 +300,13 @@ __attribute__((always_inline)) INLINE static void rt_gradients_nonsym_collect(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part *restrict pi, struct part *restrict pj) {
 
+  struct rt_part_data *rt_data_i = part_get_rt_data_p(pi);
+  const struct fvpm_geometry_struct *geometry_i =
+      part_get_const_fvpm_geometry_p(pi);
+
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(pi, 2, __func__);
-  pi->rt_data.debug_calls_iact_gradient_interaction += 1;
+  rt_data_i->debug_calls_iact_gradient_interaction += 1;
 #endif
 
   /* Get r and 1/r. */
@@ -293,12 +317,13 @@ __attribute__((always_inline)) INLINE static void rt_gradients_nonsym_collect(
 
   for (int k = 0; k < 3; k++) {
     for (int l = 0; l < 3; l++) {
-      Bi[k][l] = pi->geometry.matrix_E[k][l];
+      Bi[k][l] = geometry_i->matrix_E[k][l];
     }
   }
 
   /* Compute kernel of pi. */
-  float wi, wi_dx;
+  float wi;
+  float wi_dx;
   const float hi_inv = 1.0f / hi;
   const float qi = r * hi_inv;
   /* factor 1/omega for psi is swallowed in matrix */
@@ -322,13 +347,17 @@ __attribute__((always_inline)) INLINE static void rt_gradients_nonsym_collect(
 
   for (int g = 0; g < RT_NGROUPS; g++) {
 
-    float Ui[4], Uj[4];
+    float Ui[4];
+    float Uj[4];
     rt_part_get_radiation_state_vector(pi, g, Ui);
     rt_part_get_radiation_state_vector(pj, g, Uj);
     const float dU[4] = {Ui[0] - Uj[0], Ui[1] - Uj[1], Ui[2] - Uj[2],
                          Ui[3] - Uj[3]};
 
-    float dE_i[3], dFx_i[3], dFy_i[3], dFz_i[3];
+    float dE_i[3];
+    float dFx_i[3];
+    float dFy_i[3];
+    float dFz_i[3];
 
     /* Compute gradients for pi */
     /* there is a sign difference w.r.t. eqn. (6) because of the inverse
@@ -395,8 +424,14 @@ __attribute__((always_inline)) INLINE static void rt_gradients_predict(
    * they haven't been touched since the call
    * to rt_injection_update_photon_density */
 
-  float dE_i[3], dFx_i[3], dFy_i[3], dFz_i[3];
-  float dE_j[3], dFx_j[3], dFy_j[3], dFz_j[3];
+  float dE_i[3];
+  float dFx_i[3];
+  float dFy_i[3];
+  float dFz_i[3];
+  float dE_j[3];
+  float dFx_j[3];
+  float dFy_j[3];
+  float dFz_j[3];
   rt_part_get_gradients(pi, group, dE_i, dFx_i, dFy_i, dFz_i);
   rt_part_get_gradients(pj, group, dE_j, dFx_j, dFy_j, dFz_j);
 
@@ -453,7 +488,10 @@ __attribute__((always_inline)) INLINE static void rt_gradients_predict_drift(
    * they haven't been touched since the call
    * to rt_injection_update_photon_density */
 
-  float dE[3], dFx[3], dFy[3], dFz[3];
+  float dE[3];
+  float dFx[3];
+  float dFy[3];
+  float dFz[3];
   rt_part_get_gradients(p, group, dE, dFx, dFy, dFz);
 
   float dU[4];

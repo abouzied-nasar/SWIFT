@@ -58,9 +58,8 @@
 __attribute__((always_inline)) INLINE static void rt_first_init_timestep_data(
     struct part *restrict p) {
 
-  struct rt_timestepping_data *td = part_get_rt_time_data_p(p);
-  td->min_ngb_time_bin = num_time_bins + 1;
-  td->time_bin = 0;
+  part_set_rt_min_ngb_time_bin(p, num_time_bins + 1);
+  part_set_rt_time_bin(p, 0);
 }
 
 /**
@@ -71,8 +70,7 @@ __attribute__((always_inline)) INLINE static void rt_first_init_timestep_data(
 __attribute__((always_inline)) INLINE static void rt_timestep_prepare_force(
     struct part *restrict p) {
 
-  struct rt_timestepping_data *td = part_get_rt_time_data_p(p);
-  td->min_ngb_time_bin = num_time_bins + 1;
+  part_set_rt_min_ngb_time_bin(p, num_time_bins + 1);
 }
 
 /**
@@ -97,13 +95,17 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_timebin(
 
 #ifndef RT_NONE
   /* Update the minimal time-bin */
-  if (pj->rt_time_data.time_bin > 0)
-    pi->rt_time_data.min_ngb_time_bin =
-        min(pi->rt_time_data.min_ngb_time_bin, pj->rt_time_data.time_bin);
+  if (part_get_rt_time_bin(pj) > 0) {
+    timebin_t min_ngb_time_bin =
+        min(part_get_rt_min_ngb_time_bin(pi), part_get_rt_time_bin(pj));
+    part_set_rt_min_ngb_time_bin(pi, min_ngb_time_bin);
+  }
 
-  if (pi->rt_time_data.time_bin > 0)
-    pj->rt_time_data.min_ngb_time_bin =
-        min(pj->rt_time_data.min_ngb_time_bin, pi->rt_time_data.time_bin);
+  if (part_get_rt_time_bin(pi) > 0) {
+    timebin_t min_ngb_time_bin =
+        min(part_get_rt_min_ngb_time_bin(pj), part_get_rt_time_bin(pi));
+    part_set_rt_min_ngb_time_bin(pj, min_ngb_time_bin);
+  }
 #endif
 }
 
@@ -130,9 +132,11 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_rt_timebin(
 
 #ifndef RT_NONE
   /* Update the minimal time-bin */
-  if (pj->rt_time_data.time_bin > 0)
-    pi->rt_time_data.min_ngb_time_bin =
-        min(pi->rt_time_data.min_ngb_time_bin, pj->rt_time_data.time_bin);
+  if (part_get_rt_time_bin(pj) > 0) {
+    timebin_t min_ngb_time_bin =
+        min(part_get_rt_min_ngb_time_bin(pi), part_get_rt_time_bin(pj));
+    part_set_rt_min_ngb_time_bin(pi, min_ngb_time_bin);
+  }
 #endif
 }
 

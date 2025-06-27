@@ -22,6 +22,7 @@
 #ifdef SWIFT_RT_DEBUG_CHECKS
 
 #include "active.h"
+#include "fvpm_geometry.h"
 #include "rt_properties.h"
 #include "timeline.h"
 
@@ -45,8 +46,9 @@ __attribute__((always_inline)) INLINE static void rt_debugging_check_timestep(
     const integertime_t *dti_hydro, int max_nr_rt_subcycles, double time_base) {
 
   if (*dti_hydro < *dti_rt)
-    error("part %lld has hydro time (%lld/%g) < RT time step (%lld/%g", p->id,
-          *dti_hydro, *dti_hydro * time_base, *dti_rt, *dti_rt * time_base);
+    error("part %lld has hydro time (%lld/%g) < RT time step (%lld/%g",
+          part_get_id(p), *dti_hydro, *dti_hydro * time_base, *dti_rt,
+          *dti_rt * time_base);
 }
 
 /**
@@ -56,7 +58,8 @@ __attribute__((always_inline)) INLINE static void rt_debugging_check_timestep(
  */
 __attribute__((always_inline)) INLINE static void rt_debugging_count_subcycle(
     struct part *restrict p) {
-  p->rt_data.debug_nsubcycles += 1;
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
+  rt_data->debug_nsubcycles += 1;
 }
 
 /**
@@ -80,20 +83,21 @@ rt_debugging_check_nr_subcycles(struct part *restrict p,
    * the hydro and the timestep we already do an RT step. */
 
   /* skip initialization */
-  if (p->time_bin == 0) return;
-  if (p->rt_time_data.time_bin == 0)
-    error("Got part %lld with RT time bin 0", p->id);
+  if (part_get_time_bin(p) == 0) return;
+  if (part_get_rt_time_bin(p) == 0)
+    error("Got part %lld with RT time bin 0", part_get_id(p));
 
-  timebin_t bindiff = p->time_bin - p->rt_time_data.time_bin;
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
+  timebin_t bindiff = part_get_time_bin(p) - part_get_rt_time_bin(p);
 
   if (rt_props->debug_max_nr_subcycles <= 1) {
     /* Running without subcycling. */
     if (bindiff != 0)
       error("Running without subcycling but got bindiff=%d for part=%lld",
-            bindiff, p->id);
-    if (p->rt_data.debug_nsubcycles != 1)
+            bindiff, part_get_id(p));
+    if (rt_data->debug_nsubcycles != 1)
       error("Running without subcycling but got part=%lld subcycle count=%d",
-            p->id, p->rt_data.debug_nsubcycles);
+            part_get_id(p), rt_data->debug_nsubcycles);
     return;
   }
 }
@@ -106,13 +110,14 @@ rt_debugging_check_nr_subcycles(struct part *restrict p,
 __attribute__((always_inline)) INLINE static void
 rt_debugging_reset_each_subcycle(struct part *restrict p) {
 
-  p->rt_data.debug_calls_iact_gradient_interaction = 0;
-  p->rt_data.debug_calls_iact_transport_interaction = 0;
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
+  rt_data->debug_calls_iact_gradient_interaction = 0;
+  rt_data->debug_calls_iact_transport_interaction = 0;
 
-  p->rt_data.debug_injection_done = 0;
-  p->rt_data.debug_gradients_done = 0;
-  p->rt_data.debug_transport_done = 0;
-  p->rt_data.debug_thermochem_done = 0;
+  rt_data->debug_injection_done = 0;
+  rt_data->debug_gradients_done = 0;
+  rt_data->debug_transport_done = 0;
+  rt_data->debug_thermochem_done = 0;
 }
 
 /**
@@ -203,16 +208,19 @@ static void rt_debugging_end_of_step_hydro_mapper(void *restrict map_data,
   for (int k = 0; k < count; k++) {
 
     struct part *restrict p = &parts[k];
-    absorption_sum_this_step += p->rt_data.debug_iact_stars_inject;
-    absorption_sum_tot += p->rt_data.debug_radiation_absorbed_tot;
+    struct rt_part_data *rt_data = part_get_rt_data_p(p);
+    const struct fvpm_geometry_struct *geometry =
+        part_get_const_fvpm_geometry_p(p);
+
+    absorption_sum_this_step += rt_data->debug_iact_stars_inject;
+    absorption_sum_tot += rt_data->debug_radiation_absorbed_tot;
 
     /* Reset all values here in case particles won't be active next step */
-    p->rt_data.debug_iact_stars_inject = 0;
+    rt_data->debug_iact_stars_inject = 0;
 
     /* Sum up total energies for budget */
     for (int g = 0; g < RT_NGROUPS; g++) {
-      energy_sum[g] +=
-          p->rt_data.radiation[g].energy_density * p->geometry.volume;
+      energy_sum[g] += rt_data->radiation[g].energy_density * geometry->volume;
     }
   }
 
@@ -307,23 +315,25 @@ __attribute__((always_inline)) INLINE static void rt_debug_sequence_check(
    * compatible with subcycling. There is no reliable point where to
    * reset the counters and have sensible results. */
 
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
+
   if (loc > 0) {
     /* Are kicks done? */
-    if (p->rt_data.debug_nsubcycles == 0) {
-      if (p->rt_data.debug_kicked != 1)
+    if (rt_data->debug_nsubcycles == 0) {
+      if (rt_data->debug_kicked != 1)
         error(
             "called %s on particle %lld with wrong kick count=%d (expected "
             "1) cycle=%d",
-            function_name, p->id, p->rt_data.debug_kicked,
-            p->rt_data.debug_nsubcycles);
-    } else if (p->rt_data.debug_nsubcycles > 0) {
+            function_name, part_get_id(p), rt_data->debug_kicked,
+            rt_data->debug_nsubcycles);
+    } else if (rt_data->debug_nsubcycles > 0) {
       /* This covers case 1, 2, 3, 4, 5 */
-      if (p->rt_data.debug_kicked != 2)
+      if (rt_data->debug_kicked != 2)
         error(
             "called %s on particle %lld with wrong kick count=%d (expected 2) "
             "cycle=%d",
-            function_name, p->id, p->rt_data.debug_kicked,
-            p->rt_data.debug_nsubcycles);
+            function_name, part_get_id(p), rt_data->debug_kicked,
+            rt_data->debug_nsubcycles);
     } else {
       error("Got negative subcycle???");
     }
@@ -331,30 +341,30 @@ __attribute__((always_inline)) INLINE static void rt_debug_sequence_check(
 
   if (loc > 1) {
     /* is injection done? */
-    if (p->rt_data.debug_injection_done != 1)
+    if (rt_data->debug_injection_done != 1)
       error("called %s on part %lld when finalise injection count is %d ID",
-            function_name, p->id, p->rt_data.debug_injection_done);
+            function_name, part_get_id(p), rt_data->debug_injection_done);
   }
 
   if (loc > 2) {
     /* are gradients done? */
-    if (p->rt_data.debug_gradients_done != 1)
+    if (rt_data->debug_gradients_done != 1)
       error("called %s on part %lld when gradients_done count is %d",
-            function_name, p->id, p->rt_data.debug_gradients_done);
+            function_name, part_get_id(p), rt_data->debug_gradients_done);
   }
 
   if (loc > 3) {
     /* is transport done? */
-    if (p->rt_data.debug_transport_done != 1)
+    if (rt_data->debug_transport_done != 1)
       error("called %s on part %lld when transport_done != 1: %d",
-            function_name, p->id, p->rt_data.debug_transport_done);
+            function_name, part_get_id(p), rt_data->debug_transport_done);
   }
 
   if (loc > 4) {
     /* is thermochemistry done? */
-    if (p->rt_data.debug_thermochem_done != 1)
+    if (rt_data->debug_thermochem_done != 1)
       error("called %s on part %lld with thermochem_done count=%d",
-            function_name, p->id, p->rt_data.debug_thermochem_done);
+            function_name, part_get_id(p), rt_data->debug_thermochem_done);
   }
 }
 

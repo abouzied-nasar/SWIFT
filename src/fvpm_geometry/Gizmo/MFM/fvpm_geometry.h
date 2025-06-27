@@ -1,6 +1,9 @@
 #ifndef SWIFT_FVPM_GEOMETRY_GIZMO_MFM_H
 #define SWIFT_FVPM_GEOMETRY_GIZMO_MFM_H
 
+#include "hydro_part.h"
+#include "inline.h"
+
 /**
  * @brief Reset the variables used to store the centroid; used for the velocity
  * correction.
