@@ -91,12 +91,14 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
     v[2] *= a_factor_vel;
 
 #ifdef HYDRO_DIMENSION_2D
-    double *x = part_get_x(&p[k]) x[2] = 0.f;
+    double *x = part_get_x(&p[k]);
+    x[2] = 0.f;
     v[2] = 0.f;
 #endif
 
 #ifdef HYDRO_DIMENSION_1D
-    double *x = part_get_x(&p[k]) x[1] = x[2] = 0.;
+    double *x = part_get_x(&p[k]);
+    x[1] = x[2] = 0.;
     v[1] = v[2] = 0.f;
 #endif
   }
