@@ -45,11 +45,13 @@
 __attribute__((always_inline)) INLINE static void rt_part_reset_fluxes(
     struct part* restrict p) {
 
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
+
   for (int g = 0; g < RT_NGROUPS; g++) {
-    p->rt_data.flux[g].energy = 0.f;
-    p->rt_data.flux[g].flux[0] = 0.f;
-    p->rt_data.flux[g].flux[1] = 0.f;
-    p->rt_data.flux[g].flux[2] = 0.f;
+    rt_data->flux[g].energy = 0.f;
+    rt_data->flux[g].flux[0] = 0.f;
+    rt_data->flux[g].flux[1] = 0.f;
+    rt_data->flux[g].flux[2] = 0.f;
   }
 }
 

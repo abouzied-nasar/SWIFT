@@ -19,10 +19,12 @@
 #ifndef SWIFT_RT_GEAR_THERMOCHEMISTRY_H
 #define SWIFT_RT_GEAR_THERMOCHEMISTRY_H
 
+#include "rt_getters.h"
 #include "rt_grackle_utils.h"
 #include "rt_interaction_cross_sections.h"
 #include "rt_interaction_rates.h"
 #include "rt_ionization_equilibrium.h"
+#include "rt_unphysical.h"
 
 /**
  * @file src/rt/GEAR/rt_thermochemistry.h
@@ -47,43 +49,46 @@ __attribute__((always_inline)) INLINE static void rt_tchem_first_init_part(
     const struct unit_system* restrict us,
     const struct cosmology* restrict cosmo) {
 
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
+
   if (rt_props->set_equilibrium_initial_ionization_mass_fractions) {
     float XHI, XHII, XHeI, XHeII, XHeIII;
     rt_ion_equil_get_mass_fractions(&XHI, &XHII, &XHeI, &XHeII, &XHeIII, p,
                                     rt_props, hydro_props, phys_const, us,
                                     cosmo);
-    p->rt_data.tchem.mass_fraction_HI = XHI;
-    p->rt_data.tchem.mass_fraction_HII = XHII;
-    p->rt_data.tchem.mass_fraction_HeI = XHeI;
-    p->rt_data.tchem.mass_fraction_HeII = XHeII;
-    p->rt_data.tchem.mass_fraction_HeIII = XHeIII;
+
+    rt_data->tchem.mass_fraction_HI = XHI;
+    rt_data->tchem.mass_fraction_HII = XHII;
+    rt_data->tchem.mass_fraction_HeI = XHeI;
+    rt_data->tchem.mass_fraction_HeII = XHeII;
+    rt_data->tchem.mass_fraction_HeIII = XHeIII;
   } else if (rt_props->set_initial_ionization_mass_fractions) {
-    p->rt_data.tchem.mass_fraction_HI = rt_props->mass_fraction_HI_init;
-    p->rt_data.tchem.mass_fraction_HII = rt_props->mass_fraction_HII_init;
-    p->rt_data.tchem.mass_fraction_HeI = rt_props->mass_fraction_HeI_init;
-    p->rt_data.tchem.mass_fraction_HeII = rt_props->mass_fraction_HeII_init;
-    p->rt_data.tchem.mass_fraction_HeIII = rt_props->mass_fraction_HeIII_init;
+    rt_data->tchem.mass_fraction_HI = rt_props->mass_fraction_HI_init;
+    rt_data->tchem.mass_fraction_HII = rt_props->mass_fraction_HII_init;
+    rt_data->tchem.mass_fraction_HeI = rt_props->mass_fraction_HeI_init;
+    rt_data->tchem.mass_fraction_HeII = rt_props->mass_fraction_HeII_init;
+    rt_data->tchem.mass_fraction_HeIII = rt_props->mass_fraction_HeIII_init;
   }
 
   /* pretend you have nonzero density so the check doesn't reset the mass
    * fractions */
-  p->rho = 1.f;
+  part_set_rho(p, 1.f);
   /* Check that we didn't do something stupid */
   rt_check_unphysical_mass_fractions(p);
-  p->rho = 0.f;
+  part_set_rho(p, 0.f);
 
   /* Check that the Hydrogen and Helium mass fractions correspond to those
    * provided by the user in the parameter file. This mass fraction is also
    * passed down to grackle internally, so it is error-prone if left
    * unchecked. */
   const float mH =
-      p->rt_data.tchem.mass_fraction_HI + p->rt_data.tchem.mass_fraction_HII;
+      rt_data->tchem.mass_fraction_HI + rt_data->tchem.mass_fraction_HII;
   if (fabsf(mH - rt_props->hydrogen_mass_fraction) > 1e-4)
     error("Got wrong Hydrogen mass fraction: Got =%.6f provided in yml =%.6f",
           mH, rt_props->hydrogen_mass_fraction);
-  const float mHe = p->rt_data.tchem.mass_fraction_HeI +
-                    p->rt_data.tchem.mass_fraction_HeII +
-                    p->rt_data.tchem.mass_fraction_HeIII;
+  const float mHe = rt_data->tchem.mass_fraction_HeI +
+                    rt_data->tchem.mass_fraction_HeII +
+                    rt_data->tchem.mass_fraction_HeIII;
   if (fabsf(mHe - rt_props->helium_mass_fraction) > 1e-4)
     error("Got wrong Helium mass fraction: Got =%.6f provided in yml =%.6f",
           mHe, rt_props->helium_mass_fraction);
@@ -117,6 +122,8 @@ INLINE static void rt_do_thermochemistry(
 
   /* This is where the fun begins */
   /* ---------------------------- */
+
+  struct rt_part_data* rt_data = part_get_rt_data_p(p);
 
   /* initialize data so it'll be in scope */
   grackle_field_data particle_grackle_data;
@@ -190,15 +197,15 @@ INLINE static void rt_do_thermochemistry(
 
   /* Update mass fractions */
   const gr_float one_over_rho = 1. / density;
-  p->rt_data.tchem.mass_fraction_HI =
+  rt_data->tchem.mass_fraction_HI =
       particle_grackle_data.HI_density[0] * one_over_rho;
-  p->rt_data.tchem.mass_fraction_HII =
+  rt_data->tchem.mass_fraction_HII =
       particle_grackle_data.HII_density[0] * one_over_rho;
-  p->rt_data.tchem.mass_fraction_HeI =
+  rt_data->tchem.mass_fraction_HeI =
       particle_grackle_data.HeI_density[0] * one_over_rho;
-  p->rt_data.tchem.mass_fraction_HeII =
+  rt_data->tchem.mass_fraction_HeII =
       particle_grackle_data.HeII_density[0] * one_over_rho;
-  p->rt_data.tchem.mass_fraction_HeIII =
+  rt_data->tchem.mass_fraction_HeIII =
       particle_grackle_data.HeIII_density[0] * one_over_rho;
 
   rt_check_unphysical_mass_fractions(p);
@@ -225,17 +232,17 @@ INLINE static void rt_do_thermochemistry(
 
   /* Now remove absorbed radiation */
   for (int g = 0; g < RT_NGROUPS; g++) {
-    const float E_old = p->rt_data.radiation[g].energy_density;
+    const float E_old = rt_data->radiation[g].energy_density;
     double f = dt * 0.5 * (absorption_rates[g] + absorption_rates_new[g]);
     f = min(1., f);
     f = max(0., f);
-    p->rt_data.radiation[g].energy_density *= (1. - f);
+    rt_data->radiation[g].energy_density *= (1. - f);
     for (int i = 0; i < 3; i++) {
-      p->rt_data.radiation[g].flux[i] *= (1. - f);
+      rt_data->radiation[g].flux[i] *= (1. - f);
     }
 
-    rt_check_unphysical_state(&p->rt_data.radiation[g].energy_density,
-                              p->rt_data.radiation[g].flux, E_old,
+    rt_check_unphysical_state(&rt_data->radiation[g].energy_density,
+                              rt_data->radiation[g].flux, E_old,
                               /*callloc=*/2);
   }
   /* Clean up after yourself. */

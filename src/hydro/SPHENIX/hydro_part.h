@@ -1079,16 +1079,18 @@ static __attribute__((always_inline)) INLINE void part_set_pressure_floor_data(
 
 /**
  * Use this for read-write access.
+ * Don't make it static so we can forward-declare it in rt_struct.h
  */
-static __attribute__((always_inline)) INLINE struct rt_part_data *
+__attribute__((always_inline)) INLINE struct rt_part_data *
 part_get_rt_data_p(struct part *restrict p) {
   return &p->_rt_data;
 }
 
 /**
  * Use this for read-only access.
+ * Don't make it static so we can forward-declare it in rt_struct.h
  */
-static __attribute__((always_inline)) INLINE const struct rt_part_data *
+__attribute__((always_inline)) INLINE const struct rt_part_data *
 part_get_const_rt_data_p(const struct part *restrict p) {
   return &p->_rt_data;
 }

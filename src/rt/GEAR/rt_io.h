@@ -21,6 +21,10 @@
 
 #define RT_LABELS_SIZE 10
 
+#include "inline.h"
+#include "io_properties.h"
+#include "rt_part_api.h"
+
 /**
  * @file src/rt/GEAR/rt_io.h
  * @brief Main header file for GEAR M1 Closure radiative transfer
@@ -45,29 +49,29 @@ INLINE static int rt_read_particles(const struct part* parts,
   for (int phg = 0; phg < RT_NGROUPS; phg++) {
     sprintf(fieldname, "PhotonEnergiesGroup%d", phg + 1);
     list[count++] =
-        io_make_input_field(fieldname, FLOAT, 1, OPTIONAL, UNIT_CONV_ENERGY,
-                            parts, rt_data.radiation[phg].energy_density);
+        io_make_indexed_getter_input_field(fieldname, FLOAT, 1, OPTIONAL, UNIT_CONV_ENERGY, parts, part_get_const_rt_radiation_energy_density_p, phg);
+
     sprintf(fieldname, "PhotonFluxesGroup%d", phg + 1);
-    list[count++] = io_make_input_field(fieldname, FLOAT, 3, OPTIONAL,
+    list[count++] = io_make_indexed_getter_input_field(fieldname, FLOAT, 3, OPTIONAL,
                                         UNIT_CONV_ENERGY_VELOCITY, parts,
-                                        rt_data.radiation[phg].flux);
+                                        part_get_const_rt_radiation_flux, phg);
   }
 
-  list[count++] = io_make_input_field("MassFractionHI", FLOAT, 1, OPTIONAL,
+  list[count++] = io_make_getter_input_field("MassFractionHI", FLOAT, 1, OPTIONAL,
                                       UNIT_CONV_NO_UNITS, parts,
-                                      rt_data.tchem.mass_fraction_HI);
-  list[count++] = io_make_input_field("MassFractionHII", FLOAT, 1, OPTIONAL,
+                                      part_get_const_rt_mass_fraction_HI_p);
+  list[count++] = io_make_getter_input_field("MassFractionHII", FLOAT, 1, OPTIONAL,
                                       UNIT_CONV_NO_UNITS, parts,
-                                      rt_data.tchem.mass_fraction_HII);
-  list[count++] = io_make_input_field("MassFractionHeI", FLOAT, 1, OPTIONAL,
+                                      part_get_const_rt_mass_fraction_HII_p);
+  list[count++] = io_make_getter_input_field("MassFractionHeI", FLOAT, 1, OPTIONAL,
                                       UNIT_CONV_NO_UNITS, parts,
-                                      rt_data.tchem.mass_fraction_HeI);
-  list[count++] = io_make_input_field("MassFractionHeII", FLOAT, 1, OPTIONAL,
+                                      part_get_const_rt_mass_fraction_HeI_p);
+  list[count++] = io_make_getter_input_field("MassFractionHeII", FLOAT, 1, OPTIONAL,
                                       UNIT_CONV_NO_UNITS, parts,
-                                      rt_data.tchem.mass_fraction_HeII);
-  list[count++] = io_make_input_field("MassFractionHeIII", FLOAT, 1, OPTIONAL,
+                                      part_get_const_rt_mass_fraction_HeII_p);
+  list[count++] = io_make_getter_input_field("MassFractionHeIII", FLOAT, 1, OPTIONAL,
                                       UNIT_CONV_NO_UNITS, parts,
-                                      rt_data.tchem.mass_fraction_HeIII);
+                                      part_get_const_rt_mass_fraction_HeIII_p);
 
   return count;
 }
@@ -99,8 +103,11 @@ INLINE static void rt_convert_radiation_energies(const struct engine* engine,
                                                  const struct xpart* xpart,
                                                  float* ret) {
 
+  const struct rt_part_data* rtd = part_get_const_rt_data_p(part);
+  const struct fvpm_geometry_struct* geometry = part_get_const_fvpm_geometry_p(part);
+
   for (int g = 0; g < RT_NGROUPS; g++) {
-    ret[g] = part->rt_data.radiation[g].energy_density * part->geometry.volume;
+    ret[g] = rtd->radiation[g].energy_density * geometry->volume;
   }
 }
 
@@ -118,11 +125,12 @@ INLINE static void rt_convert_radiation_fluxes(const struct engine* engine,
                                                const struct xpart* xpart,
                                                float* ret) {
 
+  const struct rt_part_data* rt_data = part_get_const_rt_data_p(part);
   int i = 0;
   for (int g = 0; g < RT_NGROUPS; g++) {
-    ret[i++] = part->rt_data.radiation[g].flux[0];
-    ret[i++] = part->rt_data.radiation[g].flux[1];
-    ret[i++] = part->rt_data.radiation[g].flux[2];
+    ret[i++] = rt_data->radiation[g].flux[0];
+    ret[i++] = rt_data->radiation[g].flux[1];
+    ret[i++] = rt_data->radiation[g].flux[2];
   }
 }
 
@@ -140,11 +148,13 @@ INLINE static void rt_convert_mass_fractions(const struct engine* engine,
                                              const struct xpart* xpart,
                                              float* ret) {
 
-  ret[0] = part->rt_data.tchem.mass_fraction_HI;
-  ret[1] = part->rt_data.tchem.mass_fraction_HII;
-  ret[2] = part->rt_data.tchem.mass_fraction_HeI;
-  ret[3] = part->rt_data.tchem.mass_fraction_HeII;
-  ret[4] = part->rt_data.tchem.mass_fraction_HeIII;
+  const struct rt_part_data* rt_data = part_get_const_rt_data_p(part);
+
+  ret[0] = rt_data->tchem.mass_fraction_HI;
+  ret[1] = rt_data->tchem.mass_fraction_HII;
+  ret[2] = rt_data->tchem.mass_fraction_HeI;
+  ret[3] = rt_data->tchem.mass_fraction_HeII;
+  ret[4] = rt_data->tchem.mass_fraction_HeIII;
 }
 
 /**
@@ -181,38 +191,38 @@ INLINE static int rt_write_particles(const struct part* parts,
   num_elements += 8;
   list[3] =
       io_make_output_field("RTDebugInjectionDone", INT, 1, UNIT_CONV_NO_UNITS,
-                           0, parts, rt_data.debug_injection_done,
+                           0, parts, _rt_data.debug_injection_done,
                            "How many times rt_injection_update_photon_density "
                            "has been called");
   list[4] = io_make_output_field(
       "RTDebugCallsIactGradientInteractions", INT, 1, UNIT_CONV_NO_UNITS, 0,
-      parts, rt_data.debug_calls_iact_gradient_interaction,
+      parts, _rt_data.debug_calls_iact_gradient_interaction,
       "number of calls to this particle during the gradient interaction loop "
       "from the actual interaction function");
   list[5] = io_make_output_field("RTDebugCallsIactTransportInteractions", INT,
                                  1, UNIT_CONV_NO_UNITS, 0, parts,
-                                 rt_data.debug_calls_iact_transport_interaction,
+                                 _rt_data.debug_calls_iact_transport_interaction,
                                  "number of calls to this particle during the "
                                  "transport interaction loop from the actual "
                                  "interaction function");
   list[6] =
       io_make_output_field("RTDebugGradientsDone", INT, 1, UNIT_CONV_NO_UNITS,
-                           0, parts, rt_data.debug_gradients_done,
+                           0, parts, _rt_data.debug_gradients_done,
                            "How many times finalise_gradients was called");
   list[7] =
       io_make_output_field("RTDebugTransportDone", INT, 1, UNIT_CONV_NO_UNITS,
-                           0, parts, rt_data.debug_transport_done,
+                           0, parts, _rt_data.debug_transport_done,
                            "How many times finalise_transport was called");
   list[8] = io_make_output_field(
       "RTDebugThermochemistryDone", INT, 1, UNIT_CONV_NO_UNITS, 0, parts,
-      rt_data.debug_thermochem_done, "How many times rt_tchem was called");
+      _rt_data.debug_thermochem_done, "How many times rt_tchem was called");
   list[9] = io_make_output_field(
       "RTDebugRadAbsorbedTot", ULONGLONG, 1, UNIT_CONV_NO_UNITS, 0, parts,
-      rt_data.debug_radiation_absorbed_tot,
+      _rt_data.debug_radiation_absorbed_tot,
       "Radiation absorbed by this part during its lifetime");
   list[10] = io_make_output_field(
       "RTDebugSubcycles", INT, 1, UNIT_CONV_NO_UNITS, 0, parts,
-      rt_data.debug_nsubcycles, "How many times this part was subcycled");
+      _rt_data.debug_nsubcycles, "How many times this part was subcycled");
 #endif
 
   return num_elements;

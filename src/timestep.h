@@ -284,13 +284,11 @@ __attribute__((always_inline)) INLINE static integertime_t get_part_rt_timestep(
     error(
         "part (id=%lld) wants an RT time-step (%e) below dt_min/nr_subcycles "
         "(%e)",
-        p->id, new_dt, e->dt_min / f);
+        part_get_id(p), new_dt, e->dt_min / f);
 #endif
 
-  const struct rt_timestepping_data *rt_time_data =
-      part_get_const_rt_time_data_p(p);
   const integertime_t new_dti = make_integer_timestep(
-      new_dt, rt_time_data->time_bin, rt_time_data->min_ngb_time_bin,
+      new_dt, part_get_rt_time_bin(p), part_get_rt_min_ngb_time_bin(p),
       e->ti_current, e->time_base_inv);
 
   return new_dti;
