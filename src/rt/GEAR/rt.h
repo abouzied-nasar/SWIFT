@@ -303,7 +303,8 @@ __attribute__((always_inline)) INLINE static void rt_convert_quantities(
    * We only read in conserved quantities, so only check those. */
 
   struct rt_part_data* rtd = part_get_rt_data_p(p);
-  const struct fvpm_geometry_struct* geometry = part_get_const_fvpm_geometry_p(p);
+  const struct fvpm_geometry_struct* geometry =
+      part_get_const_fvpm_geometry_p(p);
   const float Vinv = 1.f / geometry->volume;
 
   /* If we read in radiation energy, we read in
@@ -351,12 +352,13 @@ __attribute__((always_inline)) INLINE static float rt_compute_timestep(
     const struct phys_const* restrict phys_const,
     const struct unit_system* restrict us) {
 
-  const struct fvpm_geometry_struct* geometry = part_get_const_fvpm_geometry_p(p);
+  const struct fvpm_geometry_struct* geometry =
+      part_get_const_fvpm_geometry_p(p);
 
   /* just mimic the gizmo particle "size" for now */
-  const float psize = cosmo->a * cosmo->a *
-                      powf(geometry->volume / hydro_dimension_unit_sphere,
-                           hydro_dimension_inv);
+  const float psize =
+      cosmo->a * cosmo->a *
+      powf(geometry->volume / hydro_dimension_unit_sphere, hydro_dimension_inv);
   float dt = psize * rt_params.reduced_speed_of_light_inverse *
              rt_props->CFL_condition;
 
@@ -476,7 +478,8 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
     const struct cosmology* restrict cosmo) {
 
   struct rt_part_data* restrict rtd = part_get_rt_data_p(p);
-  const struct fvpm_geometry_struct* restrict geometry = part_get_const_fvpm_geometry_p(p);
+  const struct fvpm_geometry_struct* restrict geometry =
+      part_get_const_fvpm_geometry_p(p);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 3, __func__);

@@ -137,41 +137,34 @@ part_set_timestep_limiter_to_be_synchronized(struct part* restrict p,
   timestep_limiter_set_to_be_synchronized(d, to_be_synchronized);
 }
 
-
 /* ----------------------------------------------
  * Radiative Transfer time data getters/setters
  * ---------------------------------------------- */
 
 static __attribute__((always_inline)) INLINE timebin_t
 part_get_rt_time_bin(const struct part* restrict p) {
-  const struct rt_timestepping_data *const rtd = part_get_const_rt_time_data_p(p);
+  const struct rt_timestepping_data* const rtd =
+      part_get_const_rt_time_data_p(p);
   return rt_timestepping_data_get_time_bin(rtd);
 }
 
-static __attribute__((always_inline)) INLINE void
-part_set_rt_time_bin(struct part* restrict p, const timebin_t time_bin) {
-  struct rt_timestepping_data *rtd = part_get_rt_time_data_p(p);
+static __attribute__((always_inline)) INLINE void part_set_rt_time_bin(
+    struct part* restrict p, const timebin_t time_bin) {
+  struct rt_timestepping_data* rtd = part_get_rt_time_data_p(p);
   rt_timestepping_data_set_time_bin(rtd, time_bin);
 }
 
 static __attribute__((always_inline)) INLINE timebin_t
 part_get_rt_min_ngb_time_bin(const struct part* restrict p) {
-  const struct rt_timestepping_data *const rtd = part_get_const_rt_time_data_p(p);
+  const struct rt_timestepping_data* const rtd =
+      part_get_const_rt_time_data_p(p);
   return rt_timestepping_data_get_min_ngb_time_bin(rtd);
 }
 
-static __attribute__((always_inline)) INLINE void
-part_set_rt_min_ngb_time_bin(struct part* restrict p, const timebin_t min_ngb_time_bin) {
-  struct rt_timestepping_data *rtd = part_get_rt_time_data_p(p);
+static __attribute__((always_inline)) INLINE void part_set_rt_min_ngb_time_bin(
+    struct part* restrict p, const timebin_t min_ngb_time_bin) {
+  struct rt_timestepping_data* rtd = part_get_rt_time_data_p(p);
   rt_timestepping_data_set_min_ngb_time_bin(rtd, min_ngb_time_bin);
 }
-
-
-
-
-
-
-
-
 
 #endif

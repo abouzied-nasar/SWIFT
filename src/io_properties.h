@@ -228,7 +228,8 @@ INLINE static void safe_strcpy(char *restrict dst, const char *restrict src,
  * io_make_getter_output_field() macro instead.
  *
  * It also assumes that the getter function has the following signature:
- *   datatype* get_pointer_to_part_struct_by_index(struct part_struct* part, size_t index);
+ *   datatype* get_pointer_to_part_struct_by_index(struct part_struct* part,
+ * size_t index);
  *
  * @param name The name of the field in the ICs.
  * @param type The data type.
@@ -243,9 +244,8 @@ INLINE static void safe_strcpy(char *restrict dst, const char *restrict src,
 #define io_make_indexed_getter_input_field(name, type, dim, importance, units, \
                                            part, getter, index)                \
   io_make_input_field_(name, type, dim, importance, units,                     \
-                       (char *)(getter(&part[0], (index))), sizeof(part[0]),     \
-                       NULL);   \
-
+                       (char *)(getter(&part[0], (index))), sizeof(part[0]),   \
+                       NULL);
 
 /**
  * @brief Constructs an #io_props from its parameters. This version uses
@@ -380,7 +380,6 @@ INLINE static struct io_props io_make_input_field_(
   }
   return r;
 }
-
 
 /**
  * @brief Constructs an #io_props from its parameters. This version uses

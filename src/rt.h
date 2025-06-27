@@ -95,13 +95,15 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_timebin(
 
 #ifndef RT_NONE
   /* Update the minimal time-bin */
-  if (part_get_rt_time_bin(pj) > 0){
-    timebin_t min_ngb_time_bin = min(part_get_rt_min_ngb_time_bin(pi), part_get_rt_time_bin(pj));
+  if (part_get_rt_time_bin(pj) > 0) {
+    timebin_t min_ngb_time_bin =
+        min(part_get_rt_min_ngb_time_bin(pi), part_get_rt_time_bin(pj));
     part_set_rt_min_ngb_time_bin(pi, min_ngb_time_bin);
   }
 
-  if (part_get_rt_time_bin(pi) > 0){
-    timebin_t min_ngb_time_bin = min(part_get_rt_min_ngb_time_bin(pj), part_get_rt_time_bin(pi));
+  if (part_get_rt_time_bin(pi) > 0) {
+    timebin_t min_ngb_time_bin =
+        min(part_get_rt_min_ngb_time_bin(pj), part_get_rt_time_bin(pi));
     part_set_rt_min_ngb_time_bin(pj, min_ngb_time_bin);
   }
 #endif
@@ -130,8 +132,9 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_rt_timebin(
 
 #ifndef RT_NONE
   /* Update the minimal time-bin */
-  if (part_get_rt_time_bin(pj) > 0){
-    timebin_t min_ngb_time_bin = min(part_get_rt_min_ngb_time_bin(pi), part_get_rt_time_bin(pj));
+  if (part_get_rt_time_bin(pj) > 0) {
+    timebin_t min_ngb_time_bin =
+        min(part_get_rt_min_ngb_time_bin(pi), part_get_rt_time_bin(pj));
     part_set_rt_min_ngb_time_bin(pi, min_ngb_time_bin);
   }
 #endif

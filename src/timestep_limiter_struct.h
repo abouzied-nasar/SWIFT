@@ -69,14 +69,14 @@ timestep_limiter_get_wakeup_p(struct timestep_limiter_data* restrict d) {
   return &d->_wakeup;
 }
 
-
 static __attribute__((always_inline)) INLINE void timestep_limiter_set_wakeup(
     struct timestep_limiter_data* restrict d, const timebin_t wakeup) {
   d->_wakeup = wakeup;
 }
 
 static __attribute__((always_inline)) INLINE timebin_t
-timestep_limiter_get_min_ngb_time_bin(const struct timestep_limiter_data* restrict d) {
+timestep_limiter_get_min_ngb_time_bin(
+    const struct timestep_limiter_data* restrict d) {
   return d->_min_ngb_time_bin;
 }
 
@@ -87,13 +87,14 @@ timestep_limiter_set_min_ngb_time_bin(struct timestep_limiter_data* d,
 }
 
 static __attribute__((always_inline)) INLINE char
-timestep_limiter_get_to_be_synchronized(const struct timestep_limiter_data* restrict d) {
+timestep_limiter_get_to_be_synchronized(
+    const struct timestep_limiter_data* restrict d) {
   return d->_to_be_synchronized;
 }
 
 static __attribute__((always_inline)) INLINE void
-timestep_limiter_set_to_be_synchronized(struct timestep_limiter_data* restrict d,
-                                        const char to_be_synchronized) {
+timestep_limiter_set_to_be_synchronized(
+    struct timestep_limiter_data* restrict d, const char to_be_synchronized) {
   d->_to_be_synchronized = to_be_synchronized;
 }
 

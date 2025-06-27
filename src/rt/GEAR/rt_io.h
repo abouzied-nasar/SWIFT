@@ -48,30 +48,31 @@ INLINE static int rt_read_particles(const struct part* parts,
   int count = 0;
   for (int phg = 0; phg < RT_NGROUPS; phg++) {
     sprintf(fieldname, "PhotonEnergiesGroup%d", phg + 1);
-    list[count++] =
-        io_make_indexed_getter_input_field(fieldname, FLOAT, 1, OPTIONAL, UNIT_CONV_ENERGY, parts, part_get_const_rt_radiation_energy_density_p, phg);
+    list[count++] = io_make_indexed_getter_input_field(
+        fieldname, FLOAT, 1, OPTIONAL, UNIT_CONV_ENERGY, parts,
+        part_get_const_rt_radiation_energy_density_p, phg);
 
     sprintf(fieldname, "PhotonFluxesGroup%d", phg + 1);
-    list[count++] = io_make_indexed_getter_input_field(fieldname, FLOAT, 3, OPTIONAL,
-                                        UNIT_CONV_ENERGY_VELOCITY, parts,
-                                        part_get_const_rt_radiation_flux, phg);
+    list[count++] = io_make_indexed_getter_input_field(
+        fieldname, FLOAT, 3, OPTIONAL, UNIT_CONV_ENERGY_VELOCITY, parts,
+        part_get_const_rt_radiation_flux, phg);
   }
 
-  list[count++] = io_make_getter_input_field("MassFractionHI", FLOAT, 1, OPTIONAL,
-                                      UNIT_CONV_NO_UNITS, parts,
-                                      part_get_const_rt_mass_fraction_HI_p);
-  list[count++] = io_make_getter_input_field("MassFractionHII", FLOAT, 1, OPTIONAL,
-                                      UNIT_CONV_NO_UNITS, parts,
-                                      part_get_const_rt_mass_fraction_HII_p);
-  list[count++] = io_make_getter_input_field("MassFractionHeI", FLOAT, 1, OPTIONAL,
-                                      UNIT_CONV_NO_UNITS, parts,
-                                      part_get_const_rt_mass_fraction_HeI_p);
-  list[count++] = io_make_getter_input_field("MassFractionHeII", FLOAT, 1, OPTIONAL,
-                                      UNIT_CONV_NO_UNITS, parts,
-                                      part_get_const_rt_mass_fraction_HeII_p);
-  list[count++] = io_make_getter_input_field("MassFractionHeIII", FLOAT, 1, OPTIONAL,
-                                      UNIT_CONV_NO_UNITS, parts,
-                                      part_get_const_rt_mass_fraction_HeIII_p);
+  list[count++] = io_make_getter_input_field(
+      "MassFractionHI", FLOAT, 1, OPTIONAL, UNIT_CONV_NO_UNITS, parts,
+      part_get_const_rt_mass_fraction_HI_p);
+  list[count++] = io_make_getter_input_field(
+      "MassFractionHII", FLOAT, 1, OPTIONAL, UNIT_CONV_NO_UNITS, parts,
+      part_get_const_rt_mass_fraction_HII_p);
+  list[count++] = io_make_getter_input_field(
+      "MassFractionHeI", FLOAT, 1, OPTIONAL, UNIT_CONV_NO_UNITS, parts,
+      part_get_const_rt_mass_fraction_HeI_p);
+  list[count++] = io_make_getter_input_field(
+      "MassFractionHeII", FLOAT, 1, OPTIONAL, UNIT_CONV_NO_UNITS, parts,
+      part_get_const_rt_mass_fraction_HeII_p);
+  list[count++] = io_make_getter_input_field(
+      "MassFractionHeIII", FLOAT, 1, OPTIONAL, UNIT_CONV_NO_UNITS, parts,
+      part_get_const_rt_mass_fraction_HeIII_p);
 
   return count;
 }
@@ -104,7 +105,8 @@ INLINE static void rt_convert_radiation_energies(const struct engine* engine,
                                                  float* ret) {
 
   const struct rt_part_data* rtd = part_get_const_rt_data_p(part);
-  const struct fvpm_geometry_struct* geometry = part_get_const_fvpm_geometry_p(part);
+  const struct fvpm_geometry_struct* geometry =
+      part_get_const_fvpm_geometry_p(part);
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     ret[g] = rtd->radiation[g].energy_density * geometry->volume;
@@ -199,12 +201,12 @@ INLINE static int rt_write_particles(const struct part* parts,
       parts, _rt_data.debug_calls_iact_gradient_interaction,
       "number of calls to this particle during the gradient interaction loop "
       "from the actual interaction function");
-  list[5] = io_make_output_field("RTDebugCallsIactTransportInteractions", INT,
-                                 1, UNIT_CONV_NO_UNITS, 0, parts,
-                                 _rt_data.debug_calls_iact_transport_interaction,
-                                 "number of calls to this particle during the "
-                                 "transport interaction loop from the actual "
-                                 "interaction function");
+  list[5] = io_make_output_field(
+      "RTDebugCallsIactTransportInteractions", INT, 1, UNIT_CONV_NO_UNITS, 0,
+      parts, _rt_data.debug_calls_iact_transport_interaction,
+      "number of calls to this particle during the "
+      "transport interaction loop from the actual "
+      "interaction function");
   list[6] =
       io_make_output_field("RTDebugGradientsDone", INT, 1, UNIT_CONV_NO_UNITS,
                            0, parts, _rt_data.debug_gradients_done,

@@ -107,7 +107,8 @@ __attribute__((always_inline)) INLINE static void rt_finalise_gradient_part(
     norm = hinvdim;
   } else {
     const float hinvdimp1 = pow_dimension_plus_one(h_inv);
-    const struct fvpm_geometry_struct* geometry = part_get_const_fvpm_geometry_p(p);
+    const struct fvpm_geometry_struct *geometry =
+        part_get_const_fvpm_geometry_p(p);
     const float volume = geometry->volume;
     norm = hinvdimp1 * volume;
   }
@@ -143,11 +144,13 @@ __attribute__((always_inline)) INLINE static void rt_gradients_collect(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part *restrict pi, struct part *restrict pj) {
 
-  struct rt_part_data* rt_data_i = part_get_rt_data_p(pi);
-  struct rt_part_data* rt_data_j = part_get_rt_data_p(pj);
+  struct rt_part_data *rt_data_i = part_get_rt_data_p(pi);
+  struct rt_part_data *rt_data_j = part_get_rt_data_p(pj);
 
-  const struct fvpm_geometry_struct* geometry_i = part_get_const_fvpm_geometry_p(pi);
-  const struct fvpm_geometry_struct* geometry_j = part_get_const_fvpm_geometry_p(pj);
+  const struct fvpm_geometry_struct *geometry_i =
+      part_get_const_fvpm_geometry_p(pi);
+  const struct fvpm_geometry_struct *geometry_j =
+      part_get_const_fvpm_geometry_p(pj);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(pi, 2, __func__);
@@ -297,8 +300,9 @@ __attribute__((always_inline)) INLINE static void rt_gradients_nonsym_collect(
     const float r2, const float dx[3], const float hi, const float hj,
     struct part *restrict pi, struct part *restrict pj) {
 
-  struct rt_part_data* rt_data_i = part_get_rt_data_p(pi);
-  const struct fvpm_geometry_struct* geometry_i = part_get_const_fvpm_geometry_p(pi);
+  struct rt_part_data *rt_data_i = part_get_rt_data_p(pi);
+  const struct fvpm_geometry_struct *geometry_i =
+      part_get_const_fvpm_geometry_p(pi);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(pi, 2, __func__);
