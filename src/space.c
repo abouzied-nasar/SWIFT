@@ -2292,20 +2292,22 @@ void space_check_limiter_mapper(void *map_data, int nr_parts,
   /* Verify that all limited particles have been treated */
   for (int k = 0; k < nr_parts; k++) {
     const timebin_t time_bin = part_get_time_bin(&parts[k]);
-    const struct timestep_limiter_data *limiter_data =
-        part_get_limiter_data_p(&parts[k]);
 
     if (time_bin == time_bin_inhibited) continue;
 
     if (time_bin < 0) error("Particle has negative time-bin!");
 
-    if (with_timestep_limiter && limiter_data->wakeup != time_bin_not_awake)
+    if (with_timestep_limiter &&
+        part_get_timestep_limiter_wakeup(&parts[k]) != time_bin_not_awake)
       error("Particle still woken up! id=%lld wakeup=%d",
-            part_get_id(&parts[k]), limiter_data->wakeup);
+            part_get_id(&parts[k]),
+            part_get_timestep_limiter_wakeup(&parts[k]));
 
-    if (with_timestep_sync && limiter_data->to_be_synchronized != 0)
+    if (with_timestep_sync &&
+        part_get_timestep_limiter_to_be_synchronized(&parts[k]) != 0)
       error("Synchronized particle not treated! id=%lld synchronized=%d",
-            part_get_id(&parts[k]), limiter_data->to_be_synchronized);
+            part_get_id(&parts[k]),
+            part_get_timestep_limiter_to_be_synchronized(&parts[k]));
 
     const struct gpart *gp = part_get_gpart(&parts[k]);
     if (gp != NULL) {

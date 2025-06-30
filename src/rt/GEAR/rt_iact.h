@@ -105,6 +105,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
    * have nothing to do here. */
   if (si->density.wcount == 0.f) return;
 
+  struct rt_part_data *rt_data = part_get_rt_data_p(pj);
+
 #ifdef SWIFT_RT_DEBUG_CHECKS
 
   /* Do some checks and increase neighbour counts
@@ -119,8 +121,8 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   si->rt_data.debug_iact_hydro_inject += 1;
   si->rt_data.debug_radiation_emitted_tot += 1ULL;
 
-  pj->rt_data.debug_iact_stars_inject += 1;
-  pj->rt_data.debug_radiation_absorbed_tot += 1ULL;
+  rt_data->debug_iact_stars_inject += 1;
+  rt_data->debug_radiation_absorbed_tot += 1ULL;
 
 #endif
 
@@ -159,15 +161,18 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
   /* We might end up in this scenario due to roundoff errors */
   if (psi == 0.f || octw == 0.f) return;
 
+  const struct fvpm_geometry_struct *geometry =
+      part_get_const_fvpm_geometry_p(pj);
+
   const float weight = psi / (nonempty_octants * octw);
-  const float Vinv = 1.f / pj->geometry.volume;
+  const float Vinv = 1.f / geometry->volume;
 
   /* Nurse, the patient is ready now */
   for (int g = 0; g < RT_NGROUPS; g++) {
     /* Inject energy. */
     const float injected_energy_density =
         si->rt_data.emission_this_step[g] * weight * Vinv;
-    pj->rt_data.radiation[g].energy_density += injected_energy_density;
+    rt_data->radiation[g].energy_density += injected_energy_density;
 
     /* Don't inject flux. */
   }
@@ -180,7 +185,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_inject(
       error(
           "Injecting abnormal energy spart %lld part %lld group %d | %.6e %.6e "
           "%.6e",
-          si->id, pj->id, g, injected_energy, weight,
+          si->id, part_get_id(pj), g, injected_energy, weight,
 
           si->rt_data.emission_this_step[g]);
     si->rt_data.debug_injected_energy[g] += injected_energy;
@@ -211,14 +216,21 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_flux_common(
     struct part *restrict pi, struct part *restrict pj, const float a,
     const float H, int mode) {
 
+  struct rt_part_data *rt_data_i = part_get_rt_data_p(pi);
+  struct rt_part_data *rt_data_j = part_get_rt_data_p(pj);
+  const struct fvpm_geometry_struct *geometry_i =
+      part_get_const_fvpm_geometry_p(pi);
+  const struct fvpm_geometry_struct *geometry_j =
+      part_get_const_fvpm_geometry_p(pj);
+
 #ifdef SWIFT_RT_DEBUG_CHECKS
   const char *func_name = (mode == 1) ? "sym flux iact" : "nonsym flux iact";
   rt_debug_sequence_check(pi, 3, func_name);
-  pi->rt_data.debug_calls_iact_transport_interaction += 1;
+  rt_data_i->debug_calls_iact_transport_interaction += 1;
 
   if (mode == 1) {
     rt_debug_sequence_check(pj, 3, func_name);
-    pj->rt_data.debug_calls_iact_transport_interaction += 1;
+    rt_data_j->debug_calls_iact_transport_interaction += 1;
   }
 #endif
 
@@ -231,22 +243,24 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_flux_common(
   float Bj[3][3];
   for (int k = 0; k < 3; k++) {
     for (int l = 0; l < 3; l++) {
-      Bi[k][l] = pi->geometry.matrix_E[k][l];
-      Bj[k][l] = pj->geometry.matrix_E[k][l];
+      Bi[k][l] = geometry_i->matrix_E[k][l];
+      Bj[k][l] = geometry_j->matrix_E[k][l];
     }
   }
-  const float Vi = pi->geometry.volume;
-  const float Vj = pj->geometry.volume;
+  const float Vi = geometry_i->volume;
+  const float Vj = geometry_j->volume;
 
   /* Compute kernel of pi. */
-  float wi, wi_dx;
+  float wi;
+  float wi_dx;
   const float hi_inv = 1.0f / hi;
   const float hi_inv_dim = pow_dimension(hi_inv);
   const float xi = r * hi_inv;
   kernel_deval(xi, &wi, &wi_dx);
 
   /* Compute kernel of pj. */
-  float wj, wj_dx;
+  float wj;
+  float wj_dx;
   const float hj_inv = 1.0f / hj;
   const float hj_inv_dim = pow_dimension(hj_inv);
   const float xj = r * hj_inv;
@@ -326,17 +340,17 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_flux_common(
   const float xfac = -hi / (hi + hj);
   const float xij_i[3] = {xfac * dx[0], xfac * dx[1], xfac * dx[2]};
 
-  struct rt_part_data *restrict rti = &pi->rt_data;
-  struct rt_part_data *restrict rtj = &pj->rt_data;
   /* Get the time step for the flux exchange. This is always the smallest time
    * step among the two particles. */
-  const float mindt =
-      (rtj->flux_dt > 0.f) ? fminf(rti->flux_dt, rtj->flux_dt) : rti->flux_dt;
+  const float mindt = (rt_data_j->flux_dt > 0.f)
+                          ? fminf(rt_data_i->flux_dt, rt_data_j->flux_dt)
+                          : rt_data_i->flux_dt;
 
   for (int g = 0; g < RT_NGROUPS; g++) {
 
     /* radiation state to be used to compute the flux */
-    float Ui[4], Uj[4];
+    float Ui[4];
+    float Uj[4];
     rt_gradients_predict(pi, pj, Ui, Uj, g, dx, r, xij_i);
 
     /* For first order method, skip the gradients */
@@ -360,15 +374,15 @@ __attribute__((always_inline)) INLINE static void runner_iact_rt_flux_common(
      * the fluxes are always exchanged symmetrically. Thanks to our sneaky use
      * of flux_dt, we can detect inactive neighbours through their negative time
      * step. */
-    rti->flux[g].energy -= totflux[0] * mindt;
-    rti->flux[g].flux[0] -= totflux[1] * mindt;
-    rti->flux[g].flux[1] -= totflux[2] * mindt;
-    rti->flux[g].flux[2] -= totflux[3] * mindt;
-    if (mode == 1 || (rtj->flux_dt < 0.f)) {
-      rtj->flux[g].energy += totflux[0] * mindt;
-      rtj->flux[g].flux[0] += totflux[1] * mindt;
-      rtj->flux[g].flux[1] += totflux[2] * mindt;
-      rtj->flux[g].flux[2] += totflux[3] * mindt;
+    rt_data_i->flux[g].energy -= totflux[0] * mindt;
+    rt_data_i->flux[g].flux[0] -= totflux[1] * mindt;
+    rt_data_i->flux[g].flux[1] -= totflux[2] * mindt;
+    rt_data_i->flux[g].flux[2] -= totflux[3] * mindt;
+    if (mode == 1 || (rt_data_j->flux_dt < 0.f)) {
+      rt_data_j->flux[g].energy += totflux[0] * mindt;
+      rt_data_j->flux[g].flux[0] += totflux[1] * mindt;
+      rt_data_j->flux[g].flux[1] += totflux[2] * mindt;
+      rt_data_j->flux[g].flux[2] += totflux[3] * mindt;
     }
   }
 }

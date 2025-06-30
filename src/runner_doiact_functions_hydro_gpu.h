@@ -369,11 +369,11 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
       error("Created %i more than expected leaf cells. depth %i",
             *n_leafs_found, depth);
     //	double dist = sqrt(pow(ci->loc[0] - cj->loc[0], 2) + pow(ci->loc[1] -
-    //cj->loc[1], 2)
+    // cj->loc[1], 2)
     //	        + pow(ci->loc[2] - cj->loc[2], 2));
     //	if(dist > 0.5)
     //	  error("Incorect dists %f shifts %f %f %f", dist, shift[0], shift[1],
-    //shift[2]);
+    // shift[2]);
   }
 }
 
