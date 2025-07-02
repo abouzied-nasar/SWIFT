@@ -1277,73 +1277,47 @@ void *runner_main2(void *data) {
           else if (t->subtype == task_subtype_gradient) {
             int Do_nothing = 0;
 #ifndef GPUOFFLOAD_GRADIENT
-            struct timespec t0, t1, dt;
-            clock_gettime(CLOCK_REALTIME, &t0);
-            // runner_dopair1_branch_gradient(r, ci, cj);
 #ifdef EXTRA_HYDRO_LOOP_TYPE2
             runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 1);
 #else
             runner_dosub_pair1_gradient(r, ci, cj, /*below_h_max=*/0, 1);
 #endif
-            clock_gettime(CLOCK_REALTIME, &t1);
-            tasks_done_cpu++;
-            time_for_cpu_pair_g += (t1.tv_sec - t0.tv_sec) +
-                                   (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 #endif
           }
 #endif  // EXTRA_HYDRO_LOOP
           else if (t->subtype == task_subtype_force) {
-            int Do_nothing = 0;
 #ifndef GPUOFFLOAD_FORCE
-            struct timespec t0, t1, dt;
-            clock_gettime(CLOCK_REALTIME, &t0);
-            // runner_dopair2_branch_force(r, ci, cj);
             runner_dosub_pair2_force(r, ci, cj, /*below_h_max=*/0, 1);
-            clock_gettime(CLOCK_REALTIME, &t1);
-            tasks_done_cpu++;
-            time_for_cpu_pair_f += (t1.tv_sec - t0.tv_sec) +
-                                   (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 #endif  // GPUOFFLOAD_FORCE
           } else if (t->subtype == task_subtype_limiter)
-            // runner_dopair1_branch_limiter(r, ci, cj);
             runner_dosub_pair1_limiter(r, ci, cj, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_stars_density)
-            // runner_dopair_branch_stars_density(r, ci, cj);
             runner_dosub_pair_stars_density(r, ci, cj, /*below_h_max=*/0, 1);
 #ifdef EXTRA_STAR_LOOPS
           else if (t->subtype == task_subtype_stars_prep1)
-            // runner_dopair_branch_stars_prep1(r, ci, cj);
             runner_dosub_pair_stars_prep1(r, ci, cj, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_stars_prep2)
-            // runner_dopair_branch_stars_prep2(r, ci, cj);
             runner_dosub_pair_stars_prep2(r, ci, cj, /*below_h_max=*/0, 1);
 #endif
           else if (t->subtype == task_subtype_stars_feedback)
-            // runner_dopair_branch_stars_feedback(r, ci, cj);
             runner_dosub_pair_stars_feedback(r, ci, cj, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_bh_density)
-            // runner_dopair_branch_bh_density(r, ci, cj);
             runner_dosub_pair_bh_density(r, ci, cj, 1);
           else if (t->subtype == task_subtype_bh_swallow)
-            // runner_dopair_branch_bh_swallow(r, ci, cj);
             runner_dosub_pair_bh_swallow(r, ci, cj, 1);
           else if (t->subtype == task_subtype_do_gas_swallow)
             runner_do_gas_swallow_pair(r, ci, cj, 1);
           else if (t->subtype == task_subtype_do_bh_swallow)
             runner_do_bh_swallow_pair(r, ci, cj, 1);
           else if (t->subtype == task_subtype_bh_feedback)
-            // runner_dopair_branch_bh_feedback(r, ci, cj);
             runner_dosub_pair_bh_feedback(r, ci, cj, 1);
           else if (t->subtype == task_subtype_rt_gradient)
-            // runner_dopair1_branch_rt_gradient(r, ci, cj);
             runner_dosub_pair1_rt_gradient(r, ci, cj, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_rt_transport)
-            // runner_dopair2_branch_rt_transport(r, ci, cj);
             runner_dosub_pair2_rt_transport(r, ci, cj, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_sink_density)
             runner_dosub_pair_sinks_density(r, ci, cj, 1);
           else if (t->subtype == task_subtype_sink_swallow)
-            // runner_dopair_branch_sinks_swallow(r, ci, cj);
             runner_dosub_pair_sinks_swallow(r, ci, cj, 1);
           else if (t->subtype == task_subtype_sink_do_gas_swallow)
             runner_do_sinks_gas_swallow_pair(r, ci, cj, 1);
@@ -1590,14 +1564,11 @@ void *runner_main2(void *data) {
         cj->tasks_executed[t->type]++;
         cj->subtasks_executed[t->subtype]++;
       }
-
       /* This runner is not doing a task anymore */
       r->t = NULL;
 #endif
-
       /* We're done with this task, see if we get a next one. */
       prev = t;
-
       if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
         /* Don't enqueue unpacks yet. Just signal the runners */
@@ -1641,113 +1612,6 @@ void *runner_main2(void *data) {
       }
     } /* main loop. */
 
-    message("n_leafs found %i", n_leafs_total);
-//    message("cpu %i packed %i cells with %i containing more parts than target of %i max_count %i",
-//            r->cpuid, n_cells_d, n_w_prts_gtr_target_d, np_per_cell, maxcount);
-//    message("cpu %i packed %i cells_G with %i containing more parts than target of %i max_count %i",
-//            r->cpuid, n_cells_g, n_w_prts_gtr_target_g, np_per_cell, maxcount);
-//    message("cpu %i packed %i cells_F with %i containing more parts than target of %i max_count %i",
-//            r->cpuid, n_cells_f, n_w_prts_gtr_target_f, np_per_cell, maxcount);
-//    message("cpu %i packed %i pairs_D with %i containing more parts than target of %i max_count %i",
-//            r->cpuid, n_cells_p_d, n_w_prts_gtr_target_p_d, np_per_cell, maxcount);
-//    message("cpu %i packed %i pairs_G with %i containing more parts than target of %i max_count %i",
-//            r->cpuid, n_cells_p_g, n_w_prts_gtr_target_p_g, np_per_cell, maxcount);
-//    message("cpu %i packed %i pairs_F with %i containing more parts than target of %i max_count %i",
-//            r->cpuid, n_cells_p_f, n_w_prts_gtr_target_p_f, np_per_cell, maxcount);
-
-    //    message("Worked on %i supers w more than 100 parts", g100);
-    // Stuff for writing debug data to file for validation
-    //        if (step % 10 == 0 || step == 1) {
-//          if(r->cpuid == 0 && engine_rank == 0){
-//          fprintf(fgpu_steps, "x, y, z, "
-//        		  "rho, rhodh, v_sig, lap_u, a_visc_max, ax, ay, az\n");
-//          for (int tid = 0; tid < space->nr_local_cells; tid++) { /* This should indeed be tasks_done_gpu as they are
-//               the only
-//    //                     tasks which have been done*/
-//            struct cell *ctemp = &(space->cells_top[tid]);
-//            for (int i = 0; i < ctemp->hydro.count; i++) {
-//              fprintf(fgpu_steps, "%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-//                      ctemp->hydro.parts[i].x[0],
-//                      ctemp->hydro.parts[i].x[1],
-//                      ctemp->hydro.parts[i].x[2], ctemp->hydro.parts[i].rho,
-//                      ctemp->hydro.parts[i].density.rho_dh,
-//                      ctemp->hydro.parts[i].viscosity.v_sig,
-//                      ctemp->hydro.parts[i].diffusion.laplace_u,
-//                      ctemp->hydro.parts[i].force.alpha_visc_max_ngb,
-//                      ctemp->hydro.parts[i].a_hydro[0],
-//    				  ctemp->hydro.parts[i].a_hydro[1],
-//    				  ctemp->hydro.parts[i].a_hydro[2]);
-//    //          message("wcount %f density %f",
-//    // ctemp->hydro.parts[i].density.wcount, ctemp->hydro.parts[i].rho); /
-//    // message("wcount is %f\n", ctemp->hydro.parts[i].density.wcount);
-//            }
-//          }
-//          fflush(fgpu_steps);
-//          }
-    //  }
-    /*Output compute times to separate files. cat later into one file*/
-//    if (step % 11 == 0 || step == 1) {
-#ifdef DUMP_TIMINGS
-#if defined(GPUOFFLOAD_DENSITY) || defined(GPUOFFLOAD_GRADIENT) || \
-    defined(GPUOFFLOAD_FORCE)
-    //        char buffer[30];
-    //        snprintf(buffer, sizeof(buffer), "t%d_stepnfullbundles%d",
-    //        r->cpuid, step); FILE *fullbundles = fopen(buffer, "w");
-    //        if(r->cpuid == 0)fprintf(fullbundles, "nfull, npartial,
-    //        nfullpair, npartialpair\n"); else fprintf(fullbundles, "%i, %i,
-    //        %i, %i\n", 		n_full_d_bundles, n_partial_d_bundles,
-    //        n_full_p_d_bundles, n_partial_p_d_bundles); fflush(fullbundles);
-
-    ///////////////////////////////////////////////////////////////
-    /// to ooutput timings uncomment this
-    ///////////////////////////////////////////////////////////////
-    if (r->cpuid == 0 && engine_rank == 0)
-      fprintf(fgpu_steps,
-              "GPU_SD, P_SD, U_SD, GPU_PD,  P_PD, U_PD, "
-              "GPU_SF, P_SF, U_SF, GPU_PF, P_PF, U_PF, GPU_SG, P_SG, U_SG, "
-              "GPU_PG, P_PG, U_PG\n "
-              "%e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, "
-              "%e, %e\n",
-              time_for_density_gpu, packing_time, unpack_time_self,
-              time_for_density_gpu_pair, packing_time_pair, unpacking_time_pair,
-              time_for_gpu_f, packing_time_f, unpack_time_self_f,
-              time_for_gpu_pair_f, packing_time_pair_f, unpacking_time_pair_f,
-              time_for_gpu_g, packing_time_g, unpack_time_self_g,
-              time_for_gpu_pair_g, packing_time_pair_g, unpacking_time_pair_f);
-
-    else
-      fprintf(fgpu_steps,
-              "%e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, "
-              "%e, %e\n",
-              time_for_density_gpu, packing_time, unpack_time_self,
-              time_for_density_gpu_pair, packing_time_pair, unpacking_time_pair,
-              time_for_gpu_f, packing_time_f, unpack_time_self_f,
-              time_for_gpu_pair_f, packing_time_pair_f, unpacking_time_pair_f,
-              time_for_gpu_g, packing_time_g, unpack_time_self_g,
-              time_for_gpu_pair_g, packing_time_pair_g, unpacking_time_pair_f);
-      //////////////////////////////////////////////////////////////
-      ///////////////////////////////////////////////////////////////
-      ///////////////////////////////////////////////////////////////
-
-#else  // No GPU offload
-    if (r->cpuid == 0 && engine_rank == 0)
-      fprintf(fgpu_steps,
-              "CPU TIME SELF, CPU TIME PAIR, "
-              "CPU TIME SELF F, CPU TIME PAIR F, CPU TIME SELF G, CPU TIME "
-              "PAIR G\n "
-              "%e, %e, %e, %e, %e, %e\n",
-              time_for_density_cpu, time_for_density_cpu_pair, time_for_cpu_f,
-              time_for_cpu_pair_f, time_for_cpu_g, time_for_cpu_pair_g);
-
-    else
-      fprintf(fgpu_steps, "%e, %e, %e, %e, %e, %e,\n", time_for_density_cpu,
-              time_for_density_cpu_pair, time_for_cpu_f, time_for_cpu_pair_f,
-              time_for_cpu_g, time_for_cpu_pair_g);
-#endif
-    //    }
-    fflush(fgpu_steps);
-    fclose(fgpu_steps);
-#endif  // DUMPTIMINGS
     time_for_density_cpu = 0.0;
     time_for_density_gpu = 0.0;
     time_for_density_cpu_pair = 0.0;
