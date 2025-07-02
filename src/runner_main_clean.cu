@@ -966,170 +966,18 @@ void *runner_main2(void *data) {
             } /* End of GPU work Pairs */
 
 #else //RECURSE
-
-            ticks tic_cpu_pack = getticks();
             /////////////////////W.I.P!!!////////////////////////////////////////////////////////
             /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
             * We are recursing separately to find out how much work we have before offloading*/
             //We need to allocate a list to put cell pointers into for each new task
             int n_expected_tasks = 4096; //A. Nasar: Need to come up with a good estimate for this
-            //PACK_VARS
-            int n_leaves_found = 0;
-            int top_tasks_packed = pack_vars_pair_dens->top_tasks_packed;
-            //PACK_VARS
             int depth = 0;
-            //PACK_VARS (n_daughters_packed_index & n_daughters_total)
             int n_daughters_packed_index = n_daughters_total;
+            int n_leaves_found = 0;
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
                       parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_d, cj_d, n_daughters_total);
-//            runner_pack_recurse_and_launch();
-            n_daughters_total += n_leaves_found;
-            //Keep separate
-            first_and_last_daughters[top_tasks_packed][0] = n_daughters_packed_index;
-            //Keep separate
-            ci_top[top_tasks_packed] = ci;
-            cj_top[top_tasks_packed] = cj;
-            n_leafs_total += n_leaves_found;
-            int first_cell_to_move = n_daughters_packed_index;
-            int n_daughters_left = n_daughters_total;
-            /*Get pointer to top level task. Needed to enqueue deps*/
-            pack_vars_pair_dens->top_task_list[top_tasks_packed] = t;
-            /*Increment how many top tasks we've packed*/
-            pack_vars_pair_dens->top_tasks_packed++;
-            top_tasks_packed++;
-            //A. Nasar: Remove this from struct as not needed. Was only used for de-bugging
-            /*How many daughter tasks do we want to offload at once?*/
-            int target_n_tasks_tmp = pack_vars_pair_dens->target_n_tasks;
-            t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
-            // A. Nasar: Check to see if this is the last task in the queue.
-            // If so, set launch_leftovers to 1 and recursively pack and launch daughter tasks on GPU
-            lock_lock(&sched->queues[qid].lock);
-            sched->queues[qid].n_packs_pair_left_d--;
-            if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
-            lock_unlock(&sched->queues[qid].lock);
-            /*Counter for how many tasks we've packed*/
-            int npacked = 0;
-
-            int launched = 0;
-            //A. Nasar: Loop through the daughter tasks we found
-            int copy_index = n_daughters_packed_index;
-            int index_start_packing = n_daughters_packed_index;
-            int index_end_packing = n_daughters_total;
-            int index_start_unpacking = first_and_last_daughters[0][0];
-            int index_end_unpacking = index_start_unpacking + target_n_tasks_tmp;
-            //not strictly true!!! Could be that we packed and moved on without launching
-            int n_p_current_task = 0;
-            int had_prev_task = 0;
-            if(n_daughters_packed_index > 0)
-              had_prev_task = 1;
-
-            cell_unlocktree(ci);
-            cell_unlocktree(cj);
-
-            while(npacked < n_leaves_found){
-              top_tasks_packed = pack_vars_pair_dens->top_tasks_packed;
-              tic_cpu_pack = getticks();
-              int launch = 0;
-              struct cell * cii = ci_d[copy_index];
-              struct cell * cjj = cj_d[copy_index];
-              packing_time_pair += runner_dopair1_pack_f4(
-                  r, sched, pack_vars_pair_dens, cii, cjj, t,
-                  parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens);
-              //record number of tasks we've copied from last launch
-              copy_index++;
-              n_p_current_task++;
-              //Record how many daughters we've packed in total for while loop
-              npacked++;
-              first_cell_to_move++;
-              /*Re-think this. Probably not necessary to have this if statement and we can just use the form in the else statement*/
-              if(had_prev_task)
-                first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index - n_daughters_packed_index;
-              else
-                first_and_last_daughters[top_tasks_packed - 1][1] = first_and_last_daughters[top_tasks_packed - 1][0] + copy_index;
-
-              if(pack_vars_pair_dens->tasks_packed == target_n_tasks_tmp)
-            	  pack_vars_pair_dens->launch = 1;
-              if(pack_vars_pair_dens->launch || (pack_vars_pair_dens->launch_leftovers && npacked == n_leaves_found)){
-
-            	if(pack_vars_pair_dens->launch_leftovers && npacked == n_leaves_found)
-                  leftover_launch_count++;
-
-                last_launched = first_and_last_daughters[top_tasks_packed - 1][1];
-            	launched = 1;
-            	//Here we only launch the tasks. No unpacking! This is done in next function ;)
-                runner_dopair1_launch_f4_one_memcpy_no_unpack(
-                      r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
-                      parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
-                      d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
-                      &packing_time_pair, &time_for_density_gpu_pair,
-                      &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-                      pair_end);
-                launch_count++;
-                runner_dopair1_unpack_f4(
-                      r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
-                      parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
-                      d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
-                      &packing_time_pair, &time_for_density_gpu_pair,
-                      &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-                      pair_end, npacked, n_leaves_found, ci_d, cj_d, first_and_last_daughters, ci_top, cj_top);
-                if(npacked == n_leaves_found){
-                  n_daughters_total = 0;
-                  pack_vars_pair_dens->top_tasks_packed = 0;
-                }
-                //Special treatment required here. Launched but have not packed all tasks
-                else{
-                  //If we launch but still have daughters left re-set this task to be the first in the list
-                  //so that we can continue packing correctly
-                  pack_vars_pair_dens->top_task_list[0] = t;
-                  //Move all tasks forward in list so that the first next task will be packed to index 0
-                  last_launched = 0;//first_cell_to_move;
-                  //Move remaining cell indices so that their indexing starts from zero and ends in n_daughters_left
-                  for(int i = first_cell_to_move; i < n_daughters_left; i++){
-                    int shuffle = i - first_cell_to_move;
-                    ci_d[shuffle] = ci_d[i];
-                    cj_d[shuffle] = cj_d[i];
-                  }
-                  copy_index = 0;
-                  first_and_last_daughters[0][0] = 0;
-                  first_and_last_daughters[0][1] = n_daughters_left - first_cell_to_move;
-
-                  cj_top[0] = cj;
-                  ci_top[0] = ci;
-
-                  n_daughters_left -= first_cell_to_move;
-                  first_cell_to_move = 0;
-
-            	  pack_vars_pair_dens->top_tasks_packed = 1;
-                  had_prev_task = 0;
-                }
-          	    pack_vars_pair_dens->tasks_packed = 0;
-                pack_vars_pair_dens->count_parts = 0;
-                pack_vars_pair_dens->launch = 0;
-              }
-              //case when we have launched then gone back to pack but did not pack enough to launch again
-              else if(npacked == n_leaves_found){
-                if(launched == 1){
-                  n_daughters_total = n_daughters_left;
-                  cj_top[0] = cj;
-                  ci_top[0] = ci;
-                  first_and_last_daughters[0][0] = 0;
-                  first_and_last_daughters[0][1] = n_daughters_left;
-                  pack_vars_pair_dens->top_tasks_packed = 1;
-                  pack_vars_pair_dens->top_task_list[0] = t;
-                  launched = 0;
-                }
-                else {
-                  first_and_last_daughters[top_tasks_packed - 1][0] = n_daughters_packed_index;
-                  first_and_last_daughters[top_tasks_packed - 1][1] = n_daughters_total;
-                }
-                pack_vars_pair_dens->launch = 0;
-              }
-              pack_vars_pair_dens->launch = 0;
-              t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
-            }
-            //A. Nasar: Launch-leftovers counter re-set to zero and cells unlocked
-            pack_vars_pair_dens->launch_leftovers = 0;
-            pack_vars_pair_dens->launch = 0;
+            runner_pack_daughters_and_launch();
+        ///////
 #endif  //RECURSE
 #endif  // GPUOFFLOAD_DENSITY
           } /* pair / pack */
