@@ -714,12 +714,12 @@ void *runner_main2(void *data) {
     /*Some bits for output in case of debug*/
     char buf5[20];
     snprintf(buf5, sizeof(buf5), "t%dr%dstep%d", r->cpuid, engine_rank, step);
-#ifdef DUMP_TIMINGS
-    FILE *fgpu_steps;
-    fgpu_steps = fopen(buf5, "w");
-#endif
-    FILE *fgpu_steps;
-    fgpu_steps = fopen(buf5, "w");
+//#ifdef DUMP_TIMINGS
+//    FILE *fgpu_steps;
+//    fgpu_steps = fopen(buf5, "w");
+//#endif
+//    FILE *fgpu_steps;
+//    fgpu_steps = fopen(buf5, "w");
     //    if (step == 0) cudaProfilerStart();
     step++;
 
@@ -1006,9 +1006,6 @@ void *runner_main2(void *data) {
 
 #ifndef RECURSE
             ticks tic_cpu_pack = getticks();
-//            if(ci->loc[0] - cj->loc[0] > 0.5)
-//              fprintf(fgpu_steps, "x, y, z, "
-//            		"rho, rhodh, v_sig, lap_u, a_visc_max, ax, ay, az\n");
             /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
             packing_time_pair_f +=
                 runner_dopair1_pack_f4_d(r, sched, pack_vars_pair_dens, ci,
@@ -1022,7 +1019,6 @@ void *runner_main2(void *data) {
             if (launch || launch_leftovers) {
               /*Launch GPU tasks*/
               int t_packed = pack_vars_pair_dens->tasks_packed;
-              //                signal_sleeping_runners(sched, t, t_packed);
               runner_dopair1_launch_f4_one_memcpy(
                   r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
                   parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
@@ -1032,46 +1028,11 @@ void *runner_main2(void *data) {
                   pair_end);
 
               pack_vars_pair_dens->launch_leftovers = 0;
-//              if(ci->loc[0] - cj->loc[0] > 0.5){
-//            	  message("got in");
-//              struct cell * ctemp = ci;
-//              for (int i = 0; i < ctemp->hydro.count; i++) {
-//              	fprintf(fgpu_steps, "%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-//              			ctemp->hydro.parts[i].x[0],
-//							ctemp->hydro.parts[i].x[1],
-//							ctemp->hydro.parts[i].x[2], ctemp->hydro.parts[i].rho,
-//							ctemp->hydro.parts[i].density.rho_dh,
-//							ctemp->hydro.parts[i].viscosity.v_sig,
-//							ctemp->hydro.parts[i].diffusion.laplace_u,
-//							ctemp->hydro.parts[i].force.alpha_visc_max_ngb,
-//							ctemp->hydro.parts[i].a_hydro[0],
-//							ctemp->hydro.parts[i].a_hydro[1],
-//							ctemp->hydro.parts[i].a_hydro[2]);
-//              }
-//              ctemp = cj;
-//              for (int i = 0; i < ctemp->hydro.count; i++) {
-//              	fprintf(fgpu_steps, "%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-//              			ctemp->hydro.parts[i].x[0],
-//							ctemp->hydro.parts[i].x[1],
-//							ctemp->hydro.parts[i].x[2], ctemp->hydro.parts[i].rho,
-//							ctemp->hydro.parts[i].density.rho_dh,
-//							ctemp->hydro.parts[i].viscosity.v_sig,
-//							ctemp->hydro.parts[i].diffusion.laplace_u,
-//							ctemp->hydro.parts[i].force.alpha_visc_max_ngb,
-//							ctemp->hydro.parts[i].a_hydro[0],
-//							ctemp->hydro.parts[i].a_hydro[1],
-//							ctemp->hydro.parts[i].a_hydro[2]);
-//              }
-//              fflush(fgpu_steps);
-//              error("Not recursing");
-//              }
             } /* End of GPU work Pairs */
 
 #else //RECURSE
 
             ticks tic_cpu_pack = getticks();
-//            message("recursing");
-
             /////////////////////W.I.P!!!////////////////////////////////////////////////////////
             /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
             * We are recursing separately to find out how much work we have before offloading*/
@@ -1106,8 +1067,6 @@ void *runner_main2(void *data) {
             /*Increment how many top tasks we've packed*/
             pack_vars_pair_dens->top_tasks_packed++;
             top_tasks_packed++;
-            //A. Nasar: Remove this from struct as not needed. Was only used for de-bugging
-//            pack_vars_pair_dens->task_locked = 1;
             /*How many daughter tasks do we want to offload at once?*/
             int target_n_tasks = pack_vars_pair_dens->target_n_tasks;
             t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
@@ -1116,7 +1075,6 @@ void *runner_main2(void *data) {
             // If so, set launch_leftovers to 1 and recursively pack and launch daughter tasks on GPU
             lock_lock(&sched->queues[qid].lock);
             sched->queues[qid].n_packs_pair_left_d--;
-//            if (sched->queues[qid].n_packs_pair_left_d < 1) pack_vars_pair_dens->launch_leftovers = 1;
             lock_unlock(&sched->queues[qid].lock);
             /*Counter for how many tasks we've packed*/
             int npacked = 0;
@@ -1125,11 +1083,6 @@ void *runner_main2(void *data) {
               for(int j = 0; j < ll_temp->n_leaves; j++){
                 struct cell * cci = ll_temp->ci[j];
                 struct cell * ccj = ll_temp->cj[j];
-//                if(ll_temp->citop != cci->top->cellID && ll_temp->citop != ccj->top->cellID)
-//                  error("Top mismatch");
-                message("ttid %i lpdt %i npacked %i, ci %i, cj %i citop %i, cjtop %i",
-                i, ll_temp->lpdt, ll_temp->n_packed,
-                cci->cellID, ccj->cellID, cci->top->cellID, ccj->top->cellID);
               }
             }
             //A. Nasar: Loop through the daughter tasks we found
@@ -1151,10 +1104,6 @@ void *runner_main2(void *data) {
               // should be noffload which is set to zero after launch. count_parts should also be zero after launch
               struct cell * cii = ll_current->ci[npacked];
               struct cell * cjj = ll_current->cj[npacked];
-              message("Packing ttid %i t_packed %i npacked %i, ci %i, cj %i citop %i, cjtop %i",
-                  top_tasks_packed - 1, pack_vars_pair_dens->tasks_packed, npacked,
-                  cii->cellID, cjj->cellID, cii->top->cellID, cjj->top->cellID);
-        	  message("Packing % i % i %i", cii->hydro.count, cjj->hydro.count, pack_vars_pair_dens->count_parts);
               packing_time_pair += runner_dopair1_pack_f4(
                   r, sched, pack_vars_pair_dens, cii, cjj, t,
                   parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens);
@@ -1164,7 +1113,6 @@ void *runner_main2(void *data) {
             	  pack_vars_pair_dens->launch = 1;
               if(pack_vars_pair_dens->launch){
             	//Here we only launch the tasks. No unpacking! This is done in next function ;)
-            	message("Launch");
                 runner_dopair1_launch_f4_one_memcpy_no_unpack(
                       r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
                       parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
@@ -1196,30 +1144,17 @@ void *runner_main2(void *data) {
                 	//so that we can continue packing correctly
                   struct leaf_cell_list * ll_zero = &pack_vars_pair_dens->leaf_list[0];
                   pack_vars_pair_dens->top_task_list[0] = t;
-//                  struct leaf_cell_list * ll_current = &pack_vars_pair_dens->leaf_list[top_tasks_packed - 1];
                   *(ll_zero) = *(ll_current);
                   ll_zero->citop = ll_zero->ci[0]->top->cellID;
                   ll_zero->cjtop = ll_zero->cj[0]->top->cellID;
-//                  error("Stop");
-//                  ll_zero->n_leaves = ll_current->n_leaves;
-//                  error("Stop");
-
-              	  // Last packed daughter task -> index of the last task we packed before last launch (not this launch)
-//              	  int lpdt = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].lpdt;
               	  //un-necessary as the copy above handles this
               	  for(int cc = 0; cc < ll_zero->n_leaves; cc++){
-//              		if(ll_zero->ci[cc] == ll_current->ci[cc]) error("stop");
-//                    message("ctop i %i ctop j %i", ll_zero->ci[cc]->top->cellID, ll_zero->cj[cc]->top->cellID);
-//                    message("ctop i_c %i ctop_c j %i", ll_current->ci[cc]->top->cellID, ll_current->cj[cc]->top->cellID);
               		ll_zero->ci[cc] = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].ci[cc];
               		ll_zero->cj[cc] = pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].cj[cc];
-              		message("ciid %i cjid %i citop %i cjtop %i", ll_zero->ci[cc]->cellID, ll_zero->cj[cc]->cellID,
-              				ll_zero->ci[cc]->top->cellID, ll_zero->cj[cc]->top->cellID);
               	  }
             	  pack_vars_pair_dens->top_tasks_packed = 1;
                   ll_zero->lpdt = npacked;
                 }
-//                pack_vars_pair_dens->leaf_list[top_tasks_packed - 1].n_offload = 0;
           	    pack_vars_pair_dens->tasks_packed = 0;
                 pack_vars_pair_dens->count_parts = 0;
                 pack_vars_pair_dens->launch = 0;
@@ -1227,55 +1162,15 @@ void *runner_main2(void *data) {
                 //will exit if packed all daughters
                 continue;
               }
-//              if(pack_vars_pair_dens->launch_leftovers){
-//                int nleft = n_leaves_found - npacked;
-//				  error("Launching Leftovers");
-//                //Check to see if we have enough tasks left to launch a full pack
-//				if(nleft > target_n_tasks && npacked < n_leaves_found){
-//				  //Don't launch leftovers,
-//				  //we can do a normal launch as above keep recursing for now
-//				  continue;
-//				}
-//				else if(nleft <= target_n_tasks && npacked == n_leaves_found){
-//	              runner_dopair1_launch_f4_one_memcpy_no_unpack(
-//	                      r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
-//	                      parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
-//	                      d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
-//	                      &packing_time_pair, &time_for_density_gpu_pair,
-//	                      &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-//	                      pair_end);
-//	              //A. Nasar: Unpack data and zero count_parts counter
-//	              runner_dopair1_unpack_f4(
-//	                      r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
-//	                      parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
-//	                      d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
-//	                      &packing_time_pair, &time_for_density_gpu_pair,
-//	                      &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-//	                      pair_end, npacked, n_leaves_found);
-//              	  pack_vars_pair_dens->top_tasks_packed = 0;
-////              	  pack_vars_pair_dens->top_task_list[0] = NULL;
-//            	  pack_vars_pair_dens->tasks_packed = 0;
-//                  pack_vars_pair_dens->count_parts = 0;
-//                  pack_vars_pair_dens->launch_leftovers = 0;
-//				}
-//              }
               if(pack_vars_pair_dens->count_parts > count_max_parts_tmp)
                 error("Packed more parts than possible");
               t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
             }
-//            if(ci->loc[0] - cj->loc[0] > 0.5)
-//            	error("Dumped all leafs");
             //A. Nasar: Launch-leftovers counter re-set to zero and cells unlocked
             pack_vars_pair_dens->launch_leftovers = 0;
             pack_vars_pair_dens->launch = 0;
             cell_unlocktree(ci);
             cell_unlocktree(cj);
-            message("tops packed %i", pack_vars_pair_dens->top_tasks_packed);
-//            enqueue_dependencies(sched, t);
-//            pthread_mutex_lock(&sched->sleep_mutex);
-//            atomic_dec(&sched->waiting);
-//            pthread_cond_broadcast(&sched->sleep_cond);
-//            pthread_mutex_unlock(&sched->sleep_mutex);
             /////////////////////W.I.P!!!////////////////////////////////////////////////////////
 #endif  //RECURSE
 #endif  // GPUOFFLOAD_DENSITY
@@ -1713,7 +1608,6 @@ void *runner_main2(void *data) {
       }
     } /* main loop. */
 
-    message("n_leafs found %i", n_leafs_total);
 //    message("cpu %i packed %i cells with %i containing more parts than target of %i max_count %i",
 //            r->cpuid, n_cells_d, n_w_prts_gtr_target_d, np_per_cell, maxcount);
 //    message("cpu %i packed %i cells_G with %i containing more parts than target of %i max_count %i",
@@ -1773,52 +1667,52 @@ void *runner_main2(void *data) {
     ///////////////////////////////////////////////////////////////
     /// to ooutput timings uncomment this
     ///////////////////////////////////////////////////////////////
-    if (r->cpuid == 0 && engine_rank == 0)
-      fprintf(fgpu_steps,
-              "GPU_SD, P_SD, U_SD, GPU_PD,  P_PD, U_PD, "
-              "GPU_SF, P_SF, U_SF, GPU_PF, P_PF, U_PF, GPU_SG, P_SG, U_SG, "
-              "GPU_PG, P_PG, U_PG\n "
-              "%e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, "
-              "%e, %e\n",
-              time_for_density_gpu, packing_time, unpack_time_self,
-              time_for_density_gpu_pair, packing_time_pair, unpacking_time_pair,
-              time_for_gpu_f, packing_time_f, unpack_time_self_f,
-              time_for_gpu_pair_f, packing_time_pair_f, unpacking_time_pair_f,
-              time_for_gpu_g, packing_time_g, unpack_time_self_g,
-              time_for_gpu_pair_g, packing_time_pair_g, unpacking_time_pair_f);
-
-    else
-      fprintf(fgpu_steps,
-              "%e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, "
-              "%e, %e\n",
-              time_for_density_gpu, packing_time, unpack_time_self,
-              time_for_density_gpu_pair, packing_time_pair, unpacking_time_pair,
-              time_for_gpu_f, packing_time_f, unpack_time_self_f,
-              time_for_gpu_pair_f, packing_time_pair_f, unpacking_time_pair_f,
-              time_for_gpu_g, packing_time_g, unpack_time_self_g,
-              time_for_gpu_pair_g, packing_time_pair_g, unpacking_time_pair_f);
+//    if (r->cpuid == 0 && engine_rank == 0)
+//      fprintf(fgpu_steps,
+//              "GPU_SD, P_SD, U_SD, GPU_PD,  P_PD, U_PD, "
+//              "GPU_SF, P_SF, U_SF, GPU_PF, P_PF, U_PF, GPU_SG, P_SG, U_SG, "
+//              "GPU_PG, P_PG, U_PG\n "
+//              "%e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, "
+//              "%e, %e\n",
+//              time_for_density_gpu, packing_time, unpack_time_self,
+//              time_for_density_gpu_pair, packing_time_pair, unpacking_time_pair,
+//              time_for_gpu_f, packing_time_f, unpack_time_self_f,
+//              time_for_gpu_pair_f, packing_time_pair_f, unpacking_time_pair_f,
+//              time_for_gpu_g, packing_time_g, unpack_time_self_g,
+//              time_for_gpu_pair_g, packing_time_pair_g, unpacking_time_pair_f);
+//
+//    else
+//      fprintf(fgpu_steps,
+//              "%e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, %e, "
+//              "%e, %e\n",
+//              time_for_density_gpu, packing_time, unpack_time_self,
+//              time_for_density_gpu_pair, packing_time_pair, unpacking_time_pair,
+//              time_for_gpu_f, packing_time_f, unpack_time_self_f,
+//              time_for_gpu_pair_f, packing_time_pair_f, unpacking_time_pair_f,
+//              time_for_gpu_g, packing_time_g, unpack_time_self_g,
+//              time_for_gpu_pair_g, packing_time_pair_g, unpacking_time_pair_f);
       //////////////////////////////////////////////////////////////
       ///////////////////////////////////////////////////////////////
       ///////////////////////////////////////////////////////////////
 
 #else  // No GPU offload
-    if (r->cpuid == 0 && engine_rank == 0)
-      fprintf(fgpu_steps,
-              "CPU TIME SELF, CPU TIME PAIR, "
-              "CPU TIME SELF F, CPU TIME PAIR F, CPU TIME SELF G, CPU TIME "
-              "PAIR G\n "
-              "%e, %e, %e, %e, %e, %e\n",
-              time_for_density_cpu, time_for_density_cpu_pair, time_for_cpu_f,
-              time_for_cpu_pair_f, time_for_cpu_g, time_for_cpu_pair_g);
-
-    else
-      fprintf(fgpu_steps, "%e, %e, %e, %e, %e, %e,\n", time_for_density_cpu,
-              time_for_density_cpu_pair, time_for_cpu_f, time_for_cpu_pair_f,
-              time_for_cpu_g, time_for_cpu_pair_g);
+//    if (r->cpuid == 0 && engine_rank == 0)
+//      fprintf(fgpu_steps,
+//              "CPU TIME SELF, CPU TIME PAIR, "
+//              "CPU TIME SELF F, CPU TIME PAIR F, CPU TIME SELF G, CPU TIME "
+//              "PAIR G\n "
+//              "%e, %e, %e, %e, %e, %e\n",
+//              time_for_density_cpu, time_for_density_cpu_pair, time_for_cpu_f,
+//              time_for_cpu_pair_f, time_for_cpu_g, time_for_cpu_pair_g);
+//
+//    else
+//      fprintf(fgpu_steps, "%e, %e, %e, %e, %e, %e,\n", time_for_density_cpu,
+//              time_for_density_cpu_pair, time_for_cpu_f, time_for_cpu_pair_f,
+//              time_for_cpu_g, time_for_cpu_pair_g);
 #endif
     //    }
-    fflush(fgpu_steps);
-    fclose(fgpu_steps);
+//    fflush(fgpu_steps);
+//    fclose(fgpu_steps);
 #endif  // DUMPTIMINGS
     time_for_density_cpu = 0.0;
     time_for_density_gpu = 0.0;
