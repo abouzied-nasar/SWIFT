@@ -797,8 +797,6 @@ void *runner_main2(void *data) {
       r->t = t;
 #endif
 
-//      if(t->subtype != task_subtype_gpu_pack_d) message("doing task subtype (%s/%s).",
-//              taskID_names[t->type], subtaskID_names[t->subtype]);
       const ticks task_beg = getticks();
       /* Different types of tasks... */
       switch (t->type) {
@@ -815,28 +813,15 @@ void *runner_main2(void *data) {
           } else if (t->subtype == task_subtype_gpu_unpack_f) {
             unpacked_f++;
           } else if (t->subtype == task_subtype_density) {
-            cpu_self++;
 #ifndef GPUOFFLOAD_DENSITY
-            struct timespec t0, t1, dt;
-            clock_gettime(CLOCK_REALTIME, &t0);
-            // runner_doself1_branch_density(r, ci);
             runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
-            clock_gettime(CLOCK_REALTIME, &t1);
-            tasks_done_cpu++;
-            time_for_density_cpu += (t1.tv_sec - t0.tv_sec) +
-                                    (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-            density++;
 #endif
             /* GPU WORK */
           } else if (t->subtype == task_subtype_gpu_pack_d) {
             packed_self++;
 #ifdef GPUOFFLOAD_DENSITY
-            ticks tic_cpu_pack = getticks();
-            packing_time +=
-                runner_doself1_pack_f4(r, sched, pack_vars_self_dens, ci, t,
+            runner_doself1_pack_f4(r, sched, pack_vars_self_dens, ci, t,
                                        parts_aos_f4_send, task_first_part_f4);
-            //Record times for task analysis
-            t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
             /* No pack tasks left in queue, flag that we want to run */
             int launch_leftovers = pack_vars_self_dens->launch_leftovers;
             /*Packed enough tasks. Let's go*/
@@ -844,7 +829,6 @@ void *runner_main2(void *data) {
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
               /*Launch GPU tasks*/
-              int t_packed = pack_vars_self_dens->tasks_packed;
               runner_doself1_launch_f4(
                   r, sched, pack_vars_self_dens, ci, t, parts_aos_f4_send,
                   parts_aos_f4_recv, d_parts_aos_f4_send, d_parts_aos_f4_recv,
@@ -855,14 +839,10 @@ void *runner_main2(void *data) {
 #endif
           } /* self / pack */
           else if (t->subtype == task_subtype_gpu_pack_g) {
-            packed_self_g++;
 #ifdef GPUOFFLOAD_GRADIENT
-            ticks tic_cpu_pack = getticks();
             packing_time_g += runner_doself1_pack_f4_g(
                 r, sched, pack_vars_self_grad, ci, t, parts_aos_grad_f4_send,
                 task_first_part_f4_g);
-            //Record times for task analysis
-            t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
             /* No pack tasks left in queue, flag that we want to run */
             int launch_leftovers = pack_vars_self_grad->launch_leftovers;
             /*Packed enough tasks let's go*/
@@ -870,7 +850,6 @@ void *runner_main2(void *data) {
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
               /*Launch GPU tasks*/
-              int t_packed = pack_vars_self_grad->tasks_packed;
               runner_doself1_launch_f4_g(
                   r, sched, pack_vars_self_grad, ci, t, parts_aos_grad_f4_send,
                   parts_aos_grad_f4_recv, d_parts_aos_grad_f4_send,
@@ -880,14 +859,10 @@ void *runner_main2(void *data) {
             } /*End of GPU work Self*/
 #endif  // GPUGRADSELF
           } else if (t->subtype == task_subtype_gpu_pack_f) {
-            packed_self_f++;
 #ifdef GPUOFFLOAD_FORCE
-            ticks tic_cpu_pack = getticks();
             packing_time_f += runner_doself1_pack_f4_f(
                 r, sched, pack_vars_self_forc, ci, t, parts_aos_forc_f4_send,
                 task_first_part_f4_f);
-            //Record times for task analysis
-            t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
             /* No pack tasks left in queue, flag that we want to run */
             int launch_leftovers = pack_vars_self_forc->launch_leftovers;
             /*Packed enough tasks let's go*/
@@ -895,7 +870,6 @@ void *runner_main2(void *data) {
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
               /*Launch GPU tasks*/
-              int t_packed = pack_vars_self_forc->tasks_packed;
               runner_doself1_launch_f4_f(
                   r, sched, pack_vars_self_forc, ci, t, parts_aos_forc_f4_send,
                   parts_aos_forc_f4_recv, d_parts_aos_forc_f4_send,
@@ -907,75 +881,49 @@ void *runner_main2(void *data) {
           }
 #ifdef EXTRA_HYDRO_LOOP
           else if (t->subtype == task_subtype_gradient) {
-            cpu_self_g++;
 #ifndef GPUOFFLOAD_GRADIENT
-            struct timespec t0, t1, dt;
-            clock_gettime(CLOCK_REALTIME, &t0);
-            // runner_doself1_branch_gradient(r, ci);
 #ifdef EXTRA_HYDRO_LOOP_TYPE2
             runner_dosub_self2_gradient(r, ci, /*below_h_max=*/0, 1);
 #else
             runner_dosub_self1_gradient(r, ci, /*below_h_max=*/0, 1);
 #endif 
-            clock_gettime(CLOCK_REALTIME, &t1);
-            tasks_done_cpu++;
-            time_for_cpu_g += (t1.tv_sec - t0.tv_sec) +
-                              (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 #endif
           }
 #endif
           else if (t->subtype == task_subtype_force) {
             cpu_self_f++;
 #ifndef GPUOFFLOAD_FORCE
-            struct timespec t0, t1;
-            clock_gettime(CLOCK_REALTIME, &t0);
-            // runner_doself2_branch_force(r, ci);
             runner_dosub_self2_force(r, ci, /*below_h_max=*/0, 1);
-            clock_gettime(CLOCK_REALTIME, &t1);
-            tasks_done_cpu++;
-            time_for_cpu_f += (t1.tv_sec - t0.tv_sec) +
-                              (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 #endif
           } else if (t->subtype == task_subtype_limiter)
-            // runner_doself1_branch_limiter(r, ci);
             runner_dosub_self1_limiter(r, ci, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_stars_density)
-            // runner_doself_branch_stars_density(r, ci);
             runner_dosub_self_stars_density(r, ci, /*below_h_max=*/0, 1);
 #ifdef EXTRA_STAR_LOOPS
           else if (t->subtype == task_subtype_stars_prep1)
-            // runner_doself_branch_stars_prep1(r, ci);
             runner_dosub_self_stars_prep1(r, ci, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_stars_prep2)
-            // runner_doself_branch_stars_prep2(r, ci);
             runner_dosub_self_stars_prep2(r, ci, /*below_h_max=*/0, 1);
 #endif
           else if (t->subtype == task_subtype_stars_feedback)
-            // runner_doself_branch_stars_feedback(r, ci);
             runner_dosub_self_stars_feedback(r, ci, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_bh_density)
-            // runner_doself_branch_bh_density(r, ci);
             runner_dosub_self_bh_density(r, ci, 1);
           else if (t->subtype == task_subtype_bh_swallow)
-            // runner_doself_branch_bh_swallow(r, ci);
             runner_dosub_self_bh_swallow(r, ci, 1);
           else if (t->subtype == task_subtype_do_gas_swallow)
             runner_do_gas_swallow_self(r, ci, 1);
           else if (t->subtype == task_subtype_do_bh_swallow)
             runner_do_bh_swallow_self(r, ci, 1);
           else if (t->subtype == task_subtype_bh_feedback)
-            // runner_doself_branch_bh_feedback(r, ci);
             runner_dosub_self_bh_feedback(r, ci, 1);
           else if (t->subtype == task_subtype_rt_gradient)
-            // runner_doself1_branch_rt_gradient(r, ci);
             runner_dosub_self1_rt_gradient(r, ci, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_rt_transport)
-            // runner_doself2_branch_rt_transport(r, ci);
             runner_dosub_self2_rt_transport(r, ci, /*below_h_max=*/0, 1);
           else if (t->subtype == task_subtype_sink_density)
             runner_dosub_self_sinks_density(r, ci, 1);
           else if (t->subtype == task_subtype_sink_swallow)
-            // runner_doself_branch_sinks_swallow(r, ci);
             runner_dosub_self_sinks_swallow(r, ci, 1);
           else if (t->subtype == task_subtype_sink_do_gas_swallow)
             runner_do_sinks_gas_swallow_self(r, ci, 1);
@@ -990,17 +938,8 @@ void *runner_main2(void *data) {
           if (t->subtype == task_subtype_grav)
             runner_dopair_recursive_grav(r, ci, cj, 1);
           else if (t->subtype == task_subtype_density) {
-            cpu_pair++;
 #ifndef GPUOFFLOAD_DENSITY
-            struct timespec t0, t1, dt;
-            clock_gettime(CLOCK_REALTIME, &t0);
-            // runner_dopair1_branch_density(r, ci, cj);
             runner_dosub_pair1_density(r, ci, cj, /*below_h_max=*/0, 1);
-            clock_gettime(CLOCK_REALTIME, &t1);
-            tasks_done_cpu++;
-            time_for_density_cpu_pair +=
-                (t1.tv_sec - t0.tv_sec) +
-                (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 #endif
           }
           /* GPU WORK */
@@ -1010,9 +949,6 @@ void *runner_main2(void *data) {
 
 #ifndef RECURSE
             ticks tic_cpu_pack = getticks();
-//            if(ci->loc[0] - cj->loc[0] > 0.5)
-//              fprintf(fgpu_steps, "x, y, z, "
-//            		"rho, rhodh, v_sig, lap_u, a_visc_max, ax, ay, az\n");
             /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
             packing_time_pair +=
                 runner_dopair1_pack_f4_d(r, sched, pack_vars_pair_dens, ci,
@@ -1025,8 +961,6 @@ void *runner_main2(void *data) {
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
               /*Launch GPU tasks*/
-              int t_packed = pack_vars_pair_dens->tasks_packed;
-              //                signal_sleeping_runners(sched, t, t_packed);
               runner_dopair1_launch_f4_one_memcpy(
                   r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
                   parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
@@ -1034,48 +968,12 @@ void *runner_main2(void *data) {
                   &packing_time_pair, &time_for_gpu_pair,
                   &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
                   pair_end);
-
               pack_vars_pair_dens->launch_leftovers = 0;
-//              if(ci->loc[0] - cj->loc[0] > 0.5){
-//            	  message("got in");
-//              struct cell * ctemp = ci;
-//              for (int i = 0; i < ctemp->hydro.count; i++) {
-//              	fprintf(fgpu_steps, "%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-//              			ctemp->hydro.parts[i].x[0],
-//							ctemp->hydro.parts[i].x[1],
-//							ctemp->hydro.parts[i].x[2], ctemp->hydro.parts[i].rho,
-//							ctemp->hydro.parts[i].density.rho_dh,
-//							ctemp->hydro.parts[i].viscosity.v_sig,
-//							ctemp->hydro.parts[i].diffusion.laplace_u,
-//							ctemp->hydro.parts[i].force.alpha_visc_max_ngb,
-//							ctemp->hydro.parts[i].a_hydro[0],
-//							ctemp->hydro.parts[i].a_hydro[1],
-//							ctemp->hydro.parts[i].a_hydro[2]);
-//              }
-//              ctemp = cj;
-//              for (int i = 0; i < ctemp->hydro.count; i++) {
-//              	fprintf(fgpu_steps, "%f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f\n",
-//              			ctemp->hydro.parts[i].x[0],
-//							ctemp->hydro.parts[i].x[1],
-//							ctemp->hydro.parts[i].x[2], ctemp->hydro.parts[i].rho,
-//							ctemp->hydro.parts[i].density.rho_dh,
-//							ctemp->hydro.parts[i].viscosity.v_sig,
-//							ctemp->hydro.parts[i].diffusion.laplace_u,
-//							ctemp->hydro.parts[i].force.alpha_visc_max_ngb,
-//							ctemp->hydro.parts[i].a_hydro[0],
-//							ctemp->hydro.parts[i].a_hydro[1],
-//							ctemp->hydro.parts[i].a_hydro[2]);
-//              }
-//              fflush(fgpu_steps);
-//              error("Not recursing");
-//              }
             } /* End of GPU work Pairs */
 
 #else //RECURSE
 
             ticks tic_cpu_pack = getticks();
-//            message("recursing");
-
             /////////////////////W.I.P!!!////////////////////////////////////////////////////////
             /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
             * We are recursing separately to find out how much work we have before offloading*/
@@ -1088,16 +986,10 @@ void *runner_main2(void *data) {
             int n_daughters_packed_index = n_daughters_total;
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
                       parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_d, cj_d, n_daughters_total);
-//            message("ndaughters prev %i, nfound %i, ntotal %i tops_packed %i", n_daughters_total, n_leaves_found, n_daughters_total + n_leaves_found, top_tasks_packed);
             n_daughters_total += n_leaves_found;
             first_and_last_daughters[top_tasks_packed][0] = n_daughters_packed_index;
             ci_top[top_tasks_packed] = ci;
             cj_top[top_tasks_packed] = cj;
-
-//            first_and_last_daughters[top_tasks_packed][1] = target_n_tasks - n_daughters_packed_index;
-            tops_packed_in_step++;
-            n_tops_reset++;
-//            message("Found %i daughter tasks", n_leaves_found);
             n_leafs_total += n_leaves_found;
             int first_cell_to_move = n_daughters_packed_index;
             int n_daughters_left = n_daughters_total;
@@ -1318,7 +1210,6 @@ void *runner_main2(void *data) {
 #endif  // GPUOFFLOAD_DENSITY
           } /* pair / pack */
           else if (t->subtype == task_subtype_gpu_pack_g) {
-            packed_pair_g++;
 #ifdef GPUOFFLOAD_GRADIENT
               ticks tic_cpu_pack = getticks();
               packing_time_pair_g +=
