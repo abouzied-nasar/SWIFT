@@ -711,14 +711,7 @@ void *runner_main2(void *data) {
     struct task *t = NULL;
     struct task *prev = NULL;
     /*Some bits for output in case of debug*/
-    char buf5[20];
-    snprintf(buf5, sizeof(buf5), "t%dr%dstep%d", r->cpuid, engine_rank, step);
-#ifdef DUMP_TIMINGS
-    FILE *fgpu_steps;
-    fgpu_steps = fopen(buf5, "w");
-#endif
-    FILE *fgpu_steps;
-    fgpu_steps = fopen(buf5, "w");
+
     //    if (step == 0) cudaProfilerStart();
     step++;
 
