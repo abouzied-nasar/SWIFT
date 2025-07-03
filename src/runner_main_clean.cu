@@ -559,25 +559,48 @@ void *runner_main2(void *data) {
   int n_leaves_max = 128;
   /*Allocate target_n_tasks for top level tasks. This is a 2D array with length target_n_tasks and width n_leaves_max*/
   int max_length = 2 * target_n_tasks * 16 * n_leaves_max;
-  struct cell **ci_d = malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_d = malloc(max_length * sizeof(struct cell *));
-  int **first_and_last_daughters;
+  struct cell **ci_dd = malloc(max_length * sizeof(struct cell *));
+  struct cell **cj_dd = malloc(max_length * sizeof(struct cell *));
+  struct cell **ci_dg = malloc(max_length * sizeof(struct cell *));
+  struct cell **cj_dg = malloc(max_length * sizeof(struct cell *));
+  struct cell **ci_df = malloc(max_length * sizeof(struct cell *));
+  struct cell **cj_df = malloc(max_length * sizeof(struct cell *));
+  int **first_and_last_daughters_d;
+  int **first_and_last_daughters_g;
+  int **first_and_last_daughters_f;
   int launch_count = 0;
 
   for(int i = 0; i < max_length; i++){
-	  ci_d[i] = malloc(sizeof(struct cell *));
-	  cj_d[i] = malloc(sizeof(struct cell *));
+	  ci_dd[i] = malloc(sizeof(struct cell *));
+	  cj_dd[i] = malloc(sizeof(struct cell *));
+	  ci_dg[i] = malloc(sizeof(struct cell *));
+	  cj_dg[i] = malloc(sizeof(struct cell *));
+	  ci_df[i] = malloc(sizeof(struct cell *));
+	  cj_df[i] = malloc(sizeof(struct cell *));
   }
-  first_and_last_daughters = malloc(target_n_tasks * n_leaves_max * sizeof(int *));
-  struct cell **ci_top = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
-  struct cell **cj_top = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
+
+  struct cell **ci_top_d = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
+  struct cell **cj_top_d = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
+  struct cell **ci_top_g = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
+  struct cell **cj_top_g = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
+  struct cell **ci_top_f = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
+  struct cell **cj_top_f = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
   for(int i = 0; i < 2 * target_n_tasks * 16; i++){
-	  ci_top[i] = malloc(sizeof(struct cell *));
-	  cj_top[i] = malloc(sizeof(struct cell *));
+	  ci_top_d[i] = malloc(sizeof(struct cell *));
+	  cj_top_d[i] = malloc(sizeof(struct cell *));
+	  ci_top_g[i] = malloc(sizeof(struct cell *));
+	  cj_top_g[i] = malloc(sizeof(struct cell *));
+	  ci_top_f[i] = malloc(sizeof(struct cell *));
+	  cj_top_f[i] = malloc(sizeof(struct cell *));
   }
   //change above declaration to the assignment below
+  first_and_last_daughters_d = malloc(target_n_tasks * n_leaves_max * sizeof(int *));
+  first_and_last_daughters_g = malloc(target_n_tasks * n_leaves_max * sizeof(int *));
+  first_and_last_daughters_f = malloc(target_n_tasks * n_leaves_max * sizeof(int *));
   for (int i = 0; i < target_n_tasks * n_leaves_max; i++){
-	  first_and_last_daughters[i] = malloc(2 * sizeof(int));
+	  first_and_last_daughters_d[i] = malloc(2 * sizeof(int));
+	  first_and_last_daughters_g[i] = malloc(2 * sizeof(int));
+	  first_and_last_daughters_f[i] = malloc(2 * sizeof(int));
   }
   /*Allocate memory for n_leaves_max task pointers per top level task*/
 
@@ -723,6 +746,8 @@ void *runner_main2(void *data) {
     sched->nr_packs_pair_grad_done = 0;
 
     pack_vars_pair_dens->n_daughters_total = 0;
+    pack_vars_pair_grad->n_daughters_total = 0;
+    pack_vars_pair_forc->n_daughters_total = 0;
 
     int n_cells_d = 0;
     int n_cells_g = 0;
@@ -940,7 +965,6 @@ void *runner_main2(void *data) {
           else if (t->subtype == task_subtype_gpu_pack_d) {
             packed_pair++;
 #ifdef GPUOFFLOAD_DENSITY
-
 #ifndef RECURSE
             ticks tic_cpu_pack = getticks();
             /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
@@ -975,19 +999,20 @@ void *runner_main2(void *data) {
             pack_vars_pair_dens->n_daughters_packed_index = pack_vars_pair_dens->n_daughters_total;
             int n_leaves_found = 0;
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
-                      parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_d, cj_d, pack_vars_pair_dens->n_daughters_total);
+                      parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_dd, cj_dd, pack_vars_pair_dens->n_daughters_total);
 
             runner_pack_daughters_and_launch(r, sched, ci, cj, pack_vars_pair_dens,
             	    t, parts_aos_pair_f4_send , parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
             	    parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e, &packing_time_pair, &time_for_gpu_pair,
             	    &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-            	    pair_end, n_leaves_found, ci_d, cj_d, first_and_last_daughters, ci_top, cj_top);
+            	    pair_end, n_leaves_found, ci_dd, cj_dd, first_and_last_daughters_d, ci_top_d, cj_top_d);
         ///////
 #endif  //RECURSE
 #endif  // GPUOFFLOAD_DENSITY
           } /* pair / pack */
           else if (t->subtype == task_subtype_gpu_pack_g) {
 #ifdef GPUOFFLOAD_GRADIENT
+#ifndef RECURSE
               ticks tic_cpu_pack = getticks();
               packing_time_pair_g +=
                   runner_dopair1_pack_f4_g(r, sched, pack_vars_pair_grad, ci,
@@ -1012,6 +1037,24 @@ void *runner_main2(void *data) {
                     pair_end_g);
               }
               pack_vars_pair_grad->launch_leftovers = 0;
+#else
+              /////////////////////W.I.P!!!////////////////////////////////////////////////////////
+              /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
+              * We are recursing separately to find out how much work we have before offloading*/
+              //We need to allocate a list to put cell pointers into for each new task
+              int n_expected_tasks = 4096; //A. Nasar: Need to come up with a good estimate for this
+              int depth = 0;
+              pack_vars_pair_grad->n_daughters_packed_index = pack_vars_pair_grad->n_daughters_total;
+              int n_leaves_found = 0;
+              runner_recurse_gpu(r, sched, pack_vars_pair_grad, ci, cj, t,
+                        parts_aos_pair_f4_g_send, e, fparti_fpartj_lparti_lpartj_grad, &n_leaves_found, depth, n_expected_tasks, ci_dg, cj_dg, pack_vars_pair_grad->n_daughters_total);
+
+              runner_pack_daughters_and_launch_g(r, sched, ci, cj, pack_vars_pair_grad,
+              	    t, parts_aos_pair_f4_g_send , parts_aos_pair_f4_g_recv, d_parts_aos_pair_f4_g_send,
+              	    parts_aos_pair_f4_g_recv, stream_pairs, d_a, d_H, e, &packing_time_pair_g, &time_for_gpu_pair_g,
+              	    &unpacking_time_pair_g, fparti_fpartj_lparti_lpartj_grad,
+              	    pair_end_g, n_leaves_found, ci_dg, cj_dg, first_and_last_daughters_g, ci_top_g, cj_top_g);
+#endif
 #endif  // GPUOFFLOAD_GRADIENT
           } else if (t->subtype == task_subtype_gpu_pack_f) {
             packed_pair_f++;
