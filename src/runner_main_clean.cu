@@ -722,7 +722,7 @@ void *runner_main2(void *data) {
     sched->nr_packs_self_grad_done = 0;
     sched->nr_packs_pair_grad_done = 0;
 
-    int n_daughters_total = 0;
+    pack_vars_pair_dens->n_daughters_total = 0;
 
     int n_cells_d = 0;
     int n_cells_g = 0;
@@ -972,11 +972,16 @@ void *runner_main2(void *data) {
             //We need to allocate a list to put cell pointers into for each new task
             int n_expected_tasks = 4096; //A. Nasar: Need to come up with a good estimate for this
             int depth = 0;
-            int n_daughters_packed_index = n_daughters_total;
+            pack_vars_pair_dens->n_daughters_packed_index = pack_vars_pair_dens->n_daughters_total;
             int n_leaves_found = 0;
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
-                      parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_d, cj_d, n_daughters_total);
-            runner_pack_daughters_and_launch();
+                      parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_d, cj_d, pack_vars_pair_dens->n_daughters_total);
+
+            runner_pack_daughters_and_launch(r, sched, ci, cj, pack_vars_pair_dens,
+            	    t, parts_aos_pair_f4_send , parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
+            	    parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e, &packing_time_pair, &time_for_gpu_pair,
+            	    &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
+            	    pair_end, n_leaves_found, ci_d, cj_d, first_and_last_daughters, ci_top, cj_top);
         ///////
 #endif  //RECURSE
 #endif  // GPUOFFLOAD_DENSITY

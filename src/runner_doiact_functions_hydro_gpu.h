@@ -1972,7 +1972,7 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
     struct part_aos_f4_recv *d_parts_recv, cudaStream_t *stream, float d_a,
     float d_H, struct engine *e, double *packing_time, double *gpu_time,
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
-    cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
+    cudaEvent_t *pair_end, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
     , struct cell ** ci_top, struct cell ** cj_top){
   //Everything from here on needs moving to runner_doiact_functions_hydro_gpu.h
   ticks tic_cpu_pack = getticks();
@@ -1997,19 +1997,21 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
   t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
   // A. Nasar: Check to see if this is the last task in the queue.
   // If so, set launch_leftovers to 1 and recursively pack and launch daughter tasks on GPU
+  unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_pair_left_d--;
   if (s->queues[qid].n_packs_pair_left_d < 1) pack_vars->launch_leftovers = 1;
   lock_unlock(&s->queues[qid].lock);
   /*Counter for how many tasks we've packed*/
-  int npacked = 0;
-  int launched = 0;
+  unsigned int npacked = 0;
+  unsigned int launched = 0;
   //A. Nasar: Loop through the daughter tasks we found
   int copy_index = pack_vars->n_daughters_packed_index;
   int index_start_packing = pack_vars->n_daughters_packed_index;
   int index_end_packing = pack_vars->n_daughters_total;
   int index_start_unpacking = f_l_daughters[0][0];
   int index_end_unpacking = index_start_unpacking + target_n_tasks_tmp;
+  int last_launched = 0;
   //not strictly true!!! Could be that we packed and moved on without launching
   int n_p_current_task = 0;
   int had_prev_task = 0;
@@ -2025,9 +2027,9 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
     int launch = 0;
     struct cell * cii = ci_d[copy_index];
     struct cell * cjj = cj_d[copy_index];
-    double packing_time_pair += runner_dopair1_pack_f4(
-        r, sched, pack_vars, cii, cjj, t,
-        parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens);
+    runner_dopair1_pack_f4(
+        r, s, pack_vars, cii, cjj, t,
+        parts_send, e, fparti_fpartj_lparti_lpartj_dens);
     //record number of tasks we've copied from last launch
     copy_index++;
     n_p_current_task++;
@@ -2036,7 +2038,7 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
     first_cell_to_move++;
     /*Re-think this. Probably not necessary to have this if statement and we can just use the form in the else statement*/
     if(had_prev_task)
-      f_l_daughters[top_tasks_packed - 1][1] = f_l_daughters[top_tasks_packed - 1][0] + copy_index - n_daughters_packed_index;
+      f_l_daughters[top_tasks_packed - 1][1] = f_l_daughters[top_tasks_packed - 1][0] + copy_index - pack_vars->n_daughters_packed_index;
     else
       f_l_daughters[top_tasks_packed - 1][1] = f_l_daughters[top_tasks_packed - 1][0] + copy_index;
 
@@ -2044,26 +2046,22 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
         pack_vars->launch = 1;
     if(pack_vars->launch || (pack_vars->launch_leftovers && npacked == n_leaves_found)){
 
-      if(pack_vars->launch_leftovers && npacked == n_leaves_found)
-        leftover_launch_count++;
-
       last_launched = f_l_daughters[top_tasks_packed - 1][1];
       launched = 1;
       //Here we only launch the tasks. No unpacking! This is done in next function ;)
       runner_dopair1_launch_f4_one_memcpy_no_unpack(
-            r, sched, pack_vars, t, parts_aos_pair_f4_send,
-            parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
-            d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
-            &packing_time_pair, &time_for_density_gpu_pair,
-            &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
+            r, s, pack_vars, t, parts_send,
+            parts_recv, d_parts_send,
+            d_parts_recv, stream, d_a, d_H, e,
+            &packing_time, &gpu_time,
+            &unpack_time, fparti_fpartj_lparti_lpartj_dens,
             pair_end);
-      launch_count++;
       runner_dopair1_unpack_f4(
-            r, sched, pack_vars, t, parts_aos_pair_f4_send,
-            parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
-            d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
-            &packing_time_pair, &time_for_density_gpu_pair,
-            &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
+            r, s, pack_vars, t, parts_send,
+            parts_recv, d_parts_send,
+            d_parts_recv, stream, d_a, d_H, e,
+            &packing_time, &gpu_time,
+            &unpack_time, fparti_fpartj_lparti_lpartj_dens,
             pair_end, npacked, n_leaves_found, ci_d, cj_d, f_l_daughters, ci_top, cj_top);
       if(npacked == n_leaves_found){
         pack_vars->n_daughters_total = 0;
