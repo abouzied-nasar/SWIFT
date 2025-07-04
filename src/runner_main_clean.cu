@@ -265,7 +265,7 @@ void *runner_main2(void *data) {
   pack_vars_self_forc->target_n_tasks = target_n_tasks;
   pack_vars_pair_forc->target_n_tasks = target_n_tasks_pair;
   pack_vars_self_grad->target_n_tasks = target_n_tasks;
-  pack_vars_pair_grad->target_n_tasks = target_n_tasks_pair;
+  pack_vars_pair_grad->target_n_tasks = target_n_tasks_pair * 16;
   // how many tasks we want in each bundle (used for launching kernels in
   // different streams)
   const int bundle_size = N_TASKS_BUNDLE_SELF;
@@ -275,7 +275,7 @@ void *runner_main2(void *data) {
   pack_vars_self_forc->bundle_size = bundle_size;
   pack_vars_pair_forc->bundle_size = bundle_size_pair;
   pack_vars_self_grad->bundle_size = bundle_size;
-  pack_vars_pair_grad->bundle_size = bundle_size_pair;
+  pack_vars_pair_grad->bundle_size = target_n_tasks_pair * 4;
   // Keep track of first and last particles for each task (particle data is
   // arranged in long arrays containing particles from all the tasks we will
   // work with)
@@ -304,7 +304,7 @@ void *runner_main2(void *data) {
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_forc,
 		  target_n_tasks * sizeof(int4));
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_grad,
-		  target_n_tasks * sizeof(int4));
+		  target_n_tasks * 16 * sizeof(int4));
 
   /* nBundles is the number of task bundles each
   thread has ==> Used to loop through bundles */
@@ -400,7 +400,7 @@ void *runner_main2(void *data) {
   pack_vars_self_forc->tasksperbundle = tasksperbundle;
   pack_vars_pair_forc->tasksperbundle = tasksperbundle_pair;
   pack_vars_self_grad->tasksperbundle = tasksperbundle;
-  pack_vars_pair_grad->tasksperbundle = tasksperbundle_pair;
+  pack_vars_pair_grad->tasksperbundle = tasksperbundle_pair * 16;
 
   for (int i = 0; i < nBundles; ++i)
     cudaStreamCreateWithFlags(&stream[i], cudaStreamNonBlocking);
@@ -637,9 +637,9 @@ void *runner_main2(void *data) {
   pack_vars_pair_grad->task_list =
       (struct task **)calloc(target_n_tasks, sizeof(struct task *));
   pack_vars_pair_grad->ci_list =
-      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
+      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
   pack_vars_pair_grad->cj_list =
-      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
+      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
 
   // number of density self tasks executed
   int tasks_done_cpu = 0;
