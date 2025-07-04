@@ -836,7 +836,7 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4_f(
     struct runner *r, struct cell *restrict ci, struct cell *restrict cj,
     struct part_aos_f4_f_send *restrict parts_aos_buffer, int timer,
     int *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
-    const int count_cj, float3 shift_tmp) {
+    const int count_cj, double3 shift_tmp) {
 
   TIMER_TIC;
 

@@ -263,7 +263,7 @@ void *runner_main2(void *data) {
   pack_vars_self_dens->target_n_tasks = target_n_tasks;
   pack_vars_pair_dens->target_n_tasks = target_n_tasks_pair * 16; //Accounting for one level of recursion
   pack_vars_self_forc->target_n_tasks = target_n_tasks;
-  pack_vars_pair_forc->target_n_tasks = target_n_tasks_pair;
+  pack_vars_pair_forc->target_n_tasks = target_n_tasks_pair * 16;
   pack_vars_self_grad->target_n_tasks = target_n_tasks;
   pack_vars_pair_grad->target_n_tasks = target_n_tasks_pair * 16;
   // how many tasks we want in each bundle (used for launching kernels in
@@ -273,7 +273,7 @@ void *runner_main2(void *data) {
   pack_vars_self_dens->bundle_size = bundle_size;
   pack_vars_pair_dens->bundle_size = target_n_tasks_pair * 4; //Trying to make it so that we have 4 bundles
   pack_vars_self_forc->bundle_size = bundle_size;
-  pack_vars_pair_forc->bundle_size = bundle_size_pair;
+  pack_vars_pair_forc->bundle_size = target_n_tasks_pair * 4;
   pack_vars_self_grad->bundle_size = bundle_size;
   pack_vars_pair_grad->bundle_size = target_n_tasks_pair * 4;
   // Keep track of first and last particles for each task (particle data is
@@ -302,7 +302,7 @@ void *runner_main2(void *data) {
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_dens,
 		  target_n_tasks * 16 * sizeof(int4));
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_forc,
-		  target_n_tasks * sizeof(int4));
+		  target_n_tasks * 16 * sizeof(int4));
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_grad,
 		  target_n_tasks * 16 * sizeof(int4));
 
@@ -398,7 +398,7 @@ void *runner_main2(void *data) {
   pack_vars_self_dens->tasksperbundle = tasksperbundle;
   pack_vars_pair_dens->tasksperbundle = tasksperbundle_pair * 16;
   pack_vars_self_forc->tasksperbundle = tasksperbundle;
-  pack_vars_pair_forc->tasksperbundle = tasksperbundle_pair;
+  pack_vars_pair_forc->tasksperbundle = tasksperbundle_pair * 16;
   pack_vars_self_grad->tasksperbundle = tasksperbundle;
   pack_vars_pair_grad->tasksperbundle = tasksperbundle_pair * 16;
 
@@ -625,9 +625,9 @@ void *runner_main2(void *data) {
   pack_vars_pair_forc->task_list =
       (struct task **)calloc(target_n_tasks, sizeof(struct task *));
   pack_vars_pair_forc->ci_list =
-      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
+      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
   pack_vars_pair_forc->cj_list =
-      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
+      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
 
   pack_vars_self_grad->task_list =
       (struct task **)calloc(target_n_tasks, sizeof(struct task *));
@@ -1067,6 +1067,7 @@ void *runner_main2(void *data) {
           } else if (t->subtype == task_subtype_gpu_pack_f) {
             packed_pair_f++;
 #ifdef GPUOFFLOAD_FORCE
+#ifndef RECURSE
               ticks tic_cpu_pack = getticks();
               /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
               packing_time_pair_f +=
@@ -1092,6 +1093,24 @@ void *runner_main2(void *data) {
 
                 pack_vars_pair_forc->launch_leftovers = 0;
               } /* End of GPU work Pairs */
+#else
+              /////////////////////W.I.P!!!////////////////////////////////////////////////////////
+              /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
+              * We are recursing separately to find out how much work we have before offloading*/
+              //We need to allocate a list to put cell pointers into for each new task
+              int n_expected_tasks = 4096; //A. Nasar: Need to come up with a good estimate for this
+              int depth = 0;
+              pack_vars_pair_forc->n_daughters_packed_index = pack_vars_pair_forc->n_daughters_total;
+              int n_leaves_found = 0;
+              runner_recurse_gpu(r, sched, pack_vars_pair_forc, ci, cj, t,
+                        parts_aos_pair_f4_f_send, e, fparti_fpartj_lparti_lpartj_forc, &n_leaves_found, depth, n_expected_tasks, ci_df, cj_df, pack_vars_pair_forc->n_daughters_total);
+
+              runner_pack_daughters_and_launch_f(r, sched, ci, cj, pack_vars_pair_forc,
+                    t, parts_aos_pair_f4_f_send, parts_aos_pair_f4_f_recv, d_parts_aos_pair_f4_f_send,
+                    parts_aos_pair_f4_f_recv, stream_pairs, d_a, d_H, e, &packing_time_pair_f, &time_for_gpu_pair_f,
+                    &unpacking_time_pair_f, fparti_fpartj_lparti_lpartj_forc,
+                    pair_end_f, n_leaves_found, ci_df, cj_df, first_and_last_daughters_f, ci_top_f, cj_top_f);
+#endif
 #endif  // GPUOFFLOAD_FORCE
           } else if (t->subtype == task_subtype_gpu_unpack_d) {
             unpacked_pair++;
