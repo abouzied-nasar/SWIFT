@@ -556,6 +556,14 @@ void *runner_main2(void *data) {
       (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
   pack_vars_pair_dens->top_task_list =
       (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
+  pack_vars_pair_grad->task_list =
+      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
+  pack_vars_pair_grad->top_task_list =
+      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
+  pack_vars_pair_forc->task_list =
+      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
+  pack_vars_pair_forc->top_task_list =
+      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
   int n_leaves_max = 128;
   /*Allocate target_n_tasks for top level tasks. This is a 2D array with length target_n_tasks and width n_leaves_max*/
   int max_length = 2 * target_n_tasks * 16 * n_leaves_max;
@@ -1050,7 +1058,7 @@ void *runner_main2(void *data) {
                         parts_aos_pair_f4_g_send, e, fparti_fpartj_lparti_lpartj_grad, &n_leaves_found, depth, n_expected_tasks, ci_dg, cj_dg, pack_vars_pair_grad->n_daughters_total);
 
               runner_pack_daughters_and_launch_g(r, sched, ci, cj, pack_vars_pair_grad,
-              	    t, parts_aos_pair_f4_g_send , parts_aos_pair_f4_g_recv, d_parts_aos_pair_f4_g_send,
+              	    t, parts_aos_pair_f4_g_send, parts_aos_pair_f4_g_recv, d_parts_aos_pair_f4_g_send,
               	    parts_aos_pair_f4_g_recv, stream_pairs, d_a, d_H, e, &packing_time_pair_g, &time_for_gpu_pair_g,
               	    &unpacking_time_pair_g, fparti_fpartj_lparti_lpartj_grad,
               	    pair_end_g, n_leaves_found, ci_dg, cj_dg, first_and_last_daughters_g, ci_top_g, cj_top_g);
