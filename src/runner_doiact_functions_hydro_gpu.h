@@ -1895,7 +1895,6 @@ void runner_dopair1_unpack_f4(
     cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
     , struct cell ** ci_top, struct cell ** cj_top) {
 
-//  int topid;
   /////////////////////////////////
   // Should this be reset to zero HERE???
   /////////////////////////////////
@@ -1904,47 +1903,27 @@ void runner_dopair1_unpack_f4(
   /*Loop over top level tasks*/
   for (int topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
     const ticks tic = getticks();
-//    int first_daughter_id = f_l_daughters[topid][1] - 1;
     int first_daughter_id = f_l_daughters[topid][0];
 	struct cell *cii_top = ci_d[first_daughter_id];
 	struct cell *cjj_top = cj_d[first_daughter_id];
-//    if(topid < pack_vars->top_tasks_packed - 1){
-//      message("topid %i tops packed %i citop %i cjtop %i d_id %i", topid, pack_vars->top_tasks_packed, cii_top->top->cellID, cjj_top->top->cellID, first_daughter_id);
-      while (cell_locktree(ci_top[topid])) {
-        ; /* spin until we acquire the lock */
-      }
-      while (cell_locktree(cj_top[topid])) {
-        ; /* spin until we acquire the lock */
-      }
-//    }
+	while (cell_locktree(ci_top[topid])) {
+	  ; /* spin until we acquire the lock */
+	}
+	while (cell_locktree(cj_top[topid])) {
+	  ; /* spin until we acquire the lock */
+	}
 
     /* Loop through each daughter task */
     for (int tid = f_l_daughters[topid][0]; tid < f_l_daughters[topid][1]; tid++){
       /*Get pointers to the leaf cells*/
       struct cell *cii_l = ci_d[tid];
       struct cell *cjj_l = cj_d[tid];
-//      message("unpacking % i % i %i", cii_l->hydro.count, cjj_l->hydro.count,
-//              pack_vars->count_parts);
-//      message(
-//          "unpacking ttid %i tid %i npacked %i, ci %i, cj %i, citop %i, cjtop "
-//          "%i count i %i, count j %i",
-//          topid, tid, npacked, cii_l->cellID, cjj_l->cellID, cii_l->top->cellID,
-//          cjj_l->top->cellID, cii_l->hydro.count, cjj_l->hydro.count);
-//      if (cii_l->loc[0] != ll_current->ci[tid]->loc[0]) error("stop");
-//      if (cii_l->hydro.count == 0 || cjj_l->hydro.count == 0)
-//        error("Unpacking empty cells");
       runner_do_ci_cj_gpu_unpack_neat_aos_f4(r, cii_l, cjj_l, parts_recv, 0,
                                              &pack_length_unpack, tid,
                                              2 * pack_vars->count_max_parts, e);
     }
-//    if(topid < pack_vars->top_tasks_packed - 1){
-//      pthread_mutex_lock(&s->sleep_mutex);
-//      atomic_dec(&s->waiting);
-//      pthread_cond_broadcast(&s->sleep_cond);
-//      pthread_mutex_unlock(&s->sleep_mutex);
-      cell_unlocktree(ci_top[topid]);
-      cell_unlocktree(cj_top[topid]);
-//    }
+    cell_unlocktree(ci_top[topid]);
+    cell_unlocktree(cj_top[topid]);
 
     const ticks toc = getticks();
     total_cpu_unpack_ticks += toc - tic;
@@ -1961,9 +1940,6 @@ void runner_dopair1_unpack_f4(
     pthread_cond_broadcast(&s->sleep_cond);
     pthread_mutex_unlock(&s->sleep_mutex);
   }
-//  if (pack_length_unpack != pack_vars->count_parts)
-//    error("count unpacked %i != count_packed %i", pack_length_unpack,
-//          pack_vars->count_parts);
 }
 
 void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, struct cell * ci, struct cell * cj, struct pack_vars_pair *pack_vars,
