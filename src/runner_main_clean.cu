@@ -261,21 +261,21 @@ void *runner_main2(void *data) {
   const int target_n_tasks = sched->pack_size;
   const int target_n_tasks_pair = sched->pack_size_pair;
   pack_vars_self_dens->target_n_tasks = target_n_tasks;
-  pack_vars_pair_dens->target_n_tasks = target_n_tasks_pair * 16; //Accounting for one level of recursion
+  pack_vars_pair_dens->target_n_tasks = target_n_tasks_pair; //Accounting for one level of recursion
   pack_vars_self_forc->target_n_tasks = target_n_tasks;
-  pack_vars_pair_forc->target_n_tasks = target_n_tasks_pair * 16;
+  pack_vars_pair_forc->target_n_tasks = target_n_tasks_pair;
   pack_vars_self_grad->target_n_tasks = target_n_tasks;
-  pack_vars_pair_grad->target_n_tasks = target_n_tasks_pair * 16;
+  pack_vars_pair_grad->target_n_tasks = target_n_tasks_pair;
   // how many tasks we want in each bundle (used for launching kernels in
   // different streams)
   const int bundle_size = N_TASKS_BUNDLE_SELF;
   const int bundle_size_pair = N_TASKS_BUNDLE_PAIR;
   pack_vars_self_dens->bundle_size = bundle_size;
-  pack_vars_pair_dens->bundle_size = target_n_tasks_pair * 4; //Trying to make it so that we have 4 bundles
+  pack_vars_pair_dens->bundle_size = bundle_size_pair; //Trying to make it so that we have 4 bundles
   pack_vars_self_forc->bundle_size = bundle_size;
-  pack_vars_pair_forc->bundle_size = target_n_tasks_pair * 4;
+  pack_vars_pair_forc->bundle_size = bundle_size_pair;
   pack_vars_self_grad->bundle_size = bundle_size;
-  pack_vars_pair_grad->bundle_size = target_n_tasks_pair * 4;
+  pack_vars_pair_grad->bundle_size = bundle_size_pair;
   // Keep track of first and last particles for each task (particle data is
   // arranged in long arrays containing particles from all the tasks we will
   // work with)
@@ -336,11 +336,11 @@ void *runner_main2(void *data) {
                  nBundles * sizeof(int));
 
   cudaMallocHost((void **)&pack_vars_pair_dens->bundle_first_part,
-                 2 * nBundles * sizeof(int));
+                 2 * nBundles_pair * sizeof(int));
   cudaMallocHost((void **)&pack_vars_pair_dens->bundle_last_part,
-                 2 * nBundles * sizeof(int));
+                 2 * nBundles_pair * sizeof(int));
   cudaMallocHost((void **)&pack_vars_pair_dens->bundle_first_task_list,
-                 2 * nBundles * sizeof(int));
+                 2 * nBundles_pair * sizeof(int));
 
   cudaMallocHost((void **)&pack_vars_self_forc->bundle_first_part,
                  nBundles * sizeof(int));
@@ -350,11 +350,11 @@ void *runner_main2(void *data) {
                  nBundles * sizeof(int));
 
   cudaMallocHost((void **)&pack_vars_pair_forc->bundle_first_part,
-                 2 * nBundles * sizeof(int));
+                 2 * nBundles_pair * sizeof(int));
   cudaMallocHost((void **)&pack_vars_pair_forc->bundle_last_part,
-                 2 * nBundles * sizeof(int));
+                 2 * nBundles_pair * sizeof(int));
   cudaMallocHost((void **)&pack_vars_pair_forc->bundle_first_task_list,
-                 2 * nBundles * sizeof(int));
+                 2 * nBundles_pair * sizeof(int));
 
   cudaMallocHost((void **)&pack_vars_self_grad->bundle_first_part,
                  nBundles * sizeof(int));
@@ -364,11 +364,11 @@ void *runner_main2(void *data) {
                  nBundles * sizeof(int));
 
   cudaMallocHost((void **)&pack_vars_pair_grad->bundle_first_part,
-                 2 * nBundles * sizeof(int));
+                 2 * nBundles_pair * sizeof(int));
   cudaMallocHost((void **)&pack_vars_pair_grad->bundle_last_part,
-                 2 * nBundles * sizeof(int));
+                 2 * nBundles_pair * sizeof(int));
   cudaMallocHost((void **)&pack_vars_pair_grad->bundle_first_task_list,
-                 2 * nBundles * sizeof(int));
+                 2 * nBundles_pair * sizeof(int));
 
   /*Create streams so that we can off-load different batches of work in
    * different streams and get some con-CURRENCY! Events used to maximise
@@ -384,23 +384,23 @@ void *runner_main2(void *data) {
   cudaEvent_t self_end_f[nBundles];
   for (int i = 0; i < nBundles; i++) cudaEventCreate(&self_end_f[i]);
 
-  cudaEvent_t pair_end[nBundles];
-  for (int i = 0; i < nBundles; i++) cudaEventCreate(&pair_end[i]);
-  cudaEvent_t pair_end_g[nBundles];
-  for (int i = 0; i < nBundles; i++) cudaEventCreate(&pair_end_g[i]);
-  cudaEvent_t pair_end_f[nBundles];
-  for (int i = 0; i < nBundles; i++) cudaEventCreate(&pair_end_f[i]);
+  cudaEvent_t pair_end[nBundles_pair];
+  for (int i = 0; i < nBundles_pair; i++) cudaEventCreate(&pair_end[i]);
+  cudaEvent_t pair_end_g[nBundles_pair];
+  for (int i = 0; i < nBundles_pair; i++) cudaEventCreate(&pair_end_g[i]);
+  cudaEvent_t pair_end_f[nBundles_pair];
+  for (int i = 0; i < nBundles_pair; i++) cudaEventCreate(&pair_end_f[i]);
 
   int tasksperbundle = (target_n_tasks + nBundles - 1) / nBundles;
   int tasksperbundle_pair =
       (target_n_tasks_pair + nBundles_pair - 1) / nBundles_pair;
 
   pack_vars_self_dens->tasksperbundle = tasksperbundle;
-  pack_vars_pair_dens->tasksperbundle = tasksperbundle_pair * 16;
+  pack_vars_pair_dens->tasksperbundle = tasksperbundle_pair;
   pack_vars_self_forc->tasksperbundle = tasksperbundle;
-  pack_vars_pair_forc->tasksperbundle = tasksperbundle_pair * 16;
+  pack_vars_pair_forc->tasksperbundle = tasksperbundle_pair;
   pack_vars_self_grad->tasksperbundle = tasksperbundle;
-  pack_vars_pair_grad->tasksperbundle = tasksperbundle_pair * 16;
+  pack_vars_pair_grad->tasksperbundle = tasksperbundle_pair;
 
   for (int i = 0; i < nBundles; ++i)
     cudaStreamCreateWithFlags(&stream[i], cudaStreamNonBlocking);
@@ -551,22 +551,44 @@ void *runner_main2(void *data) {
       (struct task **)calloc(target_n_tasks, sizeof(struct task *));
   pack_vars_self_dens->cell_list =
       (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
+  //A. Nasar: The pair version of these is no longer required
+  /*Allocate memory for n_leaves_max task pointers per top level task*/
+  pack_vars_pair_dens->ci_list =
+      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
+  pack_vars_pair_dens->cj_list =
+      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
 
-  pack_vars_pair_dens->task_list =
-      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
+  pack_vars_self_forc->task_list =
+      (struct task **)calloc(target_n_tasks, sizeof(struct task *));
+  pack_vars_self_forc->cell_list =
+      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
+
+  pack_vars_pair_forc->ci_list =
+      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
+  pack_vars_pair_forc->cj_list =
+      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
+
+  pack_vars_self_grad->task_list =
+      (struct task **)calloc(target_n_tasks, sizeof(struct task *));
+  pack_vars_self_grad->cell_list =
+      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
+
+  pack_vars_pair_grad->ci_list =
+      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
+  pack_vars_pair_grad->cj_list =
+      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
+
   pack_vars_pair_dens->top_task_list =
-      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
-  pack_vars_pair_grad->task_list =
-      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
+      (struct task **)calloc(target_n_tasks_pair, sizeof(struct task *));
   pack_vars_pair_grad->top_task_list =
-      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
-  pack_vars_pair_forc->task_list =
-      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
+      (struct task **)calloc(target_n_tasks_pair, sizeof(struct task *));
   pack_vars_pair_forc->top_task_list =
-      (struct task **)calloc(target_n_tasks * 16, sizeof(struct task *));
+      (struct task **)calloc(target_n_tasks_pair, sizeof(struct task *));
+
   int n_leaves_max = 128;
+  //A. Nasar: Over-setimate better than under-estimate
   /*Allocate target_n_tasks for top level tasks. This is a 2D array with length target_n_tasks and width n_leaves_max*/
-  int max_length = 2 * target_n_tasks * 16 * n_leaves_max;
+  int max_length = 2 * target_n_tasks_pair * n_leaves_max;
   struct cell **ci_dd = malloc(max_length * sizeof(struct cell *));
   struct cell **cj_dd = malloc(max_length * sizeof(struct cell *));
   struct cell **ci_dg = malloc(max_length * sizeof(struct cell *));
@@ -587,13 +609,13 @@ void *runner_main2(void *data) {
 	  cj_df[i] = malloc(sizeof(struct cell *));
   }
 
-  struct cell **ci_top_d = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
-  struct cell **cj_top_d = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
-  struct cell **ci_top_g = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
-  struct cell **cj_top_g = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
-  struct cell **ci_top_f = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
-  struct cell **cj_top_f = malloc(2 * target_n_tasks * 16 * sizeof(struct cell *));
-  for(int i = 0; i < 2 * target_n_tasks * 16; i++){
+  struct cell **ci_top_d = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **cj_top_d = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **ci_top_g = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **cj_top_g = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **ci_top_f = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **cj_top_f = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  for(int i = 0; i < 2 * target_n_tasks_pair; i++){
 	  ci_top_d[i] = malloc(sizeof(struct cell *));
 	  cj_top_d[i] = malloc(sizeof(struct cell *));
 	  ci_top_g[i] = malloc(sizeof(struct cell *));
@@ -602,44 +624,14 @@ void *runner_main2(void *data) {
 	  cj_top_f[i] = malloc(sizeof(struct cell *));
   }
   //change above declaration to the assignment below
-  first_and_last_daughters_d = malloc(target_n_tasks * n_leaves_max * sizeof(int *));
-  first_and_last_daughters_g = malloc(target_n_tasks * n_leaves_max * sizeof(int *));
-  first_and_last_daughters_f = malloc(target_n_tasks * n_leaves_max * sizeof(int *));
-  for (int i = 0; i < target_n_tasks * n_leaves_max; i++){
+  first_and_last_daughters_d = malloc(target_n_tasks_pair * n_leaves_max * sizeof(int *));
+  first_and_last_daughters_g = malloc(target_n_tasks_pair * n_leaves_max * sizeof(int *));
+  first_and_last_daughters_f = malloc(target_n_tasks_pair * n_leaves_max * sizeof(int *));
+  for (int i = 0; i < target_n_tasks_pair * n_leaves_max; i++){
 	  first_and_last_daughters_d[i] = malloc(2 * sizeof(int));
 	  first_and_last_daughters_g[i] = malloc(2 * sizeof(int));
 	  first_and_last_daughters_f[i] = malloc(2 * sizeof(int));
   }
-  /*Allocate memory for n_leaves_max task pointers per top level task*/
-
-  pack_vars_pair_dens->ci_list =
-      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
-  pack_vars_pair_dens->cj_list =
-      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
-
-  pack_vars_self_forc->task_list =
-      (struct task **)calloc(target_n_tasks, sizeof(struct task *));
-  pack_vars_self_forc->cell_list =
-      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
-
-  pack_vars_pair_forc->task_list =
-      (struct task **)calloc(target_n_tasks, sizeof(struct task *));
-  pack_vars_pair_forc->ci_list =
-      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
-  pack_vars_pair_forc->cj_list =
-      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
-
-  pack_vars_self_grad->task_list =
-      (struct task **)calloc(target_n_tasks, sizeof(struct task *));
-  pack_vars_self_grad->cell_list =
-      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
-
-  pack_vars_pair_grad->task_list =
-      (struct task **)calloc(target_n_tasks, sizeof(struct task *));
-  pack_vars_pair_grad->ci_list =
-      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
-  pack_vars_pair_grad->cj_list =
-      (struct cell **)calloc(target_n_tasks * 16, sizeof(struct cell *));
 
   // number of density self tasks executed
   int tasks_done_cpu = 0;
