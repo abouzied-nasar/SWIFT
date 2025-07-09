@@ -300,11 +300,11 @@ void *runner_main2(void *data) {
   int4 *fparti_fpartj_lparti_lpartj_forc;
   int4 *fparti_fpartj_lparti_lpartj_grad;
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_dens,
-		  target_n_tasks * 16 * sizeof(int4));
+		  target_n_tasks_pair * sizeof(int4));
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_forc,
-		  target_n_tasks * 16 * sizeof(int4));
+          target_n_tasks_pair * sizeof(int4));
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_grad,
-		  target_n_tasks * 16 * sizeof(int4));
+          target_n_tasks_pair * sizeof(int4));
 
   /* nBundles is the number of task bundles each
   thread has ==> Used to loop through bundles */
