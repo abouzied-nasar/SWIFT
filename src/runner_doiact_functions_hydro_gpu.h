@@ -2176,6 +2176,7 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
         pack_vars->launch = 1;
     if(pack_vars->launch || (pack_vars->launch_leftovers && npacked == n_leaves_found)){
 
+//      message("tasks packed density %i", pack_vars->tasks_packed);
       last_launched = f_l_daughters[top_tasks_packed - 1][1];
       launched = 1;
       //Here we only launch the tasks. No unpacking! This is done in next function ;)
@@ -2777,6 +2778,7 @@ void runner_pack_daughters_and_launch_g(struct runner *r, struct scheduler *s, s
         pack_vars->launch = 1;
     if(pack_vars->launch || (pack_vars->launch_leftovers && npacked == n_leaves_found)){
 
+//      message("tasks packed gradient %i", pack_vars->tasks_packed);
       last_launched = f_l_daughters[top_tasks_packed - 1][1];
       launched = 1;
       //Here we only launch the tasks. No unpacking! This is done in next function ;)
@@ -3392,6 +3394,7 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
 
       last_launched = f_l_daughters[top_tasks_packed - 1][1];
       launched = 1;
+//      message("tasks packed force %i", pack_vars->tasks_packed);
       //Here we only launch the tasks. No unpacking! This is done in next function ;)
       runner_dopair1_launch_f4_one_memcpy_no_unpack_f(
             r, s, pack_vars, t, parts_send,
