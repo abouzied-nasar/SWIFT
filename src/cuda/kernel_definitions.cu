@@ -46,8 +46,8 @@ void Initialise_GPU() {
 extern "C" {
 #endif
 void CPU_runner_doself1_branch_gradient(struct cell_gpu *restrict ci_gpu) {
-  int id = ci_gpu->hydro.parts[0].id;
-  printf("id of first part %d\n", id);
+  // int id = ci_gpu->hydro.parts[0].id;
+  // printf("id of first part %d\n", id);
   // Do stuff here for interactions on CPU but using the temporary GPU arrays
   //	const int count_i = ci_gpu->hydro.count;
   //  	const int count_j = cj_gpu->hydro.count;
