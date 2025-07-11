@@ -201,7 +201,7 @@ __global__ void runner_do_self_density_GPU(
           /* Recover some data */
           const float mj = mass_tmp[j_block];
           /* Get the kernel for hi. */
-          if (hi < 1.f / 256.f) printf("h < dx\n");
+          // if (hi < 1.f / 256.f) printf("h < dx\n");
           //          if(hi<1.f/256.f)printf("h < dx\n");
           const float h_inv = 1.f / hi;
           const float ui = r * h_inv;
@@ -1108,7 +1108,7 @@ __global__ void DOSELF_GPU_AOS_F(struct part_aos_f *parts_aos,
 
           /* Internal energy time derivative */
           u_dti += du_dt_i * mj;
-          if (mj == 0.f) printf("zero mass mj %f\n", mj);
+          // if (mj == 0.f) printf("zero mass mj %f\n", mj);
 
           /* Get the time derivative for h. */
           h_dti -= mj * dvdr * r_inv / rhoj * wi_dr;
@@ -1476,7 +1476,7 @@ __global__ void runner_do_pair_density_GPU_naive(
           /* Recover some data */
           const float mj = mass_tmp[j_block];
           /* Get the kernel for hi. */
-          if (hi < 1.f / dx) printf("h < dx\n");
+          // if (hi < 1.f / dx) printf("h < dx\n");
           //          if(hi<1.f/256.f)printf("h < dx\n");
           const float h_inv = 1.f / hi;
           const float ui = r * h_inv;
@@ -1655,7 +1655,7 @@ __device__ void DOPAIRGPU(struct part_soa parts_soa, int pid,
           /* Recover some data */
           const float mj = mass_tmp[j_block];
           /* Get the kernel for hi. */
-          if (hi < 1.f / dx) printf("h < dx\n");
+          // if (hi < 1.f / dx) printf("h < dx\n");
           const float h_inv = 1.f / hi;
           const float ui = r * h_inv;
           float wi, wi_dx;
@@ -2176,8 +2176,8 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
 //      if(mj < 0.0000001)
 //      	printf("zero mass");
     }
-    else if(r2 > 0.5)
-      printf("Distance is %f\n", sqrt(r2));
+    // else if(r2 > 0.5)
+    //   printf("Distance is %f\n", sqrt(r2));
   } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
   //  if (pid >= ci_start && pid < ci_end) {
 
@@ -2659,7 +2659,7 @@ __device__ void DOPAIR2NONSYMGPUAOSF(struct part_aos_f *parts_aos, int pid,
 
           /* Internal energy time derivative */
           u_dti += du_dt_i * mj;
-          if (mj == 0.f) printf("zero mass mj %f\n", mj);
+          // if (mj == 0.f) printf("zero mass mj %f\n", mj);
 
           /* Get the time derivative for h. */
           h_dti -= mj * dvdr * r_inv / rhoj * wi_dr;
@@ -4127,7 +4127,7 @@ __global__ void runner_do_self_density_GPU_naive(
             /* Recover some data */
             const float mj = mass_tmp;
             /* Get the kernel for hi. */
-            if (hi < 1.f / 128.f) printf("h < dx\n");
+            // if (hi < 1.f / 128.f) printf("h < dx\n");
             const float h_inv = 1.f / hi;
             const float ui = r * h_inv;
             float wi, wi_dx;
@@ -4163,8 +4163,8 @@ __global__ void runner_do_self_density_GPU_naive(
     }
     //    float wi, wi_dx;
     //    d_kernel_deval(0.f, &wi, &wi_dx);
-    if (Found_neighbours == 0)
-      printf("Not sure what's going on but no neighbours found in GPU loop\n");
+    // if (Found_neighbours == 0)
+    //   printf("Not sure what's going on but no neighbours found in GPU loop\n");
     parts_soa.rho[pid] = rhoi, parts_soa.rho_dh[pid] = rho_dhi;
     parts_soa.wcount[pid] = wcounti, parts_soa.wcount_dh[pid] = wcount_dhi;
     parts_soa.div_v[pid] = div_vi;
