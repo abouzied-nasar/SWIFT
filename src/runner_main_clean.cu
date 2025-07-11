@@ -45,6 +45,8 @@ extern "C" {
 #include <mpi.h>
 #endif
 
+#include "swift_likwid.h"
+
 /* This object's header. */
 #include "runner.h"
 
@@ -186,6 +188,9 @@ void *runner_main2(void *data) {
   struct engine *e = r->e;
   struct scheduler *sched = &e->sched;
   struct space *space = e->s;
+
+
+  swift_init_likwid_markers();
 
   //////////Declare and allocate GPU launch control data structures/////////
   /*pack_vars contain data required for self and pair packing tasks destined
@@ -828,9 +833,20 @@ void *runner_main2(void *data) {
             packed_self++;
 #ifdef GPUOFFLOAD_DENSITY
             ticks tic_cpu_pack = getticks();
+
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_START("pack_density");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_START("pack_density_self");
+#endif
             packing_time +=
                 runner_doself1_pack_f4(r, sched, pack_vars_self_dens, ci, t,
                                        parts_aos_f4_send, task_first_part_f4);
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_density");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_density_self");
+#endif
             //Record times for task analysis
             t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
             /* No pack tasks left in queue, flag that we want to run */
@@ -854,9 +870,20 @@ void *runner_main2(void *data) {
             packed_self_g++;
 #ifdef GPUOFFLOAD_GRADIENT
             ticks tic_cpu_pack = getticks();
+
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_START("pack_grad");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_START("pack_grad_self");
+#endif
             packing_time_g += runner_doself1_pack_f4_g(
                 r, sched, pack_vars_self_grad, ci, t, parts_aos_grad_f4_send,
                 task_first_part_f4_g);
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_grad");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_grad_self");
+#endif
             //Record times for task analysis
             t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
             /* No pack tasks left in queue, flag that we want to run */
@@ -879,9 +906,21 @@ void *runner_main2(void *data) {
             packed_self_f++;
 #ifdef GPUOFFLOAD_FORCE
             ticks tic_cpu_pack = getticks();
+
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_START("pack_force");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_START("pack_force_self");
+#endif
             packing_time_f += runner_doself1_pack_f4_f(
                 r, sched, pack_vars_self_forc, ci, t, parts_aos_forc_f4_send,
                 task_first_part_f4_f);
+
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_force");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_force_self");
+#endif
             //Record times for task analysis
             t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
             /* No pack tasks left in queue, flag that we want to run */
@@ -912,7 +951,7 @@ void *runner_main2(void *data) {
             runner_dosub_self2_gradient(r, ci, /*below_h_max=*/0, 1);
 #else
             runner_dosub_self1_gradient(r, ci, /*below_h_max=*/0, 1);
-#endif 
+#endif
             clock_gettime(CLOCK_REALTIME, &t1);
             tasks_done_cpu++;
             time_for_cpu_g += (t1.tv_sec - t0.tv_sec) +
@@ -1007,10 +1046,21 @@ void *runner_main2(void *data) {
 #ifndef RECURSE
             ticks tic_cpu_pack = getticks();
             /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
+
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_START("pack_density");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_START("pack_density_pair");
+#endif
             packing_time_pair_f +=
                 runner_dopair1_pack_f4_d(r, sched, pack_vars_pair_dens, ci,
                                          cj, t, parts_aos_pair_f4_send, e,
                                          fparti_fpartj_lparti_lpartj_dens);
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_density");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_density_pair");
+#endif
             /* No pack tasks left in queue, flag that we want to run */
             int launch_leftovers = pack_vars_pair_dens->launch_leftovers;
             /*Packed enough tasks let's go*/
@@ -1179,10 +1229,22 @@ void *runner_main2(void *data) {
             packed_pair_g++;
 #ifdef GPUOFFLOAD_GRADIENT
               ticks tic_cpu_pack = getticks();
+
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_START("pack_grad");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_START("pack_grad_pair");
+#endif
               packing_time_pair_g +=
                   runner_dopair1_pack_f4_g(r, sched, pack_vars_pair_grad, ci,
                                            cj, t, parts_aos_pair_f4_g_send, e,
                                            fparti_fpartj_lparti_lpartj_grad);
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_grad");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_grad_pair");
+#endif
+
               t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
               /* No pack tasks left in queue, flag that we want to run */
               int launch_leftovers = pack_vars_pair_grad->launch_leftovers;
@@ -1208,10 +1270,23 @@ void *runner_main2(void *data) {
 #ifdef GPUOFFLOAD_FORCE
               ticks tic_cpu_pack = getticks();
               /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
+
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_START("pack_force");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_START("pack_force_pair");
+#endif
+
               packing_time_pair_f +=
                   runner_dopair1_pack_f4_f(r, sched, pack_vars_pair_forc, ci,
                                            cj, t, parts_aos_pair_f4_f_send, e,
                                            fparti_fpartj_lparti_lpartj_forc);
+#ifdef SWIFT_LIKWID_SUM_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_force");
+#elif defined SWIFT_LIKWID_SELF_PAIR_MEASUREMENT
+            LIKWID_MARKER_STOP("pack_force_pair");
+#endif
+
               /* No pack tasks left in queue, flag that we want to run */
               int launch_leftovers = pack_vars_pair_forc->launch_leftovers;
               /*Packed enough tasks let's go*/

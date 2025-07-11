@@ -44,6 +44,8 @@
 #include "argparse.h"
 #include "swift.h"
 
+#include "swift_likwid.h"
+
 /* Engine policy flags. */
 #ifndef ENGINE_POLICY
 #define ENGINE_POLICY engine_policy_none
@@ -118,6 +120,8 @@ int main(int argc, char *argv[]) {
   struct unit_system us;
   struct los_props los_properties;
   struct ic_info ics_metadata;
+
+  swift_init_likwid();
 
   int nr_nodes = 1, myrank = 0;
 
@@ -1232,7 +1236,7 @@ int main(int argc, char *argv[]) {
     /* Initialize power spectra calculation */
     if (with_power) {
 #ifdef HAVE_FFTW
-      power_init(&pow_data, params, nr_threads);
+      power_spectrum_init(&pow_data, params, nr_threads);
 #else
       error("No FFTW library found. Cannot compute power spectra.");
 #endif
@@ -1964,6 +1968,8 @@ int main(int argc, char *argv[]) {
   if ((res = MPI_Finalize()) != MPI_SUCCESS)
     error("call to MPI_Finalize failed with error %i.", res);
 #endif
+
+  swift_close_likwid();
 
   /* Say goodbye. */
   if (myrank == 0) message("done. Bye.");
