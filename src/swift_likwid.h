@@ -29,12 +29,14 @@
 #endif
 
 __attribute__((always_inline)) INLINE void swift_init_likwid(void){
+  /* Needs to be in serial region! */
   LIKWID_MARKER_INIT;
 }
 
 
 static __attribute__((always_inline)) INLINE void swift_init_likwid_markers(void){
   /* Do this in parallel region! */
+
 #ifdef SWIFT_LIKWID_SUM_MEASUREMENT
   LIKWID_MARKER_REGISTER("pack_density");
   LIKWID_MARKER_REGISTER("pack_gradient");

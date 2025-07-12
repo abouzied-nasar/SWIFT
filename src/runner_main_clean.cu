@@ -191,6 +191,9 @@ void *runner_main2(void *data) {
 
 
   swift_init_likwid_markers();
+  /* swift_barrier_wait(&e->wait_barrier); */
+  engine_barrier(e);
+  message("Passed barrier step=%d id=%d", e->step, r->id);
 
   //////////Declare and allocate GPU launch control data structures/////////
   /*pack_vars contain data required for self and pair packing tasks destined
@@ -765,6 +768,8 @@ void *runner_main2(void *data) {
         /* Did I get anything? */
         if (t == NULL) break;
       }
+
+message("step=%d thread=%d running %s/%s", e->step, r->id, taskID_names[t->type], subtaskID_names[t->subtype]);
       /* Get the cells. */
       struct cell *ci = t->ci;
       struct cell *cj = t->cj;
