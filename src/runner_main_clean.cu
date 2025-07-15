@@ -735,7 +735,7 @@ void *runner_main2(void *data) {
     struct task *prev = NULL;
     /*Some bits for output in case of debug*/
 
-    //    if (step == 0) cudaProfilerStart();
+    if (step == 0) cudaProfilerStart();
     step++;
 
     sched->nr_packs_self_dens_done = 0;
@@ -1472,7 +1472,7 @@ void *runner_main2(void *data) {
     density = 0;
     density_sub = 0;
     unpacked = 0;
-    //	if(step == 2)cudaProfilerStop();
+    if(step == 4)cudaProfilerStop();
     //	if(step == 2)exit(0);
     //	  size_t free_byte ;
     //	  size_t total_byte ;
