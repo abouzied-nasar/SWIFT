@@ -619,6 +619,14 @@ void *runner_main2(void *data) {
 
   /* Main loop. */
   while (1) {
+
+    char logfname[80];
+    sprintf(logfname, "log_thread%03d_step%03d.dat", r->id, e->step);
+    FILE* logfile = fopen(logfname, "w");
+    if (logfile==NULL)
+      error("Error opening pack trace log file");
+    fprintf(logfile, "#task_type,ci_id,cj_id,ci_hydro_count,cj_hydro_count,time[ms]\n");
+
     /*Stuff for debugging*/
     int n_full_d_bundles = 0, n_full_g_bundles = 0, n_full_f_bundles = 0;
     int n_full_p_d_bundles = 0, n_full_p_g_bundles = 0, n_full_p_f_bundles = 0;
@@ -832,7 +840,12 @@ void *runner_main2(void *data) {
                 runner_doself1_pack_f4(r, sched, pack_vars_self_dens, ci, t,
                                        parts_aos_f4_send, task_first_part_f4);
             //Record times for task analysis
-            t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
+            ticks tic_cpu_pack_end = getticks();
+            t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
+            fprintf(logfile, "density_self,%lld,-1,%d,-1,%g\n",
+                t->ci->cellID, t->ci->hydro.count, clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
+
+
             /* No pack tasks left in queue, flag that we want to run */
             int launch_leftovers = pack_vars_self_dens->launch_leftovers;
             /*Packed enough tasks. Let's go*/
@@ -858,7 +871,10 @@ void *runner_main2(void *data) {
                 r, sched, pack_vars_self_grad, ci, t, parts_aos_grad_f4_send,
                 task_first_part_f4_g);
             //Record times for task analysis
-            t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
+            ticks tic_cpu_pack_end = getticks();
+            t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
+            fprintf(logfile, "gradient_self,%lld,-1,%d,-1,%g\n",
+                t->ci->cellID, t->ci->hydro.count, clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
             /* No pack tasks left in queue, flag that we want to run */
             int launch_leftovers = pack_vars_self_grad->launch_leftovers;
             /*Packed enough tasks let's go*/
@@ -883,7 +899,12 @@ void *runner_main2(void *data) {
                 r, sched, pack_vars_self_forc, ci, t, parts_aos_forc_f4_send,
                 task_first_part_f4_f);
             //Record times for task analysis
-            t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
+            ticks tic_cpu_pack_end = getticks();
+            t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
+            fprintf(logfile, "force_self,%lld,-1,%d,-1,%g\n",
+                t->ci->cellID, t->ci->hydro.count, clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
+
+
             /* No pack tasks left in queue, flag that we want to run */
             int launch_leftovers = pack_vars_self_forc->launch_leftovers;
             /*Packed enough tasks let's go*/
@@ -912,7 +933,7 @@ void *runner_main2(void *data) {
             runner_dosub_self2_gradient(r, ci, /*below_h_max=*/0, 1);
 #else
             runner_dosub_self1_gradient(r, ci, /*below_h_max=*/0, 1);
-#endif 
+#endif
             clock_gettime(CLOCK_REALTIME, &t1);
             tasks_done_cpu++;
             time_for_cpu_g += (t1.tv_sec - t0.tv_sec) +
@@ -1011,6 +1032,12 @@ void *runner_main2(void *data) {
                 runner_dopair1_pack_f4_d(r, sched, pack_vars_pair_dens, ci,
                                          cj, t, parts_aos_pair_f4_send, e,
                                          fparti_fpartj_lparti_lpartj_dens);
+            ticks tic_cpu_pack_end = getticks();
+            t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
+            fprintf(logfile, "density_pair,%lld,%lld,%d,%d,%g\n",
+                t->ci->cellID, t->cj->cellID, t->ci->hydro.count, t->cj->hydro.count,
+                clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
+
             /* No pack tasks left in queue, flag that we want to run */
             int launch_leftovers = pack_vars_pair_dens->launch_leftovers;
             /*Packed enough tasks let's go*/
@@ -1183,7 +1210,14 @@ void *runner_main2(void *data) {
                   runner_dopair1_pack_f4_g(r, sched, pack_vars_pair_grad, ci,
                                            cj, t, parts_aos_pair_f4_g_send, e,
                                            fparti_fpartj_lparti_lpartj_grad);
-              t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
+              ticks tic_cpu_pack_end = getticks();
+              t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
+              fprintf(logfile, "gradient_pair,%lld,%lld,%d,%d,%g\n",
+                  t->ci->cellID, t->cj->cellID, t->ci->hydro.count, t->cj->hydro.count,
+                  clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
+
+
+
               /* No pack tasks left in queue, flag that we want to run */
               int launch_leftovers = pack_vars_pair_grad->launch_leftovers;
               /*Packed enough tasks, let's go*/
@@ -1212,6 +1246,13 @@ void *runner_main2(void *data) {
                   runner_dopair1_pack_f4_f(r, sched, pack_vars_pair_forc, ci,
                                            cj, t, parts_aos_pair_f4_f_send, e,
                                            fparti_fpartj_lparti_lpartj_forc);
+
+              ticks tic_cpu_pack_end = getticks();
+              t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
+              fprintf(logfile, "force_pair,%lld,%lld,%d,%d,%g\n",
+                  t->ci->cellID, t->cj->cellID, t->ci->hydro.count, t->cj->hydro.count,
+                  clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
+
               /* No pack tasks left in queue, flag that we want to run */
               int launch_leftovers = pack_vars_pair_forc->launch_leftovers;
               /*Packed enough tasks let's go*/
@@ -1745,6 +1786,8 @@ void *runner_main2(void *data) {
     // fprintf(stderr, "Used %f GB GPU memory\n", used/1e9);
     /* Wait at the wait barrier. */
     //    swift_barrier_wait(&e->wait_barrier);
+
+    fclose(logfile);
   }
   // Free all data
   //  cudaFree(d_tid_p);

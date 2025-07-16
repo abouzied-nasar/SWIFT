@@ -3885,3 +3885,17 @@ void scheduler_report_task_times(const struct scheduler *s,
   message("took %.3f %s.", clocks_from_ticks(getticks() - tic),
           clocks_getunit());
 }
+
+
+void scheduler_log_run_params(struct scheduler* s, int nr_threads){
+
+  FILE* outfile = fopen("log_runtime_params.dat", "w");
+  if (outfile == NULL)
+    error("Error opening file");
+
+  fprintf(outfile, "nr_threads: %d\n", nr_threads);
+  fclose(outfile);
+
+  message("Written simulation parameter log.");
+
+}
