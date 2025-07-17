@@ -2421,7 +2421,7 @@ void engine_init_particles(struct engine *e, int flag_entropy_ICs,
 
   scheduler_write_dependencies(&e->sched, e->verbose, e->step);
   scheduler_write_cell_dependencies(&e->sched, e->verbose, e->step);
-  scheduler_log_run_params(&e->sched, e->nr_threads);
+  scheduler_log_run_params(&e->sched, e->nr_threads, e->s->nr_parts);
   if (e->nodeID == 0) scheduler_write_task_level(&e->sched, e->step);
 
   /* Zero the list of cells that have had their time-step updated */

@@ -3887,13 +3887,14 @@ void scheduler_report_task_times(const struct scheduler *s,
 }
 
 
-void scheduler_log_run_params(struct scheduler* s, int nr_threads){
+void scheduler_log_run_params(struct scheduler* s, int nr_threads, size_t nr_parts){
 
   FILE* outfile = fopen("log_runtime_params.dat", "w");
   if (outfile == NULL)
     error("Error opening file");
 
   fprintf(outfile, "nr_threads: %d\n", nr_threads);
+  fprintf(outfile, "nr_parts: %ld\n", nr_parts);
   fclose(outfile);
 
   message("Written simulation parameter log.");
