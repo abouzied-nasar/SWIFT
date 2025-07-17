@@ -187,6 +187,8 @@ void *runner_main2(void *data) {
   struct scheduler *sched = &e->sched;
   struct space *space = e->s;
 
+  struct part *all_parts = space->parts;
+
   //////////Declare and allocate GPU launch control data structures/////////
   /*pack_vars contain data required for self and pair packing tasks destined
    *  for the GPU*/
@@ -625,7 +627,8 @@ void *runner_main2(void *data) {
     FILE* logfile = fopen(logfname, "w");
     if (logfile==NULL)
       error("Error opening pack trace log file");
-    fprintf(logfile, "#task_type,ci_id,cj_id,ci_hydro_count,cj_hydro_count,time[ms]\n");
+    fprintf(logfile,
+        "//task_type,ci_offset,cj_offset,ci_hydro_count,cj_hydro_count,time[ms]\n");
 
     /*Stuff for debugging*/
     int n_full_d_bundles = 0, n_full_g_bundles = 0, n_full_f_bundles = 0;
@@ -842,8 +845,9 @@ void *runner_main2(void *data) {
             //Record times for task analysis
             ticks tic_cpu_pack_end = getticks();
             t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
-            fprintf(logfile, "density_self,%lld,-1,%d,-1,%g\n",
-                t->ci->cellID, t->ci->hydro.count, clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
+            fprintf(logfile, "density_self,%ld,-1,%d,-1,%g\n",
+                t->ci->hydro.parts - all_parts, t->ci->hydro.count,
+                clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
 
 
             /* No pack tasks left in queue, flag that we want to run */
@@ -873,8 +877,11 @@ void *runner_main2(void *data) {
             //Record times for task analysis
             ticks tic_cpu_pack_end = getticks();
             t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
-            fprintf(logfile, "gradient_self,%lld,-1,%d,-1,%g\n",
-                t->ci->cellID, t->ci->hydro.count, clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
+
+            fprintf(logfile, "gradient_self,%ld,-1,%d,-1,%g\n",
+                t->ci->hydro.parts - all_parts, t->ci->hydro.count,
+                clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
+
             /* No pack tasks left in queue, flag that we want to run */
             int launch_leftovers = pack_vars_self_grad->launch_leftovers;
             /*Packed enough tasks let's go*/
@@ -901,8 +908,10 @@ void *runner_main2(void *data) {
             //Record times for task analysis
             ticks tic_cpu_pack_end = getticks();
             t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
-            fprintf(logfile, "force_self,%lld,-1,%d,-1,%g\n",
-                t->ci->cellID, t->ci->hydro.count, clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
+
+            fprintf(logfile, "force_self,%ld,-1,%d,-1,%g\n",
+                t->ci->hydro.parts - all_parts, t->ci->hydro.count,
+                clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
 
 
             /* No pack tasks left in queue, flag that we want to run */
@@ -1034,8 +1043,10 @@ void *runner_main2(void *data) {
                                          fparti_fpartj_lparti_lpartj_dens);
             ticks tic_cpu_pack_end = getticks();
             t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
-            fprintf(logfile, "density_pair,%lld,%lld,%d,%d,%g\n",
-                t->ci->cellID, t->cj->cellID, t->ci->hydro.count, t->cj->hydro.count,
+
+            fprintf(logfile, "density_pair,%ld,%ld,%d,%d,%g\n",
+                t->ci->hydro.parts - all_parts, t->cj->hydro.parts - all_parts,
+                t->ci->hydro.count, t->cj->hydro.count,
                 clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
 
             /* No pack tasks left in queue, flag that we want to run */
@@ -1212,8 +1223,10 @@ void *runner_main2(void *data) {
                                            fparti_fpartj_lparti_lpartj_grad);
               ticks tic_cpu_pack_end = getticks();
               t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
-              fprintf(logfile, "gradient_pair,%lld,%lld,%d,%d,%g\n",
-                  t->ci->cellID, t->cj->cellID, t->ci->hydro.count, t->cj->hydro.count,
+
+              fprintf(logfile, "gradient_pair,%ld,%ld,%d,%d,%g\n",
+                  t->ci->hydro.parts - all_parts, t->cj->hydro.parts -
+                  all_parts, t->ci->hydro.count, t->cj->hydro.count,
                   clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
 
 
@@ -1249,8 +1262,10 @@ void *runner_main2(void *data) {
 
               ticks tic_cpu_pack_end = getticks();
               t->total_cpu_pack_ticks += tic_cpu_pack_end - tic_cpu_pack;
-              fprintf(logfile, "force_pair,%lld,%lld,%d,%d,%g\n",
-                  t->ci->cellID, t->cj->cellID, t->ci->hydro.count, t->cj->hydro.count,
+
+              fprintf(logfile, "force_pair,%ld,%ld,%d,%d,%g\n",
+                  t->ci->hydro.parts - all_parts, t->cj->hydro.parts - all_parts,
+                  t->ci->hydro.count, t->cj->hydro.count,
                   clocks_diff_ticks(tic_cpu_pack_end, tic_cpu_pack));
 
               /* No pack tasks left in queue, flag that we want to run */
