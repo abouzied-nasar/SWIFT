@@ -418,8 +418,11 @@ void *runner_main2(void *data) {
     error("MPI_Comm_size failed with error %i.", res);
 #endif
 
+  /*A. Nasar: Try to estimate average number of particles per leaf-level cell*/
+  //Get smoothing length/particle spacing
   float eta_neighbours = e->s->eta_neighbours;
   int np_per_cell = ceil(2.0 * eta_neighbours);
+  //Cube to find average number of particles in 3D
   np_per_cell *= np_per_cell * np_per_cell;
   /*A. Nasar: Increase parts per recursed task-level cell by buffer to
     ensure we allocate enough memory*/
@@ -427,8 +430,9 @@ void *runner_main2(void *data) {
   /*A. Nasar: Multiplication by 2 is also to ensure we do not over-run
    *  the allocated memory on buffers and GPU. This can happen if calculated h
    * is larger than cell width and splitting makes bigger than target cells*/
+  //Leave this until we implement recursive self tasks -> Exaggerated as we will
+  //off-load really big cells since we don't recurse
   int count_max_parts_tmp = 64 * 8 * target_n_tasks * (np_per_cell + buff);
-
   pack_vars_self_dens->count_max_parts = count_max_parts_tmp;
   pack_vars_pair_dens->count_max_parts = count_max_parts_tmp;
   pack_vars_self_forc->count_max_parts = count_max_parts_tmp;
@@ -544,33 +548,18 @@ void *runner_main2(void *data) {
       (struct task **)calloc(target_n_tasks, sizeof(struct task *));
   pack_vars_self_dens->cell_list =
       (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
-  //A. Nasar: The pair version of these is no longer required
-  /*Allocate memory for n_leaves_max task pointers per top level task*/
-  pack_vars_pair_dens->ci_list =
-      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
-  pack_vars_pair_dens->cj_list =
-      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
 
   pack_vars_self_forc->task_list =
       (struct task **)calloc(target_n_tasks, sizeof(struct task *));
   pack_vars_self_forc->cell_list =
       (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
 
-  pack_vars_pair_forc->ci_list =
-      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
-  pack_vars_pair_forc->cj_list =
-      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
-
   pack_vars_self_grad->task_list =
       (struct task **)calloc(target_n_tasks, sizeof(struct task *));
   pack_vars_self_grad->cell_list =
       (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
 
-  pack_vars_pair_grad->ci_list =
-      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
-  pack_vars_pair_grad->cj_list =
-      (struct cell **)calloc(target_n_tasks_pair, sizeof(struct cell *));
-
+  /*Allocate memory for n_leaves_max task pointers per top level task*/
   pack_vars_pair_dens->top_task_list =
       (struct task **)calloc(target_n_tasks_pair, sizeof(struct task *));
   pack_vars_pair_grad->top_task_list =
