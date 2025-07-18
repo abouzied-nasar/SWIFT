@@ -621,14 +621,9 @@ void *runner_main2(void *data) {
   /* Main loop. */
   while (1) {
     /*Stuff for debugging*/
-    int n_full_d_bundles = 0, n_full_g_bundles = 0, n_full_f_bundles = 0;
-    int n_full_p_d_bundles = 0, n_full_p_g_bundles = 0, n_full_p_f_bundles = 0;
-    int n_partial_d_bundles = 0, n_partial_g_bundles = 0,
-        n_partial_f_bundles = 0;
-    int n_partial_p_d_bundles = 0, n_partial_p_g_bundles = 0,
-        n_partial_p_f_bundles = 0;
+
     int output = 0;
-    int packed_self = 0;
+
     int packed_pair = 0;
     int packed_self_f = 0;
     int packed_pair_f = 0;
@@ -817,7 +812,6 @@ void *runner_main2(void *data) {
 #endif
             /* GPU WORK */
           } else if (t->subtype == task_subtype_gpu_pack_d) {
-            packed_self++;
 #ifdef GPUOFFLOAD_DENSITY
             runner_doself1_pack_f4(r, sched, pack_vars_self_dens, ci, t,
                                        parts_aos_f4_send, task_first_part_f4);
@@ -1443,7 +1437,6 @@ void *runner_main2(void *data) {
     if (ghost_in > 0)
       fprintf(stderr, "total tasks not done on GPU %i is %i\n", r->cpuid,
               ghost_in);
-    packed_self = 0;
     packed_pair = 0;
     packed_self_f = 0;
     packed_pair_f = 0;
