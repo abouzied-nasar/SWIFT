@@ -345,6 +345,6 @@ void scheduler_report_task_times(const struct scheduler *s,
 struct task *enqueue_dependencies(struct scheduler *s, struct task *t);
 struct task *signal_sleeping_runners(struct scheduler *s, struct task *t,
                                      int tasks_packed);
-void scheduler_log_run_params(struct scheduler* s, int nr_threads, size_t nr_parts);
+void scheduler_log_run_params(struct scheduler* s, int nr_threads, size_t nr_parts, int step);
 
 #endif /* SWIFT_SCHEDULER_H */

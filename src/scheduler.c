@@ -3887,7 +3887,13 @@ void scheduler_report_task_times(const struct scheduler *s,
 }
 
 
-void scheduler_log_run_params(struct scheduler* s, int nr_threads, size_t nr_parts){
+/**
+ * Write log of the run parameters for the reproduction.
+ * This should be called every step, even though not strictly necessary.
+ * Instead, I abuse engine->step to tell me the total number of steps
+ * we've written and logged events for.
+ */
+void scheduler_log_run_params(struct scheduler* s, int nr_threads, size_t nr_parts, int nr_steps){
 
   FILE* outfile = fopen("log_runtime_params.dat", "w");
   if (outfile == NULL)
@@ -3895,6 +3901,7 @@ void scheduler_log_run_params(struct scheduler* s, int nr_threads, size_t nr_par
 
   fprintf(outfile, "nr_threads: %d\n", nr_threads);
   fprintf(outfile, "nr_parts: %ld\n", nr_parts);
+  fprintf(outfile, "nr_steps: %ld\n", nr_steps);
   fclose(outfile);
 
   message("Written simulation parameter log.");
