@@ -417,10 +417,7 @@ void *runner_main2(void *data) {
   if ((res = MPI_Comm_size(MPI_COMM_WORLD, &nr_nodes)) != MPI_SUCCESS)
     error("MPI_Comm_size failed with error %i.", res);
 #endif
-  int parts_per_top_level_cell =
-      space->nr_local_cells_with_particles /
-      space->nr_parts; /*A. Nasar: What I think is a good approximation for
-                                   average N particles in each top level cell*/
+
   float eta_neighbours = e->s->eta_neighbours;
   int np_per_cell = ceil(2.0 * eta_neighbours);
   np_per_cell *= np_per_cell * np_per_cell;
