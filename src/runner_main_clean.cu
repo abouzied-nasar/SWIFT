@@ -621,23 +621,8 @@ void *runner_main2(void *data) {
   /* Main loop. */
   while (1) {
     /*Stuff for debugging*/
-
-    int output = 0;
-
-    int packed_pair = 0;
-    int packed_self_f = 0;
-    int packed_pair_f = 0;
-    int packed_self_g = 0;
-    int packed_pair_g = 0;
-    int last_launched = 0;
     int density = 0;
     int density_sub = 0;
-    int unpacked = 0;
-    int unpacked_f = 0;
-    int unpacked_g = 0;
-    int unpacked_pair = 0;
-    int unpacked_pair_f = 0;
-    int unpacked_pair_g = 0;
     int ghost_in = 0;
     int cpu_self = 0;
     int cpu_self_f = 0;
@@ -801,11 +786,8 @@ void *runner_main2(void *data) {
           else if (t->subtype == task_subtype_external_grav)
             runner_do_grav_external(r, ci, 1);
           else if (t->subtype == task_subtype_gpu_unpack_d) {
-            unpacked++;
           } else if (t->subtype == task_subtype_gpu_unpack_g) {
-            unpacked_g++;
           } else if (t->subtype == task_subtype_gpu_unpack_f) {
-            unpacked_f++;
           } else if (t->subtype == task_subtype_density) {
 #ifndef GPUOFFLOAD_DENSITY
             runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
@@ -937,7 +919,6 @@ void *runner_main2(void *data) {
           }
           /* GPU WORK */
           else if (t->subtype == task_subtype_gpu_pack_d) {
-            packed_pair++;
 #ifdef GPUOFFLOAD_DENSITY
 #ifndef RECURSE
             ticks tic_cpu_pack = getticks();
@@ -1031,7 +1012,6 @@ void *runner_main2(void *data) {
 #endif
 #endif  // GPUOFFLOAD_GRADIENT
           } else if (t->subtype == task_subtype_gpu_pack_f) {
-            packed_pair_f++;
 #ifdef GPUOFFLOAD_FORCE
 #ifndef RECURSE
               ticks tic_cpu_pack = getticks();
@@ -1079,11 +1059,8 @@ void *runner_main2(void *data) {
 #endif
 #endif  // GPUOFFLOAD_FORCE
           } else if (t->subtype == task_subtype_gpu_unpack_d) {
-            unpacked_pair++;
           } else if (t->subtype == task_subtype_gpu_unpack_g) {
-            unpacked_pair_g++;
           } else if (t->subtype == task_subtype_gpu_unpack_f) {
-            unpacked_pair_f++;
           }
 
 #ifdef EXTRA_HYDRO_LOOP
@@ -1437,14 +1414,8 @@ void *runner_main2(void *data) {
     if (ghost_in > 0)
       fprintf(stderr, "total tasks not done on GPU %i is %i\n", r->cpuid,
               ghost_in);
-    packed_pair = 0;
-    packed_self_f = 0;
-    packed_pair_f = 0;
-    packed_self_g = 0;
-    packed_pair_g = 0;
     density = 0;
     density_sub = 0;
-    unpacked = 0;
     if(step == 4)cudaProfilerStop();
     //	if(step == 2)exit(0);
     //	  size_t free_byte ;
