@@ -616,7 +616,6 @@ void *runner_main2(void *data) {
   // number of density self tasks executed
   int tasks_done_cpu = 0;
   int tasks_done_gpu = 0;
-  int tasks_done_gpu_inc = 0;
 
   /* Main loop. */
   while (1) {
@@ -679,26 +678,9 @@ void *runner_main2(void *data) {
     pack_vars_pair_grad->n_daughters_total = 0;
     pack_vars_pair_forc->n_daughters_total = 0;
 
-    int n_cells_d = 0;
-    int n_cells_g = 0;
-    int n_cells_f = 0;
-    int n_cells_p_d = 0;
-    int n_cells_p_g = 0;
-    int n_cells_p_f = 0;
-    int n_w_prts_gtr_target_d = 0;
-    int n_w_prts_gtr_target_g = 0;
-    int n_w_prts_gtr_target_f = 0;
-    int n_w_prts_gtr_target_p_d = 0;
-    int n_w_prts_gtr_target_p_g = 0;
-    int n_w_prts_gtr_target_p_f = 0;
-    int leftover_launch_count = 0;
-    int g100 = 0;
-    int l100 = 0;
-    int maxcount = 0;
     /* Loop while there are tasks... */
-    tasks_done_gpu_inc = 0;
     ticks hang_time = getticks();
-    struct task * ttop_prev;
+
     while (1) {
       // A. Nasar: Get qid for re-use later
       int qid = r->qid;
@@ -1375,7 +1357,6 @@ void *runner_main2(void *data) {
     time_for_density_gpu_pair = 0.0;
     tasks_done_gpu = 0;
     tasks_done_cpu = 0;
-    tasks_done_gpu_inc = 0;
     if(step == 4)cudaProfilerStop();
     //	if(step == 2)exit(0);
     //	  size_t free_byte ;
