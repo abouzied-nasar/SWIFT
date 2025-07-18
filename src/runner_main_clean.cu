@@ -239,44 +239,40 @@ void *runner_main2(void *data) {
   cudaDeviceGetAttribute(&maxBlocksSM, cudaDevAttrMaxBlocksPerMultiprocessor,
                          devId);
   cudaDeviceGetAttribute(&nSMs, cudaDevAttrMultiProcessorCount, devId);
-  int nPartsPerCell = space->nr_parts / space->tot_cells;
-
-  if (r->cpuid == 0 && mpi_rank == 0) {
-    message("%i devices available device id is %i\n", nDevices, devId);
-    message("Device : %s\n", prop.name);
-    message("nSMs %i max blocks per SM %i maxnBlocks per stream %i\n",
-            nSMs, maxBlocksSM, nSMs * maxBlocksSM);
-    message("Target nBlocks per kernel is %i\n",
-            N_TASKS_BUNDLE_SELF * nPartsPerCell / BLOCK_SIZE);
-    message("Target nBlocks per stream is %i\n",
-            N_TASKS_PER_PACK_SELF * nPartsPerCell / BLOCK_SIZE);
-  }
-
   cudaError_t cu_error;
   size_t free_mem, total_mem;
   cudaMemGetInfo(&free_mem, &total_mem);
-
-  message("free mem %lu, total mem %lu", free_mem, total_mem);
-  // how many tasks do we want for each launch of GPU kernel
+  int nPartsPerCell = space->nr_parts / space->tot_cells;
+  if (r->cpuid == 0 && mpi_rank == 0) {
+    message("%i devices available device id is %i", nDevices, devId);
+    message("Device : %s\n", prop.name);
+    message("nSMs %i max blocks per SM %i maxnBlocks per stream %i",
+            nSMs, maxBlocksSM, nSMs * maxBlocksSM);
+    message("Target nBlocks per kernel is %i",
+            N_TASKS_BUNDLE_SELF * nPartsPerCell / BLOCK_SIZE);
+    message("Target nBlocks per stream is %i",
+            N_TASKS_PER_PACK_SELF * nPartsPerCell / BLOCK_SIZE);
+    message("free mem %lu, total mem %lu", free_mem, total_mem);
+  }
+  //A. Nasar: pack_size defines the total number of leaf-level tasks we will compute for each GPU off-load cycle
   const int target_n_tasks = sched->pack_size;
   const int target_n_tasks_pair = sched->pack_size_pair;
   pack_vars_self_dens->target_n_tasks = target_n_tasks;
-  pack_vars_pair_dens->target_n_tasks = target_n_tasks_pair; //Accounting for one level of recursion
+  pack_vars_pair_dens->target_n_tasks = target_n_tasks_pair;
   pack_vars_self_forc->target_n_tasks = target_n_tasks;
   pack_vars_pair_forc->target_n_tasks = target_n_tasks_pair;
   pack_vars_self_grad->target_n_tasks = target_n_tasks;
   pack_vars_pair_grad->target_n_tasks = target_n_tasks_pair;
-  // how many tasks we want in each bundle (used for launching kernels in
-  // different streams)
+  //A. Nasar: bundle_size defines the number of leaf-level tasks we will compute in each stream
   const int bundle_size = N_TASKS_BUNDLE_SELF;
   const int bundle_size_pair = N_TASKS_BUNDLE_PAIR;
   pack_vars_self_dens->bundle_size = bundle_size;
-  pack_vars_pair_dens->bundle_size = bundle_size_pair; //Trying to make it so that we have 4 bundles
+  pack_vars_pair_dens->bundle_size = bundle_size_pair;
   pack_vars_self_forc->bundle_size = bundle_size;
   pack_vars_pair_forc->bundle_size = bundle_size_pair;
   pack_vars_self_grad->bundle_size = bundle_size;
   pack_vars_pair_grad->bundle_size = bundle_size_pair;
-  // Keep track of first and last particles for each task (particle data is
+  // A. Nasar: Keep track of first and last particles for each self task (particle data is
   // arranged in long arrays containing particles from all the tasks we will
   // work with)
   /* A. N.: Needed for offloading self tasks as we use these to sort through
@@ -306,16 +302,16 @@ void *runner_main2(void *data) {
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_grad,
           target_n_tasks_pair * sizeof(int4));
 
-  /* nBundles is the number of task bundles each
+  /* A. Nasar: nBundles is the number of task bundles each
   thread has ==> Used to loop through bundles */
   int nBundles = (target_n_tasks + bundle_size - 1) / bundle_size;
   int nBundles_pair =
       (target_n_tasks_pair + bundle_size_pair - 1) / bundle_size_pair;
 
-  if (r->cpuid == 0) {
-    fprintf(stderr, "engine_rank %i cpuid %i nBundles/nStreams %i\n",
+  if (r->cpuid == 0 && mpi_rank == 0) {
+    message("engine_rank %i cpuid %i nBundles/nStreams %i\n",
             engine_rank, r->cpuid, nBundles);
-    fprintf(stderr, "nBundles/nStreams Pair %i\n", nBundles_pair);
+    message("nBundles/nStreams Pair %i\n", nBundles_pair);
   }
 
   pack_vars_self_dens->nBundles = nBundles;
@@ -326,7 +322,7 @@ void *runner_main2(void *data) {
   pack_vars_pair_grad->nBundles = nBundles_pair;
 
   // first part and last part are the first and last particle ids (locally
-  // within this thread). A. Nasar: All these are used in GPU offload setup
+  // within this thread) for each bundle. A. Nasar: All these are used in GPU offload setup
 
   cudaMallocHost((void **)&pack_vars_self_dens->bundle_first_part,
                  nBundles * sizeof(int));
