@@ -623,13 +623,6 @@ void *runner_main2(void *data) {
     /*Stuff for debugging*/
     int n_leafs_total = 0;
     //	Initialise timers to zero
-    double time_for_density_cpu = 0.0;
-    double time_for_density_cpu_pair = 0.0;
-    double time_for_cpu_g = 0.0;
-    double time_for_cpu_pair_g = 0.0;
-    double time_for_cpu_f = 0.0;
-    double time_for_cpu_pair_f = 0.0;
-    double time_for_density_cpu_sub = 0.0;
     double time_for_density_gpu = 0.0;
     double time_for_density_gpu_pair = 0.0;
     double time_for_gpu_f = 0.0;
@@ -640,9 +633,6 @@ void *runner_main2(void *data) {
     double unpack_time_self_f = 0.0;
     double unpack_time_self = 0.0;
     double time_for_gpu_pair = 0.0;
-    int nr_cells = space->nr_cells;
-    int tops_packed_in_step = 0;
-    int n_tops_reset = 0;
     /* Wait at the barrier. */
     engine_barrier(e);
     // Initialise packing counters
@@ -650,7 +640,6 @@ void *runner_main2(void *data) {
     pack_vars_pair_dens->tasks_packed = 0;
     pack_vars_self_dens->count_parts = 0;
     pack_vars_pair_dens->count_parts = 0;
-    pack_vars_pair_dens->task_locked = 0;
     pack_vars_pair_dens->top_tasks_packed = 0;
     // Initialise packing counters
     pack_vars_self_forc->tasks_packed = 0;
@@ -663,7 +652,6 @@ void *runner_main2(void *data) {
     pack_vars_self_grad->count_parts = 0;
     pack_vars_pair_grad->count_parts = 0;
 
-    int total_tasks_packed_this_time_pair = 0;
     double packing_time = 0.0;
     double packing_time_f = 0.0;
     double packing_time_g = 0.0;
@@ -676,8 +664,6 @@ void *runner_main2(void *data) {
     double unpacking_time_pair = 0.0;
     double unpacking_time_pair_f = 0.0;
     double unpacking_time_pair_g = 0.0;
-    double time_for_copy_to_struct = 0.0;
-    double tot_time_for_hard_memcpys = 0.0;
     /* Can we go home yet? */
     if (e->step_props & engine_step_prop_done) break;
 
@@ -688,13 +674,6 @@ void *runner_main2(void *data) {
 
     if (step == 0) cudaProfilerStart();
     step++;
-
-    sched->nr_packs_self_dens_done = 0;
-    sched->nr_packs_pair_dens_done = 0;
-    sched->nr_packs_self_forc_done = 0;
-    sched->nr_packs_pair_forc_done = 0;
-    sched->nr_packs_self_grad_done = 0;
-    sched->nr_packs_pair_grad_done = 0;
 
     pack_vars_pair_dens->n_daughters_total = 0;
     pack_vars_pair_grad->n_daughters_total = 0;
@@ -1392,12 +1371,8 @@ void *runner_main2(void *data) {
       }
     } /* main loop. */
 
-    time_for_density_cpu = 0.0;
     time_for_density_gpu = 0.0;
-    time_for_density_cpu_pair = 0.0;
     time_for_density_gpu_pair = 0.0;
-    time_for_density_cpu_sub = 0.0;
-    tot_time_for_hard_memcpys = 0.0;
     tasks_done_gpu = 0;
     tasks_done_cpu = 0;
     tasks_done_gpu_inc = 0;

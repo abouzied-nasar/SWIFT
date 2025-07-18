@@ -70,7 +70,6 @@ struct pack_vars_pair {
   int target_n_tasks;
   int nBundles;
   int tasksperbundle;
-  int task_locked;
   int n_daughters_total;
   int n_daughters_packed_index;
   int n_leaves_found;
