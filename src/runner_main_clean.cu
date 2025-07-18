@@ -559,7 +559,7 @@ void *runner_main2(void *data) {
   pack_vars_self_grad->cell_list =
       (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
 
-  /*Allocate memory for n_leaves_max task pointers per top level task*/
+  /*Allocate memory for task pointers per top level task*/
   pack_vars_pair_dens->top_task_list =
       (struct task **)calloc(target_n_tasks_pair, sizeof(struct task *));
   pack_vars_pair_grad->top_task_list =
@@ -567,11 +567,9 @@ void *runner_main2(void *data) {
   pack_vars_pair_forc->top_task_list =
       (struct task **)calloc(target_n_tasks_pair, sizeof(struct task *));
 
-  //A. Nasar: Assuming we can only have 128 leaf tasks after recursion. Probably a silly assumption needing revision
-  int n_leaves_max = 128;
   //A. Nasar: Over-setimate better than under-estimate
   /*A. Nasar: Over-allocated for now but a good guess is multiply by 2 to ensure we always have room for recursing through more tasks than we plan to offload*/
-  int max_length = 2 * target_n_tasks_pair * 2;//n_leaves_max;
+  int max_length = 2 * target_n_tasks_pair * 2;
   struct cell **ci_dd = malloc(max_length * sizeof(struct cell *));
   struct cell **cj_dd = malloc(max_length * sizeof(struct cell *));
   struct cell **ci_dg = malloc(max_length * sizeof(struct cell *));
@@ -592,6 +590,7 @@ void *runner_main2(void *data) {
 	  cj_df[i] = malloc(sizeof(struct cell *));
   }
 
+  //A. Nasar: This is over-kill but it's necessary in case we start of with top level cells that are all leaf cells
   struct cell **ci_top_d = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
   struct cell **cj_top_d = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
   struct cell **ci_top_g = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
@@ -606,7 +605,6 @@ void *runner_main2(void *data) {
 	  ci_top_f[i] = malloc(sizeof(struct cell *));
 	  cj_top_f[i] = malloc(sizeof(struct cell *));
   }
-  //change above declaration to the assignment below
   first_and_last_daughters_d = malloc(target_n_tasks_pair * 2 * sizeof(int *));
   first_and_last_daughters_g = malloc(target_n_tasks_pair * 2 * sizeof(int *));
   first_and_last_daughters_f = malloc(target_n_tasks_pair * 2 * sizeof(int *));
@@ -615,7 +613,6 @@ void *runner_main2(void *data) {
 	  first_and_last_daughters_g[i] = malloc(2 * sizeof(int));
 	  first_and_last_daughters_f[i] = malloc(2 * sizeof(int));
   }
-
   // number of density self tasks executed
   int tasks_done_cpu = 0;
   int tasks_done_gpu = 0;
