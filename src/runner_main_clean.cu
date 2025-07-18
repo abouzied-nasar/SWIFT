@@ -567,10 +567,11 @@ void *runner_main2(void *data) {
   pack_vars_pair_forc->top_task_list =
       (struct task **)calloc(target_n_tasks_pair, sizeof(struct task *));
 
+  //A. Nasar: Assuming we can only have 128 leaf tasks after recursion. Probably a silly assumption needing revision
   int n_leaves_max = 128;
   //A. Nasar: Over-setimate better than under-estimate
-  /*Allocate target_n_tasks for top level tasks. This is a 2D array with length target_n_tasks and width n_leaves_max*/
-  int max_length = 2 * target_n_tasks_pair * n_leaves_max;
+  /*A. Nasar: Over-allocated for now but a good guess is multiply by 2 to ensure we always have room for recursing through more tasks than we plan to offload*/
+  int max_length = 2 * target_n_tasks_pair * 2;//n_leaves_max;
   struct cell **ci_dd = malloc(max_length * sizeof(struct cell *));
   struct cell **cj_dd = malloc(max_length * sizeof(struct cell *));
   struct cell **ci_dg = malloc(max_length * sizeof(struct cell *));
@@ -606,10 +607,10 @@ void *runner_main2(void *data) {
 	  cj_top_f[i] = malloc(sizeof(struct cell *));
   }
   //change above declaration to the assignment below
-  first_and_last_daughters_d = malloc(target_n_tasks_pair * n_leaves_max * sizeof(int *));
-  first_and_last_daughters_g = malloc(target_n_tasks_pair * n_leaves_max * sizeof(int *));
-  first_and_last_daughters_f = malloc(target_n_tasks_pair * n_leaves_max * sizeof(int *));
-  for (int i = 0; i < target_n_tasks_pair * n_leaves_max; i++){
+  first_and_last_daughters_d = malloc(target_n_tasks_pair * 2 * sizeof(int *));
+  first_and_last_daughters_g = malloc(target_n_tasks_pair * 2 * sizeof(int *));
+  first_and_last_daughters_f = malloc(target_n_tasks_pair * 2 * sizeof(int *));
+  for (int i = 0; i < target_n_tasks_pair * 2; i++){
 	  first_and_last_daughters_d[i] = malloc(2 * sizeof(int));
 	  first_and_last_daughters_g[i] = malloc(2 * sizeof(int));
 	  first_and_last_daughters_f[i] = malloc(2 * sizeof(int));
