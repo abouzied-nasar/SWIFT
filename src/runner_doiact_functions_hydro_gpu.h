@@ -3392,6 +3392,49 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
         pack_vars->launch = 1;
     if(pack_vars->launch || (pack_vars->launch_leftovers && npacked == n_leaves_found)){
 
+///////////A. Nasar: Test code to find duplicates. Keep but comment out as will be useful in future/////////////////////////////
+//      int ciID[t_packed], cjID[t_packed], resI[t_packed], resJ[t_packed];
+//      struct cell **ci_unique = malloc(t_packed * sizeof(struct cell *));
+//	  struct cell **cj_unique = malloc(t_packed * sizeof(struct cell *));
+//	  for(int i = 0; i < t_packed; i++){
+//		  ci_unique[i] = malloc(sizeof(struct cell *));
+//		  cj_unique[i] = malloc(sizeof(struct cell *));
+//	  }
+//
+//	  int count_all = 0;
+//      for (int topi = 0; topi < pack_vars->top_tasks_packed; topi++) {
+//        /* Loop through each daughter task */
+//        for (int i = f_l_daughters[topi][0]; i < f_l_daughters[topi][1]; i++){
+//        	ciID[count_all] = ci_d[i]->cellID;
+//        	cjID[count_all++] = cj_d[i]->cellID;
+//        }
+//      }
+//      qsort(ciID, count_all, sizeof(int), compare_ints);
+//      qsort(cjID, count_all, sizeof(int), compare_ints);
+//
+//      unsigned int index_i = 0;
+//      unsigned int index_j = 0;
+//      for (int i = 0; i < count_all; i++){
+//    	  if(i == 0 || ciID[i] != ciID[i-1])
+//    		  resI[index_i++] = ciID[i];
+//    	  if(i == 0 || cjID[i] != cjID[i-1])
+//    		  resJ[index_j++] = cjID[i];
+//      }
+//      int uniQQQ = 0;
+//      for(int i = 0; i < index_i; i++){
+//    	  int uniq = 1;
+//    	  for(int j = 0; j < index_j; j++){
+//    		  if(resI[i] == resJ[j]){
+//    			  uniq = 0;
+//    			  break;
+//    		  }
+//    	  }
+//    	  if (uniq)
+//    		  uniQQQ++;
+//      }
+//      message("packed %i indexI %i indexJ %i uniQQQ %i RATIO %f", t_packed, index_i, index_j, uniQQQ, (float)t_packed/(float)uniQQQ);
+///////////Test code to find duplicates. Keep but comment out as will be useful in future/////////////////////////////
+
       last_launched = f_l_daughters[top_tasks_packed - 1][1];
       launched = 1;
 //      message("tasks packed force %i", pack_vars->tasks_packed);
