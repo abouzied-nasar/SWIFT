@@ -621,15 +621,6 @@ void *runner_main2(void *data) {
   /* Main loop. */
   while (1) {
     /*Stuff for debugging*/
-    int density = 0;
-    int density_sub = 0;
-    int ghost_in = 0;
-    int cpu_self = 0;
-    int cpu_self_f = 0;
-    int cpu_self_g = 0;
-    int cpu_pair = 0;
-    int cpu_pair_f = 0;
-    int cpu_pair_g = 0;
     int n_leafs_total = 0;
     //	Initialise timers to zero
     double time_for_density_cpu = 0.0;
@@ -866,7 +857,6 @@ void *runner_main2(void *data) {
           }
 #endif
           else if (t->subtype == task_subtype_force) {
-            cpu_self_f++;
 #ifndef GPUOFFLOAD_FORCE
             runner_dosub_self2_force(r, ci, /*below_h_max=*/0, 1);
 #endif
@@ -1411,11 +1401,6 @@ void *runner_main2(void *data) {
     tasks_done_gpu = 0;
     tasks_done_cpu = 0;
     tasks_done_gpu_inc = 0;
-    if (ghost_in > 0)
-      fprintf(stderr, "total tasks not done on GPU %i is %i\n", r->cpuid,
-              ghost_in);
-    density = 0;
-    density_sub = 0;
     if(step == 4)cudaProfilerStop();
     //	if(step == 2)exit(0);
     //	  size_t free_byte ;
