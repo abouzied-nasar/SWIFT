@@ -200,18 +200,18 @@ void *runner_main2(void *data) {
   struct pack_vars_pair *pack_vars_pair_grad;
 
   cudaMallocHost((void **)&pack_vars_self_dens,
-                 sizeof(struct pack_vars_self *));
+                 sizeof(struct pack_vars_self));
   cudaMallocHost((void **)&pack_vars_self_forc,
-                 sizeof(struct pack_vars_self *));
+                 sizeof(struct pack_vars_self));
   cudaMallocHost((void **)&pack_vars_self_grad,
-                 sizeof(struct pack_vars_self *));
+                 sizeof(struct pack_vars_self));
 
   cudaMallocHost((void **)&pack_vars_pair_dens,
-                 sizeof(struct pack_vars_pair *));
+                 sizeof(struct pack_vars_pair));
   cudaMallocHost((void **)&pack_vars_pair_forc,
-                 sizeof(struct pack_vars_pair *));
+                 sizeof(struct pack_vars_pair));
   cudaMallocHost((void **)&pack_vars_pair_grad,
-                 sizeof(struct pack_vars_pair *));
+                 sizeof(struct pack_vars_pair));
   ///////////////////////////////////////////////////////////////////////////
   /*Find and print GPU name(s)*/
   int devId = 0;  //gpu device name
