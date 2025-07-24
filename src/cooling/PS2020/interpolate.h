@@ -45,8 +45,8 @@ __attribute__((always_inline)) INLINE int row_major_index_2d(const int x,
                                                              const int Nx,
                                                              const int Ny) {
 #ifdef SWIFT_DEBUG_CHECKS
-  assert(x < Nx);
-  assert(y < Ny);
+  swift_assert(x < Nx);
+  swift_assert(y < Ny);
 #endif
   return x * Ny + y;
 }
@@ -62,9 +62,9 @@ __attribute__((always_inline)) INLINE int row_major_index_3d(
     const int x, const int y, const int z, const int Nx, const int Ny,
     const int Nz) {
 #ifdef SWIFT_DEBUG_CHECKS
-  assert(x < Nx);
-  assert(y < Ny);
-  assert(z < Nz);
+  swift_assert(x < Nx);
+  swift_assert(y < Ny);
+  swift_assert(z < Nz);
 #endif
   return x * Ny * Nz + y * Nz + z;
 }
@@ -80,10 +80,10 @@ __attribute__((always_inline)) INLINE int row_major_index_4d(
     const int x, const int y, const int z, const int w, const int Nx,
     const int Ny, const int Nz, const int Nw) {
 #ifdef SWIFT_DEBUG_CHECKS
-  assert(x < Nx);
-  assert(y < Ny);
-  assert(z < Nz);
-  assert(w < Nw);
+  swift_assert(x < Nx);
+  swift_assert(y < Ny);
+  swift_assert(z < Nz);
+  swift_assert(w < Nw);
 #endif
   return x * Ny * Nz * Nw + y * Nz * Nw + z * Nw + w;
 }
@@ -100,11 +100,11 @@ __attribute__((always_inline)) INLINE int row_major_index_5d(
     const int Nx, const int Ny, const int Nz, const int Nw, const int Nv) {
 
 #ifdef SWIFT_DEBUG_CHECKS
-  assert(x < Nx);
-  assert(y < Ny);
-  assert(z < Nz);
-  assert(w < Nw);
-  assert(v < Nv);
+  swift_assert(x < Nx);
+  swift_assert(y < Ny);
+  swift_assert(z < Nz);
+  swift_assert(w < Nw);
+  swift_assert(v < Nv);
 #endif
 
   return x * Ny * Nz * Nw * Nv + y * Nz * Nw * Nv + z * Nw * Nv + w * Nv + v;

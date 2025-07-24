@@ -34,10 +34,10 @@
 __attribute__((const)) INLINE static int binomial(const int n, const int k) {
 
 #ifdef SWIFT_DEBUG_CHECKS
-  assert(n >= 0);
-  assert(k >= 0);
-  assert(n <= 8);
-  assert(k <= n);
+  swift_assert(n >= 0);
+  swift_assert(k >= 0);
+  swift_assert(n <= 8);
+  swift_assert(k <= n);
 #endif
 
   /* Hello Pascal! Nice to meet again */
