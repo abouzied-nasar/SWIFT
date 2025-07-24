@@ -2911,7 +2911,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       /* Make all density tasks depend on the sorts */
       scheduler_addunlock(sched, ci->hydro.super->hydro.sorts, t);
       if (ci->hydro.super != cj->hydro.super) {
-        scheduler_addunlock(sched, cj->hydro.super->hydro.sorts, t_force_gpu);
+        scheduler_addunlock(sched, cj->hydro.super->hydro.sorts, t);
       }
       /* New task for the force A. Nasar */
       t_force_gpu = scheduler_addtask(sched, task_type_pair,
@@ -4550,27 +4550,30 @@ void engine_maketasks(struct engine *e) {
         t->subtype == task_subtype_force) {
       t->implicit = 1;
     }
-    //    if (t->subtype == task_subtype_gpu_pack_d ||
-    //      t->subtype == task_subtype_gpu_pack_g ||
-    //	  t->subtype == task_subtype_gpu_pack_f ||
-    //	  t->subtype == task_subtype_gpu_unpack_d ||
-    //	  t->subtype == task_subtype_gpu_unpack_g ||
-    //	  t->subtype == task_subtype_gpu_unpack_f){
-    //    	t->implicit = 1;
-    //    }
-    //    if (t->subtype == task_subtype_gpu_pack_g ||
-    //	  t->subtype == task_subtype_gpu_pack_f ||
-    //	  t->subtype == task_subtype_gpu_unpack_g ||
-    //	  t->subtype == task_subtype_gpu_unpack_f){// ||
-    ////	  (t->type == task_type_pair &&
-    ////	   t->subtype == task_subtype_gpu_pack_d)){
-    //    	t->implicit = 1;
-    //    }
-    //    if ((t->subtype == task_subtype_gpu_pack_d ||
-    //      t->subtype == task_subtype_gpu_pack_g  ||
-    //	  t->subtype == task_subtype_gpu_pack_f)
-    //    	t->implicit = 1;
-    ////    	error("STill have subs");
-    //    }
+//        if (t->subtype == task_subtype_density) {
+//          t->implicit = 1;
+//        }
+//        if (t->subtype == task_subtype_gpu_pack_d ||
+//          t->subtype == task_subtype_gpu_pack_g ||
+//    	  t->subtype == task_subtype_gpu_pack_f ||
+//    	  t->subtype == task_subtype_gpu_unpack_d ||
+//    	  t->subtype == task_subtype_gpu_unpack_g ||
+//    	  t->subtype == task_subtype_gpu_unpack_f){
+//        	t->implicit = 1;
+//        }
+//        if (t->subtype == task_subtype_gpu_pack_g ||
+//    	  t->subtype == task_subtype_gpu_pack_f ||
+//    	  t->subtype == task_subtype_gpu_unpack_g ||
+//    	  t->subtype == task_subtype_gpu_unpack_f){// ||
+//    //	  (t->type == task_type_pair &&
+//    //	   t->subtype == task_subtype_gpu_pack_d)){
+//        	t->implicit = 1;
+//        }
+//        if ((t->subtype == task_subtype_gpu_pack_d ||
+//          t->subtype == task_subtype_gpu_pack_g  ||
+//    	  t->subtype == task_subtype_gpu_pack_f)
+//        	t->implicit = 1;
+//    //    	error("STill have subs");
+//        }
   }
 }
