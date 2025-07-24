@@ -347,8 +347,6 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
     ci_d[n_daughters + leafs_found] = ci;
     cj_d[n_daughters + leafs_found] = cj;
 
-    ci->index = n_daughters + leafs_found;
-    cj->index = n_daughters + leafs_found;
 //    error("stop");
     (*n_leafs_found)++;  //= leafs_found + 1;
     if (*n_leafs_found >= n_expected_tasks)

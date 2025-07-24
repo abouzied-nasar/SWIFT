@@ -555,7 +555,7 @@ libswiftsim_mpi_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) lib
 
 # Sources and flags for regular CUDA library
 libswiftsim_cuda_la_SOURCES = $(AM_SOURCES)
-libswiftsim_cuda_la_CFLAGS = $(AM_CFLAGS) $(CUDA_CFLAGS) -DWITH_CUDA -O0 -g
+libswiftsim_cuda_la_CFLAGS = $(AM_CFLAGS) $(CUDA_CFLAGS) -DWITH_CUDA
 libswiftsim_cuda_la_CXXFLAGS = $(AM_CFLAGS) $(CUDA_CFLAGS) -DWITH_CUDA
 libswiftsim_cuda_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) $(CUDA_LIBS)
 libswiftsim_cuda_la_SHORTNAME = cuda
