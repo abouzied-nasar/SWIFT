@@ -338,7 +338,6 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
     /* if any cell empty: skip */
     if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
     int leafs_found = *n_leafs_found;
-    int tt_packed = pack_vars->top_tasks_packed;
     /*for all leafs to be sent add to cell list */
     //	cells_left[leafs_found] = ci;
     //	cells_right[leafs_found] = cj;
@@ -372,16 +371,12 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   struct timespec t0, t1;  //
   clock_gettime(CLOCK_REALTIME, &t0);
 
-  int tasks_packed = pack_vars->tasks_packed;
-  int qid = r->qid;
 
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
 
   /*Get the id for the daughter task*/
   const int tid = pack_vars->tasks_packed;
-  /*Get the id for the parent task*/
-  const int current_tt = pack_vars->top_tasks_packed - 1;
 
   /* Get the relative distance between the pairs, wrapping (For M. S.: what does
    * we mean by wrapping??). */
@@ -454,16 +449,11 @@ double runner_dopair1_pack_f4_gg(struct runner *r, struct scheduler *s,
   struct timespec t0, t1;  //
   clock_gettime(CLOCK_REALTIME, &t0);
 
-  int tasks_packed = pack_vars->tasks_packed;
-  int qid = r->qid;
-
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
 
   /*Get the id for the daughter task*/
   const int tid = pack_vars->tasks_packed;
-  /*Get the id for the parent task*/
-  const int current_tt = pack_vars->top_tasks_packed - 1;
 
   /* Get the relative distance between the pairs, wrapping (For M. S.: what does
    * we mean by wrapping??). */
@@ -536,16 +526,11 @@ double runner_dopair1_pack_f4_ff(struct runner *r, struct scheduler *s,
   struct timespec t0, t1;  //
   clock_gettime(CLOCK_REALTIME, &t0);
 
-  int tasks_packed = pack_vars->tasks_packed;
-  int qid = r->qid;
-
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
 
   /*Get the id for the daughter task*/
   const int tid = pack_vars->tasks_packed;
-  /*Get the id for the parent task*/
-  const int current_tt = pack_vars->top_tasks_packed - 1;
 
   /* Get the relative distance between the pairs, wrapping (For M. S.: what does
    * we mean by wrapping??). */
@@ -1885,7 +1870,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
     cudaEvent_t *pair_end) {
 
-  struct timespec t0, t1, tp0, tp1;  //
+  struct timespec t0, t1;  //
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
@@ -2016,8 +2001,6 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
   /* Issue synchronisation commands for all events recorded by GPU
    * Should swap with one cuda Device Synchronise really if we decide to go this
    * way with unpacking done separately */
-
-  int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0;
 
   for (int bid = 0; bid < nBundles_temp; bid++) {
@@ -2053,9 +2036,6 @@ void runner_dopair1_unpack_f4(
   /*Loop over top level tasks*/
   for (int topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
     const ticks tic = getticks();
-    int first_daughter_id = f_l_daughters[topid][0];
-	struct cell *cii_top = ci_d[first_daughter_id];
-	struct cell *cjj_top = cj_d[first_daughter_id];
 	while (cell_locktree(ci_top[topid])) {
 	  ; /* spin until we acquire the lock */
 	}
@@ -2129,8 +2109,8 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
   if (s->queues[qid].n_packs_pair_left_d < 1) pack_vars->launch_leftovers = 1;
   lock_unlock(&s->queues[qid].lock);
   /*Counter for how many tasks we've packed*/
-  unsigned int npacked = 0;
-  unsigned int launched = 0;
+  int npacked = 0;
+  int launched = 0;
   //A. Nasar: Loop through the daughter tasks we found
   int copy_index = pack_vars->n_daughters_packed_index;
   int index_start_packing = pack_vars->n_daughters_packed_index;
