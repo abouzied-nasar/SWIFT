@@ -581,15 +581,6 @@ void *runner_main2(void *data) {
   int **first_and_last_daughters_f;
   int launch_count = 0;
 
-  for(int i = 0; i < max_length; i++){
-	  ci_dd[i] = malloc(sizeof(struct cell *));
-	  cj_dd[i] = malloc(sizeof(struct cell *));
-	  ci_dg[i] = malloc(sizeof(struct cell *));
-	  cj_dg[i] = malloc(sizeof(struct cell *));
-	  ci_df[i] = malloc(sizeof(struct cell *));
-	  cj_df[i] = malloc(sizeof(struct cell *));
-  }
-
   //A. Nasar: This is over-kill but it's necessary in case we start of with top level cells that are all leaf cells
   struct cell **ci_top_d = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
   struct cell **cj_top_d = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
@@ -597,14 +588,6 @@ void *runner_main2(void *data) {
   struct cell **cj_top_g = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
   struct cell **ci_top_f = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
   struct cell **cj_top_f = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  for(int i = 0; i < 2 * target_n_tasks_pair; i++){
-	  ci_top_d[i] = malloc(sizeof(struct cell *));
-	  cj_top_d[i] = malloc(sizeof(struct cell *));
-	  ci_top_g[i] = malloc(sizeof(struct cell *));
-	  cj_top_g[i] = malloc(sizeof(struct cell *));
-	  ci_top_f[i] = malloc(sizeof(struct cell *));
-	  cj_top_f[i] = malloc(sizeof(struct cell *));
-  }
   first_and_last_daughters_d = malloc(target_n_tasks_pair * 2 * sizeof(int *));
   first_and_last_daughters_g = malloc(target_n_tasks_pair * 2 * sizeof(int *));
   first_and_last_daughters_f = malloc(target_n_tasks_pair * 2 * sizeof(int *));
@@ -905,7 +888,7 @@ void *runner_main2(void *data) {
             pack_vars_pair_dens->n_daughters_packed_index = pack_vars_pair_dens->n_daughters_total;
             int n_leaves_found = 0;
             runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
-                      parts_aos_pair_f4_send, e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_dd, cj_dd, pack_vars_pair_dens->n_daughters_total);
+                      e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_dd, cj_dd, pack_vars_pair_dens->n_daughters_total);
 
             runner_pack_daughters_and_launch(r, sched, ci, cj, pack_vars_pair_dens,
             	    t, parts_aos_pair_f4_send , parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
@@ -952,7 +935,7 @@ void *runner_main2(void *data) {
               pack_vars_pair_grad->n_daughters_packed_index = pack_vars_pair_grad->n_daughters_total;
               int n_leaves_found = 0;
               runner_recurse_gpu(r, sched, pack_vars_pair_grad, ci, cj, t,
-                        parts_aos_pair_f4_g_send, e, fparti_fpartj_lparti_lpartj_grad, &n_leaves_found, depth, n_expected_tasks, ci_dg, cj_dg, pack_vars_pair_grad->n_daughters_total);
+                        e, fparti_fpartj_lparti_lpartj_grad, &n_leaves_found, depth, n_expected_tasks, ci_dg, cj_dg, pack_vars_pair_grad->n_daughters_total);
 
               runner_pack_daughters_and_launch_g(r, sched, ci, cj, pack_vars_pair_grad,
               	    t, parts_aos_pair_f4_g_send, parts_aos_pair_f4_g_recv, d_parts_aos_pair_f4_g_send,
@@ -999,7 +982,7 @@ void *runner_main2(void *data) {
               pack_vars_pair_forc->n_daughters_packed_index = pack_vars_pair_forc->n_daughters_total;
               int n_leaves_found = 0;
               runner_recurse_gpu(r, sched, pack_vars_pair_forc, ci, cj, t,
-                        parts_aos_pair_f4_f_send, e, fparti_fpartj_lparti_lpartj_forc, &n_leaves_found, depth, n_expected_tasks, ci_df, cj_df, pack_vars_pair_forc->n_daughters_total);
+                        e, fparti_fpartj_lparti_lpartj_forc, &n_leaves_found, depth, n_expected_tasks, ci_df, cj_df, pack_vars_pair_forc->n_daughters_total);
 
               runner_pack_daughters_and_launch_f(r, sched, ci, cj, pack_vars_pair_forc,
                     t, parts_aos_pair_f4_f_send, parts_aos_pair_f4_f_recv, d_parts_aos_pair_f4_f_send,

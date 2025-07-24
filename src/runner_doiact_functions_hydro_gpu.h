@@ -305,8 +305,7 @@ double runner_doself1_pack_f4_f(struct runner *r, struct scheduler *s,
 void runner_recurse_gpu(struct runner *r, struct scheduler *s,
                         struct pack_vars_pair *restrict pack_vars,
                         struct cell *ci, struct cell *cj, struct task *t,
-                        struct part_aos_f4_send *parts_send, struct engine *e,
-                        int4 *fparti_fpartj_lparti_lpartj, int *n_leafs_found,
+                        struct engine *e, int4 *fparti_fpartj_lparti_lpartj, int *n_leafs_found,
                         int depth, int n_expected_tasks, struct cell ** ci_d, struct cell ** cj_d, int n_daughters) {
 
   /* Should we even bother? A. Nasar: For GPU code we need to be clever about
@@ -330,7 +329,7 @@ void runner_recurse_gpu(struct runner *r, struct scheduler *s,
       /*We probably want to record */
       if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL) {
         runner_recurse_gpu(r, s, pack_vars, ci->progeny[pid], cj->progeny[pjd],
-                           t, parts_send, e, fparti_fpartj_lparti_lpartj,
+                           t, e, fparti_fpartj_lparti_lpartj,
                            n_leafs_found, depth + 1, n_expected_tasks, ci_d, cj_d, n_daughters);
         //	        message("recursing to depth %i", depth + 1);
       }
@@ -2181,15 +2180,15 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            &packing_time, &gpu_time,
-            &unpack_time, fparti_fpartj_lparti_lpartj_dens,
+            packing_time, gpu_time,
+            unpack_time, fparti_fpartj_lparti_lpartj_dens,
             pair_end);
       runner_dopair1_unpack_f4(
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            &packing_time, &gpu_time,
-            &unpack_time, fparti_fpartj_lparti_lpartj_dens,
+            packing_time, gpu_time,
+            unpack_time, fparti_fpartj_lparti_lpartj_dens,
             pair_end, npacked, n_leaves_found, ci_d, cj_d, f_l_daughters, ci_top, cj_top);
       if(npacked == n_leaves_found){
         pack_vars->n_daughters_total = 0;
@@ -2783,15 +2782,15 @@ void runner_pack_daughters_and_launch_g(struct runner *r, struct scheduler *s, s
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            &packing_time, &gpu_time,
-            &unpack_time, fparti_fpartj_lparti_lpartj_grad,
+            packing_time, gpu_time,
+            unpack_time, fparti_fpartj_lparti_lpartj_grad,
             pair_end);
       runner_dopair1_unpack_f4_g(
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            &packing_time, &gpu_time,
-            &unpack_time, fparti_fpartj_lparti_lpartj_grad,
+            packing_time, gpu_time,
+            unpack_time, fparti_fpartj_lparti_lpartj_grad,
             pair_end, npacked, n_leaves_found, ci_d, cj_d, f_l_daughters, ci_top, cj_top);
       if(npacked == n_leaves_found){
         pack_vars->n_daughters_total = 0;
@@ -3440,15 +3439,15 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            &packing_time, &gpu_time,
-            &unpack_time, fparti_fpartj_lparti_lpartj_forc,
+            packing_time, gpu_time,
+            unpack_time, fparti_fpartj_lparti_lpartj_forc,
             pair_end);
       runner_dopair1_unpack_f4_f(
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            &packing_time, &gpu_time,
-            &unpack_time, fparti_fpartj_lparti_lpartj_forc,
+            packing_time, gpu_time,
+            unpack_time, fparti_fpartj_lparti_lpartj_forc,
             pair_end, npacked, n_leaves_found, ci_d, cj_d, f_l_daughters, ci_top, cj_top);
       if(npacked == n_leaves_found){
         pack_vars->n_daughters_total = 0;
