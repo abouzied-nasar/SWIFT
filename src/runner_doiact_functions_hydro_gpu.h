@@ -166,7 +166,7 @@ double runner_doself1_pack_f4(struct runner *r, struct scheduler *s,
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_self_left_d--;
   if (s->queues[qid].n_packs_self_left_d < 1) pack_vars->launch_leftovers = 1;
-  lock_unlock(&s->queues[qid].lock);
+  (void)lock_unlock(&s->queues[qid].lock);
   /*Have we packed enough tasks to offload to GPU?*/
   if (pack_vars->tasks_packed == pack_vars->target_n_tasks)
     pack_vars->launch = 1;
@@ -228,7 +228,7 @@ double runner_doself1_pack_f4_g(struct runner *r, struct scheduler *s,
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_self_left_g--;
   if (s->queues[qid].n_packs_self_left_g < 1) pack_vars->launch_leftovers = 1;
-  lock_unlock(&s->queues[qid].lock);
+ (void) lock_unlock(&s->queues[qid].lock);
 
   if (pack_vars->tasks_packed == pack_vars->target_n_tasks)
     pack_vars->launch = 1;
@@ -289,7 +289,7 @@ double runner_doself1_pack_f4_f(struct runner *r, struct scheduler *s,
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_self_left_f--;
   if (s->queues[qid].n_packs_self_left_f < 1) pack_vars->launch_leftovers = 1;
-  lock_unlock(&s->queues[qid].lock);
+  (void)lock_unlock(&s->queues[qid].lock);
   /*Have we packed enough tasks to offload to GPU?*/
   if (pack_vars->tasks_packed == pack_vars->target_n_tasks)
     pack_vars->launch = 1;
@@ -696,7 +696,7 @@ double runner_dopair1_pack_f4_g(struct runner *r, struct scheduler *s,
 
   if (s->queues[qid].n_packs_pair_left_g < 1) pack_vars->launch_leftovers = 1;
 
-  lock_unlock(&s->queues[qid].lock);
+  (void)lock_unlock(&s->queues[qid].lock);
 
   //  if ((s->p_g_left[qid] < 1))
   //    pack_vars->launch_leftovers = 1;
@@ -812,7 +812,7 @@ double runner_dopair1_pack_f4_d(struct runner *r, struct scheduler *s,
 
   if (s->queues[qid].n_packs_pair_left_d < 1) pack_vars->launch_leftovers = 1;
 
-  lock_unlock(&s->queues[qid].lock);
+  (void)lock_unlock(&s->queues[qid].lock);
 
   //  if ((s->p_f_left[qid] < 1))
   //    pack_vars->launch_leftovers = 1;
@@ -928,7 +928,7 @@ double runner_dopair1_pack_f4_f(struct runner *r, struct scheduler *s,
 
   if (s->queues[qid].n_packs_pair_left_f < 1) pack_vars->launch_leftovers = 1;
 
-  lock_unlock(&s->queues[qid].lock);
+  (void)lock_unlock(&s->queues[qid].lock);
 
   //  if ((s->p_f_left[qid] < 1))
   //    pack_vars->launch_leftovers = 1;
@@ -2107,17 +2107,12 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_pair_left_d--;
   if (s->queues[qid].n_packs_pair_left_d < 1) pack_vars->launch_leftovers = 1;
-  lock_unlock(&s->queues[qid].lock);
+  (void)lock_unlock(&s->queues[qid].lock);
   /*Counter for how many tasks we've packed*/
   int npacked = 0;
   int launched = 0;
   //A. Nasar: Loop through the daughter tasks we found
   int copy_index = pack_vars->n_daughters_packed_index;
-  int index_start_packing = pack_vars->n_daughters_packed_index;
-  int index_end_packing = pack_vars->n_daughters_total;
-  int index_start_unpacking = f_l_daughters[0][0];
-  int index_end_unpacking = index_start_unpacking + target_n_tasks_tmp;
-  int last_launched = 0;
   //not strictly true!!! Could be that we packed and moved on without launching
   int n_p_current_task = 0;
   int had_prev_task = 0;
@@ -2130,7 +2125,6 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
   while(npacked < n_leaves_found){
     top_tasks_packed = pack_vars->top_tasks_packed;
     tic_cpu_pack = getticks();
-    int launch = 0;
     struct cell * cii = ci_d[copy_index];
     struct cell * cjj = cj_d[copy_index];
     runner_dopair1_pack_f4(
@@ -2153,7 +2147,6 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
     if(pack_vars->launch || (pack_vars->launch_leftovers && npacked == n_leaves_found)){
 
 //      message("tasks packed density %i", pack_vars->tasks_packed);
-      last_launched = f_l_daughters[top_tasks_packed - 1][1];
       launched = 1;
       //Here we only launch the tasks. No unpacking! This is done in next function ;)
       runner_dopair1_launch_f4_one_memcpy_no_unpack(
@@ -2180,7 +2173,6 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s, str
         //so that we can continue packing correctly
         pack_vars->top_task_list[0] = t;
         //Move all tasks forward in list so that the first next task will be packed to index 0
-        last_launched = 0;//first_cell_to_move;
         //Move remaining cell indices so that their indexing starts from zero and ends in n_daughters_left
         for(int i = first_cell_to_move; i < n_daughters_left; i++){
           int shuffle = i - first_cell_to_move;
@@ -2473,7 +2465,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_grad,
     cudaEvent_t *pair_end) {
 
-  struct timespec t0, t1, tp0, tp1;  //
+  struct timespec t0, t1;  //
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
@@ -2601,8 +2593,6 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
   /* Issue synchronisation commands for all events recorded by GPU
    * Should swap with one cuda Device Synchronise really if we decide to go this
    * way with unpacking done separately */
-
-  int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0;
 
   for (int bid = 0; bid < nBundles_temp; bid++) {
@@ -2637,9 +2627,6 @@ void runner_dopair1_unpack_f4_g(
   /*Loop over top level tasks*/
   for (int topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
     const ticks tic = getticks();
-    int first_daughter_id = f_l_daughters[topid][0];
-    struct cell *cii_top = ci_d[first_daughter_id];
-    struct cell *cjj_top = cj_d[first_daughter_id];
     while (cell_locktree(ci_top[topid])) {
       ; /* spin until we acquire the lock */
     }
@@ -2709,17 +2696,12 @@ void runner_pack_daughters_and_launch_g(struct runner *r, struct scheduler *s, s
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_pair_left_g--;
   if (s->queues[qid].n_packs_pair_left_g < 1) pack_vars->launch_leftovers = 1;
-  lock_unlock(&s->queues[qid].lock);
+  (void)lock_unlock(&s->queues[qid].lock);
   /*Counter for how many tasks we've packed*/
-  unsigned int npacked = 0;
-  unsigned int launched = 0;
+  int npacked = 0;
+  int launched = 0;
   //A. Nasar: Loop through the daughter tasks we found
   int copy_index = pack_vars->n_daughters_packed_index;
-  int index_start_packing = pack_vars->n_daughters_packed_index;
-  int index_end_packing = pack_vars->n_daughters_total;
-  int index_start_unpacking = f_l_daughters[0][0];
-  int index_end_unpacking = index_start_unpacking + target_n_tasks_tmp;
-  int last_launched = 0;
   //not strictly true!!! Could be that we packed and moved on without launching
   int n_p_current_task = 0;
   int had_prev_task = 0;
@@ -2732,7 +2714,6 @@ void runner_pack_daughters_and_launch_g(struct runner *r, struct scheduler *s, s
   while(npacked < n_leaves_found){
     top_tasks_packed = pack_vars->top_tasks_packed;
     tic_cpu_pack = getticks();
-    int launch = 0;
     struct cell * cii = ci_d[copy_index];
     struct cell * cjj = cj_d[copy_index];
     runner_dopair1_pack_f4_gg(
@@ -2755,7 +2736,6 @@ void runner_pack_daughters_and_launch_g(struct runner *r, struct scheduler *s, s
     if(pack_vars->launch || (pack_vars->launch_leftovers && npacked == n_leaves_found)){
 
 //      message("tasks packed gradient %i", pack_vars->tasks_packed);
-      last_launched = f_l_daughters[top_tasks_packed - 1][1];
       launched = 1;
       //Here we only launch the tasks. No unpacking! This is done in next function ;)
       runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
@@ -2782,7 +2762,6 @@ void runner_pack_daughters_and_launch_g(struct runner *r, struct scheduler *s, s
         //so that we can continue packing correctly
         pack_vars->top_task_list[0] = t;
         //Move all tasks forward in list so that the first next task will be packed to index 0
-        last_launched = 0;//first_cell_to_move;
         //Move remaining cell indices so that their indexing starts from zero and ends in n_daughters_left
         for(int i = first_cell_to_move; i < n_daughters_left; i++){
           int shuffle = i - first_cell_to_move;
@@ -3087,7 +3066,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_f(
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_forc,
     cudaEvent_t *pair_end) {
 
-  struct timespec t0, t1, tp0, tp1;  //
+  struct timespec t0, t1;  //
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
@@ -3216,7 +3195,6 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_f(
    * Should swap with one cuda Device Synchronise really if we decide to go this
    * way with unpacking done separately */
 
-  int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0;
 
   for (int bid = 0; bid < nBundles_temp; bid++) {
@@ -3251,9 +3229,6 @@ void runner_dopair1_unpack_f4_f(
   /*Loop over top level tasks*/
   for (int topid = 0; topid < pack_vars->top_tasks_packed; topid++) {
     const ticks tic = getticks();
-    int first_daughter_id = f_l_daughters[topid][0];
-    struct cell *cii_top = ci_d[first_daughter_id];
-    struct cell *cjj_top = cj_d[first_daughter_id];
     while (cell_locktree(ci_top[topid])) {
       ; /* spin until we acquire the lock */
     }
@@ -3323,17 +3298,12 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_pair_left_f--;
   if (s->queues[qid].n_packs_pair_left_f < 1) pack_vars->launch_leftovers = 1;
-  lock_unlock(&s->queues[qid].lock);
+  (void)lock_unlock(&s->queues[qid].lock);
   /*Counter for how many tasks we've packed*/
-  unsigned int npacked = 0;
-  unsigned int launched = 0;
+  int npacked = 0;
+  int launched = 0;
   //A. Nasar: Loop through the daughter tasks we found
   int copy_index = pack_vars->n_daughters_packed_index;
-  int index_start_packing = pack_vars->n_daughters_packed_index;
-  int index_end_packing = pack_vars->n_daughters_total;
-  int index_start_unpacking = f_l_daughters[0][0];
-  int index_end_unpacking = index_start_unpacking + target_n_tasks_tmp;
-  int last_launched = 0;
   //not strictly true!!! Could be that we packed and moved on without launching
   int n_p_current_task = 0;
   int had_prev_task = 0;
@@ -3346,7 +3316,6 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
   while(npacked < n_leaves_found){
     top_tasks_packed = pack_vars->top_tasks_packed;
     tic_cpu_pack = getticks();
-    int launch = 0;
     struct cell * cii = ci_d[copy_index];
     struct cell * cjj = cj_d[copy_index];
     runner_dopair1_pack_f4_ff(
@@ -3411,7 +3380,6 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
 //      message("packed %i indexI %i indexJ %i uniQQQ %i RATIO %f", t_packed, index_i, index_j, uniQQQ, (float)t_packed/(float)uniQQQ);
 ///////////Test code to find duplicates. Keep but comment out as will be useful in future/////////////////////////////
 
-      last_launched = f_l_daughters[top_tasks_packed - 1][1];
       launched = 1;
 //      message("tasks packed force %i", pack_vars->tasks_packed);
       //Here we only launch the tasks. No unpacking! This is done in next function ;)
@@ -3439,7 +3407,6 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
         //so that we can continue packing correctly
         pack_vars->top_task_list[0] = t;
         //Move all tasks forward in list so that the first next task will be packed to index 0
-        last_launched = 0;//first_cell_to_move;
         //Move remaining cell indices so that their indexing starts from zero and ends in n_daughters_left
         for(int i = first_cell_to_move; i < n_daughters_left; i++){
           int shuffle = i - first_cell_to_move;
