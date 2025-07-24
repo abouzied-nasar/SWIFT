@@ -211,6 +211,44 @@ INLINE static void safe_strcpy(char *restrict dst, const char *restrict src,
 
 /**
  * @brief Constructs an #io_props from its parameters. This version uses
+ * getter functions for array-like structs to access particle fields to be
+ * read in.
+ *
+ * This macro is intended for writing vector/array-like structs(!) which are
+ * part of the particle struct, e.g.
+ *
+ *   struct part {
+ *     ...
+ *     struct {
+ *       int something;
+ *     } substruct[N];
+ *   }
+ *
+ * Don't use it for normal arrays like position and velocities! Use the normal
+ * io_make_getter_output_field() macro instead.
+ *
+ * It also assumes that the getter function has the following signature:
+ *   datatype* get_pointer_to_part_struct_by_index(struct part_struct* part,
+ * size_t index);
+ *
+ * @param name The name of the field in the ICs.
+ * @param type The data type.
+ * @param dim The dimensionality of the field.
+ * @param units The units used for this field.
+ * @param importance Is this field compulsory or optional?
+ * @param part Pointer to the particle array where to write.
+ * @param getter The getter function returning a pointer to the particle field
+ * to be read in.
+ * @param index The index of the part sub-struct to write into
+ */
+#define io_make_indexed_getter_input_field(name, type, dim, importance, units, \
+                                           part, getter, index)                \
+  io_make_input_field_(name, type, dim, importance, units,                     \
+                       (char *)(getter(&part[0], (index))), sizeof(part[0]),   \
+                       NULL);
+
+/**
+ * @brief Constructs an #io_props from its parameters. This version uses
  * getters to access particle fields.
  *
  * @param name The name of the field in the ICs.

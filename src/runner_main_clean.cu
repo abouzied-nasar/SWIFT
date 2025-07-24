@@ -813,7 +813,7 @@ void *runner_main2(void *data) {
             runner_dosub_self2_gradient(r, ci, /*below_h_max=*/0, 1);
 #else
             runner_dosub_self1_gradient(r, ci, /*below_h_max=*/0, 1);
-#endif 
+#endif
 #endif
           }
 #endif
@@ -912,7 +912,6 @@ void *runner_main2(void *data) {
             	    parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e, &packing_time_pair, &time_for_gpu_pair,
             	    &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
             	    pair_end, n_leaves_found, ci_dd, cj_dd, first_and_last_daughters_d, ci_top_d, cj_top_d);
-        ///////
 #endif  //RECURSE
 #endif  // GPUOFFLOAD_DENSITY
           } /* pair / pack */

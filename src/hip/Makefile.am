@@ -15,9 +15,9 @@ AM_LDFLAGS = $(HDF5_LDFLAGS) $(FFTW_LIBS) -version-info 0:0:0
 
 # Rules to compile HIP code.
 .hip.o:
-	$(HIPCC) -c $(HIPFLAGS) $(AM_CFLAGS) $(HIP_CFLAGS) $(HIP_MYFLAGS) $< -o $@
+	$(HIPCC) -c $(HIPCC_FLAGS) $(AM_CFLAGS) $(HIP_CFLAGS) $(HIP_MYFLAGS) $< -o $@
 .hip.lo:
-	PATH=$(top_srcdir):$(PATH) && cudalt.py $@ $(HIPCC) -c $(HIPFLAGS) $(AM_CFLAGS) $(HIP_CFLAGS) $(HIP_MYFLAGS) $<
+	PATH=$(top_srcdir):$(PATH) && cudalt.py $@ $(HIPCC) -c $(HIPCC_FLAGS) $(AM_CFLAGS) $(HIP_CFLAGS) $(HIP_MYFLAGS) $<
 
 # The library. Dummy C library so that we get libtool linking setup.
 lib_LTLIBRARIES = libswiftHIP.la libswiftdummy.la

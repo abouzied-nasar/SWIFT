@@ -19,6 +19,8 @@
 #ifndef SWIFT_RT_GEAR_SPECIES_H
 #define SWIFT_RT_GEAR_SPECIES_H
 
+#include "inline.h"
+
 /**
  * @file src/rt/GEAR/rt_species.h
  * @brief header file concerning (ionizing) species.

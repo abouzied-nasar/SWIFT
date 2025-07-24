@@ -21,6 +21,8 @@
 
 #include "csds.h"
 #include "fof_struct.h"
+#include "part_type.h"
+#include "timeline.h"
 
 /* Gravity particle. */
 struct gpart {
@@ -118,6 +120,63 @@ struct gpart {
   long long num_interacted_m2p;
   long long num_interacted_p2p;
   long long num_interacted_pm;
+#endif
+};
+
+/**
+ * @brief Gravity particle data when on a foreign node.
+ *
+ * We only need a small fraction of the information on foreign
+ * nodes as the particles don't get updated there.
+ */
+struct gpart_foreign {
+
+  /*! Particle position. */
+  double x[3];
+
+  /*! Particle mass. */
+  float mass;
+
+  /*! Particle softening */
+  float epsilon;
+
+  /*! Time-step length */
+  timebin_t time_bin;
+
+  /*! Type of the #gpart (DM, gas, star, ...) */
+  enum part_type type;
+
+#ifdef SWIFT_DEBUG_CHECKS
+
+  /* Time of the last drift */
+  integertime_t ti_drift;
+#endif
+};
+
+/**
+ * @brief FOF particle data when on a foreign node.
+ *
+ * We only need a small fraction of the information on foreign
+ * nodes for FOF as the particles don't get updated there.
+ */
+struct gpart_fof_foreign {
+
+  /*! Particle position. */
+  double x[3];
+
+  /*! Particle FoF properties (group ID, group size, ...) */
+  struct fof_gpart_data fof_data;
+
+  /*! Time-step length */
+  timebin_t time_bin;
+
+  /*! Type of the #gpart (DM, gas, star, ...) */
+  enum part_type type;
+
+#ifdef SWIFT_DEBUG_CHECKS
+
+  /* Time of the last drift */
+  integertime_t ti_drift;
 #endif
 };
 

@@ -33,6 +33,7 @@
 #include "gravity.h"
 #include "mhd.h"
 #include "neutrino.h"
+#include "part.h"
 #include "particle_splitting.h"
 #include "rt.h"
 #include "sink.h"
@@ -90,12 +91,14 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
     v[2] *= a_factor_vel;
 
 #ifdef HYDRO_DIMENSION_2D
-    double *x = part_get_x(&p[k]) x[2] = 0.f;
+    double *x = part_get_x(&p[k]);
+    x[2] = 0.f;
     v[2] = 0.f;
 #endif
 
 #ifdef HYDRO_DIMENSION_1D
-    double *x = part_get_x(&p[k]) x[1] = x[2] = 0.;
+    double *x = part_get_x(&p[k]);
+    x[1] = x[2] = 0.;
     v[1] = v[2] = 0.f;
 #endif
   }
@@ -112,10 +115,10 @@ void space_first_init_parts_mapper(void *restrict map_data, int count,
 
     hydro_first_init_part(&p[k], &xp[k]);
     mhd_first_init_part(&p[k], &xp[k], &hydro_props->mhd, s->dim[0]);
-    struct timestep_limiter_data *limiter_data = part_get_limiter_data_p(&p[k]);
-    limiter_data->min_ngb_time_bin = num_time_bins + 1;
-    limiter_data->wakeup = time_bin_not_awake;
-    limiter_data->to_be_synchronized = 0;
+
+    part_set_timestep_limiter_min_ngb_time_bin(&p[k], num_time_bins + 1);
+    part_set_timestep_limiter_wakeup(&p[k], time_bin_not_awake);
+    part_set_timestep_limiter_to_be_synchronized(&p[k], 0);
 
 #ifdef WITH_CSDS
     csds_part_data_init(&xp[k].csds_data);
