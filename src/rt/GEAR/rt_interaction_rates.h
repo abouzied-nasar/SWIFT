@@ -20,7 +20,6 @@
 #define SWIFT_RT_GEAR_INTERACTION_RATES_H
 
 #include "rt_parameters.h"
-#include "rt_properties.h"
 #include "rt_species.h"
 #include "rt_thermochemistry_utils.h"
 
@@ -46,7 +45,7 @@
  **/
 __attribute__((always_inline)) INLINE static void
 rt_get_interaction_rates_for_grackle(
-    gr_float rates[5], float energy_density[RT_NGROUPS],
+    gr_float rates[5], const float energy_density[RT_NGROUPS],
     gr_float species_densities[6],
     const double average_photon_energy[RT_NGROUPS], double **cse, double **csn,
     const struct phys_const *restrict phys_const,

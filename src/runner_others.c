@@ -1093,6 +1093,10 @@ void runner_do_fof_search_pair(struct runner *r, struct cell *ci,
   const struct gpart *const gparts = s->gparts;
   const double search_r2 = e->fof_properties->l_x2;
 
+#ifdef SWIFT_DEBUG_CHECKS
+  if (ci->nodeID != cj->nodeID) error("Searching foreign cells!");
+#endif
+
   rec_fof_search_pair(e->fof_properties, dim, search_r2, periodic, gparts, ci,
                       cj);
 
@@ -1212,26 +1216,22 @@ void runner_do_rt_tchem(struct runner *r, struct cell *c, int timer) {
       if (!part_is_rt_active(p, e)) continue;
 
       /* Finish the force loop */
-      const struct rt_timestepping_data *rt_time_data =
-          part_get_const_rt_time_data_p(p);
       const integertime_t ti_current_subcycle = e->ti_current_subcycle;
       const integertime_t ti_step =
-          get_integer_timestep(rt_time_data->time_bin);
+          get_integer_timestep(part_get_rt_time_bin(p));
       const integertime_t ti_begin = get_integer_time_begin(
-          ti_current_subcycle + 1, rt_time_data->time_bin);
+          ti_current_subcycle + 1, part_get_rt_time_bin(p));
       const integertime_t ti_end = ti_begin + ti_step;
 
       const double dt =
           rt_part_dt(ti_begin, ti_end, e->time_base, with_cosmology, cosmo);
 #ifdef SWIFT_DEBUG_CHECKS
-      const struct timestep_limiter_data *limiter_data =
-          part_get_limiter_data_p(p);
       if (ti_begin != ti_current_subcycle)
         error(
             "Particle in wrong time-bin, ti_end=%lld, ti_begin=%lld, "
             "ti_step=%lld time_bin=%d wakeup=%d ti_current=%lld",
             ti_end, ti_begin, ti_step, part_get_time_bin(p),
-            limiter_data->wakeup, ti_current_subcycle);
+            part_get_timestep_limiter_wakeup(p), ti_current_subcycle);
       if (dt < 0.)
         error("Got part with negative time-step: %lld, %.6g", part_get_id(p),
               dt);

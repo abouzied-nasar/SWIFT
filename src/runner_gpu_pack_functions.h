@@ -1,4 +1,6 @@
 #include "../config.h"
+#include "runner.h"
+#include "timeline.h"
 
 #ifdef HAVE_CUDA
 #pragma message "HAVE_CUDA"

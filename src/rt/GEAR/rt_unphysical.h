@@ -24,6 +24,15 @@
  * @brief Routines for checking for and correcting unphysical scenarios
  */
 
+#include "error.h"
+#include "hydro.h"
+#include "inline.h"
+#include "part.h"
+#include "rt_parameters.h"
+
+#include <float.h>
+#include <math.h>
+
 /**
  * @brief check for and correct if needed unphysical
  * values for a radiation state.
@@ -108,7 +117,7 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state_ICs(
     error(
         "Found particle with negative energy density after reading in ICs: "
         "pid= %lld group=%d E=%.6g",
-        p->id, group, *energy_density);
+        part_get_id(p), group, *energy_density);
   if (*energy_density > FLT_MAX || isnan(*energy_density))
     error("Got inf/nan energy_density: %g", *energy_density);
 
@@ -124,7 +133,7 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state_ICs(
     error(
         "Found too high radiation flux for a particle: pid=%lld, group=%d, "
         "have=%.6g, max=%.6g",
-        p->id, group, flux_norm, flux_max);
+        part_get_id(p), group, flux_norm, flux_max);
   }
 }
 
@@ -185,46 +194,48 @@ rt_check_unphysical_mass_fractions(struct part* restrict p) {
    * inactive particles however remains zero until the particle is active
    * again. See issue #833. */
 
-  if (hydro_get_mass(p) <= 0.f || p->rho <= 0.f) {
+  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+
+  if (hydro_get_mass(p) <= 0.f || part_get_rho(p) <= 0.f) {
     /* Deal with unphysical situations and vacuum. */
-    p->rt_data.tchem.mass_fraction_HI = RT_GEAR_TINY_MASS_FRACTION;
-    p->rt_data.tchem.mass_fraction_HII = RT_GEAR_TINY_MASS_FRACTION;
-    p->rt_data.tchem.mass_fraction_HeI = RT_GEAR_TINY_MASS_FRACTION;
-    p->rt_data.tchem.mass_fraction_HeII = RT_GEAR_TINY_MASS_FRACTION;
-    p->rt_data.tchem.mass_fraction_HeIII = RT_GEAR_TINY_MASS_FRACTION;
+    rt_data->tchem.mass_fraction_HI = RT_GEAR_TINY_MASS_FRACTION;
+    rt_data->tchem.mass_fraction_HII = RT_GEAR_TINY_MASS_FRACTION;
+    rt_data->tchem.mass_fraction_HeI = RT_GEAR_TINY_MASS_FRACTION;
+    rt_data->tchem.mass_fraction_HeII = RT_GEAR_TINY_MASS_FRACTION;
+    rt_data->tchem.mass_fraction_HeIII = RT_GEAR_TINY_MASS_FRACTION;
     return;
   }
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
-  if (p->rt_data.tchem.mass_fraction_HI < -1e4)
+  if (rt_data->tchem.mass_fraction_HI < -1e4)
     message("WARNING: Got negative HI mass fraction?");
-  if (p->rt_data.tchem.mass_fraction_HII < -1e4)
+  if (rt_data->tchem.mass_fraction_HII < -1e4)
     message("WARNING: Got negative HII mass fraction?");
-  if (p->rt_data.tchem.mass_fraction_HeI < -1e4)
+  if (rt_data->tchem.mass_fraction_HeI < -1e4)
     message("WARNING: Got negative HeI mass fraction?");
-  if (p->rt_data.tchem.mass_fraction_HeII < -1e4)
+  if (rt_data->tchem.mass_fraction_HeII < -1e4)
     message("WARNING: Got negative HeII mass fraction?");
-  if (p->rt_data.tchem.mass_fraction_HeIII < -1e4)
+  if (rt_data->tchem.mass_fraction_HeIII < -1e4)
     message("WARNING: Got negative HeIII mass fraction?");
 #endif
 
   /* TODO: this should be a for loop with mass fractions being enums. */
-  p->rt_data.tchem.mass_fraction_HI =
-      max(p->rt_data.tchem.mass_fraction_HI, RT_GEAR_TINY_MASS_FRACTION);
-  p->rt_data.tchem.mass_fraction_HII =
-      max(p->rt_data.tchem.mass_fraction_HII, RT_GEAR_TINY_MASS_FRACTION);
-  p->rt_data.tchem.mass_fraction_HeI =
-      max(p->rt_data.tchem.mass_fraction_HeI, RT_GEAR_TINY_MASS_FRACTION);
-  p->rt_data.tchem.mass_fraction_HeII =
-      max(p->rt_data.tchem.mass_fraction_HeII, RT_GEAR_TINY_MASS_FRACTION);
-  p->rt_data.tchem.mass_fraction_HeIII =
-      max(p->rt_data.tchem.mass_fraction_HeIII, RT_GEAR_TINY_MASS_FRACTION);
+  rt_data->tchem.mass_fraction_HI =
+      max(rt_data->tchem.mass_fraction_HI, RT_GEAR_TINY_MASS_FRACTION);
+  rt_data->tchem.mass_fraction_HII =
+      max(rt_data->tchem.mass_fraction_HII, RT_GEAR_TINY_MASS_FRACTION);
+  rt_data->tchem.mass_fraction_HeI =
+      max(rt_data->tchem.mass_fraction_HeI, RT_GEAR_TINY_MASS_FRACTION);
+  rt_data->tchem.mass_fraction_HeII =
+      max(rt_data->tchem.mass_fraction_HeII, RT_GEAR_TINY_MASS_FRACTION);
+  rt_data->tchem.mass_fraction_HeIII =
+      max(rt_data->tchem.mass_fraction_HeIII, RT_GEAR_TINY_MASS_FRACTION);
 
-  const float XHI = p->rt_data.tchem.mass_fraction_HI;
-  const float XHII = p->rt_data.tchem.mass_fraction_HII;
-  const float XHeI = p->rt_data.tchem.mass_fraction_HeI;
-  const float XHeII = p->rt_data.tchem.mass_fraction_HeII;
-  const float XHeIII = p->rt_data.tchem.mass_fraction_HeIII;
+  const float XHI = rt_data->tchem.mass_fraction_HI;
+  const float XHII = rt_data->tchem.mass_fraction_HII;
+  const float XHeI = rt_data->tchem.mass_fraction_HeI;
+  const float XHeII = rt_data->tchem.mass_fraction_HeII;
+  const float XHeIII = rt_data->tchem.mass_fraction_HeIII;
 
   const float Xtot = XHI + XHII + XHeI + XHeII + XHeIII;
 

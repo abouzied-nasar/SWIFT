@@ -384,9 +384,7 @@ __attribute__((always_inline)) INLINE static int part_is_rt_active(
     const struct part *p, const struct engine *e) {
 
   const timebin_t max_active_bin = e->max_active_bin_subcycle;
-  const struct rt_timestepping_data *const rt_time_data =
-      part_get_const_rt_time_data_p(p);
-  const timebin_t part_bin = rt_time_data->time_bin;
+  const timebin_t part_bin = part_get_rt_time_bin(p);
 
 #ifdef SWIFT_DEBUG_CHECKS
   const integertime_t ti_current_subcycle = e->ti_current_subcycle;
@@ -531,6 +529,18 @@ __attribute__((always_inline)) INLINE static int part_is_inhibited(
  */
 __attribute__((always_inline)) INLINE static int gpart_is_inhibited(
     const struct gpart *gp, const struct engine *e) {
+  return gp->time_bin == time_bin_inhibited;
+}
+
+/**
+ * @brief Has this foreign gravity particle been inhibited?
+ *
+ * @param gp The #gpart_part.
+ * @param e The #engine containing information about the current time.
+ * @return 1 if the #gpart_foreign is inhibited, 0 otherwise.
+ */
+__attribute__((always_inline)) INLINE static int gpart_foreign_is_inhibited(
+    const struct gpart_foreign *gp, const struct engine *e) {
   return gp->time_bin == time_bin_inhibited;
 }
 
