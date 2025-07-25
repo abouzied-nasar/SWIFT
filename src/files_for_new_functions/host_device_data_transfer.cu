@@ -154,7 +154,6 @@ void host2device_density(
     float *alpha_visc_max_ngb, timebin_t *time_bin, timebin_t *wakeup,
     timebin_t *min_ngb_time_bin, char *to_be_synchronized,
     int count_max_parts_tmp) {
-  cudaError_t cu_error;
   cudaMemcpy(&tid_p, &(parts_soa_buffer.tid_p),
              count_max_parts_tmp * sizeof(int), cudaMemcpyHostToDevice);
 }
@@ -226,7 +225,7 @@ void host2device_async_density(
     float *alpha_visc_max_ngb, timebin_t *time_bin, timebin_t *wakeup,
     timebin_t *min_ngb_time_bin, char *to_be_synchronized, int first_part_tmp,
     int bundle_n_parts, cudaStream_t stream) {
-  cudaError_t cu_error;
+
   cudaMemcpyAsync(&tid_p[first_part_tmp],
                   &(parts_soa_buffer.tid_p[first_part_tmp]),
                   bundle_n_parts * sizeof(int), cudaMemcpyHostToDevice, stream);
@@ -282,24 +281,6 @@ void host2device_async_density_pair(
     timebin_t *min_ngb_time_bin, char *to_be_synchronized, int first_part_tmp,
     int bundle_n_parts, cudaStream_t stream) {
 
-  //  int bundle_n_parts = bundle_n_parts_i + bundle_n_parts_j;
-  cudaError_t cu_error;
-  //  cudaMemcpyAsync(&tid_p[first_part_tmp],
-  //  &(parts_soa_buffer.tid_p[first_part_tmp]),
-  //				  bundle_n_parts * sizeof(int),
-  // cudaMemcpyHostToDevice, 				  stream);
-  //  cudaMemcpyAsync(&locx[first_part_tmp],
-  //  &(parts_soa_buffer.locx[first_part_tmp]),
-  //				  bundle_n_parts * sizeof(float),
-  //				  cudaMemcpyHostToDevice, stream);
-  //  cudaMemcpyAsync(&locy[first_part_tmp],
-  //  &(parts_soa_buffer.locy[first_part_tmp]),
-  //				  bundle_n_parts * sizeof(float),
-  //				  cudaMemcpyHostToDevice, stream);
-  //  cudaMemcpyAsync(&locz[first_part_tmp],
-  //  &parts_soa_buffer.locz[first_part_tmp],
-  //				  bundle_n_parts * sizeof(float),
-  //				  cudaMemcpyHostToDevice, stream);
   cudaMemcpyAsync(&h[first_part_tmp], &parts_soa_buffer.h[first_part_tmp],
                   bundle_n_parts * sizeof(float), cudaMemcpyHostToDevice,
                   stream);
@@ -396,7 +377,6 @@ void device2host_async_density(
     float *alpha_visc_max_ngb, timebin_t *time_bin, timebin_t *wakeup,
     timebin_t *min_ngb_time_bin, char *to_be_synchronized, int first_part_tmp,
     int bundle_n_parts, cudaStream_t stream) {
-  cudaError_t cu_error;
 
   cudaMemcpyAsync(&parts_soa_buffer.rho[first_part_tmp], &rho[first_part_tmp],
                   bundle_n_parts * sizeof(float), cudaMemcpyDeviceToHost,
@@ -437,10 +417,6 @@ void device2host_async_density_pair(
     float *alpha_visc_max_ngb, timebin_t *time_bin, timebin_t *wakeup,
     timebin_t *min_ngb_time_bin, char *to_be_synchronized, int first_part_tmp,
     int bundle_n_parts, cudaStream_t stream) {
-  cudaError_t cu_error;
-  //  fprintf(stderr, "parts i %i parts j %i\n", bundle_n_parts_i,
-  //  bundle_n_parts_j); int bundle_n_parts = bundle_n_parts_i +
-  //  bundle_n_parts_j;
 
   cudaMemcpyAsync(&parts_soa_buffer.rho[first_part_tmp], &rho[first_part_tmp],
                   bundle_n_parts * sizeof(float), cudaMemcpyDeviceToHost,
