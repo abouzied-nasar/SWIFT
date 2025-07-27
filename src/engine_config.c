@@ -33,15 +33,11 @@
 #endif
 
 #ifdef WITH_CUDA
-#include "runner_main_clean.cu"
-
-#include <cuda_runtime.h> /* A. Nasar */
+#include <cuda_runtime.h>
 #endif
 
 #ifdef WITH_HIP
-// #include "/opt/rocm-5.1.0/hip/include/hip/hip_runtime.h"
 #include "runner_main_clean.hip"
-
 #include <hip/hip_runtime.h>
 #endif
 
@@ -1005,7 +1001,7 @@ void engine_config(int restart, int fof, struct engine *e,
     e->runners[k].e = e;
 
 #ifdef WITH_CUDA
-    if (pthread_create(&e->runners[k].thread, NULL, &runner_main2,
+    if (pthread_create(&e->runners[k].thread, NULL, &runner_main_cuda,
                        &e->runners[k]) != 0)
       error("Failed to create GPU runner thread.");
 #elif defined(WITH_HIP)

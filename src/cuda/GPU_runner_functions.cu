@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /* Hacky method to make c++ compilers not die. */
-#ifdef WITH_CUDA
+#ifdef HAVE_CUDA
 #ifndef static
 #define static
 #endif
@@ -14,34 +14,31 @@
 #endif
 #endif
 
-/* Required header files */
-#include <stdio.h>
-/*ifdef WITH_CUDA prevents name mangling. C code sees exact names
+/*ifdef __cplusplus prevents name mangling. C code sees exact names
  of functions rather than mangled template names produced by C++*/
-#ifdef WITH_CUDA
+#ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "../../config.h"
+/* Required header files */
+#include <config.h>
 
 #ifndef BLOCK_SIZE_H
 #include "BLOCK_SIZE.h"
 #endif
 
-#include "GPU_runner_functions.h"
+#include <cuda.h>
+#include <cuda_device_runtime_api.h>
+#include <cuda_profiler_api.h>
+#include <cuda_runtime.h>
+#include <stdio.h>
+
+/* #include "GPU_runner_functions.h" */
 #include "device_functions.h"
 #include "part_gpu.h"
 
-#include <cuda_profiler_api.h>
-
-#ifdef WITH_CUDA
-}
-#endif
 
 /* function to initialise GPU and printout GPU name*/
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void Initialise_GPU() {
   int devId = 0;
   // find and print device name
@@ -51,18 +48,12 @@ void Initialise_GPU() {
   cudaSetDevice(devId);
   // cuda
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
-__global__ void tester(struct part_soa parts_soa, int *d_task_first_part,
-                       int *d_task_last_part, float d_a, float d_H, int bid,
+__global__ void tester(struct part_soa parts_soa, const int *d_task_first_part,
+                       const int *d_task_last_part, float d_a, float d_H, int bid,
                        int tid, int count_tasks, int tasksperbundle,
                        int nBlocks_per_task, int bundle_first_task,
-                       int max_parts, int time_bin_inhibited) {
+                       int max_parts, int _time_bin_inhibited) {
   extern __shared__ float vars[];
   __shared__ int first_part_tid_0, last_part_tid_0;
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -82,13 +73,7 @@ __global__ void tester(struct part_soa parts_soa, int *d_task_first_part,
   //	  printf("tid %i last_part_in_blocks %i\n", parts_soa.tid_p[pid],
   // last_part_in_task_blocks);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_self_density_GPU(
     struct part_soa parts_soa, int *d_task_first_part, int *d_task_last_part,
     float d_a, float d_H, int count_tasks, int tasksperbundle,
@@ -110,8 +95,11 @@ __global__ void runner_do_self_density_GPU(
   int first_part = 0;
   int count = 0;
   int last_part = 0;
-  float cellx = 0.0, celly = 0.0, cellz = 0.0;
-  float hi = 0.0, hig2 = hi * hi * kernel_gamma2;
+  float cellx = 0.0;
+  float celly = 0.0;
+  float cellz = 0.0;
+  float hi = 0.0;
+  float hig2 = hi * hi * kernel_gamma2;
   float mi = 0.0;
   float uxi = 0.0;
   float uyi = 0.0;
@@ -180,9 +168,9 @@ __global__ void runner_do_self_density_GPU(
     for (int j_block = 0; j_block < BLOCK_SIZE; j_block++) {
       j = j_block + b;
       //      if ((j != pid) && (j < last_part_in_task_blocks) &&
-      //          timebin[j_block] != time_bin_inhibited) {
+      //          timebin[j_block] != _time_bin_inhibited) {
       //      if ((j < last_part_in_task_blocks) &&
-      //    	  timebin[j_block] != time_bin_inhibited) {
+      //    	  timebin[j_block] != _time_bin_inhibited) {
       if (j < last_part_in_task_blocks) {
         /* Compute the pairwise distance. */
         const float pjx = x_p_tmp[j_block] - cellx;
@@ -251,13 +239,7 @@ __global__ void runner_do_self_density_GPU(
     parts_soa.rot_uz[pid] = rot_uzi;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void DOSELF_GPU_AOS(struct part_aos *parts_aos,
                                int *d_task_first_part, int *d_task_last_part,
                                float d_a, float d_H, int count_tasks,
@@ -414,15 +396,9 @@ __global__ void DOSELF_GPU_AOS(struct part_aos *parts_aos,
     parts_aos[pid].rot_uz = rot_uzi;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
 // template <typename T>
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 // #include <cuda/barrier>
 __global__ void DOSELF_GPU_AOS_F4(
     struct part_aos_f4_send *__restrict__ parts_send,
@@ -517,13 +493,7 @@ __global__ void DOSELF_GPU_AOS_F4(
     parts_recv[pid].rot_ux_div_v = res_rot;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void launch_density_aos(struct part_aos *parts_aos, int *d_task_first_part,
                         int *d_task_last_part, float d_a, float d_H,
                         const char *loop_type, cudaStream_t stream,
@@ -543,15 +513,9 @@ void launch_density_aos(struct part_aos *parts_aos, int *d_task_first_part,
   //  runner_do_self_density_GPU_naive<<<gridShape, BLOCK_SIZE, 0, stream>>>(
   //        parts_soa, d_task_first_part, d_task_last_part, d_a, d_H, bid, tid,
   //        count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
-  //        max_parts, time_bin_inhibited);
+  //        max_parts, _time_bin_inhibited);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 struct first_part {
   int list[32];
 };
@@ -569,15 +533,9 @@ void launch_density_aos_f4(struct part_aos_f4_send *parts_send,
   //  runner_do_self_density_GPU_naive<<<gridShape, BLOCK_SIZE, 0, stream>>>(
   //        parts_soa, d_task_first_part, d_task_last_part, d_a, d_H, bid, tid,
   //        count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
-  //        max_parts, time_bin_inhibited);
+  //        max_parts, _time_bin_inhibited);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void DOSELF_GPU_AOS_G(struct part_aos_g *parts_aos,
                                  int *d_task_first_part, int *d_task_last_part,
                                  float d_a, float d_H, int count_tasks,
@@ -682,9 +640,9 @@ __global__ void DOSELF_GPU_AOS_G(struct part_aos_g *parts_aos,
     for (int j_block = 0; j_block < BLOCK_SIZE; j_block++) {
       j = j_block + b;
       //      if ((j != pid) && (j < last_part_in_task_blocks) &&
-      //          timebin[j_block] != time_bin_inhibited) {
+      //          timebin[j_block] != _time_bin_inhibited) {
       //      if ((j < last_part_in_task_blocks) &&
-      //    	  timebin[j_block] != time_bin_inhibited) {
+      //    	  timebin[j_block] != _time_bin_inhibited) {
       if (j < last_part_in_task_blocks) {
         /* Compute the pairwise distance. */
         const float pjx = x_p_tmp[j_block] - cellx;
@@ -742,13 +700,7 @@ __global__ void DOSELF_GPU_AOS_G(struct part_aos_g *parts_aos,
     parts_aos[pid].alpha_visc_max_ngb = alpha_visc_max_ngb;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void DOSELF_GPU_AOS_F4_G(
     struct part_aos_f4_g_send *__restrict__ parts_send,
     struct part_aos_f4_g_recv *__restrict__ parts_recv, const float d_a,
@@ -863,13 +815,7 @@ __global__ void DOSELF_GPU_AOS_F4_G(
     parts_recv[pid].vsig_lapu_aviscmax = vsig_lapu_aviscmax_i;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void DOSELF_GPU_AOS_F(struct part_aos_f *parts_aos,
                                  int *d_task_first_part, int *d_task_last_part,
                                  float d_a, float d_H, int count_tasks,
@@ -1137,13 +1083,7 @@ __global__ void DOSELF_GPU_AOS_F(struct part_aos_f *parts_aos,
     parts_aos[pid].min_ngb_time_bin = min_ngb_time_bin;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void DOSELF_GPU_AOS_F4_F(
     struct part_aos_f4_f_send *__restrict__ parts_send,
     struct part_aos_f4_f_recv *__restrict__ parts_recv, const float d_a,
@@ -1345,19 +1285,13 @@ __global__ void DOSELF_GPU_AOS_F4_F(
     parts_recv[pid].a_hydro = ahydro;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_density_GPU_naive(
     struct part_soa parts_soa_ci, struct part_soa parts_soa_cj,
     int *d_task_first_part_ci, int *d_task_first_part_cj,
     int *d_task_last_part_ci, int *d_task_last_part_cj, float d_a, float d_H,
     int bid, int tid, int count_tasks, int tasksperbundle, int nBlocks_per_task,
-    int bundle_first_task, int time_bin_inhibited) {
+    int bundle_first_task, int _time_bin_inhibited) {
 
   extern __shared__ float vars[];
   //  __shared__ int first_part_tid_0, last_part_tid_0;
@@ -1383,8 +1317,11 @@ __global__ void runner_do_pair_density_GPU_naive(
   int first_part = 0;
   int count = 0;
   int last_part = 0;
-  float cellx = 0.0, celly = 0.0, cellz = 0.0;
-  float hi = 0.0, hig2 = hi * hi * kernel_gamma2;
+  float cellx = 0.0;
+  float celly = 0.0;
+  float cellz = 0.0;
+  float hi = 0.0;
+  float hig2 = hi * hi * kernel_gamma2;
   float mi = 0.0;
   float uxi = 0.0;
   float uyi = 0.0;
@@ -1401,7 +1338,6 @@ __global__ void runner_do_pair_density_GPU_naive(
   float rot_uyi = 0.0;
   float rot_uzi = 0.0;
   int Found_neighbours = 0;
-  //	if(pid<b_last_part&&pid<last_part_in_task_blocks){
   if (pid < last_part_in_task_blocks_ci) {
     ttid = parts_soa_ci.tid_p[pid];
     first_part = d_task_first_part_ci[ttid];
@@ -1452,10 +1388,6 @@ __global__ void runner_do_pair_density_GPU_naive(
     __syncthreads();
     for (int j_block = 0; j_block < BLOCK_SIZE; j_block++) {
       j = j_block + b;
-      //      if ((j != pid) && (j < last_part_in_task_blocks) &&
-      //          timebin[j_block] != time_bin_inhibited) {
-      //      if ((j < last_part_in_task_blocks) &&
-      //    	  timebin[j_block] != time_bin_inhibited) {
       if (j < last_part_in_task_blocks_cj) {
         /* Compute the pairwise distance. */
         const float pjx = x_p_tmp[j_block] - cellx;
@@ -1469,7 +1401,6 @@ __global__ void runner_do_pair_density_GPU_naive(
         // 0.0000001f) && pid < last_part_in_task_blocks){
         // printf("very small value for hi %f or hj %f or r2 %f\n", hi, hj, r2);
         //				}
-        //        if (r2 < hig2 && r2 > (0.01f/128.f)*(0.01f/128.f)) {
         if (r2 < hig2 && r2 > (0.01f / dx) * (0.01f / dx)) {
           Found_neighbours = 1;
           const float r = sqrt(r2);
@@ -1522,13 +1453,7 @@ __global__ void runner_do_pair_density_GPU_naive(
     parts_soa_ci.rot_uz[pid] = rot_uzi;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void launch_density_pair_two_kernels(
     struct part_soa parts_soa_ci, struct part_soa parts_soa_cj,
     int *d_task_first_part_ci, int *d_task_first_part_cj,
@@ -1536,7 +1461,7 @@ void launch_density_pair_two_kernels(
     const char *loop_type, cudaStream_t stream, int bid, int block_size,
     int count_tasks, int tasksperbundle, int max_parts_i, int max_parts_j,
     int numBlocks_y, int tid, int offset, int bundle_first_task,
-    int time_bin_inhibited) {
+    int _time_bin_inhibited) {
 
   int max_parts = max(max_parts_j, max_parts_i);
   int numBlocks_x = (max_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
@@ -1550,7 +1475,7 @@ void launch_density_pair_two_kernels(
                                      stream>>>(
       parts_soa_ci, parts_soa_cj, d_task_first_part_ci, d_task_first_part_cj,
       d_task_last_part_ci, d_task_last_part_cj, d_a, d_H, bid, tid, count_tasks,
-      tasksperbundle, nBlocks_per_task, bundle_first_task, time_bin_inhibited);
+      tasksperbundle, nBlocks_per_task, bundle_first_task, _time_bin_inhibited);
 
   //  numBlocks_x = (max_parts_i + BLOCK_SIZE - 1) / BLOCK_SIZE;
   //  gridShape = dim3(numBlocks_x, numBlocks_y);
@@ -1562,20 +1487,14 @@ void launch_density_pair_two_kernels(
                                      stream>>>(
       parts_soa_cj, parts_soa_ci, d_task_first_part_cj, d_task_first_part_ci,
       d_task_last_part_cj, d_task_last_part_ci, d_a, d_H, bid, tid, count_tasks,
-      tasksperbundle, nBlocks_per_task, bundle_first_task, time_bin_inhibited);
+      tasksperbundle, nBlocks_per_task, bundle_first_task, _time_bin_inhibited);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __device__ void DOPAIRGPU(struct part_soa parts_soa, int pid,
                           int last_part_in_task_blocks_ci,
                           int first_part_in_task_blocks_cj,
                           int last_part_in_task_blocks_cj, float d_a, float d_H,
-                          int time_bin_inhibited, float *vars) {
+                          int _time_bin_inhibited, float *vars) {
 
   float dx =
       1.f / 64.f;  // Value used to avoid interacting parts with themselves
@@ -1699,13 +1618,7 @@ __device__ void DOPAIRGPU(struct part_soa parts_soa, int pid,
     parts_soa.rot_uz[pid] = rot_uzi;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __device__ void DOPAIR2NONSYMGPU(struct part_soa parts_soa, int pid,
                                  const int ci_start, const int ci_end,
                                  const int cj_start, const int cj_end,
@@ -1843,13 +1756,7 @@ __device__ void DOPAIR2NONSYMGPU(struct part_soa parts_soa, int pid,
     parts_soa.rot_uz[pid] = rot_uzi;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __device__ void DOPAIR2NONSYMGPUAOS(struct part_aos *parts_aos, int pid,
                                     const int ci_start, const int ci_end,
                                     const int cj_start, const int cj_end,
@@ -1990,13 +1897,7 @@ __device__ void DOPAIR2NONSYMGPUAOS(struct part_aos *parts_aos, int pid,
     parts_aos[pid].time_bin = 20;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __device__ void DOPAIR2NONSYMGPUAOSF4(
     struct part_aos_f4_send *__restrict__ parts_send,
     struct part_aos_f4_recv *__restrict__ parts_recv, int pid,
@@ -2092,13 +1993,7 @@ __device__ void DOPAIR2NONSYMGPUAOSF4(
     parts_recv[pid].rot_ux_div_v = res_rot;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __device__ void DOPAIR2NAIVEGPUAOSF4(
     const struct part_aos_f4_send pi,
     struct part_aos_f4_send *__restrict__ parts_send,
@@ -2185,13 +2080,7 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
   parts_recv[pid].rot_ux_div_v = res_rot;
   //  }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __device__ void DOPAIR2NONSYMGPUAOSG(struct part_aos_g *parts_aos, int pid,
                                      const int ci_start, const int ci_end,
                                      const int cj_start, const int cj_end,
@@ -2338,13 +2227,7 @@ __device__ void DOPAIR2NONSYMGPUAOSG(struct part_aos_g *parts_aos, int pid,
     parts_aos[pid].alpha_visc_max_ngb = alpha_visc_max_ngb;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __device__ void DOPAIR2NAIVEGPUAOSF4G(
     const struct part_aos_f4_g_send pi,
     struct part_aos_f4_g_send *__restrict__ parts_send,
@@ -2432,13 +2315,7 @@ __device__ void DOPAIR2NAIVEGPUAOSF4G(
   parts_recv[pid].vsig_lapu_aviscmax = vsig_lapu_aviscmax_i;
   //  }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __device__ void DOPAIR2NONSYMGPUAOSF(struct part_aos_f *parts_aos, int pid,
                                      const int ci_start, const int ci_end,
                                      const int cj_start, const int cj_end,
@@ -2690,13 +2567,7 @@ __device__ void DOPAIR2NONSYMGPUAOSF(struct part_aos_f *parts_aos, int pid,
     //    ahydroyi, ahydrozi);
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __device__ void DOPAIR2NAIVEGPUAOSF4F(
     const struct part_aos_f4_f_send pi,
     struct part_aos_f4_f_send *__restrict__ parts_send,
@@ -2855,17 +2726,11 @@ __device__ void DOPAIR2NAIVEGPUAOSF4F(
   parts_recv[pid].a_hydro = ahydro;
   //  }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __device__ void DOPAIR2GPU(struct part_soa parts_soa, int pid,
                            const int ci_start, const int ci_end,
                            const int cj_start, const int cj_end, float d_a,
-                           float d_H, int time_bin_inhibited, float *vars_pair,
+                           float d_H, int _time_bin_inhibited, float *vars_pair,
                            double *d_shift_x, double *d_shift_y,
                            double *d_shift_z, const int task_id_tmp) {
 
@@ -3102,19 +2967,13 @@ __device__ void DOPAIR2GPU(struct part_soa parts_soa, int pid,
     //	if(rhoi != 0.f)printf("rho i %f, rho_dh i %f\n", rhoi, rho_dhi);
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_density_GPU(
     struct part_soa parts_soa, int *d_task_first_part_ci,
     int *d_task_first_part_cj, int *d_task_last_part_ci,
     int *d_task_last_part_cj, float d_a, float d_H, int bid, int tid,
     int count_tasks, int tasksperbundle, int nBlocks_per_task,
-    int bundle_first_task, int time_bin_inhibited) {
+    int bundle_first_task, int _time_bin_inhibited) {
 
   extern __shared__ float vars[];
   //  __shared__ int first_part_tid_0, last_part_tid_0;
@@ -3136,27 +2995,21 @@ __global__ void runner_do_pair_density_GPU(
   /*Don't ever put me in an if statement. I've got __syncthreads inside*/
   DOPAIRGPU(parts_soa, pid, last_part_in_task_blocks_ci,
             first_part_in_task_blocks_cj, last_part_in_task_blocks_cj, d_a, d_H,
-            time_bin_inhibited, vars);
+            _time_bin_inhibited, vars);
   //  __syncthreads();
   // Now we start calculations for particles in cell i
   const int pjd = threadid + last_part_in_task_blocks_ci;
   /*Don't ever put me in an if statement. I've got __syncthreads inside*/
   DOPAIRGPU(parts_soa, pjd, last_part_in_task_blocks_cj,
             first_part_in_task_blocks_ci, last_part_in_task_blocks_ci, d_a, d_H,
-            time_bin_inhibited, vars);
+            _time_bin_inhibited, vars);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_sym_density_GPU(
     struct part_soa parts_soa, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, int bid, int tid,
     int count_tasks, int tasksperbundle, int nBlocks_per_task,
-    int bundle_first_task, int time_bin_inhibited, double *d_shift_x,
+    int bundle_first_task, int _time_bin_inhibited, double *d_shift_x,
     double *d_shift_y, double *d_shift_z) {
 
   extern __shared__ float vars_pair[];
@@ -3178,22 +3031,16 @@ __global__ void runner_do_pair_sym_density_GPU(
 
   /*Don't ever put me in an if statement. I've got __syncthreads inside*/
   DOPAIR2GPU(parts_soa, pid, ci_start, ci_end, cj_start, cj_end, d_a, d_H,
-             time_bin_inhibited, vars_pair, d_shift_x, d_shift_y, d_shift_z,
+             _time_bin_inhibited, vars_pair, d_shift_x, d_shift_y, d_shift_z,
              task_id_tmp);
   //  __syncthreads();
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_nonsym_density_GPU(
     struct part_soa parts_soa, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, int bid, int tid,
     int count_tasks, int tasksperbundle, int nBlocks_per_task,
-    int bundle_first_task, int time_bin_inhibited, double *d_shift_x,
+    int bundle_first_task, int _time_bin_inhibited, double *d_shift_x,
     double *d_shift_y, double *d_shift_z) {
 
   extern __shared__ float vars_pair[];
@@ -3230,13 +3077,7 @@ __global__ void runner_do_pair_nonsym_density_GPU(
                    vars_pair, d_shift_x, d_shift_y, d_shift_z, task_id_tmp + 1,
                    flip_j);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_ci_density_GPU(
     struct part_soa parts_soa, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, int bid, int tid,
@@ -3266,13 +3107,7 @@ __global__ void runner_do_pair_ci_density_GPU(
                    vars_pair, d_shift_x, d_shift_y, d_shift_z, task_id_tmp,
                    flip_i);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_cj_density_GPU(
     struct part_soa parts_soa, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, int bid, int tid,
@@ -3302,13 +3137,7 @@ __global__ void runner_do_pair_cj_density_GPU(
                    vars_pair, d_shift_x, d_shift_y, d_shift_z, task_id_tmp + 1,
                    flip_j);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_ci_density_GPU_aos(
     struct part_aos *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, int bid, int tid,
@@ -3338,13 +3167,7 @@ __global__ void runner_do_pair_ci_density_GPU_aos(
                       d_H, vars_pair_aos, d_shift_x, d_shift_y, d_shift_z,
                       task_id_tmp, flip_i);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_cj_density_GPU_aos(
     struct part_aos *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, int bid, int tid,
@@ -3374,13 +3197,7 @@ __global__ void runner_do_pair_cj_density_GPU_aos(
                       d_H, vars_pair_aos, d_shift_x, d_shift_y, d_shift_z,
                       task_id_tmp + 1, flip_j);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_ci_density_GPU_aos_f4(
     struct part_aos_f4_send *parts_send, struct part_aos_f4_recv *parts_recv,
     int4 *fparti_fpartj_lparti_lpartj_dens, float d_a, float d_H,
@@ -3406,13 +3223,7 @@ __global__ void runner_do_pair_ci_density_GPU_aos_f4(
   DOPAIR2NONSYMGPUAOSF4(parts_send, parts_recv, pid, ci_start, ci_end, cj_start,
                         cj_end, d_a, d_H, vars_pair_i_f4);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_cj_density_GPU_aos_f4(
     struct part_aos_f4_send *parts_send, struct part_aos_f4_recv *parts_recv,
     int4 *fparti_fpartj_lparti_lpartj_dens, float d_a, float d_H,
@@ -3434,13 +3245,7 @@ __global__ void runner_do_pair_cj_density_GPU_aos_f4(
   DOPAIR2NONSYMGPUAOSF4(parts_send, parts_recv, pjd, cj_start, cj_end, ci_start,
                         ci_end, d_a, d_H, vars_pair_j_f4);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_density_GPU_aos_f4(
     struct part_aos_f4_send *parts_send, struct part_aos_f4_recv *parts_recv,
     float d_a, float d_H, int bundle_first_part, int bundle_n_parts) {
@@ -3463,13 +3268,7 @@ __global__ void runner_do_pair_density_GPU_aos_f4(
                          d_H);
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_ci_density_GPU_aos_g(
     struct part_aos_g *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, int bid, int tid,
@@ -3499,13 +3298,7 @@ __global__ void runner_do_pair_ci_density_GPU_aos_g(
                        d_H, vars_pair_aosg, d_shift_x, d_shift_y, d_shift_z,
                        task_id_tmp, flip_i);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_cj_density_GPU_aos_g(
     struct part_aos_g *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, int bid, int tid,
@@ -3535,13 +3328,7 @@ __global__ void runner_do_pair_cj_density_GPU_aos_g(
                        d_H, vars_pair_aosg, d_shift_x, d_shift_y, d_shift_z,
                        task_id_tmp + 1, flip_j);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_gradient_GPU_aos_f4(
     struct part_aos_f4_g_send *parts_send,
     struct part_aos_f4_g_recv *parts_recv, float d_a, float d_H,
@@ -3563,13 +3350,7 @@ __global__ void runner_do_pair_gradient_GPU_aos_f4(
                           d_a, d_H);
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_ci_density_GPU_aos_f(
     struct part_aos_f *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, int bid, int tid,
@@ -3599,13 +3380,7 @@ __global__ void runner_do_pair_ci_density_GPU_aos_f(
                        d_H, vars_pair_aosf, d_shift_x, d_shift_y, d_shift_z,
                        task_id_tmp, flip_i);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_cj_density_GPU_aos_f(
     struct part_aos_f *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, int bid, int tid,
@@ -3635,13 +3410,7 @@ __global__ void runner_do_pair_cj_density_GPU_aos_f(
                        d_H, vars_pair_aosf, d_shift_x, d_shift_y, d_shift_z,
                        task_id_tmp + 1, flip_j);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 __global__ void runner_do_pair_force_GPU_aos_f4(
     struct part_aos_f4_f_send *parts_send,
     struct part_aos_f4_f_recv *parts_recv, float d_a, float d_H,
@@ -3663,19 +3432,13 @@ __global__ void runner_do_pair_force_GPU_aos_f4(
                           d_a, d_H);
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopair1_branch_density_gpu(
     struct part_soa parts_soa, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,
     cudaStream_t stream, int bid, int block_size, int count_tasks,
     int tasksperbundle, int max_parts_i, int max_parts_j, int numBlocks_y,
-    int tid, int offset, int bundle_first_task, int time_bin_inhibited,
+    int tid, int offset, int bundle_first_task, int _time_bin_inhibited,
     double *d_shift_x, double *d_shift_y, double *d_shift_z) {
 
   int max_parts = max(max_parts_j, max_parts_i);
@@ -3698,7 +3461,7 @@ void runner_dopair1_branch_density_gpu(
   //          stream>>>(
   //      parts_soa, d_task_first_parts_pair, d_task_last_parts_pair,
   //      d_a, d_H, bid, tid, count_tasks, tasksperbundle,
-  //      nBlocks_per_task, bundle_first_task, time_bin_inhibited, d_shift_x,
+  //      nBlocks_per_task, bundle_first_task, _time_bin_inhibited, d_shift_x,
   //      d_shift_y, d_shift_z);
 
   runner_do_pair_nonsym_density_GPU<<<gridShape, BLOCK_SIZE,
@@ -3708,15 +3471,9 @@ void runner_dopair1_branch_density_gpu(
                                       stream>>>(
       parts_soa, d_task_first_parts_pair, d_task_last_parts_pair, d_a, d_H, bid,
       tid, count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
-      time_bin_inhibited, d_shift_x, d_shift_y, d_shift_z);
+      _time_bin_inhibited, d_shift_x, d_shift_y, d_shift_z);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopairci_branch_density_gpu(
     struct part_soa parts_soa, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,
@@ -3739,13 +3496,7 @@ void runner_dopairci_branch_density_gpu(
       tid, count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
       d_shift_x, d_shift_y, d_shift_z);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopaircj_branch_density_gpu(
     struct part_soa parts_soa, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,
@@ -3768,13 +3519,7 @@ void runner_dopaircj_branch_density_gpu(
       tid, count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
       d_shift_x, d_shift_y, d_shift_z);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopairci_branch_density_gpu_aos(
     struct part_aos *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,
@@ -3797,13 +3542,7 @@ void runner_dopairci_branch_density_gpu_aos(
       tid, count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
       d_shift_x, d_shift_y, d_shift_z);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopaircj_branch_density_gpu_aos(
     struct part_aos *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,
@@ -3826,13 +3565,7 @@ void runner_dopaircj_branch_density_gpu_aos(
       tid, count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
       d_shift_x, d_shift_y, d_shift_z);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopairci_branch_density_gpu_aos_f4(
     struct part_aos_f4_send *parts_send, struct part_aos_f4_recv *parts_recv,
     float d_a, float d_H, cudaStream_t stream, int numBlocks_x, int numBlocks_y,
@@ -3846,13 +3579,7 @@ void runner_dopairci_branch_density_gpu_aos_f4(
       parts_send, parts_recv, fparti_fpartj_lparti_lpartj_dens, d_a, d_H,
       bundle_first_task);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopaircj_branch_density_gpu_aos_f4(
     struct part_aos_f4_send *parts_send, struct part_aos_f4_recv *parts_recv,
     float d_a, float d_H, cudaStream_t stream, int numBlocks_x, int numBlocks_y,
@@ -3866,13 +3593,7 @@ void runner_dopaircj_branch_density_gpu_aos_f4(
       parts_send, parts_recv, fparti_fpartj_lparti_lpartj_dens, d_a, d_H,
       bundle_first_task);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopair_branch_density_gpu_aos_f4(
     struct part_aos_f4_send *parts_send, struct part_aos_f4_recv *parts_recv,
     float d_a, float d_H, cudaStream_t stream, int numBlocks_x, int numBlocks_y,
@@ -3885,13 +3606,7 @@ void runner_dopair_branch_density_gpu_aos_f4(
   runner_do_pair_density_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopairci_branch_density_gpu_aos_g(
     struct part_aos_g *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,
@@ -3912,13 +3627,7 @@ void runner_dopairci_branch_density_gpu_aos_g(
       tid, count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
       d_shift_x, d_shift_y, d_shift_z);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopaircj_branch_density_gpu_aos_g(
     struct part_aos_g *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,
@@ -3939,13 +3648,7 @@ void runner_dopaircj_branch_density_gpu_aos_g(
       tid, count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
       d_shift_x, d_shift_y, d_shift_z);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopair_branch_gradient_gpu_aos_f4(
     struct part_aos_f4_g_send *parts_send,
     struct part_aos_f4_g_recv *parts_recv, float d_a, float d_H,
@@ -3959,13 +3662,7 @@ void runner_dopair_branch_gradient_gpu_aos_f4(
   runner_do_pair_gradient_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopairci_branch_density_gpu_aos_f(
     struct part_aos_f *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,
@@ -3986,13 +3683,7 @@ void runner_dopairci_branch_density_gpu_aos_f(
       tid, count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
       d_shift_x, d_shift_y, d_shift_z);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopaircj_branch_density_gpu_aos_f(
     struct part_aos_f *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,
@@ -4013,13 +3704,7 @@ void runner_dopaircj_branch_density_gpu_aos_f(
       tid, count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
       d_shift_x, d_shift_y, d_shift_z);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void runner_dopair_branch_force_gpu_aos_f4(
     struct part_aos_f4_f_send *parts_send,
     struct part_aos_f4_f_recv *parts_recv, float d_a, float d_H,
@@ -4033,19 +3718,13 @@ void runner_dopair_branch_force_gpu_aos_f4(
   runner_do_pair_force_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 
 __global__ void runner_do_self_density_GPU_naive(
     struct part_soa parts_soa, int *d_task_first_part, int *d_task_last_part,
     float d_a, float d_H, int bid, int tid, int count_tasks, int tasksperbundle,
     int nBlocks_per_task, int bundle_first_task, int max_parts,
-    int time_bin_inhibited) {
+    int _time_bin_inhibited) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int task_id = bundle_first_task + blockIdx.y;
@@ -4172,20 +3851,14 @@ __global__ void runner_do_self_density_GPU_naive(
     parts_soa.rot_uz[pid] = rot_uzi;
   }
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void launch_tester_kernel(struct part_soa parts_soa, int *d_task_first_part,
                           int *d_task_last_part, float d_a, float d_H,
                           const char *loop_type, cudaStream_t stream, int bid,
                           int block_size, int count_tasks, int tasksperbundle,
                           int numBlocks_x, int numBlocks_y, int tid, int offset,
                           int bundle_first_task, int max_parts,
-                          int time_bin_inhibited) {
+                          int _time_bin_inhibited) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
   int nBlocks_per_task = numBlocks_x;
@@ -4193,15 +3866,9 @@ void launch_tester_kernel(struct part_soa parts_soa, int *d_task_first_part,
            8 * BLOCK_SIZE * sizeof(float) + BLOCK_SIZE * sizeof(timebin_t),
            stream>>>(parts_soa, d_task_first_part, d_task_last_part, d_a, d_H,
                      bid, tid, count_tasks, tasksperbundle, nBlocks_per_task,
-                     bundle_first_task, max_parts, time_bin_inhibited);
+                     bundle_first_task, max_parts, _time_bin_inhibited);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void launch_density_kernel(struct part_soa parts_soa, int *d_task_first_part,
                            int *d_task_last_part, float d_a, float d_H,
                            const char *loop_type, cudaStream_t stream,
@@ -4220,15 +3887,9 @@ void launch_density_kernel(struct part_soa parts_soa, int *d_task_first_part,
   //  runner_do_self_density_GPU_naive<<<gridShape, BLOCK_SIZE, 0, stream>>>(
   //        parts_soa, d_task_first_part, d_task_last_part, d_a, d_H, bid, tid,
   //        count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
-  //        max_parts, time_bin_inhibited);
+  //        max_parts, _time_bin_inhibited);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void launch_gradient_aos(struct part_aos_g *parts_aos, int *d_task_first_part,
                          int *d_task_last_part, float d_a, float d_H,
                          const char *loop_type, cudaStream_t stream,
@@ -4248,15 +3909,9 @@ void launch_gradient_aos(struct part_aos_g *parts_aos, int *d_task_first_part,
   //  runner_do_self_density_GPU_naive<<<gridShape, BLOCK_SIZE, 0, stream>>>(
   //        parts_soa, d_task_first_part, d_task_last_part, d_a, d_H, bid, tid,
   //        count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
-  //        max_parts, time_bin_inhibited);
+  //        max_parts, _time_bin_inhibited);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void launch_gradient_aos_f4(struct part_aos_f4_g_send *parts_send,
                             struct part_aos_f4_g_recv *parts_recv, float d_a,
                             float d_H, cudaStream_t stream, int numBlocks_x,
@@ -4271,15 +3926,9 @@ void launch_gradient_aos_f4(struct part_aos_f4_g_send *parts_send,
   //  runner_do_self_density_GPU_naive<<<gridShape, BLOCK_SIZE, 0, stream>>>(
   //        parts_soa, d_task_first_part, d_task_last_part, d_a, d_H, bid, tid,
   //        count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
-  //        max_parts, time_bin_inhibited);
+  //        max_parts, _time_bin_inhibited);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void launch_force_aos(struct part_aos_f *parts_aos, int *d_task_first_part,
                       int *d_task_last_part, float d_a, float d_H,
                       const char *loop_type, cudaStream_t stream,
@@ -4299,15 +3948,9 @@ void launch_force_aos(struct part_aos_f *parts_aos, int *d_task_first_part,
   //  runner_do_self_density_GPU_naive<<<gridShape, BLOCK_SIZE, 0, stream>>>(
   //        parts_soa, d_task_first_part, d_task_last_part, d_a, d_H, bid, tid,
   //        count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
-  //        max_parts, time_bin_inhibited);
+  //        max_parts, _time_bin_inhibited);
 }
-#ifdef WITH_CUDA
-}
-#endif
 
-#ifdef WITH_CUDA
-extern "C" {
-#endif
 void launch_force_aos_f4(struct part_aos_f4_f_send *d_parts_send,
                          struct part_aos_f4_f_recv *d_parts_recv, float d_a,
                          float d_H, cudaStream_t stream, int numBlocks_x,
@@ -4324,8 +3967,8 @@ void launch_force_aos_f4(struct part_aos_f4_f_send *d_parts_send,
   //  runner_do_self_density_GPU_naive<<<gridShape, BLOCK_SIZE, 0, stream>>>(
   //        parts_soa, d_task_first_part, d_task_last_part, d_a, d_H, bid, tid,
   //        count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
-  //        max_parts, time_bin_inhibited);
+  //        max_parts, _time_bin_inhibited);
 }
-#ifdef WITH_CUDA
+#ifdef HAVE_CUDA
 }
 #endif

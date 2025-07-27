@@ -242,6 +242,8 @@ AM_CONDITIONAL([HAVEMPI],[test $enable_mpi = "yes"])
 # Indicate that MPIRUN can be modified by an environment variable
 AC_ARG_VAR(MPIRUN, Path to the mpirun command if non-standard)
 
+AM_PROG_AR # Enable archiver for the GPU convenience library.
+
 # Add libtool support (now that CC is defined). Disable shared libraries by default.
 LT_INIT([disable-shared])
 
@@ -1028,32 +1030,41 @@ if test "x$with_cuda" != "xno"; then
    if test "x$with_cuda" != "xyes"; then
       CUDA_CFLAGS="$CUDA_CFLAGS -I$with_cuda/include"
       CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I$with_cuda/include"
-      CUDA_LIBS="-L$with_cuda/lib -L$with_cuda/lib64 -lcudart"
+      CUDA_LDFLAGS="-L$with_cuda/lib -L$with_cuda/lib64"
+      CUDA_LIBS="-lcudart"
       NVCC="$with_cuda/bin/nvcc"
       NVCC_FLAGS="$NVCC_FLAGS"
+      NVCC_LDFLAGS="$NVCC_LDFLAGS"
+      NVCC_LIBS="$NVCC_LIBS"
       have_cuda="yes"
    else
       AC_PATH_PROG([NVCC],[nvcc])
       echo "Found nvcc = $NVCC"
       if test -n "$NVCC"; then
-         CUDA_ROOT="`dirname $NVCC`/.."
-         CUDA_CFLAGS="$CUDA_CFLAGS -I${CUDA_ROOT}/include"
-         CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I${CUDA_ROOT}/include"
-         CUDA_LIBS="-L${CUDA_ROOT}/lib -L${CUDA_ROOT}/lib64 -lcudart"
+         CUDA_HOME="`dirname $NVCC`/.."
+         CUDA_CFLAGS="$CUDA_CFLAGS -I${CUDA_HOME}/include"
+         CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I${CUDA_HOME}/include"
+         CUDA_LDFLAGS="-L${CUDA_HOME}/lib -L${CUDA_HOME}/lib64"
+         CUDA_LIBS="-lcudart"
          NVCC_FLAGS="$NVCC_FLAGS"
+         NVCC_LDFLAGS="$NVCC_LDFLAGS"
+         NVCC_LIBS="$NVCC_LIBS"
          have_cuda="yes"
       fi
    fi
    if test "x$have_cuda" != "xno"; then
       AC_DEFINE([HAVE_CUDA], 1, [The CUDA compiler is installed.])
    fi
-   CFLAGS="${CFLAGS} "
+   # CFLAGS="${CFLAGS} " TODO: WHAT IS GOING ON HERE?
 fi
 AC_SUBST(CUDA_CFLAGS)
 AC_SUBST(CUDA_CXXFLAGS)
+AC_SUBST(CUDA_LDFLAGS)
 AC_SUBST(CUDA_LIBS)
 AC_SUBST(NVCC)
 AC_SUBST(NVCC_FLAGS)
+AC_SUBST(NVCC_LDFLAGS)
+AC_SUBST(NVCC_LIBS)
 AM_CONDITIONAL([HAVECUDA],[test -n "$NVCC"])
 
 # Check for HIP
@@ -1071,15 +1082,20 @@ if test "x$with_hip" != "xno"; then
       HIP_LIBS="$HIP_LIBS -L$with_hip/lib -L$with_hip/lib64"
       HIPCC="$with_hip/bin/hipcc"
       HIPCC_FLAGS="$HIPCC_FLAGS"
+      HIPCC_LDFLAGS="$HIPCC_LDFLAGS"
+      HIPCC_LIBS="$HIPCC_LIBS"
       have_hip="yes"
    else
       AC_PATH_PROG([HIPCC],[hipcc])
       echo "Found hipcc = $HIPCC"
       if test -n "$HIPCC"; then
-         HIP_ROOT="`dirname $HIPCC`/.."
-         HIP_CFLAGS="-I${HIP_ROOT}/include"
-         HIP_LIBS="-L${HIP_ROOT}/lib -L${HIP_ROOT}/lib64"
+         HIP_HOME="`dirname $HIPCC`/.."
+         HIP_CFLAGS="-I${HIP_HOME}/include"
+         HIP_LIBS="-L${HIP_HOME}/lib -L${HIP_HOME}/lib64"
+         HIPCC="${HIP_HOME}/bin/hipcc"
          HIPCC_FLAGS="$HIPCC_FLAGS"
+         HIPCC_LDFLAGS="$HIPCC_LDFLAGS"
+         HIPCC_LIBS="$HIPCC_LIBS"
          have_hip="yes"
       fi
    fi
@@ -1092,6 +1108,8 @@ AC_SUBST(HIP_CFLAGS)
 AC_SUBST(HIP_LIBS)
 AC_SUBST(HIPCC)
 AC_SUBST(HIPCC_FLAGS)
+AC_SUBST(HIPCC_LDFLAGS)
+AC_SUBST(HIPCC_LIBS)
 AM_CONDITIONAL([HAVEHIP],[test -n "$HIPCC"])
 
 # Check for FFTW. We test for this in the standard directories by default,
@@ -3416,7 +3434,7 @@ AC_CONFIG_FILES([tests/testFormat.sh], [chmod +x tests/testFormat.sh])
 AC_CONFIG_FILES([tests/testNeutrinoCosmology.sh], [chmod +x tests/testNeutrinoCosmology.sh])
 AC_CONFIG_FILES([tests/output_list_params.yml])
 # cuda .in file
-AC_CONFIG_FILES([src/cuda/Makefile])
+# AC_CONFIG_FILES([src/cuda/Makefile])
 # hip .in file
 AC_CONFIG_FILES([src/hip/Makefile])
 

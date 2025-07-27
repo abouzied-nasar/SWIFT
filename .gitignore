@@ -12,6 +12,7 @@ config.h.in
 config.sub
 ltmain.sh
 libtool
+ar-lib
 build
 swift
 swift_mpi
@@ -257,6 +258,7 @@ src/equation_of_state/planetary/*.txt
 *.ko
 *.obj
 *.elf
+*.dlink_o
 
 # Test results
 *.trs

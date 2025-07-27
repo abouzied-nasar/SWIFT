@@ -20,11 +20,7 @@
 #define SWIFT_MEMUSE_H
 
 /* Config parameters. */
-#ifdef WITH_CUDA
-#include "../config.h"
-#else
 #include <config.h>
-#endif
 /* Includes. */
 #include <stdlib.h>
 

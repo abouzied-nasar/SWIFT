@@ -1988,7 +1988,6 @@ struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
   if (ci != NULL) cell_set_flag(ci, cell_flag_has_tasks);
   if (cj != NULL) cell_set_flag(cj, cell_flag_has_tasks);
 
-  // #ifdef WITH_CUDA  A. Nasar
   if (t->subtype == task_subtype_gpu_pack_d) {
     if (t->type == task_type_self) atomic_inc(&s->nr_self_pack_tasks_d);
     if (t->type == task_type_pair) atomic_inc(&s->nr_pair_pack_tasks_d);
@@ -2001,11 +2000,8 @@ struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
     if (t->type == task_type_self) atomic_inc(&s->nr_self_pack_tasks_g);
     if (t->type == task_type_pair) atomic_inc(&s->nr_pair_pack_tasks_g);
   }
-  // #endif
   /* Add an index for it. */
-  // lock_lock( &s->lock );
   s->tasks_ind[atomic_inc(&s->nr_tasks)] = ind;
-  // lock_unlock_blind( &s->lock );
 
   /* Return a pointer to the new task. */
   return t;
