@@ -52,7 +52,7 @@ endif
 # Build a cuda version too?
 if HAVECUDA
 lib_LTLIBRARIES += libswiftsim_cuda.la
-noinst_LIBRARIES = libswift_CUDA.a
+noinst_LIBRARIES = libswift_cuda_device.a
 if HAVEMPI
 lib_LTLIBRARIES += libswiftsim_mpicuda.la
 endif
@@ -188,14 +188,17 @@ endif
 GPU_SOURCES = 
 if HAVECUDA
 # list here files to be compiled without nvcc, but needed for execution with GPU
-GPU_CUDA_SOURCES = 
-GPU_CUDA_SOURCES += runner_gpu_pack_functions.c
+GPU_CUDA_SOURCES = runner_gpu_pack_functions.c
+GPU_CUDA_SOURCES += runner_main_cuda.c cuda/GPU_data_buffers.c 
+# TODO????
+# GPU_CUDA_SOURCES += runner_doiact_functions_hydro_gpu.h
 GPU_SOURCES+=$(GPU_CUDA_SOURCES)
 endif
 
 if HAVEHIP 
 GPU_HIP_SOURCES =
 GPU_HIP_SOURCES += runner_gpu_pack_functions.c
+# TODO: Fix this. Do the same as cuda.
 GPU_SOURCES+=$(GPU_HIP_SOURCES)
 endif
 
@@ -250,19 +253,15 @@ AM_SOURCES += $(AGORA_FEEDBACK_SOURCES)
 AM_SOURCES += $(PS2020_COOLING_SOURCES)
 AM_SOURCES += $(SPHM1RT_RT_SOURCES)
 AM_SOURCES += $(GEAR_RT_SOURCES)
-AM_SOURCES += $(GPU_SOURCES)
 AM_SOURCES += swift_lustre_api.c
 
 # sources needed for the cuda build
-CUDA_SOURCES = 
-if HAVECUDA
-CUDA_SOURCES += runner_main_clean.cu
-CUDA_SOURCES += cuda/GPU_data_buffers.cu  cuda/GPU_runner_functions.cu 
-CUDA_SOURCES += runner_doiact_functions_hydro_gpu.h
-endif
-
-# common sources needed for any GPU build
-GPU_COMMON_SOURCES = runner_gpu_pack_functions.c
+# CUDA_SOURCES =
+# if HAVECUDA
+# CUDA_SOURCES += runner_main_clean.cu
+# CUDA_SOURCES += cuda/GPU_data_buffers.cu  cuda/GPU_runner_functions.cu
+# CUDA_SOURCES += runner_doiact_functions_hydro_gpu.h
+# endif
 
 # Include files for distribution, not installation.
 nobase_noinst_HEADERS = align.h approx_math.h atomic.h barrier.h cycle.h error.h inline.h kernel_hydro.h kernel_gravity.h runner_gpu_pack_functions.h
@@ -564,8 +563,7 @@ nobase_noinst_HEADERS += fvpm_geometry/None/fvpm_geometry.h fvpm_geometry/None/f
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/fvpm_geometry.h fvpm_geometry/Gizmo/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/MFM/fvpm_geometry.h fvpm_geometry/Gizmo/MFV/fvpm_geometry.h
 nobase_noinst_HEADERS += gpu_pack_vars.h
-
-nobase_noinst_HEADERS += cuda/BLOCK_SIZE.h  cuda/device_functions.h  #cuda/GPU_data_buffers.h  
+nobase_noinst_HEADERS += cuda/BLOCK_SIZE.h cuda/GPU_data_buffers.h  
 nobase_noinst_HEADERS += cuda/GPU_runner_functions.h  cuda/part_gpu.h
 nobase_noinst_HEADERS += gpu_pack_vars.h runner_gpu_pack_functions.h
 
@@ -593,7 +591,7 @@ libswiftsim_mpi_la_SHORTNAME = mpi
 libswiftsim_mpi_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav_mpi.la
 
 # Sources and flags for regular CUDA library
-libswiftsim_cuda_la_SOURCES = $(AM_SOURCES)
+libswiftsim_cuda_la_SOURCES = $(AM_SOURCES) $(GPU_SOURCES)
 libswiftsim_cuda_la_CFLAGS = $(AM_CFLAGS) $(CUDA_FLAGS)
 libswiftsim_cuda_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) $(CUDA_LDFLAGS) $(CUDA_LIBS)
 libswiftsim_cuda_la_SHORTNAME = cuda
@@ -609,7 +607,7 @@ libswiftsim_hip_la_SHORTNAME = hip
 libswiftsim_hip_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav.la
 
 # Sources and flags for MPI CUDA library
-libswiftsim_mpicuda_la_SOURCES = $(AM_SOURCES)
+libswiftsim_mpicuda_la_SOURCES = $(AM_SOURCES) $(GPU_SOURCES)
 libswiftsim_mpicuda_la_CFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(CUDA_FLAGS)
 libswiftsim_mpicuda_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS) $(CUDA_LDFLAGS) $(CUDA_LIBS)
 libswiftsim_mpicuda_la_SHORTNAME = mpicuda
@@ -625,14 +623,12 @@ libswiftsim_mpihip_la_SHORTNAME = mpihip
 libswiftsim_mpihip_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav_mpi.la
 
 if HAVECUDA
-CUDA_OBJECTS = runner_main_clean.o
-CUDA_OBJECTS += cuda/GPU_data_buffers.o  cuda/GPU_runner_functions.o
-CUDA_DLINK_OBJECTS = runner_main_clean.dlink_o
-CUDA_DLINK_OBJECTS += cuda/GPU_data_buffers.dlink_o cuda/GPU_runner_functions.dlink_o
+AM_CUDA_DEVICE_SOURCES = cuda/GPU_runner_functions.cu cuda/device_functions.h
+AM_CUDA_DEVICE_OBJECTS = cuda/GPU_runner_functions.o
+AM_CUDA_DEVICE_DLINK_OBJECTS = cuda/GPU_runner_functions.dlink_o
 
-libswift_CUDA_a_SOURCES = $(CUDA_SOURCES) $(GPU_COMMON_SOURCES)
-# libswift_CUDA_a_LIBADD = $(CUDA_OBJECTS) $(CUDA_DLINK_OBJECTS)
-libswift_CUDA_a_LIBADD = $(CUDA_DLINK_OBJECTS)
+libswift_cuda_device_a_SOURCES = $(AM_CUDA_DEVICE_SOURCES)
+libswift_cuda_device_a_LIBADD = $(AM_CUDA_DEVICE_OBJECTS) $(AM_CUDA_DEVICE_DLINK_OBJECTS)
 
 AM_NVCCFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src
 # wildcard making recipes for *.cu -> *.o

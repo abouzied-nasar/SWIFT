@@ -1,5 +1,5 @@
-#ifndef CUDA_HEADERS_H
-#define CUDA_HEADERS_H
+#ifndef CUDA_GPU_RUNNER_FUNCTIONS_H
+#define CUDA_GPU_RUNNER_FUNCTIONS_H
 #define n_streams 1024
 
 #ifdef __cplusplus
@@ -148,4 +148,4 @@ void runner_dopair_branch_force_gpu_aos_f4(
 }
 #endif
 
-#endif  // CUDA_HEADER_H
+#endif  // GPU_RUNNER_FUNCTIONS_H

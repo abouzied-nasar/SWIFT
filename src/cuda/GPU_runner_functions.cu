@@ -516,9 +516,6 @@ void launch_density_aos(struct part_aos *parts_aos, int *d_task_first_part,
   //        max_parts, _time_bin_inhibited);
 }
 
-struct first_part {
-  int list[32];
-};
 void launch_density_aos_f4(struct part_aos_f4_send *parts_send,
                            struct part_aos_f4_recv *parts_recv, float d_a,
                            float d_H, cudaStream_t stream, int numBlocks_x,

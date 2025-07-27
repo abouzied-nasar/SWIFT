@@ -57,6 +57,7 @@ extern "C" {
 #include "runner.h"
 
 /* Local headers. */
+#include "cell.h" // TODO: Check if necessary after refactor
 #include "engine.h"
 #include "feedback.h"
 #include "scheduler.h"
@@ -437,24 +438,24 @@ void *runner_main_cuda(void *data) {
   //A. Nasar: Over-setimate better than under-estimate
   /*A. Nasar: Over-allocated for now but a good guess is multiply by 2 to ensure we always have room for recursing through more tasks than we plan to offload*/
   int max_length = 2 * target_n_tasks_pair * 2;
-  struct cell **ci_dd = (cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_dd = (cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **ci_dg = (cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_dg = (cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **ci_df = (cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_df = (cell**)malloc(max_length * sizeof(struct cell *));
+  struct cell **ci_dd = (struct cell**)malloc(max_length * sizeof(struct cell *));
+  struct cell **cj_dd = (struct cell**)malloc(max_length * sizeof(struct cell *));
+  struct cell **ci_dg = (struct cell**)malloc(max_length * sizeof(struct cell *));
+  struct cell **cj_dg = (struct cell**)malloc(max_length * sizeof(struct cell *));
+  struct cell **ci_df = (struct cell**)malloc(max_length * sizeof(struct cell *));
+  struct cell **cj_df = (struct cell**)malloc(max_length * sizeof(struct cell *));
   int **first_and_last_daughters_d;
   int **first_and_last_daughters_g;
   int **first_and_last_daughters_f;
   int launch_count = 0;
 
   //A. Nasar: This is over-kill but it's necessary in case we start of with top level cells that are all leaf cells
-  struct cell **ci_top_d = (cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_d = (cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **ci_top_g = (cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_g = (cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **ci_top_f = (cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_f = (cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **ci_top_d = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **cj_top_d = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **ci_top_g = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **cj_top_g = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **ci_top_f = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **cj_top_f = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
   first_and_last_daughters_d = (int**)malloc(target_n_tasks_pair * 2 * sizeof(int *));
   first_and_last_daughters_g = (int**)malloc(target_n_tasks_pair * 2 * sizeof(int *));
   first_and_last_daughters_f = (int**)malloc(target_n_tasks_pair * 2 * sizeof(int *));
