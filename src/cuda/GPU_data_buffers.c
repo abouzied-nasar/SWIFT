@@ -38,11 +38,11 @@ void gpu_init_pack_vars_self(
 
   // first part and last part are the first and last particle ids (locally
   // within this thread) for each bundle. A. Nasar: All these are used in GPU offload setup
-  cu_error=cudaMallocHost((void **)(*pv)->bundle_first_part, n_bundles * sizeof(int));
+  cu_error=cudaMallocHost((void **)&((*pv)->bundle_first_part), n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
-  cu_error=cudaMallocHost((void **)(*pv)->bundle_last_part, n_bundles * sizeof(int));
+  cu_error=cudaMallocHost((void **)&((*pv)->bundle_last_part), n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
-  cu_error=cudaMallocHost((void **)(*pv)->bundle_first_task_list, n_bundles * sizeof(int));
+  cu_error=cudaMallocHost((void **)&((*pv)->bundle_first_task_list), n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
 
   (*pv)->tasksperbundle = tasksperbundle;
@@ -74,11 +74,11 @@ void gpu_init_pack_vars_pair(
   (*pv)->bundle_size = bundle_size;
   (*pv)->n_bundles = n_bundles;
 
-  cu_error=cudaMallocHost((void **)(*pv)->bundle_first_part, 2 * n_bundles * sizeof(int));
+  cu_error=cudaMallocHost((void **)&((*pv)->bundle_first_part), 2 * n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
-  cu_error=cudaMallocHost((void **)(*pv)->bundle_last_part, 2 * n_bundles * sizeof(int));
+  cu_error=cudaMallocHost((void **)&((*pv)->bundle_last_part), 2 * n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
-  cu_error=cudaMallocHost((void **)(*pv)->bundle_first_task_list, 2 * n_bundles * sizeof(int));
+  cu_error=cudaMallocHost((void **)&((*pv)->bundle_first_task_list), 2 * n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
 
   (*pv)->tasksperbundle = tasksperbundle;
