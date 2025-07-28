@@ -1047,7 +1047,6 @@ if test "x$with_cuda" != "xno"; then
     # Note: CUDA_*FLAGS get passed to the host compiler.
     # NVCC_*FLAGS get passed to nvcc.
     CUDA_CFLAGS="$CUDA_CFLAGS -I$with_cuda/include"
-    CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I$with_cuda/include"
     CUDA_LDFLAGS="-L$with_cuda/lib -L$with_cuda/lib64"
     CUDA_LIBS="-lcudadevrt -lcudart"
     NVCC="$with_cuda/bin/nvcc"
@@ -1061,7 +1060,6 @@ if test "x$with_cuda" != "xno"; then
     if test -n "$NVCC"; then
       CUDA_HOME="`dirname $NVCC`/.."
       CUDA_CFLAGS="$CUDA_CFLAGS -I${CUDA_HOME}/include"
-      CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I${CUDA_HOME}/include"
       CUDA_LDFLAGS="-L${CUDA_HOME}/lib -L${CUDA_HOME}/lib64"
       CUDA_LIBS="-lcudadevrt -lcudart"
       NVCC_FLAGS="$NVCC_FLAGS"
@@ -1101,7 +1099,6 @@ if test "x$with_cuda" != "xno"; then
 fi
 
 AC_SUBST(CUDA_CFLAGS)
-AC_SUBST(CUDA_CXXFLAGS)
 AC_SUBST(CUDA_LDFLAGS)
 AC_SUBST(CUDA_LIBS)
 AC_SUBST(NVCC)
