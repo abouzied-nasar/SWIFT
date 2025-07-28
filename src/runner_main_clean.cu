@@ -412,6 +412,7 @@ void *runner_main2(void *data) {
   /*Estimate how many particles to pack for GPU for each GPU launch
    * instruction*/
 #ifdef WITH_MPI
+  int nr_nodes = 1, res = 0;
   if ((res = MPI_Comm_size(MPI_COMM_WORLD, &nr_nodes)) != MPI_SUCCESS)
     error("MPI_Comm_size failed with error %i.", res);
 #endif
