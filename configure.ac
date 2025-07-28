@@ -1017,6 +1017,22 @@ AH_VERBATIM([__STDC_FORMAT_MACROS],
 
 
 
+AC_ARG_ENABLE([gpu-debug],
+	[AS_HELP_STRING([--enable-gpu-debug],
+		[enable gpu debugging symbols.]
+	)],
+	[with_gpu_debug="${enableval}"],
+	[with_gpu_debug="no"]
+)
+
+AC_ARG_WITH([cuda-arch],
+   [AS_HELP_STRING([--with-cuda-arch=<sm_XX>],
+      [Which architecture to compile cuda device code for. default: native.]
+   )],
+   [with_cuda_arch="$withval"],
+   [with_cuda_arch="native"]
+)
+
 # Check for CUDA
 have_cuda="no"
 AC_ARG_WITH([cuda],
@@ -1027,36 +1043,63 @@ AC_ARG_WITH([cuda],
     [with_cuda="no"]
 )
 if test "x$with_cuda" != "xno"; then
-   if test "x$with_cuda" != "xyes"; then
-      CUDA_CFLAGS="$CUDA_CFLAGS -I$with_cuda/include"
-      CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I$with_cuda/include"
-      CUDA_LDFLAGS="-L$with_cuda/lib -L$with_cuda/lib64"
-      CUDA_LIBS="-lcudart"
-      NVCC="$with_cuda/bin/nvcc"
+  if test "x$with_cuda" != "xyes"; then
+    # Note: CUDA_*FLAGS get passed to the host compiler.
+    # NVCC_*FLAGS get passed to nvcc.
+    CUDA_CFLAGS="$CUDA_CFLAGS -I$with_cuda/include"
+    CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I$with_cuda/include"
+    CUDA_LDFLAGS="-L$with_cuda/lib -L$with_cuda/lib64"
+    CUDA_LIBS="-lcudadevrt -lcudart"
+    NVCC="$with_cuda/bin/nvcc"
+    NVCC_FLAGS="$NVCC_FLAGS"
+    NVCC_LDFLAGS="$NVCC_LDFLAGS"
+    NVCC_LIBS="$NVCC_LIBS"
+    have_cuda="yes"
+  else
+    AC_PATH_PROG([NVCC],[nvcc])
+    echo "Found nvcc = $NVCC"
+    if test -n "$NVCC"; then
+      CUDA_HOME="`dirname $NVCC`/.."
+      CUDA_CFLAGS="$CUDA_CFLAGS -I${CUDA_HOME}/include"
+      CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I${CUDA_HOME}/include"
+      CUDA_LDFLAGS="-L${CUDA_HOME}/lib -L${CUDA_HOME}/lib64"
+      CUDA_LIBS="-lcudadevrt -lcudart"
       NVCC_FLAGS="$NVCC_FLAGS"
       NVCC_LDFLAGS="$NVCC_LDFLAGS"
       NVCC_LIBS="$NVCC_LIBS"
       have_cuda="yes"
-   else
-      AC_PATH_PROG([NVCC],[nvcc])
-      echo "Found nvcc = $NVCC"
-      if test -n "$NVCC"; then
-         CUDA_HOME="`dirname $NVCC`/.."
-         CUDA_CFLAGS="$CUDA_CFLAGS -I${CUDA_HOME}/include"
-         CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I${CUDA_HOME}/include"
-         CUDA_LDFLAGS="-L${CUDA_HOME}/lib -L${CUDA_HOME}/lib64"
-         CUDA_LIBS="-lcudart"
-         NVCC_FLAGS="$NVCC_FLAGS"
-         NVCC_LDFLAGS="$NVCC_LDFLAGS"
-         NVCC_LIBS="$NVCC_LIBS"
-         have_cuda="yes"
+    fi
+  fi
+
+  if test "x$have_cuda" != "xno"; then
+    AC_DEFINE([HAVE_CUDA], 1, [The CUDA compiler is installed.])
+
+    # disable optimization?
+    if test "$enable_opt" != "yes"; then
+      # use fast approximation mode for divisions et al.
+      # Don't want numerical output to change our behaviour.
+      NVCC_FLAGS="$NVCC_FLAGS"" -O0 "
+    else
+      # Add optimization flags. We have to do this here because nvcc doesn't
+      # have something like --no-use_fast_math.
+      NVCC_FLAGS="$NVCC_FLAGS"" --use_fast_math --extra-device-vectorization"
+      if test "x$with_gpu_debug" == "xno"; then
+        # Add link time optimization if we're not using debug flags.
+        # Can't have -G and -lto simultaneously, that's a nvcc fatal error.
+        # Again because nvcc doesn't have something like --no-lto.
+        NVCC_FLAGS="$NVCC_FLAGS"" --lto"
       fi
-   fi
-   if test "x$have_cuda" != "xno"; then
-      AC_DEFINE([HAVE_CUDA], 1, [The CUDA compiler is installed.])
-   fi
-   # CFLAGS="${CFLAGS} " TODO: WHAT IS GOING ON HERE?
+    fi
+
+    # add debug symbols?
+    if test "x$with_gpu_debug" != "xno"; then
+      NVCC_FLAGS="$NVCC_FLAGS"" -g -G --ftz=true"
+    fi
+
+    NVCC_FLAGS="$NVCC_FLAGS"" -arch=${with_cuda_arch}"
+  fi
 fi
+
 AC_SUBST(CUDA_CFLAGS)
 AC_SUBST(CUDA_CXXFLAGS)
 AC_SUBST(CUDA_LDFLAGS)
@@ -1065,7 +1108,9 @@ AC_SUBST(NVCC)
 AC_SUBST(NVCC_FLAGS)
 AC_SUBST(NVCC_LDFLAGS)
 AC_SUBST(NVCC_LIBS)
-AM_CONDITIONAL([HAVECUDA],[test -n "$NVCC"])
+AM_CONDITIONAL([HAVECUDA],[test "x$have_cuda" != "xno"])
+
+
 
 # Check for HIP
 have_hip="no"
@@ -1101,8 +1146,18 @@ if test "x$with_hip" != "xno"; then
    fi
    if test "x$have_hip" != "xno"; then
       AC_DEFINE([HAVE_HIP], 1, [The HIP compiler is installed.])
+     # add debug symbols?
+     if test "x$with_gpu_debug" != "xno"; then
+       AC_MSG_ERROR("Debug flags not set properly. Check this.")
+       HIPCC_FLAGS="$HIPCC_FLAGS"" -g -G"
+     fi
+
+     # disable optimization?
+     if test "$enable_opt" != "yes"; then
+       AC_MSG_ERROR("Noopt flags not set properly. Check this.")
+       HIPCC_FLAGS="$HIPCC_FLAGS"" -O0"
+     fi
    fi
-   CFLAGS="${CFLAGS} "
 fi
 AC_SUBST(HIP_CFLAGS)
 AC_SUBST(HIP_LIBS)

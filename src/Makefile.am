@@ -631,13 +631,21 @@ libswift_cuda_device_a_SOURCES = $(AM_CUDA_DEVICE_SOURCES)
 libswift_cuda_device_a_LIBADD = $(AM_CUDA_DEVICE_OBJECTS) $(AM_CUDA_DEVICE_DLINK_OBJECTS)
 
 AM_NVCCFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src
+AM_NVCCFLAGS += -D_FORCE_INLINES -O4 -lineinfo -src-in-ptx --maxrregcount=64
+# use fast approximation mode for divisions, sqrt et al. as default, even with
+# debug/no-optimization enabled. We don't want the float output to differ too much.
+AM_NVCCFLAGS += --ftz=false --prec-div=false --prec-sqrt=false --fmad=true
+AM_NVCCFLAGS += --default-stream per-thread
+
+# put NVCC_FLAGS after AM_NVCCFLAGS so manually passed flags override internal ones.
 # wildcard making recipes for *.cu -> *.o
 .cu.o: 
-	$(NVCC) $(NVCC_FLAGS) $(AM_NVCCFLAGS) $(AM_CFLAGS) $(CUDA_FLAGS) $< -dc -o $@
+	$(NVCC) $(AM_NVCCFLAGS) $(NVCC_FLAGS) $(AM_CFLAGS) $(CUDA_FLAGS) $< -dc -o $@
 
 # wildcard making recipes for *.cuo -> *.dlink_o
+# put NVCC_FLAGS after AM_NVCCFLAGS so manually passed flags override internal ones.
 .o.dlink_o: 
-	$(NVCC) $(NVCC_FLAGS) $(AM_NVCCFLAGS) $(AM_CFLAGS) $(CUDA_FLAGS) $< -dlink -o $@
+	$(NVCC) $(AM_NVCCFLAGS) $(NVCC_FLAGS) $(AM_CFLAGS) $(CUDA_FLAGS) $< -dlink -o $@
 endif
 
 
