@@ -326,6 +326,7 @@ void *runner_main_cuda(void *data) {
    * instruction*/
   int nr_nodes = 1, res = 0;
 #ifdef WITH_MPI
+  int nr_nodes = 1, res = 0;
   if ((res = MPI_Comm_size(MPI_COMM_WORLD, &nr_nodes)) != MPI_SUCCESS)
     error("MPI_Comm_size failed with error %i.", res);
 #endif
