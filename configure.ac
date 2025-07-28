@@ -3488,8 +3488,6 @@ AC_CONFIG_FILES([tests/testSelectOutput.sh], [chmod +x tests/testSelectOutput.sh
 AC_CONFIG_FILES([tests/testFormat.sh], [chmod +x tests/testFormat.sh])
 AC_CONFIG_FILES([tests/testNeutrinoCosmology.sh], [chmod +x tests/testNeutrinoCosmology.sh])
 AC_CONFIG_FILES([tests/output_list_params.yml])
-# cuda .in file
-# AC_CONFIG_FILES([src/cuda/Makefile])
 # hip .in file
 AC_CONFIG_FILES([src/hip/Makefile])
 

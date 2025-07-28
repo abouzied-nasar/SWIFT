@@ -19,10 +19,6 @@
 AM_CFLAGS = $(HDF5_CPPFLAGS) $(GSL_INCS) $(FFTW_INCS) $(NUMA_INCS) \
         $(GRACKLE_INCS)  $(SUNDIALS_INCS) $(CHEALPIX_CFLAGS) $(LUSTREAPI_INCS)
 
-if HAVEHIP
-AM_CFLAGS += -D__HIP_PLATFORM_AMD__
-endif
-
 # Assign a "safe" version number
 AM_LDFLAGS = $(HDF5_LDFLAGS) $(FFTW_LIBS)
 
@@ -39,6 +35,8 @@ MPI_LIBS = $(PARMETIS_LIBS) $(METIS_LIBS) $(MPI_THREAD_LIBS)
 MPI_FLAGS = -DWITH_MPI $(PARMETIS_INCS) $(METIS_INCS)
 
 CUDA_FLAGS = $(CUDA_CFLAGS) -DWITH_CUDA
+HIP_FLAGS = $(HIP_CFLAGS) -D__HIP_PLATFORM_AMD__ -DWITH_HIP
+
 
 # Build the libswiftsim library and a convenience library just for the gravity tasks
 lib_LTLIBRARIES = libswiftsim.la
@@ -189,7 +187,7 @@ GPU_SOURCES =
 if HAVECUDA
 # list here files to be compiled without nvcc, but needed for execution with GPU
 GPU_CUDA_SOURCES = runner_gpu_pack_functions.c
-GPU_CUDA_SOURCES += runner_main_cuda.c cuda/GPU_data_buffers.c 
+GPU_CUDA_SOURCES += runner_main_cuda.c cuda/GPU_data_buffers.c
 # TODO????
 # GPU_CUDA_SOURCES += runner_doiact_functions_hydro_gpu.h
 GPU_SOURCES+=$(GPU_CUDA_SOURCES)
@@ -258,14 +256,6 @@ AM_SOURCES += $(PS2020_COOLING_SOURCES)
 AM_SOURCES += $(SPHM1RT_RT_SOURCES)
 AM_SOURCES += $(GEAR_RT_SOURCES)
 AM_SOURCES += swift_lustre_api.c
-
-# sources needed for the cuda build
-# CUDA_SOURCES =
-# if HAVECUDA
-# CUDA_SOURCES += runner_main_clean.cu
-# CUDA_SOURCES += cuda/GPU_data_buffers.cu  cuda/GPU_runner_functions.cu
-# CUDA_SOURCES += runner_doiact_functions_hydro_gpu.h
-# endif
 
 # Include files for distribution, not installation.
 nobase_noinst_HEADERS = align.h approx_math.h atomic.h barrier.h cycle.h error.h inline.h kernel_hydro.h kernel_gravity.h runner_gpu_pack_functions.h
@@ -567,7 +557,7 @@ nobase_noinst_HEADERS += fvpm_geometry/None/fvpm_geometry.h fvpm_geometry/None/f
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/fvpm_geometry.h fvpm_geometry/Gizmo/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/MFM/fvpm_geometry.h fvpm_geometry/Gizmo/MFV/fvpm_geometry.h
 nobase_noinst_HEADERS += gpu_pack_vars.h
-nobase_noinst_HEADERS += cuda/BLOCK_SIZE.h cuda/GPU_data_buffers.h  
+nobase_noinst_HEADERS += cuda/BLOCK_SIZE.h cuda/GPU_data_buffers.h
 nobase_noinst_HEADERS += cuda/GPU_runner_functions.h  cuda/part_gpu.h
 nobase_noinst_HEADERS += gpu_pack_vars.h runner_gpu_pack_functions.h
 
@@ -604,9 +594,8 @@ libswiftsim_cuda_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) li
 # Sources and flags for regular HIP library
 # TODO: Needs fixing. See what we did for CUDA.
 libswiftsim_hip_la_SOURCES = $(AM_SOURCES)
-libswiftsim_hip_la_CFLAGS = $(AM_CFLAGS) $(HIP_CFLAGS) -DWITH_HIP
-# libswiftsim_hip_la_CXXFLAGS = $(AM_CXXLAGS) $(HIP_CXXLAGS) -DWITH_HIP
-libswiftsim_hip_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) $(HIP_LIBS) -lamdhip64
+libswiftsim_hip_la_CFLAGS = $(AM_CFLAGS) $(HIP_FLAGS)
+libswiftsim_hip_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) $(HIP_LDFLAGS) $(HIP_LIBS) -lamdhip64
 libswiftsim_hip_la_SHORTNAME = hip
 libswiftsim_hip_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav.la
 
@@ -620,9 +609,9 @@ libswiftsim_mpicuda_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS)
 # Sources and flags for MPI HIP library
 # TODO: Needs fixing. See what we did for CUDA.
 libswiftsim_mpihip_la_SOURCES = $(AM_SOURCES)
-libswiftsim_mpihip_la_CFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_CFLAGS) -DWITH_HIP
-libswiftsim_mpihip_la_CXXFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_CFLAGS) -DWITH_HIP
-libswiftsim_mpihip_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS) $(HIP_LIBS)
+libswiftsim_mpihip_la_CFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_FLAGS)
+libswiftsim_mpihip_la_CXXFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_FLAGS)
+libswiftsim_mpihip_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS) $(HIP_LDFLAGS) $(HIP_LIBS)
 libswiftsim_mpihip_la_SHORTNAME = mpihip
 libswiftsim_mpihip_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav_mpi.la
 
@@ -643,12 +632,12 @@ AM_NVCCFLAGS += --default-stream per-thread
 
 # put NVCC_FLAGS after AM_NVCCFLAGS so manually passed flags override internal ones.
 # wildcard making recipes for *.cu -> *.o
-.cu.o: 
+.cu.o:
 	$(NVCC) $(AM_NVCCFLAGS) $(NVCC_FLAGS) $(AM_CFLAGS) $(CUDA_FLAGS) $< -dc -o $@
 
 # wildcard making recipes for *.cuo -> *.dlink_o
 # put NVCC_FLAGS after AM_NVCCFLAGS so manually passed flags override internal ones.
-.o.dlink_o: 
+.o.dlink_o:
 	$(NVCC) $(AM_NVCCFLAGS) $(NVCC_FLAGS) $(AM_CFLAGS) $(CUDA_FLAGS) $< -dlink -o $@
 endif
 
