@@ -324,7 +324,6 @@ void *runner_main_cuda(void *data) {
 
   /*Estimate how many particles to pack for GPU for each GPU launch
    * instruction*/
-  int nr_nodes = 1, res = 0;
 #ifdef WITH_MPI
   int nr_nodes = 1, res = 0;
   if ((res = MPI_Comm_size(MPI_COMM_WORLD, &nr_nodes)) != MPI_SUCCESS)
