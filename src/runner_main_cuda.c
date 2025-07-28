@@ -251,7 +251,6 @@ void *runner_main_cuda(void *data) {
   cudaDeviceGetAttribute(&maxBlocksSM, cudaDevAttrMaxBlocksPerMultiprocessor,
                          devId);
   cudaDeviceGetAttribute(&nSMs, cudaDevAttrMultiProcessorCount, devId);
-  cudaError_t cu_error;
   size_t free_mem, total_mem;
   cudaMemGetInfo(&free_mem, &total_mem);
   int nPartsPerCell = space->nr_parts / space->tot_cells;
@@ -447,7 +446,6 @@ void *runner_main_cuda(void *data) {
   int **first_and_last_daughters_d;
   int **first_and_last_daughters_g;
   int **first_and_last_daughters_f;
-  int launch_count = 0;
 
   //A. Nasar: This is over-kill but it's necessary in case we start of with top level cells that are all leaf cells
   struct cell **ci_top_d = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
@@ -464,17 +462,12 @@ void *runner_main_cuda(void *data) {
 	  first_and_last_daughters_g[i] = (int*)malloc(2 * sizeof(int));
 	  first_and_last_daughters_f[i] = (int*)malloc(2 * sizeof(int));
   }
-  // number of density self tasks executed
-  int tasks_done_cpu = 0;
-  int tasks_done_gpu = 0;
 
   /* Main loop. */
   while (1) {
     /*Stuff for debugging*/
-    int n_leafs_total = 0;
     //	Initialise timers to zero
     double time_for_density_gpu = 0.0;
-    double time_for_density_gpu_pair = 0.0;
     double time_for_gpu_f = 0.0;
     double time_for_gpu_pair_f = 0.0;
     double time_for_gpu_g = 0.0;
@@ -505,9 +498,6 @@ void *runner_main_cuda(void *data) {
     double packing_time = 0.0;
     double packing_time_f = 0.0;
     double packing_time_g = 0.0;
-    double unpacking_time = 0.0;
-    double unpacking_time_f = 0.0;
-    double unpacking_time_g = 0.0;
     double packing_time_pair = 0.0;
     double packing_time_pair_f = 0.0;
     double packing_time_pair_g = 0.0;
@@ -530,8 +520,6 @@ void *runner_main_cuda(void *data) {
     pack_vars_pair_forc->n_daughters_total = 0;
 
     /* Loop while there are tasks... */
-    ticks hang_time = getticks();
-
     while (1) {
       // A. Nasar: Get qid for re-use later
       int qid = r->qid;
@@ -547,8 +535,6 @@ void *runner_main_cuda(void *data) {
       /* Get the cells. */
       struct cell *ci = t->ci;
       struct cell *cj = t->cj;
-
-      struct task * ttop = t;
 
       if (ci == NULL && (t->subtype != task_subtype_gpu_unpack_d
     		  && t->subtype != task_subtype_gpu_unpack_g
@@ -866,7 +852,6 @@ void *runner_main_cuda(void *data) {
 
 #ifdef EXTRA_HYDRO_LOOP
           else if (t->subtype == task_subtype_gradient) {
-            int Do_nothing = 0;
 #ifndef GPUOFFLOAD_GRADIENT
 #ifdef EXTRA_HYDRO_LOOP_TYPE2
             runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 1);
@@ -1204,9 +1189,6 @@ void *runner_main_cuda(void *data) {
     } /* main loop. */
 
     time_for_density_gpu = 0.0;
-    time_for_density_gpu_pair = 0.0;
-    tasks_done_gpu = 0;
-    tasks_done_cpu = 0;
     if(step == 4)cudaProfilerStop();
     //	if(step == 2)exit(0);
     //	  size_t free_byte ;

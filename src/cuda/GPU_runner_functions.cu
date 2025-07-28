@@ -5,7 +5,8 @@
  ******************************************************************************/
 
 /* Hacky method to make c++ compilers not die. */
-#ifdef HAVE_CUDA
+/* TODO: do we still need this..? */
+#ifdef WITH_CUDA
 #ifndef static
 #define static
 #endif
@@ -33,7 +34,7 @@ extern "C" {
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-/* #include "GPU_runner_functions.h" */
+#include "GPU_runner_functions.h"
 #include "device_functions.h"
 #include "part_gpu.h"
 
@@ -55,7 +56,6 @@ __global__ void tester(struct part_soa parts_soa, const int *d_task_first_part,
                        int nBlocks_per_task, int bundle_first_task,
                        int max_parts, int _time_bin_inhibited) {
   extern __shared__ float vars[];
-  __shared__ int first_part_tid_0, last_part_tid_0;
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int task_id = bundle_first_task + blockIdx.y;
 
@@ -79,7 +79,6 @@ __global__ void runner_do_self_density_GPU(
     float d_a, float d_H, int count_tasks, int tasksperbundle,
     int nBlocks_per_task, int bundle_first_task, int max_parts) {
   extern __shared__ float vars[];
-  __shared__ int first_part_tid_0, last_part_tid_0;
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int task_id = bundle_first_task + blockIdx.y;
 
@@ -91,16 +90,8 @@ __global__ void runner_do_self_density_GPU(
   //  __syncthreads();
   const int pid = threadid + first_part_in_task_blocks;
 
-  int ttid = 0;
-  int first_part = 0;
-  int count = 0;
-  int last_part = 0;
-  float cellx = 0.0;
-  float celly = 0.0;
-  float cellz = 0.0;
-  float hi = 0.0;
-  float hig2 = hi * hi * kernel_gamma2;
-  float mi = 0.0;
+  float cellx = 0.0, celly = 0.0, cellz = 0.0;
+  float hi = 0.0, hig2 = hi * hi * kernel_gamma2;
   float uxi = 0.0;
   float uyi = 0.0;
   float uzi = 0.0;
@@ -115,17 +106,10 @@ __global__ void runner_do_self_density_GPU(
   float rot_uxi = 0.0;
   float rot_uyi = 0.0;
   float rot_uzi = 0.0;
-  int Found_neighbours = 0;
-  //	if(pid<b_last_part&&pid<last_part_in_task_blocks){
   if (pid < last_part_in_task_blocks) {
-    ttid = parts_soa.tid_p[pid];
-    first_part = d_task_first_part[ttid];
-    last_part = d_task_last_part[ttid];
-    count = last_part - first_part;
     cellx = parts_soa.locx[pid], celly = parts_soa.locy[pid],
     cellz = parts_soa.locz[pid];
     hi = parts_soa.h[pid], hig2 = hi * hi * kernel_gamma2;
-    mi = parts_soa.mass[pid];
     uxi = parts_soa.ux[pid];
     uyi = parts_soa.uy[pid];
     uzi = parts_soa.uz[pid];
@@ -133,12 +117,6 @@ __global__ void runner_do_self_density_GPU(
     piy = parts_soa.y_p[pid] - celly;
     piz = parts_soa.z_p[pid] - cellz;
   }
-  //  if (threadIdx.x == 0) {
-  //    first_part_tid_0 = first_part;
-  //    last_part_tid_0 = last_part;
-  //  }
-  //  __syncthreads();
-  int n_neighbours = 0;
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
@@ -183,14 +161,11 @@ __global__ void runner_do_self_density_GPU(
         // printf("very small value for hi %f or hj %f or r2 %f\n", hi, hj, r2);
         //				}
         if (r2 < hig2 && r2 > (0.01f / 128.f) * (0.01f / 128.f)) {
-          //        if (r2 < hig2 && r2 > (0.01f/256.f)*(0.01f/256.f)) {
-          Found_neighbours = 1;
           const float r = sqrt(r2);
           /* Recover some data */
           const float mj = mass_tmp[j_block];
           /* Get the kernel for hi. */
           if (hi < 1.f / 256.f) printf("h < dx\n");
-          //          if(hi<1.f/256.f)printf("h < dx\n");
           const float h_inv = 1.f / hi;
           const float ui = r * h_inv;
           float wi, wi_dx;
@@ -248,7 +223,6 @@ __global__ void DOSELF_GPU_AOS(struct part_aos *parts_aos,
                                double *d_cell_x, double *d_cell_y,
                                double *d_cell_z) {
   extern __shared__ float vars[];
-  __shared__ int first_part_tid_0, last_part_tid_0;
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int task_id = bundle_first_task + blockIdx.y;
 
@@ -261,12 +235,8 @@ __global__ void DOSELF_GPU_AOS(struct part_aos *parts_aos,
   const int pid = threadid + first_part_in_task_blocks;
 
   int ttid = 0;
-  int first_part = 0;
-  int count = 0;
-  int last_part = 0;
   float cellx = 0.0, celly = 0.0, cellz = 0.0;
   float hi = 0.0, hig2 = hi * hi * kernel_gamma2;
-  float mi = 0.0;
   float uxi = 0.0;
   float uyi = 0.0;
   float uzi = 0.0;
@@ -281,17 +251,11 @@ __global__ void DOSELF_GPU_AOS(struct part_aos *parts_aos,
   float rot_uxi = 0.0;
   float rot_uyi = 0.0;
   float rot_uzi = 0.0;
-  int Found_neighbours = 0;
   struct part_aos ipart = parts_aos[pid];
-  //	if(pid<b_last_part&&pid<last_part_in_task_blocks){
   if (pid < last_part_in_task_blocks) {
     ttid = task_id;
-    first_part = d_task_first_part[ttid];
-    last_part = d_task_last_part[ttid];
-    count = last_part - first_part;
     cellx = d_cell_x[ttid], celly = d_cell_y[ttid], cellz = d_cell_z[ttid];
     hi = ipart.h, hig2 = hi * hi * kernel_gamma2;
-    mi = ipart.mass;
     uxi = ipart.ux;
     uyi = ipart.uy;
     uzi = ipart.uz;
@@ -299,12 +263,6 @@ __global__ void DOSELF_GPU_AOS(struct part_aos *parts_aos,
     piy = ipart.y_p - celly;
     piz = ipart.z_p - cellz;
   }
-  //  if (threadIdx.x == 0) {
-  //    first_part_tid_0 = first_part;
-  //    last_part_tid_0 = last_part;
-  //  }
-  //  __syncthreads();
-  int n_neighbours = 0;
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
@@ -343,7 +301,6 @@ __global__ void DOSELF_GPU_AOS(struct part_aos *parts_aos,
         const float xij = pix - pjx, yij = piy - pjy, zij = piz - pjz;
         const float r2 = xij * xij + yij * yij + zij * zij;
         if (r2 < hig2 && r2 > (0.01f / 128.f) * (0.01f / 128.f)) {
-          Found_neighbours = 1;
           const float r = sqrt(r2);
           /* Recover some data */
           const float mj = mass_tmp[j_block];
@@ -409,7 +366,6 @@ __global__ void DOSELF_GPU_AOS_F4(
   extern __shared__ float4 vars_f4[];
 
   //  auto group = cooperative_groups::this_thread_block();
-  __shared__ int first_part_tid_0, last_part_tid_0;
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int task_id = bundle_first_task + blockIdx.y;
   //  cuda::barrier<cuda::thread_scope_system> bar;
@@ -427,7 +383,6 @@ __global__ void DOSELF_GPU_AOS_F4(
   const float4 x_pi = pi.x_p_h;
   const float4 ux_pi = pi.ux_m;
   const float hi = x_pi.w, hig2 = hi * hi * kernel_gamma2;
-  int n_neighbours = 0;
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
@@ -523,7 +478,6 @@ void launch_density_aos_f4(struct part_aos_f4_send *parts_send,
                            int2 *d_task_first_part_f4) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  int nBlocks_per_task = numBlocks_x;
   DOSELF_GPU_AOS_F4<<<gridShape, BLOCK_SIZE, 2 * BLOCK_SIZE * sizeof(float4),
                       stream>>>(parts_send, parts_recv, d_a, d_H,
                                 bundle_first_task, d_task_first_part_f4);
@@ -541,7 +495,6 @@ __global__ void DOSELF_GPU_AOS_G(struct part_aos_g *parts_aos,
                                  double *d_cell_x, double *d_cell_y,
                                  double *d_cell_z) {
   extern __shared__ float varsg[];
-  __shared__ int first_part_tid_0, last_part_tid_0;
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int task_id = bundle_first_task + blockIdx.y;
 
@@ -554,34 +507,23 @@ __global__ void DOSELF_GPU_AOS_G(struct part_aos_g *parts_aos,
   const int pid = threadid + first_part_in_task_blocks;
 
   int ttid = 0;
-  int first_part = 0;
-  int count = 0;
-  int last_part = 0;
   float cellx = 0.0, celly = 0.0, cellz = 0.0;
-  float ci = 0.0, cj = 0.0;
+  float ci = 0.0;
   float hi = 0.0, hig2 = hi * hi * kernel_gamma2;
-  float mi = 0.0;
   float uxi = 0.0;
   float uyi = 0.0;
   float uzi = 0.0;
   float pix = 0.0;
   float piy = 0.0;
   float piz = 0.0;
-  float rhoi = 0.0;
-  float div_vi = 0.0;
-  int Found_neighbours = 0;
   float v_sig;
   float u = 0.f;
   float laplace_u = 0.0;
   float alpha_visc_max_ngb = 0.0;
   if (pid < last_part_in_task_blocks) {
     ttid = task_id;
-    first_part = d_task_first_part[ttid];
-    last_part = d_task_last_part[ttid];
-    count = last_part - first_part;
     cellx = d_cell_x[ttid], celly = d_cell_y[ttid], cellz = d_cell_z[ttid];
     hi = parts_aos[pid].h, hig2 = hi * hi * kernel_gamma2;
-    mi = parts_aos[pid].mass;
     uxi = parts_aos[pid].ux;
     uyi = parts_aos[pid].uy;
     uzi = parts_aos[pid].uz;
@@ -594,12 +536,6 @@ __global__ void DOSELF_GPU_AOS_G(struct part_aos_g *parts_aos,
     laplace_u = parts_aos[pid].laplace_u;
     alpha_visc_max_ngb = parts_aos[pid].alpha_visc_max_ngb;
   }
-  //  if (threadIdx.x == 0) {
-  //    first_part_tid_0 = first_part;
-  //    last_part_tid_0 = last_part;
-  //  }
-  //  __syncthreads();
-  int n_neighbours = 0;
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
@@ -648,7 +584,6 @@ __global__ void DOSELF_GPU_AOS_G(struct part_aos_g *parts_aos,
         const float xij = pix - pjx, yij = piy - pjy, zij = piz - pjz;
         const float r2 = xij * xij + yij * yij + zij * zij;
         if (r2 < hig2 && r2 > (0.01f / 128.f) * (0.01f / 128.f)) {
-          Found_neighbours = 1;
           const float r = sqrt(r2);
           const float r_inv = 1.f / r;
           /* Recover some data */
@@ -716,11 +651,6 @@ __global__ void DOSELF_GPU_AOS_F4_G(
   //  __syncthreads();
   const int pid = threadid + first_part_in_task_blocks;
 
-  /*Keep this*/
-  float v_sig = 0.f;
-  float alpha_visc_max_ngb = 0.f;
-  /////////////
-
   struct part_aos_f4_g_send pi = parts_send[pid];
   float4 x_h_i = pi.x_h;
   float4 ux_m_i = pi.ux_m;
@@ -729,7 +659,6 @@ __global__ void DOSELF_GPU_AOS_F4_G(
 
   const float hi = x_h_i.w, hig2 = hi * hi * kernel_gamma2;
 
-  int n_neighbours = 0;
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
@@ -821,7 +750,6 @@ __global__ void DOSELF_GPU_AOS_F(struct part_aos_f *parts_aos,
                                  double *d_cell_x, double *d_cell_y,
                                  double *d_cell_z) {
   extern __shared__ float varsf[];
-  __shared__ int first_part_tid_0, last_part_tid_0;
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int task_id = bundle_first_task + blockIdx.y;
 
@@ -832,11 +760,8 @@ __global__ void DOSELF_GPU_AOS_F(struct part_aos_f *parts_aos,
   const int pid = threadid + first_part_in_task_blocks;
 
   int ttid = 0;
-  int first_part = 0;
-  int count = 0;
-  int last_part = 0;
   float cellx = 0.0, celly = 0.0, cellz = 0.0;
-  float ci = 0.0, cj = 0.0;
+  float ci = 0.0;
   float hi = 0.0, hig2 = 0.0;
   float mi = 0.0;
   float uxi = 0.0;
@@ -846,13 +771,9 @@ __global__ void DOSELF_GPU_AOS_F(struct part_aos_f *parts_aos,
   float piy = 0.0;
   float piz = 0.0;
   float rhoi = 0.0;
-  float div_vi = 0.0;
-  int Found_neighbours = 0;
   float v_sigi;
   float ui = 0.f;
   float u_dti = 0.f;
-  float laplace_ui = 0.0;
-  float alpha_visc_max_ngb = 0.0;
   float pressurei = 0.0;
   float alphavisci = 0.0;
   float alphadiffi = 0.0;
@@ -865,9 +786,6 @@ __global__ void DOSELF_GPU_AOS_F(struct part_aos_f *parts_aos,
   int min_ngb_time_bin = 0;
   if (pid < last_part_in_task_blocks) {
     ttid = task_id;
-    first_part = d_task_first_part[ttid];
-    last_part = d_task_last_part[ttid];
-    count = last_part - first_part;
     cellx = d_cell_x[ttid], celly = d_cell_y[ttid], cellz = d_cell_z[ttid];
     hi = parts_aos[pid].h, hig2 = hi * hi * kernel_gamma2;
     mi = parts_aos[pid].mass;
@@ -887,15 +805,7 @@ __global__ void DOSELF_GPU_AOS_F(struct part_aos_f *parts_aos,
     alphavisci = parts_aos[pid].alpha_visc;
     alphadiffi = parts_aos[pid].alpha_diff;
     min_ngb_time_bin = parts_aos[pid].min_ngb_time_bin;
-    //    laplace_u = parts_aos[pid].laplace_u;
-    //    alpha_visc_max_ngb = parts_aos[pid].alpha_visc_max_ngb;
   }
-  //  if (threadIdx.x == 0) {
-  //    first_part_tid_0 = first_part;
-  //    last_part_tid_0 = last_part;
-  //  }
-  //  __syncthreads();
-  int n_neighbours = 0;
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
@@ -1089,7 +999,6 @@ __global__ void DOSELF_GPU_AOS_F4_F(
 
   extern __shared__ float4 varsf4_f[];
 
-  __shared__ int first_part_tid_0, last_part_tid_0;
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int task_id = bundle_first_task + blockIdx.y;
 
@@ -1102,10 +1011,6 @@ __global__ void DOSELF_GPU_AOS_F4_F(
 
   const int pid = threadid + first_part_in_task_blocks;
 
-  int ttid = 0;
-  int first_part = 0;
-  int count = 0;
-  int last_part = 0;
   const part_aos_f4_f_send pi = parts_send[pid];
   float4 x_h_i = pi.x_h;
   float4 ux_m_i = pi.ux_m;
@@ -1114,7 +1019,6 @@ __global__ void DOSELF_GPU_AOS_F4_F(
   float3 u_avisc_adiff_i = pi.u_alphavisc_alphadiff;
 
   const float mi = ux_m_i.w;
-  int Found_neighbours = 0;
   float pressurei = rho_p_c_vsig_i.y;
   const float ci = rho_p_c_vsig_i.z;
   float3 ahydro = {0.0, 0.0, 0.0};
@@ -1310,16 +1214,8 @@ __global__ void runner_do_pair_density_GPU_naive(
 
   float dx =
       1.f / 64.f;  // Value used to avoid interacting parts with themselves
-  int ttid = 0;
-  int first_part = 0;
-  int count = 0;
-  int last_part = 0;
-  float cellx = 0.0;
-  float celly = 0.0;
-  float cellz = 0.0;
-  float hi = 0.0;
-  float hig2 = hi * hi * kernel_gamma2;
-  float mi = 0.0;
+  float cellx = 0.0, celly = 0.0, cellz = 0.0;
+  float hi = 0.0, hig2 = hi * hi * kernel_gamma2;
   float uxi = 0.0;
   float uyi = 0.0;
   float uzi = 0.0;
@@ -1334,16 +1230,10 @@ __global__ void runner_do_pair_density_GPU_naive(
   float rot_uxi = 0.0;
   float rot_uyi = 0.0;
   float rot_uzi = 0.0;
-  int Found_neighbours = 0;
   if (pid < last_part_in_task_blocks_ci) {
-    ttid = parts_soa_ci.tid_p[pid];
-    first_part = d_task_first_part_ci[ttid];
-    last_part = d_task_last_part_ci[ttid];
-    count = last_part - first_part;
     cellx = parts_soa_ci.locx[pid], celly = parts_soa_ci.locy[pid],
     cellz = parts_soa_ci.locz[pid];
     hi = parts_soa_ci.h[pid], hig2 = hi * hi * kernel_gamma2;
-    mi = parts_soa_ci.mass[pid];
     uxi = parts_soa_ci.ux[pid];
     uyi = parts_soa_ci.uy[pid];
     uzi = parts_soa_ci.uz[pid];
@@ -1351,12 +1241,6 @@ __global__ void runner_do_pair_density_GPU_naive(
     piy = parts_soa_ci.y_p[pid] - celly;
     piz = parts_soa_ci.z_p[pid] - cellz;
   }
-  //  if (threadIdx.x == 0) {
-  //    first_part_tid_0 = first_part;
-  //    last_part_tid_0 = last_part;
-  //  }
-  //  __syncthreads();
-  int n_neighbours = 0;
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
@@ -1399,7 +1283,6 @@ __global__ void runner_do_pair_density_GPU_naive(
         // printf("very small value for hi %f or hj %f or r2 %f\n", hi, hj, r2);
         //				}
         if (r2 < hig2 && r2 > (0.01f / dx) * (0.01f / dx)) {
-          Found_neighbours = 1;
           const float r = sqrt(r2);
           /* Recover some data */
           const float mj = mass_tmp[j_block];
@@ -1498,7 +1381,6 @@ __device__ void DOPAIRGPU(struct part_soa parts_soa, int pid,
 
   float cellx = 0.0, celly = 0.0, cellz = 0.0;
   float hi = 0.0, hig2 = hi * hi * kernel_gamma2;
-  float mi = 0.0;
   float uxi = 0.0;
   float uyi = 0.0;
   float uzi = 0.0;
@@ -1513,13 +1395,10 @@ __device__ void DOPAIRGPU(struct part_soa parts_soa, int pid,
   float rot_uxi = 0.0;
   float rot_uyi = 0.0;
   float rot_uzi = 0.0;
-  int Found_neighbours = 0;
-
   if (pid < last_part_in_task_blocks_ci) {
     cellx = parts_soa.locx[pid], celly = parts_soa.locy[pid],
     cellz = parts_soa.locz[pid];
     hi = parts_soa.h[pid], hig2 = hi * hi * kernel_gamma2;
-    mi = parts_soa.mass[pid];
     uxi = parts_soa.ux[pid];
     uyi = parts_soa.uy[pid];
     uzi = parts_soa.uz[pid];
@@ -1528,7 +1407,6 @@ __device__ void DOPAIRGPU(struct part_soa parts_soa, int pid,
     piz = parts_soa.z_p[pid] - cellz;
   }
 
-  int n_neighbours = 0;
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
@@ -1566,7 +1444,6 @@ __device__ void DOPAIRGPU(struct part_soa parts_soa, int pid,
         const float r2 = xij * xij + yij * yij + zij * zij;
 
         if (r2 < hig2 && r2 > (0.01f / dx) * (0.01f / dx)) {
-          Found_neighbours = 1;
           const float r = sqrt(r2);
           /* Recover some data */
           const float mj = mass_tmp[j_block];
@@ -1624,12 +1501,8 @@ __device__ void DOPAIR2NONSYMGPU(struct part_soa parts_soa, int pid,
                                  double *d_shift_z, const int task_id_tmp,
                                  int flip_order) {
 
-  float dx =
-      1.f / 64.f;  // Value used to avoid interacting parts with themselves
-
   float hi = 0.0, hig2 = hi * hi * kernel_gamma2;
 
-  float mi = 0.0;
   float uxi = 0.0;
   float uyi = 0.0;
   float uzi = 0.0;
@@ -1644,15 +1517,8 @@ __device__ void DOPAIR2NONSYMGPU(struct part_soa parts_soa, int pid,
   float rot_uxi = 0.0;
   float rot_uyi = 0.0;
   float rot_uzi = 0.0;
-  int Found_neighbours = 0;
-  int count_i = cj_start;
-  //  printf("first_part_in_task_blocks_cj %i last_part_in_task_blocks_cj %i
-  //  last_part_in_task_blocks_ci %i\n",
-  //		  first_part_in_task_blocks_cj, last_part_in_task_blocks_cj,
-  // last_part_in_task_blocks_ci);
   if (pid < ci_end) {
     hi = parts_soa.h[pid], hig2 = hi * hi * kernel_gamma2;
-    mi = parts_soa.mass[pid];
     uxi = parts_soa.ux[pid];
     uyi = parts_soa.uy[pid];
     uzi = parts_soa.uz[pid];
@@ -1762,12 +1628,8 @@ __device__ void DOPAIR2NONSYMGPUAOS(struct part_aos *parts_aos, int pid,
                                     double *d_shift_z, const int task_id_tmp,
                                     int flip_order) {
 
-  float dx =
-      1.f / 64.f;  // Value used to avoid interacting parts with themselves
-
   float hi = 0.0, hig2 = 0.0;
 
-  float mi = 0.0;
   float uxi = 0.0;
   float uyi = 0.0;
   float uzi = 0.0;
@@ -1782,15 +1644,8 @@ __device__ void DOPAIR2NONSYMGPUAOS(struct part_aos *parts_aos, int pid,
   float rot_uxi = 0.0;
   float rot_uyi = 0.0;
   float rot_uzi = 0.0;
-  int Found_neighbours = 0;
-  int count_i = cj_start;
-  //  printf("first_part_in_task_blocks_cj %i last_part_in_task_blocks_cj %i
-  //  last_part_in_task_blocks_ci %i\n",
-  //		  first_part_in_task_blocks_cj, last_part_in_task_blocks_cj,
-  // last_part_in_task_blocks_ci);
   if (pid < ci_end) {
     hi = parts_aos[pid].h, hig2 = hi * hi * kernel_gamma2;
-    mi = parts_aos[pid].mass;
     uxi = parts_aos[pid].ux;
     uyi = parts_aos[pid].uy;
     uzi = parts_aos[pid].uz;
@@ -1901,13 +1756,7 @@ __device__ void DOPAIR2NONSYMGPUAOSF4(
     const int ci_start, const int ci_end, const int cj_start, const int cj_end,
     float d_a, float d_H, float4 *vars_pair_aos_f4) {
 
-  float dx =
-      1.f / 64.f;  // Value used to avoid interacting parts with themselves
-
   float hi = 0.0, hig2 = 0.0;
-
-  int Found_neighbours = 0;
-  int count_i = cj_start;
 
   float4 res_rho = {0.0, 0.0, 0.0, 0.0};
   float4 res_rot = {0.0, 0.0, 0.0, 0.0};
@@ -1997,13 +1846,7 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
     struct part_aos_f4_recv *__restrict__ parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
-  float dx =
-      1.f / 64.f;  // Value used to avoid interacting parts with themselves
-
   float hi = 0.0, hig2 = 0.0;
-
-  int Found_neighbours = 0;
-  int count_i = cj_start;
 
   float4 res_rho = {0.0, 0.0, 0.0, 0.0};
   float4 res_rot = {0.0, 0.0, 0.0, 0.0};
@@ -2086,31 +1929,21 @@ __device__ void DOPAIR2NONSYMGPUAOSG(struct part_aos_g *parts_aos, int pid,
                                      double *d_shift_y, double *d_shift_z,
                                      const int task_id_tmp, int flip_order) {
 
-  float dx =
-      1.f / 64.f;  // Value used to avoid interacting parts with themselves
-
   float hi = 0.0, hig2 = 0.0;
 
-  float mi = 0.0;
   float uxi = 0.0;
   float uyi = 0.0;
   float uzi = 0.0;
   float pix = 0.0;
   float piy = 0.0;
   float piz = 0.0;
-  float rhoi = 0.0;
-  float div_vi = 0.0;
-  int Found_neighbours = 0;
   float v_sig;
   float u = 0.f;
   float laplace_u = 0.0;
   float alpha_visc_max_ngb = 0.0;
   float ci = 0.0;
-
-  int count_i = cj_start;
   if (pid < ci_end) {
     hi = parts_aos[pid].h, hig2 = hi * hi * kernel_gamma2;
-    mi = parts_aos[pid].mass;
     uxi = parts_aos[pid].ux;
     uyi = parts_aos[pid].uy;
     uzi = parts_aos[pid].uz;
@@ -2231,17 +2064,8 @@ __device__ void DOPAIR2NAIVEGPUAOSF4G(
     struct part_aos_f4_g_recv *__restrict__ parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
-  float dx =
-      1.f / 64.f;  // Value used to avoid interacting parts with themselves
-
   float hi = 0.0, hig2 = 0.0;
 
-  int Found_neighbours = 0;
-  int count_i = cj_start;
-
-  float4 res_rho = {0.0, 0.0, 0.0, 0.0};
-  float4 res_rot = {0.0, 0.0, 0.0, 0.0};
-  //  const part_aos_f4_send pi = parts_send[pid];
   const float4 x_h_i = pi.x_h;
   const float4 ux_m_i = pi.ux_m;
   const float4 rho_avisc_u_c_i = pi.rho_avisc_u_c;
@@ -2321,7 +2145,7 @@ __device__ void DOPAIR2NONSYMGPUAOSF(struct part_aos_f *parts_aos, int pid,
                                      double *d_shift_y, double *d_shift_z,
                                      const int task_id_tmp, int flip_order) {
 
-  float ci = 0.0, cj = 0.0;
+  float ci = 0.0;
   float hi = 0.0, hig2 = 0.0;
   float mi = 0.0;
   float uxi = 0.0;
@@ -2331,13 +2155,9 @@ __device__ void DOPAIR2NONSYMGPUAOSF(struct part_aos_f *parts_aos, int pid,
   float piy = 0.0;
   float piz = 0.0;
   float rhoi = 0.0;
-  float div_vi = 0.0;
-  int Found_neighbours = 0;
   float v_sigi;
   float ui = 0.f;
   float u_dti = 0.f;
-  float laplace_ui = 0.0;
-  float alpha_visc_max_ngb = 0.0;
   float pressurei = 0.0;
   float alphavisci = 0.0;
   float alphadiffi = 0.0;
@@ -2368,12 +2188,6 @@ __device__ void DOPAIR2NONSYMGPUAOSF(struct part_aos_f *parts_aos, int pid,
     piy = parts_aos[pid].y_p - d_shift_y[task_id_tmp];
     piz = parts_aos[pid].z_p - d_shift_z[task_id_tmp];
   }
-  //  if (threadIdx.x == 0) {
-  //    first_part_tid_0 = first_part;
-  //    last_part_tid_0 = last_part;
-  //  }
-  //  __syncthreads();
-  int n_neighbours = 0;
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
@@ -2571,12 +2385,6 @@ __device__ void DOPAIR2NAIVEGPUAOSF4F(
     struct part_aos_f4_f_recv *__restrict__ parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
-  float dx =
-      1.f / 64.f;  // Value used to avoid interacting parts with themselves
-
-  int Found_neighbours = 0;
-
-  //  const part_aos_f4_send pi = parts_send[pid];
   const float4 x_h_i = pi.x_h;
   const float4 ux_m_i = pi.ux_m;
 
@@ -2731,11 +2539,6 @@ __device__ void DOPAIR2GPU(struct part_soa parts_soa, int pid,
                            double *d_shift_x, double *d_shift_y,
                            double *d_shift_z, const int task_id_tmp) {
 
-  float dx =
-      1.f / 64.f;  // Value used to avoid interacting parts with themselves
-
-  float cellx = 0.0, celly = 0.0, cellz = 0.0;
-  float cellxj = 0.0, cellyj = 0.0, cellzj = 0.0;
   float hi = 0.0, hig2 = hi * hi * kernel_gamma2;
 
   float mi = 0.0;
@@ -2753,21 +2556,8 @@ __device__ void DOPAIR2GPU(struct part_soa parts_soa, int pid,
   float rot_uxi = 0.0;
   float rot_uyi = 0.0;
   float rot_uzi = 0.0;
-  int Found_neighbours = 0;
-  int count_i = cj_start;
-  //  printf("first_part_in_task_blocks_cj %i last_part_in_task_blocks_cj %i
-  //  last_part_in_task_blocks_ci %i\n",
-  //		  first_part_in_task_blocks_cj, last_part_in_task_blocks_cj,
-  // last_part_in_task_blocks_ci);
 
   if (pid < ci_end) {
-    cellx = parts_soa.locx[pid];
-    celly = parts_soa.locy[pid];
-    cellz = parts_soa.locz[pid];
-    const int j = cj_start;
-    cellxj = parts_soa.locx[j];
-    cellyj = parts_soa.locy[j];
-    cellzj = parts_soa.locz[j];
     hi = parts_soa.h[pid], hig2 = hi * hi * kernel_gamma2;
     mi = parts_soa.mass[pid];
     uxi = parts_soa.ux[pid];
@@ -2778,12 +2568,6 @@ __device__ void DOPAIR2GPU(struct part_soa parts_soa, int pid,
     piz = parts_soa.z_p[pid] - d_shift_z[task_id_tmp];
   }
 
-  int n_neighbours = 0;
-  float av_dist = 0.f;
-  float av_distx = 0.f;
-  float av_disty = 0.f;
-  float av_distz = 0.f;
-  float distby2h = 0.f;
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
@@ -3569,7 +3353,6 @@ void runner_dopairci_branch_density_gpu_aos_f4(
     int bundle_first_task, int4 *fparti_fpartj_lparti_lpartj_dens) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  int nBlocks_per_task = numBlocks_x;
 
   runner_do_pair_ci_density_GPU_aos_f4<<<
       gridShape, BLOCK_SIZE, 2 * BLOCK_SIZE * sizeof(float4), stream>>>(
@@ -3583,7 +3366,6 @@ void runner_dopaircj_branch_density_gpu_aos_f4(
     int bundle_first_task, int4 *fparti_fpartj_lparti_lpartj_dens) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  int nBlocks_per_task = numBlocks_x;
 
   runner_do_pair_cj_density_GPU_aos_f4<<<
       gridShape, BLOCK_SIZE, 2 * BLOCK_SIZE * sizeof(float4), stream>>>(
@@ -3597,9 +3379,7 @@ void runner_dopair_branch_density_gpu_aos_f4(
     int bundle_first_part, int bundle_n_parts) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  int nBlocks_per_task = numBlocks_x;
 
-  //	  fprintf(stderr, "nblocks %i\n", numBlocks_x);
   runner_do_pair_density_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
@@ -3653,9 +3433,7 @@ void runner_dopair_branch_gradient_gpu_aos_f4(
     int bundle_first_part, int bundle_n_parts) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  int nBlocks_per_task = numBlocks_x;
 
-  //	  fprintf(stderr, "nblocks %i\n", numBlocks_x);
   runner_do_pair_gradient_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
@@ -3709,7 +3487,6 @@ void runner_dopair_branch_force_gpu_aos_f4(
     int bundle_first_part, int bundle_n_parts) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  int nBlocks_per_task = numBlocks_x;
 
   //	  fprintf(stderr, "nblocks %i\n", numBlocks_x);
   runner_do_pair_force_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
@@ -3733,13 +3510,8 @@ __global__ void runner_do_self_density_GPU_naive(
 
   const int pid = threadid + first_part_in_task_blocks;
 
-  int ttid = 0;
-  int first_part = 0;
-  int count = 0;
-  int last_part = 0;
   float cellx = 0.0, celly = 0.0, cellz = 0.0;
   float hi = 0.0, hig2 = hi * hi * kernel_gamma2;
-  float mi = 0.0;
   float uxi = 0.0;
   float uyi = 0.0;
   float uzi = 0.0;
@@ -3757,22 +3529,15 @@ __global__ void runner_do_self_density_GPU_naive(
   int Found_neighbours = 0;
 
   if (pid < last_part_in_task_blocks) {
-    ttid = parts_soa.tid_p[pid];
-    first_part = d_task_first_part[ttid];
-    last_part = d_task_last_part[ttid];
-    count = last_part - first_part;
     cellx = parts_soa.locx[pid], celly = parts_soa.locy[pid],
     cellz = parts_soa.locz[pid];
     hi = parts_soa.h[pid], hig2 = hi * hi * kernel_gamma2;
-    mi = parts_soa.mass[pid];
     uxi = parts_soa.ux[pid];
     uyi = parts_soa.uy[pid];
     uzi = parts_soa.uz[pid];
     pix = parts_soa.x_p[pid] - cellx;
     piy = parts_soa.y_p[pid] - celly;
     piz = parts_soa.z_p[pid] - cellz;
-
-    int n_neighbours = 0;
 
     /*Naive loop over neighbours*/
     for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks;
@@ -3783,12 +3548,10 @@ __global__ void runner_do_self_density_GPU_naive(
           const float x_p_tmp = parts_soa.x_p[j];
           const float y_p_tmp = parts_soa.y_p[j];
           const float z_p_tmp = parts_soa.z_p[j];
-          const float h_tmp = parts_soa.h[j];
           const float mass_tmp = parts_soa.mass[j];
           const float ux_tmp = parts_soa.ux[j];
           const float uy_tmp = parts_soa.uy[j];
           const float uz_tmp = parts_soa.uz[j];
-          const timebin_t timebin = parts_soa.time_bin[j];
 
           /* Compute the pairwise distance. */
           const float pjx = x_p_tmp - cellx;
@@ -3796,7 +3559,6 @@ __global__ void runner_do_self_density_GPU_naive(
           const float pjz = z_p_tmp - cellz;
           const float xij = pix - pjx, yij = piy - pjy, zij = piz - pjz;
           const float r2 = xij * xij + yij * yij + zij * zij;
-          const float hj = h_tmp, hjg2 = hj * hj * kernel_gamma2;
           if (r2 < hig2 && r2 > (0.01f / 128.f) * (0.01f / 128.f)) {
             Found_neighbours = 1;
             const float r = sqrt(r2);
@@ -3916,7 +3678,6 @@ void launch_gradient_aos_f4(struct part_aos_f4_g_send *parts_send,
                             int2 *d_task_first_part_f4) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  int nBlocks_per_task = numBlocks_x;
   DOSELF_GPU_AOS_F4_G<<<gridShape, BLOCK_SIZE, 3 * BLOCK_SIZE * sizeof(float4),
                         stream>>>(parts_send, parts_recv, d_a, d_H,
                                   bundle_first_task, d_task_first_part_f4);
@@ -3955,7 +3716,6 @@ void launch_force_aos_f4(struct part_aos_f4_f_send *d_parts_send,
                          int2 *d_task_first_part_f4) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  int nBlocks_per_task = numBlocks_x;
   DOSELF_GPU_AOS_F4_F<<<
       gridShape, BLOCK_SIZE,
       4 * BLOCK_SIZE * sizeof(float4) + BLOCK_SIZE * sizeof(float3), stream>>>(
@@ -3966,6 +3726,6 @@ void launch_force_aos_f4(struct part_aos_f4_f_send *d_parts_send,
   //        count_tasks, tasksperbundle, nBlocks_per_task, bundle_first_task,
   //        max_parts, _time_bin_inhibited);
 }
-#ifdef HAVE_CUDA
+#ifdef __cplusplus
 }
 #endif

@@ -216,7 +216,11 @@ AM_SOURCES += runner_doiact_hydro_vec.c runner_others.c
 AM_SOURCES += runner_sinks.c
 AM_SOURCES += cell.c cell_convert_part.c cell_drift.c cell_lock.c cell_pack.c cell_split.c
 AM_SOURCES += cell_unskip.c cell_grid.c
+if HAVECUDA
+AM_SOURCES += engine.c engine_maketasks_gpu.c engine_split_particles.c engine_strays.c
+else	
 AM_SOURCES += engine.c engine_maketasks.c engine_split_particles.c engine_strays.c
+endif	
 AM_SOURCES += engine_drift.c engine_unskip.c engine_collect_end_of_step.c
 AM_SOURCES += engine_redistribute.c engine_fof.c engine_proxy.c engine_io.c engine_config.c
 AM_SOURCES += queue.c task.c timers.c debug.c scheduler.c proxy.c version.c
