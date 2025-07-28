@@ -19,6 +19,7 @@ CUDA
 Configuration
 ----------------
 
+
 To enable GPU acceleration via the ``cuda`` implementation, configure with the
 ``--with-cuda`` flag:
 
@@ -39,7 +40,11 @@ If you want to pass on flags to the compilers, you can do so by setting variable
 - ``$CUDA_CFLAGS``: Cuda-related flags for host (C) code, passed on to the C
   compiler. Use to e.g. manually provide include path
   (``CUDA_CFLAGS=-I/path/to/cuda/include``)
+- Similarly, ``$CUDA_LDFLAGS`` and ``$CUDA_LIBS`` can be used to pass library
+  flags related to the linking with cuda to the host compiler and linker.
 - ``$NVCC_FLAGS``: Flags to be passed on to the ``nvcc`` compiler.
+- Similarly, ``$NVCC_LDFLAGS`` and ``$NVCC_LIBS`` can be used to pass library
+  flags to the device linker.
 
 Example usage (note the line break escape characters '\'):
 
@@ -49,13 +54,52 @@ Example usage (note the line break escape characters '\'):
    NVCC_FLAGS=" -allow-unsupported-compiler -diag-suppress 177 -diag-suppress 550" \
    ./configure --with-cuda=/path/to/your/cuda/installation
 
+Similar to how ``--enable-debug`` enables debug symbols in the executable for
+the CPU code, the ``--enable-gpu-debug`` flag will enable debug symbols for cuda
+(host and device) code.
+
+To disable optimization (on both host and device code, simultaneously), use the
+``--disable-optimization`` flag.
+
+If you want to compile device code for a specific GPU hardware architecture, use
+the ``--with-cuda-arch=XX`` flag. The default is ``native``, which you can use
+if you compile on a system where the GPU you want to use for your runs is
+available. Check the `CUDA Documentation <https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html#gpu-feature-list>`_ 
+for options, e.g. ``sm_90``.
 
 
-.. warning::
-   We haven't implemented automatic architecture detection yet. Currently, it's
-   hardcoded in ``src/cuda/Makefile.am`` as ``CUDA_MYFLAGS += -arch=sm_XX``.
-   Make sure to modify that depending on the hardware you're running. See e.g.
-   `CUDA Documentation <https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html#gpu-feature-list>`_ for options.
+
+Adding new files
+----------------
+
+The build system doesn't play perfectly nice with ``nvcc`` in combination with
+other compilers. We found the following solution:
+
+- Background: In a CPU only build, the build system creates two main convenience
+  libraries, ``libswiftsim.la`` (without MPI) and ``libswisim_mpi.la`` (with
+  MPI), which are ultimately linked against the 'main' object to create the
+  execuables. (There are also 2 for gravity, but let's ignore that here.)
+- We build two additional convenience libraries, ``libswiftsim_cuda.la`` and
+  ``libswiftsim_mpicuda.la`` which contain **host** code necessary to run with
+  GPUs.
+- We build a third convenience library, ``src/libswift_cuda_device.a``, which 
+  contains all **device** code.
+
+The third library was necessary because ``nvcc`` doesn't play too nice with
+libtool and needs an extra linking step to create device code linkable with the
+host compiler.
+
+So if you intend on adding new files, please follow this convention:
+
+- Files containing host code functions are treated the same as C code. Base
+  files should be ``.c`` files. Add them to the ``GPU_CUDA_SOURCES`` variable in
+  ``src/Makefile.am``.
+- Files containing device code should be ``.cu`` files. Add them to the
+  ``AM_CUDA_DEVICE_SOURCES``, ``AM_CUDA_DEVICE_OBJECTS``, and
+  ``AM_CUDA_DEVICE_DLINK_OBJECTS`` variables in ``src/Makefile.am``.
+
+
+
 
 
 
@@ -100,10 +144,20 @@ N.B CUDA and ASAN don't like each other so WHEN RUNNING CODE COMPILED WITH SANIT
 
 
 
+
+
+
+
+
 HIP
 ~~~~~~~
 
 TODO.
+
+.. warning::
+
+   The new built system is not set up to run with HIP yet. It needs adaptation
+   first.
 
 
 If you want to pass on flags to the compilers, you can do so by setting variables:
