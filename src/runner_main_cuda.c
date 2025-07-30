@@ -20,9 +20,6 @@
  *
  ******************************************************************************/
 
-#ifndef RUNNER_MAIN_CLEAN_CU
-#define RUNNER_MAIN_CLEAN_CU
-
 #ifdef WITH_CUDA
 
 /* Config parameters. */
@@ -1326,5 +1323,3 @@ void *runner_main_cuda(void *data) {
 
 #endif  // WITH_CUDA
 
-
-#endif  // ifdef RUNNER_MAIN_CLEAN_CU
