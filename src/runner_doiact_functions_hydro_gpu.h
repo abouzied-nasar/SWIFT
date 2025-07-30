@@ -3262,10 +3262,16 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
   cudaMemcpy(&d_c_list_send[0], &c_list_send[0],
 		  2 * copy_index * sizeof(struct cell_gpu_send),
                   cudaMemcpyHostToDevice);
+  int max_n_parts = 0;
+  for(int i = 0; i < copy_index; i++){
+	max_n_parts = max(max_n_parts, c_list_send[i].count);
+	max_n_parts = max(max_n_parts, c_list_send[i + 1].count);
+  }
 
-
+  int numBlocks_y = copy_index;
+  int numBlocks_x = (max_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
   runner_dopair_tester(
-  		d_c_list_send, d_c_list_recv, copy_index);
+  		d_c_list_send, d_c_list_recv, copy_index, numBlocks_x, numBlocks_y);
 
   cu_error = cudaPeekAtLastError();  // cudaGetLastError();        //
   // Get error code

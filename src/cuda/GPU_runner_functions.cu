@@ -3386,7 +3386,7 @@ void runner_dopair_branch_density_gpu_aos_f4(
 
 void runner_dopair_tester(
 		struct cell_gpu_send * c_send, struct cell_gpu_send * c_recv,
-        int n_packed) {
+        int n_packed, int numBlocks_x, int numBlocks_y) {
 
 //  dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
 
