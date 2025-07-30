@@ -179,6 +179,10 @@ void runner_do_collect_rt_times(struct runner *r, struct cell *c,
                                 const int timer);
 void *runner_main(void *data);
 
+#ifdef WITH_CUDA
+void *runner_main_cuda(void *data);
+#endif
+
 ticks runner_get_active_time(const struct runner *restrict r);
 void runner_reset_active_time(struct runner *restrict r);
 

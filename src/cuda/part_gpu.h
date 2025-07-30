@@ -1,14 +1,20 @@
 #ifndef PART_GPU_H
 #define PART_GPU_H
-/* Config parameters. */
-#include "../../config.h"
-#include "../align.h"
-typedef int8_t timebin_t;
 
-// #include </usr/local/cuda-12.2/targets/x86_64-linux/include/vector_types.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef HAVE_CUDA
 #include <vector_types.h>
 #endif
+
+/* Config parameters. */
+#include "../../config.h"
+#include "../align.h"
+#include "../timeline.h"
+/* typedef int8_t timebin_t; */
+
 
 typedef struct part_soa {
   /*Task ID*/
@@ -407,5 +413,9 @@ typedef struct part_aos_f4_g_recv {
   float3 vsig_lapu_aviscmax;
 
 } part_aos_f4_g_recv;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // PART_GPU_H

@@ -242,6 +242,8 @@ AM_CONDITIONAL([HAVEMPI],[test $enable_mpi = "yes"])
 # Indicate that MPIRUN can be modified by an environment variable
 AC_ARG_VAR(MPIRUN, Path to the mpirun command if non-standard)
 
+AM_PROG_AR # Enable archiver for the GPU convenience library.
+
 # Add libtool support (now that CC is defined). Disable shared libraries by default.
 LT_INIT([disable-shared])
 
@@ -1015,6 +1017,22 @@ AH_VERBATIM([__STDC_FORMAT_MACROS],
 
 
 
+AC_ARG_ENABLE([gpu-debug],
+	[AS_HELP_STRING([--enable-gpu-debug],
+		[enable gpu debugging symbols.]
+	)],
+	[with_gpu_debug="${enableval}"],
+	[with_gpu_debug="no"]
+)
+
+AC_ARG_WITH([cuda-arch],
+   [AS_HELP_STRING([--with-cuda-arch=<sm_XX>],
+      [Which architecture to compile cuda device code for. default: native.]
+   )],
+   [with_cuda_arch="$withval"],
+   [with_cuda_arch="native"]
+)
+
 # Check for CUDA
 have_cuda="no"
 AC_ARG_WITH([cuda],
@@ -1025,36 +1043,71 @@ AC_ARG_WITH([cuda],
     [with_cuda="no"]
 )
 if test "x$with_cuda" != "xno"; then
-   if test "x$with_cuda" != "xyes"; then
-      CUDA_CFLAGS="$CUDA_CFLAGS -I$with_cuda/include"
-      CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I$with_cuda/include"
-      CUDA_LIBS="-L$with_cuda/lib -L$with_cuda/lib64 -lcudart"
-      NVCC="$with_cuda/bin/nvcc"
+  if test "x$with_cuda" != "xyes"; then
+    # Note: CUDA_*FLAGS get passed to the host compiler.
+    # NVCC_*FLAGS get passed to nvcc.
+    CUDA_CFLAGS="$CUDA_CFLAGS -I$with_cuda/include"
+    CUDA_LDFLAGS="-L$with_cuda/lib -L$with_cuda/lib64"
+    CUDA_LIBS="-lcudadevrt -lcudart"
+    NVCC="$with_cuda/bin/nvcc"
+    NVCC_FLAGS="$NVCC_FLAGS"
+    NVCC_LDFLAGS="$NVCC_LDFLAGS"
+    NVCC_LIBS="$NVCC_LIBS"
+    have_cuda="yes"
+  else
+    AC_PATH_PROG([NVCC],[nvcc])
+    echo "Found nvcc = $NVCC"
+    if test -n "$NVCC"; then
+      CUDA_HOME="`dirname $NVCC`/.."
+      CUDA_CFLAGS="$CUDA_CFLAGS -I${CUDA_HOME}/include"
+      CUDA_LDFLAGS="-L${CUDA_HOME}/lib -L${CUDA_HOME}/lib64"
+      CUDA_LIBS="-lcudadevrt -lcudart"
       NVCC_FLAGS="$NVCC_FLAGS"
+      NVCC_LDFLAGS="$NVCC_LDFLAGS"
+      NVCC_LIBS="$NVCC_LIBS"
       have_cuda="yes"
-   else
-      AC_PATH_PROG([NVCC],[nvcc])
-      echo "Found nvcc = $NVCC"
-      if test -n "$NVCC"; then
-         CUDA_ROOT="`dirname $NVCC`/.."
-         CUDA_CFLAGS="$CUDA_CFLAGS -I${CUDA_ROOT}/include"
-         CUDA_CXXFLAGS="$CUDA_CXXFLAGS -I${CUDA_ROOT}/include"
-         CUDA_LIBS="-L${CUDA_ROOT}/lib -L${CUDA_ROOT}/lib64 -lcudart"
-         NVCC_FLAGS="$NVCC_FLAGS"
-         have_cuda="yes"
+    fi
+  fi
+
+  if test "x$have_cuda" != "xno"; then
+    AC_DEFINE([HAVE_CUDA], 1, [The CUDA compiler is installed.])
+
+    # disable optimization?
+    if test "$enable_opt" != "yes"; then
+      # use fast approximation mode for divisions et al.
+      # Don't want numerical output to change our behaviour.
+      NVCC_FLAGS="$NVCC_FLAGS"" -O0 "
+    else
+      # Add optimization flags. We have to do this here because nvcc doesn't
+      # have something like --no-use_fast_math.
+      NVCC_FLAGS="$NVCC_FLAGS"" --use_fast_math --extra-device-vectorization"
+      if test "x$with_gpu_debug" == "xno"; then
+        # Add link time optimization if we're not using debug flags.
+        # Can't have -G and -lto simultaneously, that's a nvcc fatal error.
+        # Again because nvcc doesn't have something like --no-lto.
+        NVCC_FLAGS="$NVCC_FLAGS"" --lto"
       fi
-   fi
-   if test "x$have_cuda" != "xno"; then
-      AC_DEFINE([HAVE_CUDA], 1, [The CUDA compiler is installed.])
-   fi
-   CFLAGS="${CFLAGS} "
+    fi
+
+    # add debug symbols?
+    if test "x$with_gpu_debug" != "xno"; then
+      NVCC_FLAGS="$NVCC_FLAGS"" -g -G --ftz=true"
+    fi
+
+    NVCC_FLAGS="$NVCC_FLAGS"" -arch=${with_cuda_arch}"
+  fi
 fi
+
 AC_SUBST(CUDA_CFLAGS)
-AC_SUBST(CUDA_CXXFLAGS)
+AC_SUBST(CUDA_LDFLAGS)
 AC_SUBST(CUDA_LIBS)
 AC_SUBST(NVCC)
 AC_SUBST(NVCC_FLAGS)
-AM_CONDITIONAL([HAVECUDA],[test -n "$NVCC"])
+AC_SUBST(NVCC_LDFLAGS)
+AC_SUBST(NVCC_LIBS)
+AM_CONDITIONAL([HAVECUDA],[test "x$have_cuda" != "xno"])
+
+
 
 # Check for HIP
 have_hip="no"
@@ -1071,27 +1124,44 @@ if test "x$with_hip" != "xno"; then
       HIP_LIBS="$HIP_LIBS -L$with_hip/lib -L$with_hip/lib64"
       HIPCC="$with_hip/bin/hipcc"
       HIPCC_FLAGS="$HIPCC_FLAGS"
+      HIPCC_LDFLAGS="$HIPCC_LDFLAGS"
+      HIPCC_LIBS="$HIPCC_LIBS"
       have_hip="yes"
    else
       AC_PATH_PROG([HIPCC],[hipcc])
       echo "Found hipcc = $HIPCC"
       if test -n "$HIPCC"; then
-         HIP_ROOT="`dirname $HIPCC`/.."
-         HIP_CFLAGS="-I${HIP_ROOT}/include"
-         HIP_LIBS="-L${HIP_ROOT}/lib -L${HIP_ROOT}/lib64"
+         HIP_HOME="`dirname $HIPCC`/.."
+         HIP_CFLAGS="-I${HIP_HOME}/include"
+         HIP_LIBS="-L${HIP_HOME}/lib -L${HIP_HOME}/lib64"
+         HIPCC="${HIP_HOME}/bin/hipcc"
          HIPCC_FLAGS="$HIPCC_FLAGS"
+         HIPCC_LDFLAGS="$HIPCC_LDFLAGS"
+         HIPCC_LIBS="$HIPCC_LIBS"
          have_hip="yes"
       fi
    fi
    if test "x$have_hip" != "xno"; then
       AC_DEFINE([HAVE_HIP], 1, [The HIP compiler is installed.])
+     # add debug symbols?
+     if test "x$with_gpu_debug" != "xno"; then
+       AC_MSG_ERROR("Debug flags not set properly. Check this.")
+       HIPCC_FLAGS="$HIPCC_FLAGS"" -g -G"
+     fi
+
+     # disable optimization?
+     if test "$enable_opt" != "yes"; then
+       AC_MSG_ERROR("Noopt flags not set properly. Check this.")
+       HIPCC_FLAGS="$HIPCC_FLAGS"" -O0"
+     fi
    fi
-   CFLAGS="${CFLAGS} "
 fi
 AC_SUBST(HIP_CFLAGS)
 AC_SUBST(HIP_LIBS)
 AC_SUBST(HIPCC)
 AC_SUBST(HIPCC_FLAGS)
+AC_SUBST(HIPCC_LDFLAGS)
+AC_SUBST(HIPCC_LIBS)
 AM_CONDITIONAL([HAVEHIP],[test -n "$HIPCC"])
 
 # Check for FFTW. We test for this in the standard directories by default,
@@ -3415,8 +3485,6 @@ AC_CONFIG_FILES([tests/testSelectOutput.sh], [chmod +x tests/testSelectOutput.sh
 AC_CONFIG_FILES([tests/testFormat.sh], [chmod +x tests/testFormat.sh])
 AC_CONFIG_FILES([tests/testNeutrinoCosmology.sh], [chmod +x tests/testNeutrinoCosmology.sh])
 AC_CONFIG_FILES([tests/output_list_params.yml])
-# cuda .in file
-AC_CONFIG_FILES([src/cuda/Makefile])
 # hip .in file
 AC_CONFIG_FILES([src/hip/Makefile])
 
@@ -3451,7 +3519,9 @@ AC_MSG_RESULT([
    LUSTRE API enabled   : $have_lustreapi
    METIS/ParMETIS       : $have_metis / $have_parmetis
    CUDA enabled         : $have_cuda
+    - flags             : $NVCC_FLAGS
    HIP enabled          : $have_hip
+    - flags             : $HIPCC_FLAGS
    FFTW3 enabled        : $have_fftw
     - threaded/openmp   : $have_threaded_fftw / $have_openmp_fftw
     - MPI               : $have_mpi_fftw

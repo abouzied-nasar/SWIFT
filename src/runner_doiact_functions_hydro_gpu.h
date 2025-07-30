@@ -3,120 +3,24 @@
 #include "scheduler.h"
 
 #include <atomic.h>
-struct pack_vars_self {
-  /*List of tasks and respective cells to be packed*/
-  struct task **task_list;
-  struct task **top_task_list;
-  struct cell **cell_list;
-  /*List of cell positions*/
-  double *cellx;
-  double *celly;
-  double *cellz;
-  /*List of cell positions*/
-  double *d_cellx;
-  double *d_celly;
-  double *d_cellz;
-  int bundle_size;
-  /*How many particles in a bundle*/
-  int count_parts;
-  /**/
-  int tasks_packed;
-  int top_tasks_packed;
-  int *task_first_part;
-  int *task_last_part;
-  int *d_task_first_part;
-  int *d_task_last_part;
-  int *bundle_first_part;
-  int *bundle_last_part;
-  int *bundle_first_task_list;
-  int count_max_parts;
-  int launch;
-  int launch_leftovers;
-  int target_n_tasks;
-  int nBundles;
-  int tasksperbundle;
-
-} pack_vars_self;
-struct pack_vars_pair {
-  /*List of tasks and respective cells to be packed*/
-  struct task **task_list;
-  struct task **top_task_list;
-  struct cell **ci_list;
-  struct cell **cj_list;
-  /*List of cell shifts*/
-  double *shiftx;
-  double *shifty;
-  double *shiftz;
-  /*List of cell shifts*/
-  double *d_shiftx;
-  double *d_shifty;
-  double *d_shiftz;
-  int bundle_size;
-  /*How many particles in a bundle*/
-  int count_parts;
-  /**/
-  int tasks_packed;
-  int top_tasks_packed;
-  int *task_first_part;
-  int *task_last_part;
-  int *d_task_first_part;
-  int *d_task_last_part;
-  int *bundle_first_part;
-  int *bundle_last_part;
-  int *bundle_first_task_list;
-  int count_max_parts;
-  int launch;
-  int launch_leftovers;
-  int target_n_tasks;
-  int nBundles;
-  int tasksperbundle;
-  int n_daughters_total;
-  int n_daughters_packed_index;
-  int n_leaves_found;
-  int n_leaves_total;
-
-} pack_vars_pair;
-
-struct pack_vars_pair_f4 {
-  /*List of tasks and respective cells to be packed*/
-  struct task **task_list;
-  struct cell **ci_list;
-  struct cell **cj_list;
-  /*List of cell shifts*/
-  float3 *shift;
-  /*List of cell shifts*/
-  float3 *d_shift;
-  int bundle_size;
-  /*How many particles in a bundle*/
-  int count_parts;
-  /**/
-  int tasks_packed;
-  int4 *fparti_fpartj_lparti_lpartj;
-  int4 *d_fparti_fpartj_lparti_lpartj;
-  int *bundle_first_part;
-  int *bundle_last_part;
-  int *bundle_first_task_list;
-  int count_max_parts;
-  int launch;
-  int launch_leftovers;
-  int target_n_tasks;
-  int nBundles;
-  int tasksperbundle;
-
-} pack_vars_pair_f4;
-
 #ifdef WITH_CUDA
 #include "cuda/BLOCK_SIZE.h"
 #include "cuda/GPU_runner_functions.h"
 #endif
+
 #ifdef WITH_HIP
 #include "hip/BLOCK_SIZE.h"
 #include "hip/GPU_runner_functions.h"
 #endif
 
+#include "gpu_pack_vars.h"
 #include "runner_gpu_pack_functions.h"
 #include "task.h"
 #define CUDA_DEBUG
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 double runner_doself1_pack_f4(struct runner *r, struct scheduler *s,
                               struct pack_vars_self *pack_vars, struct cell *ci,
@@ -953,7 +857,7 @@ void runner_doself1_launch_f4(
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
-  int nBundles_temp = pack_vars->nBundles;
+  int n_bundles_temp = pack_vars->n_bundles;
 
   /*How many tasks have we packed?*/
   const int tasks_packed = pack_vars->tasks_packed;
@@ -964,21 +868,21 @@ void runner_doself1_launch_f4(
   /* Special case for incomplete bundles (when having leftover tasks not enough
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
-    nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+    n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
     if (tasks_packed == 0)
       error("zero tasks packed but somehow got into GPU loop");
-    //	  pack_vars->bundle_first_part[nBundles_temp] =
+    //	  pack_vars->bundle_first_part[n_bundles_temp] =
     // pack_vars->task_first_part[tasks_packed - 1];
-    pack_vars->bundle_first_part[nBundles_temp] =
+    pack_vars->bundle_first_part[n_bundles_temp] =
         task_first_part_f4[tasks_packed - 1].x;
   }
   /* Identify the last particle for each bundle of tasks */
-  for (int bid = 0; bid < nBundles_temp - 1; bid++) {
+  for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
   /* special treatment for the last bundle */
-  if (nBundles_temp > 1)
-    pack_vars->bundle_last_part[nBundles_temp - 1] = pack_vars->count_parts;
+  if (n_bundles_temp > 1)
+    pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
   //    clock_gettime(CLOCK_REALTIME, &t0hmemcpy);
@@ -1001,9 +905,9 @@ void runner_doself1_launch_f4(
   //			(t1hmemcpy.tv_nsec - t0hmemcpy.tv_nsec) / 1000000000.0;
   /* Launch the copies for each bundle and run the GPU kernel */
   /*We don't go into this loop if tasks_left_self == 1 as
-   nBundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
+   n_bundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
   int max_parts;
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     max_parts = 0;
     int parts_in_bundle = 0;
@@ -1060,8 +964,8 @@ void runner_doself1_launch_f4(
     // #endif
     const int tasksperbundle = pack_vars->tasksperbundle;
     int tasks_left = tasksperbundle;
-    if (bid == nBundles_temp - 1) {
-      tasks_left = tasks_packed - (nBundles_temp - 1) * tasksperbundle;
+    if (bid == n_bundles_temp - 1) {
+      tasks_left = tasks_packed - (n_bundles_temp - 1) * tasksperbundle;
     }
     // Will launch a 2d grid of GPU thread blocks (number of tasks is
     // the y dimension and max_parts is the x dimension
@@ -1114,7 +1018,7 @@ void runner_doself1_launch_f4(
   /* Pack length counter for use in unpacking */
   int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0.;
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     clock_gettime(CLOCK_REALTIME, &t0);
 
@@ -1205,7 +1109,7 @@ void runner_doself1_launch_f4_g(
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
-  int nBundles_temp = pack_vars->nBundles;
+  int n_bundles_temp = pack_vars->n_bundles;
 
   /*How many tasks have we packed?*/
   const int tasks_packed = pack_vars->tasks_packed;
@@ -1216,27 +1120,27 @@ void runner_doself1_launch_f4_g(
   /* Special case for incomplete bundles (when having leftover tasks not enough
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
-    nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+    n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
     //	  if(tasks_packed == 0) error("zero tasks packed but somehow got into
     // GPU loop");
-    pack_vars->bundle_first_part[nBundles_temp] =
+    pack_vars->bundle_first_part[n_bundles_temp] =
         task_first_part_f4[tasks_packed - 1].x;
   }
   /* Identify the last particle for each bundle of tasks */
-  for (int bid = 0; bid < nBundles_temp - 1; bid++) {
+  for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
   /* special treatment for the last bundle */
-  if (nBundles_temp > 1)
-    pack_vars->bundle_last_part[nBundles_temp - 1] = pack_vars->count_parts;
+  if (n_bundles_temp > 1)
+    pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
 
   /* Launch the copies for each bundle and run the GPU kernel */
   /*We don't go into this loop if tasks_left_self == 1 as
-   nBundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
+   n_bundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
   int max_parts;
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     max_parts = 0;
     int parts_in_bundle = 0;
@@ -1282,8 +1186,8 @@ void runner_doself1_launch_f4_g(
 #endif
     const int tasksperbundle = pack_vars->tasksperbundle;
     int tasks_left = tasksperbundle;
-    if (bid == nBundles_temp - 1) {
-      tasks_left = tasks_packed - (nBundles_temp - 1) * tasksperbundle;
+    if (bid == n_bundles_temp - 1) {
+      tasks_left = tasks_packed - (n_bundles_temp - 1) * tasksperbundle;
     }
     // Will launch a 2d grid of GPU thread blocks (number of tasks is
     // the y dimension and max_parts is the x dimension
@@ -1334,7 +1238,7 @@ void runner_doself1_launch_f4_g(
   /* Pack length counter for use in unpacking */
   int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0.;
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     clock_gettime(CLOCK_REALTIME, &t0);
 
@@ -1423,7 +1327,7 @@ void runner_doself1_launch_f4_f(
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
-  int nBundles_temp = pack_vars->nBundles;
+  int n_bundles_temp = pack_vars->n_bundles;
 
   /*How many tasks have we packed?*/
   const int tasks_packed = pack_vars->tasks_packed;
@@ -1434,19 +1338,19 @@ void runner_doself1_launch_f4_f(
   /* Special case for incomplete bundles (when having leftover tasks not enough
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
-    nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+    n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
     if (tasks_packed == 0)
       error("zero tasks packed but somehow got into GPU loop");
-    pack_vars->bundle_first_part[nBundles_temp] =
+    pack_vars->bundle_first_part[n_bundles_temp] =
         task_first_part_f4_f[tasks_packed - 1].x;
   }
   /* Identify the last particle for each bundle of tasks */
-  for (int bid = 0; bid < nBundles_temp - 1; bid++) {
+  for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
   /* special treatment for the last bundle */
-  if (nBundles_temp > 1)
-    pack_vars->bundle_last_part[nBundles_temp - 1] = pack_vars->count_parts;
+  if (n_bundles_temp > 1)
+    pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
   /*Copy arrays containing first and last part for each task to GPU*/
@@ -1465,9 +1369,9 @@ void runner_doself1_launch_f4_f(
 
   /* Launch the copies for each bundle and run the GPU kernel */
   /*We don't go into this loop if tasks_left_self == 1 as
-   nBundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
+   n_bundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
   int max_parts = 0;
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     max_parts = 0;
     int parts_in_bundle = 0;
@@ -1510,8 +1414,8 @@ void runner_doself1_launch_f4_f(
 #endif
     const int tasksperbundle = pack_vars->tasksperbundle;
     int tasks_left = tasksperbundle;
-    if (bid == nBundles_temp - 1) {
-      tasks_left = tasks_packed - (nBundles_temp - 1) * tasksperbundle;
+    if (bid == n_bundles_temp - 1) {
+      tasks_left = tasks_packed - (n_bundles_temp - 1) * tasksperbundle;
     }
     // Will launch a 2d grid of GPU thread blocks (number of tasks is
     // the y dimension and max_parts is the x dimension
@@ -1560,7 +1464,7 @@ void runner_doself1_launch_f4_f(
   /* Pack length counter for use in unpacking */
   int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0.;
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     clock_gettime(CLOCK_REALTIME, &t0);
 
@@ -1642,7 +1546,7 @@ void runner_dopair1_launch_f4_one_memcpy(
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
-  int nBundles_temp = pack_vars->nBundles;
+  int n_bundles_temp = pack_vars->n_bundles;
   /*How many tasks have we packed?*/
   const int tasks_packed = pack_vars->tasks_packed;
 
@@ -1656,29 +1560,29 @@ void runner_dopair1_launch_f4_one_memcpy(
   /* Special case for incomplete bundles (when having leftover tasks not enough
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
-    nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+    n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
     if (tasks_packed == 0)
       error("zero pair tasks packed but somehow got into GPU loop");
-    //    pack_vars->bundle_first_part[nBundles_temp] =
+    //    pack_vars->bundle_first_part[n_bundles_temp] =
     // pack_vars->task_first_part[packed_tmp - 2];
-    pack_vars->bundle_first_part[nBundles_temp] =
+    pack_vars->bundle_first_part[n_bundles_temp] =
         fparti_fpartj_lparti_lpartj[tasks_packed - 1].x;
   }
   /* Identify the last particle for each bundle of tasks */
-  for (int bid = 0; bid < nBundles_temp - 1; bid++) {
+  for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
   /* special treatment for the last bundle */
-  if (nBundles_temp > 1)
-    pack_vars->bundle_last_part[nBundles_temp - 1] = pack_vars->count_parts;
+  if (n_bundles_temp > 1)
+    pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
 
   /* Launch the copies for each bundle and run the GPU kernel */
   /*We don't go into this loop if tasks_left_self == 1 as
-   nBundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
+   n_bundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
   //    int max_parts = 0;
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     int max_parts_i = 0;
     int max_parts_j = 0;
@@ -1780,7 +1684,7 @@ void runner_dopair1_launch_f4_one_memcpy(
 
   ticks total_cpu_unpack_ticks = 0.;
 
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
     /*Time unpacking*/
     clock_gettime(CLOCK_REALTIME, &t0);
 
@@ -1874,7 +1778,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
-  int nBundles_temp = pack_vars->nBundles;
+  int n_bundles_temp = pack_vars->n_bundles;
   /*How many tasks have we packed?*/
   const int tasks_packed = pack_vars->tasks_packed;
 
@@ -1884,26 +1788,26 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
   /* Special case for incomplete bundles (when having leftover tasks not enough
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
-    nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
-//    message("tasks packed %i nbundles % i", tasks_packed, nBundles_temp);
+    n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+//    message("tasks packed %i nbundles % i", tasks_packed, n_bundles_temp);
 //    if (tasks_packed == 0)
 //      error("zero pair tasks packed but somehow got into GPU loop");
-    pack_vars->bundle_first_part[nBundles_temp] =
+    pack_vars->bundle_first_part[n_bundles_temp] =
         fparti_fpartj_lparti_lpartj_dens[tasks_packed - 1].x;
     //    message("Incomplete buundle");
   }
   /* Identify the last particle for each bundle of tasks */
-  for (int bid = 0; bid < nBundles_temp - 1; bid++) {
+  for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
   /* special treatment for the case of 1 bundle */
-  if (nBundles_temp > 1)
-    pack_vars->bundle_last_part[nBundles_temp - 1] = pack_vars->count_parts;
+  if (n_bundles_temp > 1)
+    pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
 
   /* Launch the copies for each bundle and run the GPU kernel */
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     int max_parts_i = 0;
     int max_parts_j = 0;
@@ -2003,7 +1907,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
    * way with unpacking done separately */
   ticks total_cpu_unpack_ticks = 0;
 
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
     /*Time unpacking*/
     clock_gettime(CLOCK_REALTIME, &t0);
     //		cudaStreamSynchronize(stream[bid]);
@@ -2237,7 +2141,7 @@ void runner_dopair1_launch_f4_g_one_memcpy(
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
-  int nBundles_temp = pack_vars->nBundles;
+  int n_bundles_temp = pack_vars->n_bundles;
   /*How many tasks have we packed?*/
   const int tasks_packed = pack_vars->tasks_packed;
 
@@ -2251,29 +2155,29 @@ void runner_dopair1_launch_f4_g_one_memcpy(
   /* Special case for incomplete bundles (when having leftover tasks not enough
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
-    nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+    n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
     if (tasks_packed == 0)
       error("zero pair tasks packed but somehow got into GPU loop");
-    //	  pack_vars->bundle_first_part[nBundles_temp] =
+    //	  pack_vars->bundle_first_part[n_bundles_temp] =
     // pack_vars->task_first_part[packed_tmp - 2];
-    pack_vars->bundle_first_part[nBundles_temp] =
+    pack_vars->bundle_first_part[n_bundles_temp] =
         fparti_fpartj_lparti_lpartj[tasks_packed - 1].x;
   }
   /* Identify the last particle for each bundle of tasks */
-  for (int bid = 0; bid < nBundles_temp - 1; bid++) {
+  for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
   /* special treatment for the last bundle */
-  if (nBundles_temp > 1)
-    pack_vars->bundle_last_part[nBundles_temp - 1] = pack_vars->count_parts;
+  if (n_bundles_temp > 1)
+    pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
 
   /* Launch the copies for each bundle and run the GPU kernel */
   /*We don't go into this loop if tasks_left_self == 1 as
-   nBundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
+   n_bundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
   //	int max_parts = 0;
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     int max_parts_i = 0;
     int max_parts_j = 0;
@@ -2375,7 +2279,7 @@ void runner_dopair1_launch_f4_g_one_memcpy(
 
   ticks total_cpu_unpack_ticks = 0.;
 
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
     /*Time unpacking*/
     clock_gettime(CLOCK_REALTIME, &t0);
 
@@ -2469,7 +2373,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
-  int nBundles_temp = pack_vars->nBundles;
+  int n_bundles_temp = pack_vars->n_bundles;
   /*How many tasks have we packed?*/
   const int tasks_packed = pack_vars->tasks_packed;
 
@@ -2479,26 +2383,26 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
   /* Special case for incomplete bundles (when having leftover tasks not enough
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
-    nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
-//    message("tasks packed %i nbundles % i", tasks_packed, nBundles_temp);
+    n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+//    message("tasks packed %i nbundles % i", tasks_packed, n_bundles_temp);
 //    if (tasks_packed == 0)
 //      error("zero pair tasks packed but somehow got into GPU loop");
-    pack_vars->bundle_first_part[nBundles_temp] =
+    pack_vars->bundle_first_part[n_bundles_temp] =
         fparti_fpartj_lparti_lpartj_grad[tasks_packed - 1].x;
     //    message("Incomplete buundle");
   }
   /* Identify the last particle for each bundle of tasks */
-  for (int bid = 0; bid < nBundles_temp - 1; bid++) {
+  for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
   /* special treatment for the case of 1 bundle */
-  if (nBundles_temp > 1)
-    pack_vars->bundle_last_part[nBundles_temp - 1] = pack_vars->count_parts;
+  if (n_bundles_temp > 1)
+    pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
 
   /* Launch the copies for each bundle and run the GPU kernel */
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     int max_parts_i = 0;
     int max_parts_j = 0;
@@ -2595,7 +2499,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
    * way with unpacking done separately */
   ticks total_cpu_unpack_ticks = 0;
 
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
     /*Time unpacking*/
     clock_gettime(CLOCK_REALTIME, &t0);
     cudaEventSynchronize(pair_end[bid]);
@@ -2826,7 +2730,7 @@ void runner_dopair1_launch_f4_f_one_memcpy(
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
-  int nBundles_temp = pack_vars->nBundles;
+  int n_bundles_temp = pack_vars->n_bundles;
   /*How many tasks have we packed?*/
   const int tasks_packed = pack_vars->tasks_packed;
 
@@ -2840,29 +2744,29 @@ void runner_dopair1_launch_f4_f_one_memcpy(
   /* Special case for incomplete bundles (when having leftover tasks not enough
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
-    nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+    n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
     if (tasks_packed == 0)
       error("zero pair tasks packed but somehow got into GPU loop");
-    //	  pack_vars->bundle_first_part[nBundles_temp] =
+    //	  pack_vars->bundle_first_part[n_bundles_temp] =
     // pack_vars->task_first_part[packed_tmp - 2];
-    pack_vars->bundle_first_part[nBundles_temp] =
+    pack_vars->bundle_first_part[n_bundles_temp] =
         fparti_fpartj_lparti_lpartj[tasks_packed - 1].x;
   }
   /* Identify the last particle for each bundle of tasks */
-  for (int bid = 0; bid < nBundles_temp - 1; bid++) {
+  for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
   /* special treatment for the last bundle */
-  if (nBundles_temp > 1)
-    pack_vars->bundle_last_part[nBundles_temp - 1] = pack_vars->count_parts;
+  if (n_bundles_temp > 1)
+    pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
 
   /* Launch the copies for each bundle and run the GPU kernel */
   /*We don't go into this loop if tasks_left_self == 1 as
-   nBundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
+   n_bundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
   //	int max_parts = 0;
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     int max_parts_i = 0;
     int max_parts_j = 0;
@@ -2913,9 +2817,9 @@ void runner_dopair1_launch_f4_f_one_memcpy(
     //      int tid = 0;
     //      int offset = bid * tasksperbundle;
     //      int tasks_left = tasksperbundle;
-    //      if (bid == nBundles_temp - 1) {
+    //      if (bid == n_bundles_temp - 1) {
     //        tasks_left =
-    //        		tasks_packed - (nBundles_temp - 1) * tasksperbundle;
+    //        		tasks_packed - (n_bundles_temp - 1) * tasksperbundle;
     //      }
 
     // Setup 2d grid of GPU thread blocks for ci (number of tasks is
@@ -2975,7 +2879,7 @@ void runner_dopair1_launch_f4_f_one_memcpy(
   /* Pack length counter for use in unpacking */
   int pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0.;
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
     /*Time unpacking*/
     clock_gettime(CLOCK_REALTIME, &t0);
 
@@ -3070,7 +2974,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_f(
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
-  int nBundles_temp = pack_vars->nBundles;
+  int n_bundles_temp = pack_vars->n_bundles;
   /*How many tasks have we packed?*/
   const int tasks_packed = pack_vars->tasks_packed;
 
@@ -3080,26 +2984,26 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_f(
   /* Special case for incomplete bundles (when having leftover tasks not enough
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
-    nBundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
-//    message("tasks packed %i nbundles % i", tasks_packed, nBundles_temp);
+    n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+//    message("tasks packed %i nbundles % i", tasks_packed, n_bundles_temp);
 //    if (tasks_packed == 0)
 //      error("zero pair tasks packed but somehow got into GPU loop");
-    pack_vars->bundle_first_part[nBundles_temp] =
+    pack_vars->bundle_first_part[n_bundles_temp] =
         fparti_fpartj_lparti_lpartj_forc[tasks_packed - 1].x;
     //    message("Incomplete buundle");
   }
   /* Identify the last particle for each bundle of tasks */
-  for (int bid = 0; bid < nBundles_temp - 1; bid++) {
+  for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
   /* special treatment for the case of 1 bundle */
-  if (nBundles_temp > 1)
-    pack_vars->bundle_last_part[nBundles_temp - 1] = pack_vars->count_parts;
+  if (n_bundles_temp > 1)
+    pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
 
   /* Launch the copies for each bundle and run the GPU kernel */
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     int max_parts_i = 0;
     int max_parts_j = 0;
@@ -3197,7 +3101,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_f(
 
   ticks total_cpu_unpack_ticks = 0;
 
-  for (int bid = 0; bid < nBundles_temp; bid++) {
+  for (int bid = 0; bid < n_bundles_temp; bid++) {
     /*Time unpacking*/
     clock_gettime(CLOCK_REALTIME, &t0);
     cudaEventSynchronize(pair_end[bid]);
@@ -3456,3 +3360,7 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
   pack_vars->launch = 0;
 
 }
+
+#ifdef __cplusplus
+}
+#endif

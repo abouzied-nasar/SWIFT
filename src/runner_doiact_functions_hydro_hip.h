@@ -115,7 +115,7 @@ struct pack_vars_pair_f4 {
 #include "cuda/BLOCK_SIZE.h"
 #include "cuda/GPU_runner_functions.h"
 #endif
-#define WITH_HIP
+
 #ifdef WITH_HIP
 #include "hip/BLOCK_SIZE.h"
 #include "hip/GPU_runner_functions.h"

@@ -19,9 +19,6 @@
 AM_CFLAGS = $(HDF5_CPPFLAGS) $(GSL_INCS) $(FFTW_INCS) $(NUMA_INCS) \
         $(GRACKLE_INCS)  $(SUNDIALS_INCS) $(CHEALPIX_CFLAGS) $(LUSTREAPI_INCS)
 
-# Add HIP Path
-AM_CFLAGS += -D__HIP_PLATFORM_AMD__
-
 # Assign a "safe" version number
 AM_LDFLAGS = $(HDF5_LDFLAGS) $(FFTW_LIBS)
 
@@ -37,6 +34,10 @@ EXTRA_LIBS = $(GSL_LIBS) $(GMP_LIBS) $(HDF5_LIBS) $(FFTW_LIBS) $(NUMA_LIBS) \
 MPI_LIBS = $(PARMETIS_LIBS) $(METIS_LIBS) $(MPI_THREAD_LIBS)
 MPI_FLAGS = -DWITH_MPI $(PARMETIS_INCS) $(METIS_INCS)
 
+CUDA_FLAGS = $(CUDA_CFLAGS) -DWITH_CUDA
+HIP_FLAGS = $(HIP_CFLAGS) -D__HIP_PLATFORM_AMD__ -DWITH_HIP
+
+
 # Build the libswiftsim library and a convenience library just for the gravity tasks
 lib_LTLIBRARIES = libswiftsim.la
 noinst_LTLIBRARIES = libgrav.la
@@ -49,6 +50,7 @@ endif
 # Build a cuda version too?
 if HAVECUDA
 lib_LTLIBRARIES += libswiftsim_cuda.la
+noinst_LIBRARIES = libswift_cuda_device.a
 if HAVEMPI
 lib_LTLIBRARIES += libswiftsim_mpicuda.la
 endif
@@ -56,6 +58,7 @@ endif
 
 # Build a hip version too?
 if HAVEHIP
+# TODO: Needs fixing. See what we did for cuda.
 lib_LTLIBRARIES += libswiftsim_hip.la
 if HAVEMPI
 lib_LTLIBRARIES += libswiftsim_mpihip.la
@@ -182,14 +185,18 @@ endif
 
 GPU_SOURCES = 
 if HAVECUDA
-GPU_CUDA_SOURCES = 
-GPU_CUDA_SOURCES += runner_gpu_pack_functions.c
+# list here files to be compiled without nvcc, but needed for execution with GPU
+GPU_CUDA_SOURCES = runner_gpu_pack_functions.c
+GPU_CUDA_SOURCES += runner_main_cuda.c cuda/GPU_data_buffers.c
+# TODO????
+# GPU_CUDA_SOURCES += runner_doiact_functions_hydro_gpu.h
 GPU_SOURCES+=$(GPU_CUDA_SOURCES)
 endif
 
 if HAVEHIP 
 GPU_HIP_SOURCES =
 GPU_HIP_SOURCES += runner_gpu_pack_functions.c
+# TODO: Fix this. Do the same as cuda.
 GPU_SOURCES+=$(GPU_HIP_SOURCES)
 endif
 
@@ -248,7 +255,6 @@ AM_SOURCES += $(AGORA_FEEDBACK_SOURCES)
 AM_SOURCES += $(PS2020_COOLING_SOURCES)
 AM_SOURCES += $(SPHM1RT_RT_SOURCES)
 AM_SOURCES += $(GEAR_RT_SOURCES)
-AM_SOURCES += $(GPU_SOURCES)
 AM_SOURCES += swift_lustre_api.c
 
 # Include files for distribution, not installation.
@@ -550,6 +556,10 @@ nobase_noinst_HEADERS += fvpm_geometry.h fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/None/fvpm_geometry.h fvpm_geometry/None/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/fvpm_geometry.h fvpm_geometry/Gizmo/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/MFM/fvpm_geometry.h fvpm_geometry/Gizmo/MFV/fvpm_geometry.h
+nobase_noinst_HEADERS += gpu_pack_vars.h
+nobase_noinst_HEADERS += cuda/BLOCK_SIZE.h cuda/GPU_data_buffers.h
+nobase_noinst_HEADERS += cuda/GPU_runner_functions.h  cuda/part_gpu.h
+nobase_noinst_HEADERS += gpu_pack_vars.h runner_gpu_pack_functions.h
 
 # Sources and special flags for the gravity library
 libgrav_la_SOURCES = runner_doiact_grav.c
@@ -575,41 +585,62 @@ libswiftsim_mpi_la_SHORTNAME = mpi
 libswiftsim_mpi_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav_mpi.la
 
 # Sources and flags for regular CUDA library
-libswiftsim_cuda_la_SOURCES = $(AM_SOURCES)
-libswiftsim_cuda_la_CFLAGS = $(AM_CFLAGS) $(CUDA_CFLAGS) -DWITH_CUDA
-libswiftsim_cuda_la_CXXFLAGS = $(AM_CFLAGS) $(CUDA_CFLAGS) -DWITH_CUDA
-libswiftsim_cuda_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) $(CUDA_LIBS)
+libswiftsim_cuda_la_SOURCES = $(AM_SOURCES) $(GPU_SOURCES)
+libswiftsim_cuda_la_CFLAGS = $(AM_CFLAGS) $(CUDA_FLAGS)
+libswiftsim_cuda_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) $(CUDA_LDFLAGS) $(CUDA_LIBS)
 libswiftsim_cuda_la_SHORTNAME = cuda
 libswiftsim_cuda_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav.la
 
 # Sources and flags for regular HIP library
+# TODO: Needs fixing. See what we did for CUDA.
 libswiftsim_hip_la_SOURCES = $(AM_SOURCES)
-libswiftsim_hip_la_CFLAGS = $(AM_CFLAGS) $(HIP_CFLAGS) -DWITH_HIP
-libswiftsim_hip_la_CXXFLAGS = $(AM_CFLAGS) $(HIP_CFLAGS) -DWITH_HIP
-libswiftsim_hip_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) $(HIP_LIBS) -lamdhip64
+libswiftsim_hip_la_CFLAGS = $(AM_CFLAGS) $(HIP_FLAGS)
+libswiftsim_hip_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) $(HIP_LDFLAGS) $(HIP_LIBS) -lamdhip64
 libswiftsim_hip_la_SHORTNAME = hip
 libswiftsim_hip_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav.la
 
 # Sources and flags for MPI CUDA library
-libswiftsim_mpicuda_la_SOURCES = $(AM_SOURCES)
-libswiftsim_mpicuda_la_CFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(CUDA_CFLAGS) -DWITH_CUDA
-libswiftsim_mpicuda_la_CXXFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(CUDA_CFLAGS) -DWITH_CUDA
-libswiftsim_mpicuda_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS) $(CUDA_LIBS)
+libswiftsim_mpicuda_la_SOURCES = $(AM_SOURCES) $(GPU_SOURCES)
+libswiftsim_mpicuda_la_CFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(CUDA_FLAGS)
+libswiftsim_mpicuda_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS) $(CUDA_LDFLAGS) $(CUDA_LIBS)
 libswiftsim_mpicuda_la_SHORTNAME = mpicuda
 libswiftsim_mpicuda_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav_mpi.la
 
 # Sources and flags for MPI HIP library
+# TODO: Needs fixing. See what we did for CUDA.
 libswiftsim_mpihip_la_SOURCES = $(AM_SOURCES)
-libswiftsim_mpihip_la_CFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_CFLAGS) -DWITH_HIP
-libswiftsim_mpihip_la_CXXFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_CFLAGS) -DWITH_HIP
-libswiftsim_mpihip_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS) $(HIP_LIBS)
+libswiftsim_mpihip_la_CFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_FLAGS)
+libswiftsim_mpihip_la_CXXFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_FLAGS)
+libswiftsim_mpihip_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS) $(HIP_LDFLAGS) $(HIP_LIBS)
 libswiftsim_mpihip_la_SHORTNAME = mpihip
 libswiftsim_mpihip_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav_mpi.la
 
+if HAVECUDA
+AM_CUDA_DEVICE_SOURCES = cuda/GPU_runner_functions.cu cuda/device_functions.h
+AM_CUDA_DEVICE_OBJECTS = cuda/GPU_runner_functions.o
+AM_CUDA_DEVICE_DLINK_OBJECTS = cuda/GPU_runner_functions.dlink_o
 
-#subdir
-SUBDIRS = . cuda
-SUBDIRS += . hip
+libswift_cuda_device_a_SOURCES = $(AM_CUDA_DEVICE_SOURCES)
+libswift_cuda_device_a_LIBADD = $(AM_CUDA_DEVICE_OBJECTS) $(AM_CUDA_DEVICE_DLINK_OBJECTS)
+
+AM_NVCCFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src
+AM_NVCCFLAGS += -D_FORCE_INLINES -O4 -lineinfo -src-in-ptx --maxrregcount=64
+# use fast approximation mode for divisions, sqrt et al. as default, even with
+# debug/no-optimization enabled. We don't want the float output to differ too much.
+AM_NVCCFLAGS += --ftz=false --prec-div=false --prec-sqrt=false --fmad=true
+AM_NVCCFLAGS += --default-stream per-thread
+
+# put NVCC_FLAGS after AM_NVCCFLAGS so manually passed flags override internal ones.
+# wildcard making recipes for *.cu -> *.o
+.cu.o:
+	$(NVCC) $(AM_NVCCFLAGS) $(NVCC_FLAGS) $(AM_CFLAGS) $(CUDA_FLAGS) $< -dc -o $@
+
+# wildcard making recipes for *.cuo -> *.dlink_o
+# put NVCC_FLAGS after AM_NVCCFLAGS so manually passed flags override internal ones.
+.o.dlink_o:
+	$(NVCC) $(AM_NVCCFLAGS) $(NVCC_FLAGS) $(AM_CFLAGS) $(CUDA_FLAGS) $< -dlink -o $@
+endif
+
 
 # Versioning. If any sources change then update the version_string.h file with
 # the current git revision and package version.

@@ -1,11 +1,14 @@
-#ifndef CUDA_HEADERS_H
-#define CUDA_HEADERS_H
+#ifndef CUDA_GPU_RUNNER_FUNCTIONS_H
+#define CUDA_GPU_RUNNER_FUNCTIONS_H
 #define n_streams 1024
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include <cuda_runtime.h>
+
 #include "part_gpu.h"
+
 void launch_density_kernel(struct part_soa parts_soa, int *d_task_first_part,
                            int *d_task_last_part, float d_a, float d_H,
                            const char *loop_type, cudaStream_t stream,
@@ -145,4 +148,4 @@ void runner_dopair_branch_force_gpu_aos_f4(
 }
 #endif
 
-#endif  // CUDA_HEADER_H
+#endif  // GPU_RUNNER_FUNCTIONS_H

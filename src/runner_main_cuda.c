@@ -19,6 +19,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
+
+#ifdef WITH_CUDA
+
 /* Config parameters. */
 #define GPUOFFLOAD_DENSITY 1   // off-load hydro density to GPU
 #define GPUOFFLOAD_GRADIENT 1  // off-load hydro gradient to GPU
@@ -27,6 +30,12 @@
 //A. Nasar: Remove as will no longer be necessary. Leaving for now during dev
 #define RECURSE 1 //Allow recursion through sub-tasks before offloading
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Config parameters. */
+/* #include "<config.h>" */ // TODO: WHY IS THIS NOT WORKING?
 #include "../config.h"
 
 /* MPI headers. */
@@ -34,27 +43,31 @@
 #include <mpi.h>
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/* Config parameters. */
-#include <config.h>
-
-/* MPI headers. */
-#ifdef WITH_MPI
-#include <mpi.h>
+/* Cuda headers */
+#ifdef WITH_CUDA
+#include <cuda.h>
+#include <cuda_profiler_api.h>
+#include <cuda_runtime.h>
 #endif
 
 /* This object's header. */
 #include "runner.h"
 
 /* Local headers. */
+#include "cell.h" // TODO: Check if necessary after refactor
 #include "engine.h"
 #include "feedback.h"
 #include "scheduler.h"
 #include "space_getsid.h"
 #include "timers.h"
+
+#include "cuda/part_gpu.h"
+#include "cuda/GPU_runner_functions.h"
+#include "cuda/GPU_data_buffers.h"
+#include "runner_doiact_functions_hydro_gpu.h"
+#include "runner_gpu_pack_functions.h"
+
+
 
 /* Import the gravity loop functions. */
 #include "runner_doiact_grav.h"
@@ -125,7 +138,6 @@ extern "C" {
 #include "runner_doiact_black_holes.h"
 #include "runner_doiact_undef.h"
 
-/* Import the black hole feedback loop functions. */
 #define FUNCTION feedback
 #define FUNCTION_TASK_LOOP TASK_LOOP_FEEDBACK
 #include "runner_doiact_black_holes.h"
@@ -155,34 +167,12 @@ extern "C" {
 #include "runner_doiact_hydro.h"
 #include "runner_doiact_undef.h"
 
-#ifdef __cplusplus
-}
-#endif
 /**
  * @brief The #runner main thread routine.
  *
  * @param data A pointer to this thread's data.
  **/
-
-/* CUDA Header. Wrap in extern "C" to prevent C++ function name mangling */
-#ifdef WITH_CUDA
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include "cuda/part_gpu.h"
-#include <cuda.h>
-#include <cuda_profiler_api.h>
-#include <cuda_runtime.h>
-#include "runner_doiact_functions_hydro_gpu.h"
-#include "runner_gpu_pack_functions.h"
-#include "cuda/GPU_runner_functions.h"
-
-#ifdef __cplusplus
-}
-#endif
-
-void *runner_main2(void *data) {
+void *runner_main_cuda(void *data) {
   struct runner *r = (struct runner *)data;
   struct engine *e = r->e;
   struct scheduler *sched = &e->sched;
@@ -192,26 +182,45 @@ void *runner_main2(void *data) {
   /*pack_vars contain data required for self and pair packing tasks destined
    *  for the GPU*/
   //A. N: Needed
+
+  const int target_n_tasks = sched->pack_size;
+  const int target_n_tasks_pair = sched->pack_size_pair;
+  const int bundle_size = N_TASKS_BUNDLE_SELF;
+  const int bundle_size_pair = N_TASKS_BUNDLE_PAIR;
+  const int n_bundles = (target_n_tasks + bundle_size - 1) / bundle_size;
+  const int n_bundles_pair = (target_n_tasks_pair + bundle_size_pair - 1) / bundle_size_pair;
+  /*A. Nasar: Try to estimate average number of particles per leaf-level cell*/
+  //Get smoothing length/particle spacing
+  const float eta_neighbours = e->s->eta_neighbours;
+  int np_per_cell = ceil(2.0 * eta_neighbours);
+  //Cube to find average number of particles in 3D
+  np_per_cell *= np_per_cell * np_per_cell;
+  /*A. Nasar: Increase parts per recursed task-level cell by buffer to
+    ensure we allocate enough memory*/
+  const int buff = ceil(0.5 * np_per_cell);
+  /*A. Nasar: Multiplication by 2 is also to ensure we do not over-run
+   *  the allocated memory on buffers and GPU. This can happen if calculated h
+   * is larger than cell width and splitting makes bigger than target cells*/
+  //Leave this until we implement recursive self tasks -> Exaggerated as we will
+  //off-load really big cells since we don't recurse
+  const int count_max_parts_tmp = 64 * 8 * target_n_tasks * (np_per_cell + buff);
+
+
   struct pack_vars_self *pack_vars_self_dens;
-  struct pack_vars_self *pack_vars_self_forc;
   struct pack_vars_self *pack_vars_self_grad;
+  struct pack_vars_self *pack_vars_self_forc;
   struct pack_vars_pair *pack_vars_pair_dens;
-  struct pack_vars_pair *pack_vars_pair_forc;
   struct pack_vars_pair *pack_vars_pair_grad;
+  struct pack_vars_pair *pack_vars_pair_forc;
 
-  cudaMallocHost((void **)&pack_vars_self_dens,
-                 sizeof(struct pack_vars_self));
-  cudaMallocHost((void **)&pack_vars_self_forc,
-                 sizeof(struct pack_vars_self));
-  cudaMallocHost((void **)&pack_vars_self_grad,
-                 sizeof(struct pack_vars_self));
+  gpu_init_pack_vars_self(&pack_vars_self_dens, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp);
+  gpu_init_pack_vars_self(&pack_vars_self_grad, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp);
+  gpu_init_pack_vars_self(&pack_vars_self_forc, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp);
+  gpu_init_pack_vars_pair(&pack_vars_pair_dens, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp);
+  gpu_init_pack_vars_pair(&pack_vars_pair_grad, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp);
+  gpu_init_pack_vars_pair(&pack_vars_pair_forc, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp);
 
-  cudaMallocHost((void **)&pack_vars_pair_dens,
-                 sizeof(struct pack_vars_pair));
-  cudaMallocHost((void **)&pack_vars_pair_forc,
-                 sizeof(struct pack_vars_pair));
-  cudaMallocHost((void **)&pack_vars_pair_grad,
-                 sizeof(struct pack_vars_pair));
+
   ///////////////////////////////////////////////////////////////////////////
   /*Find and print GPU name(s)*/
   int devId = 0;  //gpu device name
@@ -253,24 +262,6 @@ void *runner_main2(void *data) {
             N_TASKS_PER_PACK_SELF * nPartsPerCell / BLOCK_SIZE);
     message("free mem %lu, total mem %lu", free_mem, total_mem);
   }
-  //A. Nasar: pack_size defines the total number of leaf-level tasks we will compute for each GPU off-load cycle
-  const int target_n_tasks = sched->pack_size;
-  const int target_n_tasks_pair = sched->pack_size_pair;
-  pack_vars_self_dens->target_n_tasks = target_n_tasks;
-  pack_vars_pair_dens->target_n_tasks = target_n_tasks_pair;
-  pack_vars_self_forc->target_n_tasks = target_n_tasks;
-  pack_vars_pair_forc->target_n_tasks = target_n_tasks_pair;
-  pack_vars_self_grad->target_n_tasks = target_n_tasks;
-  pack_vars_pair_grad->target_n_tasks = target_n_tasks_pair;
-  //A. Nasar: bundle_size defines the number of leaf-level tasks we will compute in each stream
-  const int bundle_size = N_TASKS_BUNDLE_SELF;
-  const int bundle_size_pair = N_TASKS_BUNDLE_PAIR;
-  pack_vars_self_dens->bundle_size = bundle_size;
-  pack_vars_pair_dens->bundle_size = bundle_size_pair;
-  pack_vars_self_forc->bundle_size = bundle_size;
-  pack_vars_pair_forc->bundle_size = bundle_size_pair;
-  pack_vars_self_grad->bundle_size = bundle_size;
-  pack_vars_pair_grad->bundle_size = bundle_size_pair;
   // A. Nasar: Keep track of first and last particles for each self task (particle data is
   // arranged in long arrays containing particles from all the tasks we will
   // work with)
@@ -301,113 +292,31 @@ void *runner_main2(void *data) {
   cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_grad,
           target_n_tasks_pair * sizeof(int4));
 
-  /* A. Nasar: nBundles is the number of task bundles each
-  thread has ==> Used to loop through bundles */
-  int nBundles = (target_n_tasks + bundle_size - 1) / bundle_size;
-  int nBundles_pair =
-      (target_n_tasks_pair + bundle_size_pair - 1) / bundle_size_pair;
-
-  if (r->cpuid == 0 && mpi_rank == 0) {
-    message("engine_rank %i cpuid %i nBundles/nStreams %i\n",
-            engine_rank, r->cpuid, nBundles);
-    message("nBundles/nStreams Pair %i\n", nBundles_pair);
-  }
-
-  pack_vars_self_dens->nBundles = nBundles;
-  pack_vars_pair_dens->nBundles = nBundles_pair;
-  pack_vars_self_forc->nBundles = nBundles;
-  pack_vars_pair_forc->nBundles = nBundles_pair;
-  pack_vars_self_grad->nBundles = nBundles;
-  pack_vars_pair_grad->nBundles = nBundles_pair;
-
-  // first part and last part are the first and last particle ids (locally
-  // within this thread) for each bundle. A. Nasar: All these are used in GPU offload setup
-
-  cudaMallocHost((void **)&pack_vars_self_dens->bundle_first_part,
-                 nBundles * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_self_dens->bundle_last_part,
-                 nBundles * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_self_dens->bundle_first_task_list,
-                 nBundles * sizeof(int));
-
-  cudaMallocHost((void **)&pack_vars_pair_dens->bundle_first_part,
-                 2 * nBundles_pair * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_pair_dens->bundle_last_part,
-                 2 * nBundles_pair * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_pair_dens->bundle_first_task_list,
-                 2 * nBundles_pair * sizeof(int));
-
-  cudaMallocHost((void **)&pack_vars_self_forc->bundle_first_part,
-                 nBundles * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_self_forc->bundle_last_part,
-                 nBundles * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_self_forc->bundle_first_task_list,
-                 nBundles * sizeof(int));
-
-  cudaMallocHost((void **)&pack_vars_pair_forc->bundle_first_part,
-                 2 * nBundles_pair * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_pair_forc->bundle_last_part,
-                 2 * nBundles_pair * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_pair_forc->bundle_first_task_list,
-                 2 * nBundles_pair * sizeof(int));
-
-  cudaMallocHost((void **)&pack_vars_self_grad->bundle_first_part,
-                 nBundles * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_self_grad->bundle_last_part,
-                 nBundles * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_self_grad->bundle_first_task_list,
-                 nBundles * sizeof(int));
-
-  cudaMallocHost((void **)&pack_vars_pair_grad->bundle_first_part,
-                 2 * nBundles_pair * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_pair_grad->bundle_last_part,
-                 2 * nBundles_pair * sizeof(int));
-  cudaMallocHost((void **)&pack_vars_pair_grad->bundle_first_task_list,
-                 2 * nBundles_pair * sizeof(int));
-
   /*Create streams so that we can off-load different batches of work in
    * different streams and get some con-CURRENCY! Events used to maximise
    * asynchrony further*/
 
-  cudaStream_t stream[nBundles];
-  cudaStream_t stream_pairs[nBundles_pair];
+  cudaStream_t stream[n_bundles];
+  cudaStream_t stream_pairs[n_bundles_pair];
 
-  cudaEvent_t self_end[nBundles];
-  for (int i = 0; i < nBundles; i++) cudaEventCreate(&self_end[i]);
-  cudaEvent_t self_end_g[nBundles];
-  for (int i = 0; i < nBundles; i++) cudaEventCreate(&self_end_g[i]);
-  cudaEvent_t self_end_f[nBundles];
-  for (int i = 0; i < nBundles; i++) cudaEventCreate(&self_end_f[i]);
+  cudaEvent_t self_end[n_bundles];
+  for (int i = 0; i < n_bundles; i++) cudaEventCreate(&self_end[i]);
+  cudaEvent_t self_end_g[n_bundles];
+  for (int i = 0; i < n_bundles; i++) cudaEventCreate(&self_end_g[i]);
+  cudaEvent_t self_end_f[n_bundles];
+  for (int i = 0; i < n_bundles; i++) cudaEventCreate(&self_end_f[i]);
 
-  cudaEvent_t pair_end[nBundles_pair];
-  for (int i = 0; i < nBundles_pair; i++) cudaEventCreate(&pair_end[i]);
-  cudaEvent_t pair_end_g[nBundles_pair];
-  for (int i = 0; i < nBundles_pair; i++) cudaEventCreate(&pair_end_g[i]);
-  cudaEvent_t pair_end_f[nBundles_pair];
-  for (int i = 0; i < nBundles_pair; i++) cudaEventCreate(&pair_end_f[i]);
+  cudaEvent_t pair_end[n_bundles_pair];
+  for (int i = 0; i < n_bundles_pair; i++) cudaEventCreate(&pair_end[i]);
+  cudaEvent_t pair_end_g[n_bundles_pair];
+  for (int i = 0; i < n_bundles_pair; i++) cudaEventCreate(&pair_end_g[i]);
+  cudaEvent_t pair_end_f[n_bundles_pair];
+  for (int i = 0; i < n_bundles_pair; i++) cudaEventCreate(&pair_end_f[i]);
 
-  int tasksperbundle = (target_n_tasks + nBundles - 1) / nBundles;
-  int tasksperbundle_pair =
-      (target_n_tasks_pair + nBundles_pair - 1) / nBundles_pair;
-
-  pack_vars_self_dens->tasksperbundle = tasksperbundle;
-  pack_vars_pair_dens->tasksperbundle = tasksperbundle_pair;
-  pack_vars_self_forc->tasksperbundle = tasksperbundle;
-  pack_vars_pair_forc->tasksperbundle = tasksperbundle_pair;
-  pack_vars_self_grad->tasksperbundle = tasksperbundle;
-  pack_vars_pair_grad->tasksperbundle = tasksperbundle_pair;
-
-  for (int i = 0; i < nBundles; ++i)
+  for (int i = 0; i < n_bundles; ++i)
     cudaStreamCreateWithFlags(&stream[i], cudaStreamNonBlocking);
-  for (int i = 0; i < nBundles_pair; ++i)
+  for (int i = 0; i < n_bundles_pair; ++i)
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
-
-  pack_vars_self_dens->count_parts = 0;
-  pack_vars_pair_dens->count_parts = 0;
-  pack_vars_self_forc->count_parts = 0;
-  pack_vars_pair_forc->count_parts = 0;
-  pack_vars_self_grad->count_parts = 0;
-  pack_vars_pair_grad->count_parts = 0;
 
   /*Estimate how many particles to pack for GPU for each GPU launch
    * instruction*/
@@ -416,28 +325,6 @@ void *runner_main2(void *data) {
   if ((res = MPI_Comm_size(MPI_COMM_WORLD, &nr_nodes)) != MPI_SUCCESS)
     error("MPI_Comm_size failed with error %i.", res);
 #endif
-
-  /*A. Nasar: Try to estimate average number of particles per leaf-level cell*/
-  //Get smoothing length/particle spacing
-  float eta_neighbours = e->s->eta_neighbours;
-  int np_per_cell = ceil(2.0 * eta_neighbours);
-  //Cube to find average number of particles in 3D
-  np_per_cell *= np_per_cell * np_per_cell;
-  /*A. Nasar: Increase parts per recursed task-level cell by buffer to
-    ensure we allocate enough memory*/
-  int buff = ceil(0.5 * np_per_cell);
-  /*A. Nasar: Multiplication by 2 is also to ensure we do not over-run
-   *  the allocated memory on buffers and GPU. This can happen if calculated h
-   * is larger than cell width and splitting makes bigger than target cells*/
-  //Leave this until we implement recursive self tasks -> Exaggerated as we will
-  //off-load really big cells since we don't recurse
-  int count_max_parts_tmp = 64 * 8 * target_n_tasks * (np_per_cell + buff);
-  pack_vars_self_dens->count_max_parts = count_max_parts_tmp;
-  pack_vars_pair_dens->count_max_parts = count_max_parts_tmp;
-  pack_vars_self_forc->count_max_parts = count_max_parts_tmp;
-  pack_vars_pair_forc->count_max_parts = count_max_parts_tmp;
-  pack_vars_self_grad->count_max_parts = count_max_parts_tmp;
-  pack_vars_pair_grad->count_max_parts = count_max_parts_tmp;
 
   /*Declare Buffer and GPU particle arrays*/
   struct part_aos_f4_send *parts_aos_f4_send;
@@ -543,56 +430,34 @@ void *runner_main2(void *data) {
   int step = 0;
 
   // a list of the cells and tasks the GPU will work on
-  pack_vars_self_dens->task_list =
-      (struct task **)calloc(target_n_tasks, sizeof(struct task *));
-  pack_vars_self_dens->cell_list =
-      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
-
-  pack_vars_self_forc->task_list =
-      (struct task **)calloc(target_n_tasks, sizeof(struct task *));
-  pack_vars_self_forc->cell_list =
-      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
-
-  pack_vars_self_grad->task_list =
-      (struct task **)calloc(target_n_tasks, sizeof(struct task *));
-  pack_vars_self_grad->cell_list =
-      (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
-
-  /*Allocate memory for task pointers per top level task*/
-  pack_vars_pair_dens->top_task_list =
-      (struct task **)calloc(target_n_tasks_pair, sizeof(struct task *));
-  pack_vars_pair_grad->top_task_list =
-      (struct task **)calloc(target_n_tasks_pair, sizeof(struct task *));
-  pack_vars_pair_forc->top_task_list =
-      (struct task **)calloc(target_n_tasks_pair, sizeof(struct task *));
 
   //A. Nasar: Over-setimate better than under-estimate
   /*A. Nasar: Over-allocated for now but a good guess is multiply by 2 to ensure we always have room for recursing through more tasks than we plan to offload*/
   int max_length = 2 * target_n_tasks_pair * 2;
-  struct cell **ci_dd = malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_dd = malloc(max_length * sizeof(struct cell *));
-  struct cell **ci_dg = malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_dg = malloc(max_length * sizeof(struct cell *));
-  struct cell **ci_df = malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_df = malloc(max_length * sizeof(struct cell *));
+  struct cell **ci_dd = (struct cell**)malloc(max_length * sizeof(struct cell *));
+  struct cell **cj_dd = (struct cell**)malloc(max_length * sizeof(struct cell *));
+  struct cell **ci_dg = (struct cell**)malloc(max_length * sizeof(struct cell *));
+  struct cell **cj_dg = (struct cell**)malloc(max_length * sizeof(struct cell *));
+  struct cell **ci_df = (struct cell**)malloc(max_length * sizeof(struct cell *));
+  struct cell **cj_df = (struct cell**)malloc(max_length * sizeof(struct cell *));
   int **first_and_last_daughters_d;
   int **first_and_last_daughters_g;
   int **first_and_last_daughters_f;
 
   //A. Nasar: This is over-kill but it's necessary in case we start of with top level cells that are all leaf cells
-  struct cell **ci_top_d = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_d = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **ci_top_g = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_g = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **ci_top_f = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_f = malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
-  first_and_last_daughters_d = malloc(target_n_tasks_pair * 2 * sizeof(int *));
-  first_and_last_daughters_g = malloc(target_n_tasks_pair * 2 * sizeof(int *));
-  first_and_last_daughters_f = malloc(target_n_tasks_pair * 2 * sizeof(int *));
+  struct cell **ci_top_d = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **cj_top_d = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **ci_top_g = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **cj_top_g = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **ci_top_f = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  struct cell **cj_top_f = (struct cell**)malloc(2 * target_n_tasks_pair * sizeof(struct cell *));
+  first_and_last_daughters_d = (int**)malloc(target_n_tasks_pair * 2 * sizeof(int *));
+  first_and_last_daughters_g = (int**)malloc(target_n_tasks_pair * 2 * sizeof(int *));
+  first_and_last_daughters_f = (int**)malloc(target_n_tasks_pair * 2 * sizeof(int *));
   for (int i = 0; i < target_n_tasks_pair * 2; i++){
-	  first_and_last_daughters_d[i] = malloc(2 * sizeof(int));
-	  first_and_last_daughters_g[i] = malloc(2 * sizeof(int));
-	  first_and_last_daughters_f[i] = malloc(2 * sizeof(int));
+	  first_and_last_daughters_d[i] = (int*)malloc(2 * sizeof(int));
+	  first_and_last_daughters_g[i] = (int*)malloc(2 * sizeof(int));
+	  first_and_last_daughters_f[i] = (int*)malloc(2 * sizeof(int));
   }
 
   /* Main loop. */
@@ -1452,10 +1317,9 @@ void *runner_main2(void *data) {
   return NULL;
 }
 
-ticks runner_get_active_time(const struct runner *restrict r) {
-  return r->active_time;
+#ifdef __cplusplus
 }
-
-void runner_reset_active_time(struct runner *restrict r) { r->active_time = 0; }
+#endif
 
 #endif  // WITH_CUDA
+
