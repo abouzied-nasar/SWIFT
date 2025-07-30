@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#include "gpu_pack_vars.h"
+#include "GPU_pack_vars.h"
 
 void gpu_init_pack_vars_self(
     struct pack_vars_self **pv,

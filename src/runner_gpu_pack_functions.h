@@ -2,19 +2,20 @@
 #include "runner.h"
 #include "timeline.h"
 
-#ifdef HAVE_CUDA
-#pragma message "HAVE_CUDA"
+/* Temporary warning during dev works. */
+#if !(defined(HAVE_CUDA) || defined(HAVE_HIP))
+#pragma warning "Don't have CUDA nor HIP"
+#endif
+
+#ifdef WITH_CUDA
 #include "cuda/GPU_part_structs.h"
 #endif
 
-// #define WITH_HIP
-#ifdef HAVE_HIP
+#ifdef WITH_HIP
 #pragma message "YES"
-#include "hip/part_gpu.h"
-// #else
-// #error "NOPE"
+#include "hip/GPU_part_structs.h"
 #endif
-// #include "hip/part_gpu.h"
+
 void runner_doself1_gpu_pack(
     struct runner *r, struct cell *c, int timer, int *pack_length, double *x_p,
     double *y_p, double *z_p, int tid, int *tid_p, long long *id, float *ux,

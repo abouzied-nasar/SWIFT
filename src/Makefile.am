@@ -556,10 +556,12 @@ nobase_noinst_HEADERS += fvpm_geometry.h fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/None/fvpm_geometry.h fvpm_geometry/None/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/fvpm_geometry.h fvpm_geometry/Gizmo/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/MFM/fvpm_geometry.h fvpm_geometry/Gizmo/MFV/fvpm_geometry.h
-nobase_noinst_HEADERS += gpu_pack_vars.h
-nobase_noinst_HEADERS += cuda/BLOCK_SIZE.h cuda/GPU_data_buffers.h
+# GPU stuff
+nobase_noinst_HEADERS += GPU_pack_vars.h
+nobase_noinst_HEADERS += cuda/GPU_data_buffers.h
 nobase_noinst_HEADERS += cuda/GPU_runner_functions.h  cuda/GPU_part_structs.h
-nobase_noinst_HEADERS += gpu_pack_vars.h runner_gpu_pack_functions.h
+nobase_noinst_HEADERS += runner_gpu_pack_functions.h
+# todo: Add HIP C-headers without base files here
 
 # Sources and special flags for the gravity library
 libgrav_la_SOURCES = runner_doiact_grav.c
