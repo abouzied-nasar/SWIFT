@@ -7,7 +7,7 @@ extern "C" {
 #endif
 #include <cuda_runtime.h>
 
-#include "part_gpu.h"
+#include "GPU_part_structs.h"
 
 void launch_density_kernel(struct part_soa parts_soa, int *d_task_first_part,
                            int *d_task_last_part, float d_a, float d_H,

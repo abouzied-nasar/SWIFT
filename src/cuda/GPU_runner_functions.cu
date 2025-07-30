@@ -36,7 +36,7 @@ extern "C" {
 
 #include "GPU_runner_functions.h"
 #include "device_functions.h"
-#include "part_gpu.h"
+#include "GPU_part_structs.h"
 
 
 /* function to initialise GPU and printout GPU name*/

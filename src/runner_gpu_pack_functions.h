@@ -4,7 +4,7 @@
 
 #ifdef HAVE_CUDA
 #pragma message "HAVE_CUDA"
-#include "cuda/part_gpu.h"
+#include "cuda/GPU_part_structs.h"
 #endif
 
 // #define WITH_HIP

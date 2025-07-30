@@ -258,7 +258,7 @@ AM_SOURCES += $(GEAR_RT_SOURCES)
 AM_SOURCES += swift_lustre_api.c
 
 # Include files for distribution, not installation.
-nobase_noinst_HEADERS = align.h approx_math.h atomic.h barrier.h cycle.h error.h inline.h kernel_hydro.h kernel_gravity.h runner_gpu_pack_functions.h
+nobase_noinst_HEADERS = align.h approx_math.h atomic.h barrier.h cycle.h error.h inline.h kernel_hydro.h kernel_gravity.h
 nobase_noinst_HEADERS += gravity_iact.h kernel_long_gravity.h vector.h accumulate.h cache.h exp.h log.h
 nobase_noinst_HEADERS += runner_doiact_nosort.h runner_doiact_hydro.h runner_doiact_stars.h runner_doiact_black_holes.h runner_doiact_grav.h
 nobase_noinst_HEADERS += runner_doiact_functions_hydro.h runner_doiact_functions_stars.h runner_doiact_functions_black_holes.h
@@ -558,7 +558,7 @@ nobase_noinst_HEADERS += fvpm_geometry/Gizmo/fvpm_geometry.h fvpm_geometry/Gizmo
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/MFM/fvpm_geometry.h fvpm_geometry/Gizmo/MFV/fvpm_geometry.h
 nobase_noinst_HEADERS += gpu_pack_vars.h
 nobase_noinst_HEADERS += cuda/BLOCK_SIZE.h cuda/GPU_data_buffers.h
-nobase_noinst_HEADERS += cuda/GPU_runner_functions.h  cuda/part_gpu.h
+nobase_noinst_HEADERS += cuda/GPU_runner_functions.h  cuda/GPU_part_structs.h
 nobase_noinst_HEADERS += gpu_pack_vars.h runner_gpu_pack_functions.h
 
 # Sources and special flags for the gravity library

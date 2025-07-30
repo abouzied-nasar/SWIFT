@@ -35,7 +35,6 @@ extern "C" {
 #endif
 
 /* Config parameters. */
-/* #include "<config.h>" */ // TODO: WHY IS THIS NOT WORKING?
 #include "../config.h"
 
 /* MPI headers. */
@@ -61,7 +60,7 @@ extern "C" {
 #include "space_getsid.h"
 #include "timers.h"
 
-#include "cuda/part_gpu.h"
+#include "cuda/GPU_part_structs.h"
 #include "cuda/GPU_runner_functions.h"
 #include "cuda/GPU_data_buffers.h"
 #include "runner_doiact_functions_hydro_gpu.h"
