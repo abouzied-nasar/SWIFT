@@ -8,9 +8,9 @@ extern "C" {
 #include <vector_types.h>
 
 /**
- * TODO: documentation
+ * TODO Abouzeid: documentation
  */
-static struct pack_vars_self {
+struct pack_vars_self {
   /*List of tasks and respective cells to be packed*/
   struct task **task_list;
   struct task **top_task_list;
@@ -42,13 +42,12 @@ static struct pack_vars_self {
   int target_n_tasks;
   int n_bundles;
   int tasksperbundle;
-
-} pack_vars_self;
+};
 
 /**
- * TODO: documentation
+ * TODO Abouzeid: documentation
  */
-static struct pack_vars_pair {
+struct pack_vars_pair {
   /*List of tasks and respective cells to be packed*/
   struct task **task_list;
   struct task **top_task_list;
@@ -86,12 +85,12 @@ static struct pack_vars_pair {
   int n_leaves_found;
   int n_leaves_total;
 
-} pack_vars_pair;
+};
 
 /**
- * TODO: documentation
+ * TODO Abouzeid: documentation
  */
-static struct pack_vars_pair_f4 {
+struct pack_vars_pair_f4 {
   /*List of tasks and respective cells to be packed*/
   struct task **task_list;
   struct cell **ci_list;
@@ -117,7 +116,7 @@ static struct pack_vars_pair_f4 {
   int nBundles;
   int tasksperbundle;
 
-} pack_vars_pair_f4;
+};
 
 #ifdef __cplusplus
 }
