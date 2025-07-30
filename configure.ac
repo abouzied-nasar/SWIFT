@@ -3519,7 +3519,9 @@ AC_MSG_RESULT([
    LUSTRE API enabled   : $have_lustreapi
    METIS/ParMETIS       : $have_metis / $have_parmetis
    CUDA enabled         : $have_cuda
+    - flags             : $NVCC_FLAGS
    HIP enabled          : $have_hip
+    - flags             : $HIPCC_FLAGS
    FFTW3 enabled        : $have_fftw
     - threaded/openmp   : $have_threaded_fftw / $have_openmp_fftw
     - MPI               : $have_mpi_fftw
