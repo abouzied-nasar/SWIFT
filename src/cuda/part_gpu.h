@@ -195,7 +195,12 @@ typedef struct part_aos_f4_send {
    * pair tasks*/
   int2 cjs_cje;
 
-} part_aos_f4_send __attribute__((aligned(SWIFT_STRUCT_ALIGNMENT)));
+} part_aos_f4_send;// __attribute__((aligned(SWIFT_STRUCT_ALIGNMENT)));
+//Cell containing 128 particles to send to GPU
+typedef struct cell_gpu_send{
+	struct part_aos_f4_send parts[128];
+	int count;
+} cell_gpu_send;
 
 typedef struct part_aos_f4_recv {
   /* Density information; rho */
@@ -207,6 +212,12 @@ typedef struct part_aos_f4_recv {
    * velocity divergence; div_v */
   float4 rot_ux_div_v;
 } part_aos_f4_recv;
+
+//Cell containing 128 particles to send results back to CPU
+typedef struct cell_gpu_recv{
+	struct part_aos_f4_recv parts[128];
+	int count;
+} cell_gpu_recv;
 
 /*Container for particle data required for density calcs*/
 typedef struct part_aos_f4 {

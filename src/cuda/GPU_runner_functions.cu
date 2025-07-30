@@ -3384,6 +3384,16 @@ void runner_dopair_branch_density_gpu_aos_f4(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
+void runner_dopair_tester(
+		struct cell_gpu_send * c_send, struct cell_gpu_send * c_recv,
+        int n_packed) {
+
+//  dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
+
+//  runner_do_pair_density_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
+//      parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
+}
+
 void runner_dopairci_branch_density_gpu_aos_g(
     struct part_aos_g *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,

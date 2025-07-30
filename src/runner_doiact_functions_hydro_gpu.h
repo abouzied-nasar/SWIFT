@@ -3168,7 +3168,9 @@ void runner_dopair1_unpack_f4_f(
     pthread_mutex_unlock(&s->sleep_mutex);
   }
 }
-
+int comp(const void* a,const void* b) {
+  	return *(int*)a - *(int*)b;
+}
 void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, struct cell * ci, struct cell * cj, struct pack_vars_pair *pack_vars,
     struct task *t, struct part_aos_f4_f_send *parts_send,
     struct part_aos_f4_f_recv *parts_recv, struct part_aos_f4_f_send *d_parts_send,
@@ -3216,6 +3218,72 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
 
   cell_unlocktree(ci);
   cell_unlocktree(cj);
+  struct cell_gpu_send * c_list_send, * d_c_list_send;
+  struct cell_gpu_recv * c_list_recv, * d_c_list_recv;
+  cudaMallocHost((void **)&c_list_send, 2 * copy_index * sizeof(cell_gpu_send));
+  cudaMalloc((void **)&d_c_list_send, 2 * copy_index * sizeof(cell_gpu_send));
+  cudaMallocHost((void **)&c_list_recv, 2 * copy_index * sizeof(cell_gpu_recv));
+  cudaMalloc((void **)&d_c_list_recv, 2 * copy_index * sizeof(cell_gpu_recv));
+
+  cudaError_t cu_error = cudaPeekAtLastError();  // cudaGetLastError();        //
+  // Get error code
+  if (cu_error != cudaSuccess) {
+	    error("CUDA error with mallocs: %s cpuid id is: %i\n ",
+	            cudaGetErrorString(cu_error), r->cpuid);
+  }
+
+  for(int dt = 0; dt < copy_index; dt++){
+	  for(int id = 0; id < ci_d[dt]->hydro.count; id++){
+//		  struct part p = &ci_d[dt]->hydro.parts[id];
+		  const struct part *p = &ci_d[dt]->hydro.parts[id];
+		  const double *x = part_get_const_x(p);
+		  c_list_send[dt].parts[id].x_p_h.x = x[0];
+		  c_list_send[dt].parts[id].x_p_h.y = x[1];
+		  c_list_send[dt].parts[id].x_p_h.z = x[2];
+		  c_list_send[dt].parts[id].x_p_h.z = part_get_h(p);
+		  const float *v = part_get_const_v(p);
+		  c_list_send[dt].parts[id].ux_m.x = v[0];
+		  c_list_send[dt].parts[id].ux_m.y = v[1];
+		  c_list_send[dt].parts[id].ux_m.z = v[2];
+	  }
+	  for(int id = 0; id < cj_d[dt]->hydro.count; id++){
+		  const struct part *p = &ci_d[dt]->hydro.parts[id];
+		  const double *x = part_get_const_x(p);
+		  c_list_send[dt + 1].parts[id].x_p_h.x = x[0];
+		  c_list_send[dt + 1].parts[id].x_p_h.y = x[1];
+		  c_list_send[dt + 1].parts[id].x_p_h.z = x[2];
+		  c_list_send[dt + 1].parts[id].x_p_h.z = part_get_h(p);
+		  const float *v = part_get_const_v(p);
+		  c_list_send[dt + 1].parts[id].ux_m.x = v[0];
+		  c_list_send[dt + 1].parts[id].ux_m.y = v[1];
+		  c_list_send[dt + 1].parts[id].ux_m.z = v[2];
+	  }
+  }
+  cudaMemcpy(&d_c_list_send[0], &c_list_send[0],
+		  2 * copy_index * sizeof(struct cell_gpu_send),
+                  cudaMemcpyHostToDevice);
+
+
+  runner_dopair_tester(
+  		d_c_list_send, d_c_list_recv, copy_index);
+
+  cu_error = cudaPeekAtLastError();  // cudaGetLastError();        //
+  // Get error code
+  if (cu_error != cudaSuccess) {
+    error("CUDA error with memcpys: %s copy_index is %i",
+            cudaGetErrorString(cu_error), r->cpuid);
+  }
+  cudaFreeHost(c_list_send);
+  cudaFree(d_c_list_send);
+  cudaFreeHost(c_list_recv);
+  cudaFree(d_c_list_recv);
+
+  cu_error = cudaPeekAtLastError();  // cudaGetLastError();        //
+  // Get error code
+  if (cu_error != cudaSuccess) {
+	    error("CUDA error with frees: %s cpuid id is: %i\n ",
+	            cudaGetErrorString(cu_error), r->cpuid);
+  }
 
   while(npacked < n_leaves_found){
     top_tasks_packed = pack_vars->top_tasks_packed;
@@ -3225,6 +3293,7 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
     runner_dopair1_pack_f4_ff(
         r, s, pack_vars, cii, cjj, t,
         parts_send, e, fparti_fpartj_lparti_lpartj_forc);
+
     //record number of tasks we've copied from last launch
     copy_index++;
     n_p_current_task++;
@@ -3242,46 +3311,46 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
     if(pack_vars->launch || (pack_vars->launch_leftovers && npacked == n_leaves_found)){
 
 ///////////A. Nasar: Test code to find duplicates. Keep but comment out as will be useful in future/////////////////////////////
-//      int ciID[t_packed], cjID[t_packed], resI[t_packed], resJ[t_packed];
-//      struct cell **ci_unique = malloc(t_packed * sizeof(struct cell *));
-//	  struct cell **cj_unique = malloc(t_packed * sizeof(struct cell *));
-//	  for(int i = 0; i < t_packed; i++){
+      int ciID[target_n_tasks_tmp], cjID[target_n_tasks_tmp], resI[target_n_tasks_tmp], resJ[target_n_tasks_tmp];
+      struct cell **ci_unique = malloc(target_n_tasks_tmp * sizeof(struct cell *));
+	  struct cell **cj_unique = malloc(target_n_tasks_tmp * sizeof(struct cell *));
+//	  for(int i = 0; i < target_n_tasks_tmp; i++){
 //		  ci_unique[i] = malloc(sizeof(struct cell *));
 //		  cj_unique[i] = malloc(sizeof(struct cell *));
 //	  }
-//
-//	  int count_all = 0;
-//      for (int topi = 0; topi < pack_vars->top_tasks_packed; topi++) {
-//        /* Loop through each daughter task */
-//        for (int i = f_l_daughters[topi][0]; i < f_l_daughters[topi][1]; i++){
-//        	ciID[count_all] = ci_d[i]->cellID;
-//        	cjID[count_all++] = cj_d[i]->cellID;
-//        }
-//      }
-//      qsort(ciID, count_all, sizeof(int), compare_ints);
-//      qsort(cjID, count_all, sizeof(int), compare_ints);
-//
-//      unsigned int index_i = 0;
-//      unsigned int index_j = 0;
-//      for (int i = 0; i < count_all; i++){
-//    	  if(i == 0 || ciID[i] != ciID[i-1])
-//    		  resI[index_i++] = ciID[i];
-//    	  if(i == 0 || cjID[i] != cjID[i-1])
-//    		  resJ[index_j++] = cjID[i];
-//      }
-//      int uniQQQ = 0;
-//      for(int i = 0; i < index_i; i++){
-//    	  int uniq = 1;
-//    	  for(int j = 0; j < index_j; j++){
-//    		  if(resI[i] == resJ[j]){
-//    			  uniq = 0;
-//    			  break;
-//    		  }
-//    	  }
-//    	  if (uniq)
-//    		  uniQQQ++;
-//      }
-//      message("packed %i indexI %i indexJ %i uniQQQ %i RATIO %f", t_packed, index_i, index_j, uniQQQ, (float)t_packed/(float)uniQQQ);
+
+	  int count_all = 0;
+      for (int topi = 0; topi < pack_vars->top_tasks_packed; topi++) {
+        /* Loop through each daughter task */
+        for (int i = f_l_daughters[topi][0]; i < f_l_daughters[topi][1]; i++){
+        	ciID[count_all] = ci_d[i]->cellID;
+        	cjID[count_all++] = cj_d[i]->cellID;
+        }
+      }
+      qsort(ciID, count_all, sizeof(int), comp);
+      qsort(cjID, count_all, sizeof(int), comp);
+
+      unsigned int index_i = 0;
+      unsigned int index_j = 0;
+      for (int i = 0; i < count_all; i++){
+    	  if(i == 0 || ciID[i] != ciID[i-1])
+    		  resI[index_i++] = ciID[i];
+    	  if(i == 0 || cjID[i] != cjID[i-1])
+    		  resJ[index_j++] = cjID[i];
+      }
+      int uniQQQ = 0;
+      for(int i = 0; i < index_i; i++){
+    	  int uniq = 1;
+    	  for(int j = 0; j < index_j; j++){
+    		  if(resI[i] == resJ[j]){
+    			  uniq = 0;
+    			  break;
+    		  }
+    	  }
+    	  if (uniq)
+    		  uniQQQ++;
+      }
+      message("packed %i indexI %i indexJ %i uniQQQ %i RATIO %f", target_n_tasks_tmp, index_i, index_j, uniQQQ, (float)target_n_tasks_tmp/(float)uniQQQ);
 ///////////Test code to find duplicates. Keep but comment out as will be useful in future/////////////////////////////
 
       launched = 1;
