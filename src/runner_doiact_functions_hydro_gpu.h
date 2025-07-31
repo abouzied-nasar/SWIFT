@@ -3218,8 +3218,11 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
 
   cell_unlocktree(ci);
   cell_unlocktree(cj);
-  struct cell_gpu_send * c_list_send, * d_c_list_send;
-  struct cell_gpu_recv * c_list_recv, * d_c_list_recv;
+  struct cell_gpu_send * c_list_send;
+  struct cell_gpu_send * d_c_list_send;
+  struct cell_gpu_recv * c_list_recv;
+  struct cell_gpu_recv * d_c_list_recv;
+
   cudaMallocHost((void **)&c_list_send, 2 * n_leaves_found * sizeof(cell_gpu_send));
   cudaMalloc((void **)&d_c_list_send, 2 * n_leaves_found * sizeof(cell_gpu_send));
   cudaMallocHost((void **)&c_list_recv, 2 * n_leaves_found * sizeof(cell_gpu_recv));
@@ -3232,7 +3235,8 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
 	            cudaGetErrorString(cu_error), r->cpuid);
   }
 
-  for(int dt = 0; dt < n_leaves_found; dt++){
+  int dt =0;
+  while(dt < n_leaves_found){
 	  c_list_send[dt].count = 0;
 	  c_list_send[dt+1].count = 0;
 	  for(int id = 0; id < ci_d[dt]->hydro.count; id++){
@@ -3264,7 +3268,9 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
 		  c_list_send[dt + 1].parts[id].ux_m.w = part_get_mass(p);
 		  c_list_send[dt + 1].count++;
 	  }
+	  dt+=2;
   }
+
   cudaMemcpy(&d_c_list_send[0], &c_list_send[0],
 		  2 * n_leaves_found * sizeof(struct cell_gpu_send),
                   cudaMemcpyHostToDevice);

@@ -1942,7 +1942,7 @@ __device__ void DOPAIR2NAIVEGPUTESTER(const int pid, const int cid,
   //  printf("js %i je %i\n", cj_start, cj_end);
   /*Particles copied in blocks to shared memory*/
   for (int j = 0; j < j_count; j++) {
-    struct part_aos_f4_send pj = cells_send[cid + 1].parts[j];
+    const part_aos_f4_send pj = cells_send[cid + 1].parts[j];
 
     const float4 x_p_h_j = pj.x_p_h;
     const float4 ux_m_j = pj.ux_m;
