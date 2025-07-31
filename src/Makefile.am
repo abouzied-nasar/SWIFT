@@ -76,7 +76,7 @@ include_HEADERS += statistics.h memswap.h cache.h runner_doiact_hydro_vec.h runn
 include_HEADERS += csds.h active.h timeline.h xmf.h gravity_properties.h gravity_derivatives.h
 include_HEADERS += gravity_softened_derivatives.h vector_power.h collectgroup.h hydro_space.h sort_part.h
 include_HEADERS += chemistry.h chemistry_additions.h chemistry_io.h chemistry_struct.h chemistry_debug.h
-include_HEADERS += cosmology.h restart.h space_getsid.h utilities.h
+include_HEADERS += cosmology.h restart.h space_getsid.h utilities.h part_type.h 
 include_HEADERS += cbrt.h exp10.h velociraptor_interface.h swift_velociraptor_part.h output_list.h
 include_HEADERS += csds_io.h
 include_HEADERS += tracers_io.h tracers.h tracers_triggers.h tracers_struct.h tracers_debug.h
@@ -109,7 +109,7 @@ include_HEADERS += swift_lustre_api.h
 # C-Headers (not cuda, i.e. not device!) with accompanying base .c files go here.
 # C-Headers without any accompanying base files go to nobase_noinst_HEADERS.
 # cuda/hip headers with accompanying .cu/.hip base files go in libswift_[cuda,swift]_device_a_HEADERS.
-include_HEADERS += runner_gpu_pack_functions.h cuda/GPU_data_buffers.h cuda/GPU_utils.h
+include_HEADERS += runner_gpu_pack_functions.h cuda/GPU_data_buffers.h cuda/GPU_utils.h cuda/cuda_config.h
 
 # source files for EAGLE extra I/O
 EAGLE_EXTRA_IO_SOURCES=
@@ -268,7 +268,8 @@ nobase_noinst_HEADERS += runner_doiact_nosort.h runner_doiact_hydro.h runner_doi
 nobase_noinst_HEADERS += runner_doiact_functions_hydro.h runner_doiact_functions_stars.h runner_doiact_functions_black_holes.h
 nobase_noinst_HEADERS += runner_doiact_functions_limiter.h runner_doiact_functions_sinks.h runner_doiact_limiter.h units.h swift_intrinsics.h minmax.h
 nobase_noinst_HEADERS += runner_doiact_sinks.h
-nobase_noinst_HEADERS += kick.h timestep.h drift.h adiabatic_index.h io_properties.h dimension.h part_type.h periodic.h memswap.h
+nobase_noinst_HEADERS += black_holes_part.h gravity_part.h hydro_part.h sink_part.h stars_part.h
+nobase_noinst_HEADERS += kick.h timestep.h drift.h adiabatic_index.h io_properties.h dimension.h periodic.h memswap.h
 nobase_noinst_HEADERS += timestep_limiter.h timestep_limiter_iact.h timestep_sync.h timestep_sync_part.h timestep_limiter_struct.h
 nobase_noinst_HEADERS += csds.h sign.h csds_io.h hashmap.h gravity.h gravity_io.h gravity_csds.h  gravity_cache.h output_options.h
 nobase_noinst_HEADERS += gravity/Default/gravity.h gravity/Default/gravity_iact.h gravity/Default/gravity_io.h

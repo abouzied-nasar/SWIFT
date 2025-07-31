@@ -24,9 +24,6 @@ extern "C" {
 /* Required header files */
 #include <config.h>
 
-#ifndef BLOCK_SIZE_H
-#include "BLOCK_SIZE.h"
-#endif
 
 #include <cuda.h>
 #include <cuda_device_runtime_api.h>
@@ -37,6 +34,7 @@ extern "C" {
 #include "GPU_runner_functions.h"
 #include "device_functions.h"
 #include "GPU_part_structs.h"
+#include "cuda_config.h"
 
 
 /* function to initialise GPU and printout GPU name*/
