@@ -99,6 +99,9 @@ void runner_dopair_branch_density_gpu_aos_f4(
     struct part_aos_f4_send *parts_send, struct part_aos_f4_recv *parts_recv,
     float d_a, float d_H, cudaStream_t stream, int numBlocks_x, int numBlocks_y,
     int bundle_first_part, int bundle_n_parts);
+void runner_dopair_tester(
+        struct cell_gpu_send * c_send, struct cell_gpu_recv * c_recv,
+        int n_packed, int numBlocks_x, int numBlocks_y);
 void runner_dopaircj_branch_density_gpu_aos(
     struct part_aos *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, const char *loop_type,
