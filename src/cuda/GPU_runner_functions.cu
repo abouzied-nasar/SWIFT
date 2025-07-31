@@ -15,8 +15,8 @@
 #endif
 #endif
 
-/*ifdef __cplusplus prevents name mangling. C code sees exact names
- of functions rather than mangled template names produced by C++*/
+/* ifdef __cplusplus prevents name mangling. C code sees exact names
+ of functions rather than mangled template names produced by C++ */
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -31,13 +31,13 @@ extern "C" {
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-#include "GPU_runner_functions.h"
-#include "device_functions.h"
 #include "GPU_part_structs.h"
+#include "GPU_runner_functions.h"
 #include "cuda_config.h"
+#include "device_functions.h"
 
 
-/* function to initialise GPU and printout GPU name*/
+/* function to initialise GPU and printout GPU name */
 void Initialise_GPU() {
   int devId = 0;
   // find and print device name

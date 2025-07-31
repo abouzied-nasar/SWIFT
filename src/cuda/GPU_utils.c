@@ -57,8 +57,8 @@ void gpu_init_thread(const struct engine* e, const int cpuid){
     message("max blocks per stream:      %i", n_SMs * max_blocks_SM);
     message("Target n_blocks per kernel: %i", N_TASKS_BUNDLE_SELF * nPartsPerCell / BLOCK_SIZE);
     message("Target n_blocks per stream: %i", N_TASKS_PER_PACK_SELF * nPartsPerCell / BLOCK_SIZE);
-    message("free mem:                   %lu", free_mem);
-    message("total mem:                  %lu", total_mem);
+    message("free mem:                   %.3g GB", ((double)free_mem) / (1024. * 1024. * 1024.));
+    message("total mem:                  %.3g GB", ((double)total_mem) / (1024. * 1024. * 1024.));
   }
 }
 
@@ -79,7 +79,9 @@ void gpu_print_free_mem(const struct engine* e, const int cpuid){
   size_t total_mem;
   cudaMemGetInfo(&free_mem, &total_mem);
   if (cpuid == 0) {
-    message("After allocation: free mem: %lu / total mem: %lu", free_mem, total_mem);
+    message("After allocation: free mem: %.3g GB, total mem: %.3g GB",
+        ((double)free_mem) / (1024. * 1024. * 1024.),
+        ((double)total_mem) / (1024. * 1024. * 1024.));
   }
 }
 
