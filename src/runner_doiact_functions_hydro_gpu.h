@@ -3220,10 +3220,10 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
   cell_unlocktree(cj);
   struct cell_gpu_send * c_list_send, * d_c_list_send;
   struct cell_gpu_recv * c_list_recv, * d_c_list_recv;
-  cudaMallocHost((void **)&c_list_send, 2 * copy_index * sizeof(cell_gpu_send));
-  cudaMalloc((void **)&d_c_list_send, 2 * copy_index * sizeof(cell_gpu_send));
-  cudaMallocHost((void **)&c_list_recv, 2 * copy_index * sizeof(cell_gpu_recv));
-  cudaMalloc((void **)&d_c_list_recv, 2 * copy_index * sizeof(cell_gpu_recv));
+  cudaMallocHost((void **)&c_list_send, 2 * n_leaves_found * sizeof(cell_gpu_send));
+  cudaMalloc((void **)&d_c_list_send, 2 * n_leaves_found * sizeof(cell_gpu_send));
+  cudaMallocHost((void **)&c_list_recv, 2 * n_leaves_found * sizeof(cell_gpu_recv));
+  cudaMalloc((void **)&d_c_list_recv, 2 * n_leaves_found * sizeof(cell_gpu_recv));
 
   cudaError_t cu_error = cudaPeekAtLastError();  // cudaGetLastError();        //
   // Get error code
@@ -3232,7 +3232,9 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
 	            cudaGetErrorString(cu_error), r->cpuid);
   }
 
-  for(int dt = 0; dt < copy_index; dt++){
+  for(int dt = 0; dt < n_leaves_found; dt++){
+	  c_list_send[dt].count = 0;
+	  c_list_send[dt+1].count = 0;
 	  for(int id = 0; id < ci_d[dt]->hydro.count; id++){
 //		  struct part p = &ci_d[dt]->hydro.parts[id];
 		  const struct part *p = &ci_d[dt]->hydro.parts[id];
@@ -3240,11 +3242,13 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
 		  c_list_send[dt].parts[id].x_p_h.x = x[0];
 		  c_list_send[dt].parts[id].x_p_h.y = x[1];
 		  c_list_send[dt].parts[id].x_p_h.z = x[2];
-		  c_list_send[dt].parts[id].x_p_h.z = part_get_h(p);
+		  c_list_send[dt].parts[id].x_p_h.w = part_get_h(p);
 		  const float *v = part_get_const_v(p);
 		  c_list_send[dt].parts[id].ux_m.x = v[0];
 		  c_list_send[dt].parts[id].ux_m.y = v[1];
 		  c_list_send[dt].parts[id].ux_m.z = v[2];
+		  c_list_send[dt].parts[id].ux_m.w = part_get_mass(p);
+		  c_list_send[dt].count++;
 	  }
 	  for(int id = 0; id < cj_d[dt]->hydro.count; id++){
 		  const struct part *p = &ci_d[dt]->hydro.parts[id];
@@ -3252,33 +3256,51 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
 		  c_list_send[dt + 1].parts[id].x_p_h.x = x[0];
 		  c_list_send[dt + 1].parts[id].x_p_h.y = x[1];
 		  c_list_send[dt + 1].parts[id].x_p_h.z = x[2];
-		  c_list_send[dt + 1].parts[id].x_p_h.z = part_get_h(p);
+		  c_list_send[dt + 1].parts[id].x_p_h.w = part_get_h(p);
 		  const float *v = part_get_const_v(p);
 		  c_list_send[dt + 1].parts[id].ux_m.x = v[0];
 		  c_list_send[dt + 1].parts[id].ux_m.y = v[1];
 		  c_list_send[dt + 1].parts[id].ux_m.z = v[2];
+		  c_list_send[dt + 1].parts[id].ux_m.w = part_get_mass(p);
+		  c_list_send[dt + 1].count++;
 	  }
   }
   cudaMemcpy(&d_c_list_send[0], &c_list_send[0],
-		  2 * copy_index * sizeof(struct cell_gpu_send),
+		  2 * n_leaves_found * sizeof(struct cell_gpu_send),
                   cudaMemcpyHostToDevice);
   int max_n_parts = 0;
-  for(int i = 0; i < copy_index; i++){
+  for(int i = 0; i < n_leaves_found; i++){
 	max_n_parts = max(max_n_parts, c_list_send[i].count);
 	max_n_parts = max(max_n_parts, c_list_send[i + 1].count);
   }
 
-  int numBlocks_y = copy_index;
+  int numBlocks_y = n_leaves_found;
   int numBlocks_x = (max_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
   runner_dopair_tester(
-  		d_c_list_send, d_c_list_recv, copy_index, numBlocks_x, numBlocks_y);
+  		d_c_list_send, d_c_list_recv, n_leaves_found, numBlocks_x, numBlocks_y);
 
   cu_error = cudaPeekAtLastError();  // cudaGetLastError();        //
   // Get error code
   if (cu_error != cudaSuccess) {
-    error("CUDA error with memcpys: %s copy_index is %i",
-            cudaGetErrorString(cu_error), r->cpuid);
+    error("CUDA error with kernel %s n_leaves_found is %i",
+            cudaGetErrorString(cu_error), n_leaves_found);
   }
+
+  const struct part *p = &ci_d[0]->hydro.parts[0];
+  float rho = part_get_rho(p);
+//  message("density cell0p0 before %f", rho);
+
+  cudaMemcpy(&c_list_recv[0], &d_c_list_recv[0],
+		  2 * n_leaves_found * sizeof(struct cell_gpu_recv),
+                  cudaMemcpyDeviceToHost);
+  cu_error = cudaPeekAtLastError();  // cudaGetLastError();        //
+  // Get error code
+  if (cu_error != cudaSuccess) {
+	    error("CUDA error with D2H memcpy: %s cpuid id is: %i\n ",
+	            cudaGetErrorString(cu_error), r->cpuid);
+  }
+//  message("density cell0p0 after %f", c_list_recv[0].parts[0].rho_dh_wcount.x);
+
   cudaFreeHost(c_list_send);
   cudaFree(d_c_list_send);
   cudaFreeHost(c_list_recv);

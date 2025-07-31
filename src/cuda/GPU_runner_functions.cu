@@ -1921,6 +1921,85 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
   //  }
 }
 
+__device__ void DOPAIR2NAIVEGPUTESTER(const int pid, const int cid,
+    struct cell_gpu_send *cells_send, struct cell_gpu_recv *cells_recv){
+
+  float hi = 0.0, hig2 = 0.0;
+
+  float4 res_rho = {0.0, 0.0, 0.0, 0.0};
+  float4 res_rot = {0.0, 0.0, 0.0, 0.0};
+  const part_aos_f4_send pi = cells_send[cid].parts[pid];
+  const int j_count = cells_send[cid + 1].count;
+  const float4 x_pi = pi.x_p_h;
+  const float4 ux_pi = pi.ux_m;
+
+  hi = x_pi.w, hig2 = hi * hi * kernel_gamma2;
+  const float mi = ux_pi.w;
+  if(mi > 0.0004)
+	  printf("part %i in cell %i hi %f mi %f\n", pid, cid, hi, ux_pi.w);
+
+  int interacted = 0;
+  //  printf("js %i je %i\n", cj_start, cj_end);
+  /*Particles copied in blocks to shared memory*/
+  for (int j = 0; j < j_count; j++) {
+    struct part_aos_f4_send pj = cells_send[cid + 1].parts[j];
+
+    const float4 x_p_h_j = pj.x_p_h;
+    const float4 ux_m_j = pj.ux_m;
+
+    const float xij = x_pi.x - x_p_h_j.x, yij = x_pi.y - x_p_h_j.y,
+                zij = x_pi.z - x_p_h_j.z;
+    const float r2 = xij * xij + yij * yij + zij * zij;
+    //	printf("r2 %f \n", r2);
+    if (r2 < hig2) {
+      interacted ++;
+//      printf("interacting\n");
+      /* Recover some data */
+      const float mj = ux_m_j.w;
+      const float r = sqrt(r2);
+      /* Get the kernel for hi. */
+      const float h_inv = 1.f / hi;
+      const float ui = r * h_inv;
+      float wi, wi_dx;
+
+      d_kernel_deval(ui, &wi, &wi_dx);
+      /*Add to sums of rho, rho_dh, wcount and wcount_dh*/
+//      if(wi == 0)
+//    	  printf("r %f h %f\n", r, sqrt(hig2));
+      res_rho.x += mj * wi;
+      res_rho.y -= mj * (hydro_dimension * wi + ui * wi_dx);
+      res_rho.z += wi;
+      res_rho.w -= (hydro_dimension * wi + ui * wi_dx);
+
+      const float r_inv = 1.f / r;
+      const float faci = mj * wi_dx * r_inv;
+      /* Compute dv dot r */
+      const float dvx = ux_pi.x - ux_m_j.x, dvy = ux_pi.y - ux_m_j.y,
+                  dvz = ux_pi.z - ux_m_j.z;
+      const float dvdr = dvx * xij + dvy * yij + dvz * zij;
+      /* Compute dv cross r */
+      const float curlvrx = dvy * zij - dvz * yij;
+      const float curlvry = dvz * xij - dvx * zij;
+      const float curlvrz = dvx * yij - dvy * xij;
+
+      res_rot.x += faci * curlvrx;
+      res_rot.y += faci * curlvry;
+      res_rot.z += faci * curlvrz;
+      res_rot.w -= faci * dvdr;
+//      if(mj < 0.0000001)
+//      	printf("zero mass");
+    }
+//    else if(r2 > 0.5)
+//      printf("Distance is %f\n", sqrt(r2));
+  } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
+  //  if (pid >= ci_start && pid < ci_end) {
+//  printf("part %i in cell %i interacted %i particles\n", pid, cid, interacted);
+
+  cells_recv[cid].parts[pid].rho_dh_wcount = res_rho;
+  cells_recv[cid].parts[pid].rot_ux_div_v = res_rot;
+  //  }
+}
+
 __device__ void DOPAIR2NONSYMGPUAOSG(struct part_aos_g *parts_aos, int pid,
                                      const int ci_start, const int ci_end,
                                      const int cj_start, const int cj_end,
@@ -3050,6 +3129,21 @@ __global__ void runner_do_pair_density_GPU_aos_f4(
   }
 }
 
+__global__ void runner_do_pair_tester(
+    struct cell_gpu_send *cell_send, struct cell_gpu_recv *cell_recv) {
+
+  const int threadid = threadIdx.x;
+  const int pid = threadid;
+  //Striding over cell data to find cells i, cells j are stored in cid + 1;
+  const int cid = 2 * blockIdx.y;
+  const int count_i = cell_send[cid].count;
+
+  if (pid < count_i) {
+    /* Start calculations for particles in cell i*/
+    DOPAIR2NAIVEGPUTESTER(pid, cid, cell_send, cell_recv);
+  }
+}
+
 __global__ void runner_do_pair_ci_density_GPU_aos_g(
     struct part_aos_g *parts_aos, int *d_task_first_parts_pair,
     int *d_task_last_parts_pair, float d_a, float d_H, int bid, int tid,
@@ -3385,13 +3479,13 @@ void runner_dopair_branch_density_gpu_aos_f4(
 }
 
 void runner_dopair_tester(
-		struct cell_gpu_send * c_send, struct cell_gpu_send * c_recv,
+		struct cell_gpu_send * c_send, struct cell_gpu_recv * c_recv,
         int n_packed, int numBlocks_x, int numBlocks_y) {
 
-//  dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
+  dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
 
-//  runner_do_pair_density_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
-//      parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
+  runner_do_pair_tester<<<gridShape, BLOCK_SIZE, 0>>>(
+		  c_send, c_recv);
 }
 
 void runner_dopairci_branch_density_gpu_aos_g(
