@@ -105,10 +105,6 @@ include_HEADERS += forcing.h
 include_HEADERS += power_spectrum.h
 include_HEADERS += ghost_stats.h
 include_HEADERS += swift_lustre_api.h
-# GPU stuff. 
-# C-Headers (not cuda, i.e. not device!) with accompanying base .c files go here.
-# C-Headers without any accompanying base files go to nobase_noinst_HEADERS.
-# cuda/hip headers with accompanying .cu/.hip base files go in libswift_[cuda,swift]_device_a_HEADERS.
 include_HEADERS += runner_gpu_pack_functions.h cuda/GPU_data_buffers.h cuda/GPU_utils.h cuda/cuda_config.h
 
 # source files for EAGLE extra I/O
@@ -561,11 +557,8 @@ nobase_noinst_HEADERS += fvpm_geometry.h fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/None/fvpm_geometry.h fvpm_geometry/None/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/fvpm_geometry.h fvpm_geometry/Gizmo/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/MFM/fvpm_geometry.h fvpm_geometry/Gizmo/MFV/fvpm_geometry.h
-# GPU stuff. C-Headers (not cuda!) without any accompanying base files go here.
-# C-Headers with accompanying base .c files go in install_HEADERS.
-# cuda/hip headers with accompanying .cu/.hip base files go in 
 nobase_noinst_HEADERS += GPU_pack_vars.h 
-nobase_noinst_HEADERS += cuda/GPU_runner_functions.h cuda/GPU_part_structs.h
+nobase_noinst_HEADERS += cuda/GPU_part_structs.h
 nobase_noinst_HEADERS += runner_doiact_functions_hydro_gpu.h
 nobase_noinst_HEADERS += cuda/device_functions.h cuda/GPU_runner_functions.h
 
@@ -681,3 +674,9 @@ BUILT_SOURCES = version_string.h
 
 #  And distribute the built files.
 EXTRA_DIST = version_string.h version_string.h.in
+
+
+# Add my suffixes to clean
+clean-local:
+	-rm -rf *.dlink_o cuda/*.dlink_o
+

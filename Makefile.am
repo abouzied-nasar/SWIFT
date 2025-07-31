@@ -120,7 +120,7 @@ swift_mpi_LDADD =  src/libswiftsim_mpi.la argparse/libargparse.la $(MPI_LIBS) $(
 # Sources for swift_cuda
 swift_cuda_SOURCES = swift.c
 swift_cuda_CFLAGS = $(MYFLAGS) $(AM_CFLAGS) $(CUDA_FLAGS) -DENGINE_POLICY="engine_policy_keep $(ENGINE_POLICY_SETAFFINITY)"
-swift_cuda_LDADD =  src/.libs/libswiftsim_cuda.la $(EXTRA_LIBS) argparse/.libs/libargparse.a src/.libs/libgrav.la src/libswift_cuda_device.a $(CUDA_LDFLAGS) $(CUDA_LIBS)
+swift_cuda_LDADD = src/.libs/libswiftsim_cuda.la $(EXTRA_LIBS) argparse/.libs/libargparse.a src/.libs/libgrav.la src/libswift_cuda_device.a $(CUDA_LDFLAGS) $(CUDA_LIBS)
 
 
 # Sources for swift_hip
