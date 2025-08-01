@@ -3275,10 +3275,13 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
 		  2 * n_leaves_found * sizeof(struct cell_gpu_send),
                   cudaMemcpyHostToDevice);
   int max_n_parts = 0;
-  for(int i = 0; i < n_leaves_found; i++){
-	max_n_parts = max(max_n_parts, c_list_send[i].count);
-	max_n_parts = max(max_n_parts, c_list_send[i + 1].count);
+  dt = 0;
+  while(dt < 2 * n_leaves_found){
+	max_n_parts = max(max_n_parts, c_list_send[dt].count);
+	max_n_parts = max(max_n_parts, c_list_send[dt + 1].count);
+	dt+=2;
   }
+  message("max_n_parts %i", max_n_parts);
 
   int numBlocks_y = n_leaves_found;
   int numBlocks_x = (max_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
@@ -3288,8 +3291,8 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
   cu_error = cudaPeekAtLastError();  // cudaGetLastError();        //
   // Get error code
   if (cu_error != cudaSuccess) {
-    error("CUDA error with kernel %s n_leaves_found is %i",
-            cudaGetErrorString(cu_error), n_leaves_found);
+    error("CUDA error with kernel %s n_leaves_found is %i nBlocksX %i",
+            cudaGetErrorString(cu_error), n_leaves_found, numBlocks_x);
   }
 
   const struct part *p = &ci_d[0]->hydro.parts[0];
