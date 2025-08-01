@@ -1,22 +1,27 @@
+#include "atomic.h"
+#include "GPU_pack_vars.h"
 #include "active.h"
+#include "error.h"
 #include "runner_doiact_hydro.h"
+#include "runner_gpu_pack_functions.h"
 #include "scheduler.h"
+#include "space_getsid.h"
+#include "task.h"
 
-#include <atomic.h>
+
 #ifdef WITH_CUDA
-#include "cuda/BLOCK_SIZE.h"
+#include <cuda.h>
+#include <cuda_runtime.h>
+
 #include "cuda/GPU_runner_functions.h"
+#include "cuda/cuda_config.h"
+#else
 #endif
 
 #ifdef WITH_HIP
-#include "hip/BLOCK_SIZE.h"
+#include "hip/hip_config.h"
 #include "hip/GPU_runner_functions.h"
 #endif
-
-#include "gpu_pack_vars.h"
-#include "runner_gpu_pack_functions.h"
-#include "task.h"
-#define CUDA_DEBUG
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,7 +35,8 @@ double runner_doself1_pack_f4(struct runner *r, struct scheduler *s,
   /* Timers for how long this all takes.
    * t0 and t1 are from start to finish including GPU calcs
    * tp0 and tp1 only time packing and unpacking*/
-  struct timespec t0, t1;  //
+  struct timespec t0;
+  struct timespec t1;
   clock_gettime(CLOCK_REALTIME, &t0);
   /* Find my queue for use later*/
   int qid = r->qid;
@@ -93,7 +99,8 @@ double runner_doself1_pack_f4_g(struct runner *r, struct scheduler *s,
   /* Timers for how long this all takes.
    * t0 and t1 are from start to finish including GPU calcs
    * tp0 and tp1 only time packing and unpacking*/
-  struct timespec t0, t1;  //
+  struct timespec t0;
+  struct timespec t1;
   clock_gettime(CLOCK_REALTIME, &t0);
   /* Find my queue for use later*/
   int qid = r->qid;
@@ -154,7 +161,8 @@ double runner_doself1_pack_f4_f(struct runner *r, struct scheduler *s,
   /* Timers for how long this all takes.
    * t0 and t1 are from start to finish including GPU calcs
    * tp0 and tp1 only time packing and unpacking*/
-  struct timespec t0, t1;  //
+  struct timespec t0;
+  struct timespec t1;
   clock_gettime(CLOCK_REALTIME, &t0);
   /* Find my queue for use later*/
   int qid = r->qid;
@@ -272,7 +280,8 @@ double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
   /* Timers for how long this all takes.
    * t0 and t1 are from start to finish including GPU calcs
    * tp0 and tp1 only time packing and unpacking*/
-  struct timespec t0, t1;  //
+  struct timespec t0;
+  struct timespec t1;
   clock_gettime(CLOCK_REALTIME, &t0);
 
 
@@ -910,7 +919,6 @@ void runner_doself1_launch_f4(
   for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     max_parts = 0;
-    int parts_in_bundle = 0;
     const int first_task = bid * bundle_size;
     int last_task = (bid + 1) * bundle_size;
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
@@ -918,7 +926,6 @@ void runner_doself1_launch_f4(
         /*Get an estimate for the max number of parts per cell in the bundle.
          *  Used for determining the number of GPU CUDA blocks*/
         int count = task_first_part_f4[tid].y - task_first_part_f4[tid].x;
-        parts_in_bundle += count;
         max_parts = max(max_parts, count);
         last_task = tid;
       }
@@ -1143,7 +1150,6 @@ void runner_doself1_launch_f4_g(
   for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     max_parts = 0;
-    int parts_in_bundle = 0;
     const int first_task = bid * bundle_size;
     int last_task = (bid + 1) * bundle_size;
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
@@ -1151,7 +1157,6 @@ void runner_doself1_launch_f4_g(
         /*Get an estimate for the max number of parts per cell in the bundle.
          *  Used for determining the number of GPU CUDA blocks*/
         int count = task_first_part_f4[tid].y - task_first_part_f4[tid].x;
-        parts_in_bundle += count;
         max_parts = max(max_parts, count);
         last_task = tid;
       }
@@ -1323,7 +1328,10 @@ void runner_doself1_launch_f4_f(
     int2 *task_first_part_f4_f, int2 *d_task_first_part_f4_f,
     cudaEvent_t *self_end, double *unpack_time) {
 
-  struct timespec t0, t1, tp0, tp1;  //
+  struct timespec t0;
+  struct timespec t1;
+  struct timespec tp0;
+  struct timespec tp1;
   clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
@@ -1374,7 +1382,6 @@ void runner_doself1_launch_f4_f(
   for (int bid = 0; bid < n_bundles_temp; bid++) {
 
     max_parts = 0;
-    int parts_in_bundle = 0;
     const int first_task = bid * bundle_size;
     int last_task = (bid + 1) * bundle_size;
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
@@ -1382,7 +1389,6 @@ void runner_doself1_launch_f4_f(
         /*Get an estimate for the max number of parts per cell in the bundle.
          *  Used for determining the number of GPU CUDA blocks*/
         int count = task_first_part_f4_f[tid].y - task_first_part_f4_f[tid].x;
-        parts_in_bundle += count;
         max_parts = max(max_parts, count);
         last_task = tid;
       }
@@ -1586,19 +1592,15 @@ void runner_dopair1_launch_f4_one_memcpy(
 
     int max_parts_i = 0;
     int max_parts_j = 0;
-    int parts_in_bundle_ci = 0;
-    int parts_in_bundle_cj = 0;
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
       if (tid < tasks_packed) {
         /*Get an estimate for the max number of parts per cell in each bundle.
          *  Used for determining the number of GPU CUDA blocks*/
         int count_i = fparti_fpartj_lparti_lpartj[tid].z -
                       fparti_fpartj_lparti_lpartj[tid].x;
-        parts_in_bundle_ci += count_i;
         max_parts_i = max(max_parts_i, count_i);
         int count_j = fparti_fpartj_lparti_lpartj[tid].w -
                       fparti_fpartj_lparti_lpartj[tid].y;
-        parts_in_bundle_cj += count_j;
         max_parts_j = max(max_parts_j, count_j);
       }
     }
@@ -1811,19 +1813,15 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
 
     int max_parts_i = 0;
     int max_parts_j = 0;
-    int parts_in_bundle_ci = 0;
-    int parts_in_bundle_cj = 0;
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
       if (tid < tasks_packed) {
         /*Get an estimate for the max number of parts per cell in each bundle.
          *  Used for determining the number of GPU CUDA blocks*/
         int count_i = fparti_fpartj_lparti_lpartj_dens[tid].z -
                       fparti_fpartj_lparti_lpartj_dens[tid].x;
-        parts_in_bundle_ci += count_i;
         max_parts_i = max(max_parts_i, count_i);
         int count_j = fparti_fpartj_lparti_lpartj_dens[tid].w -
                       fparti_fpartj_lparti_lpartj_dens[tid].y;
-        parts_in_bundle_cj += count_j;
         max_parts_j = max(max_parts_j, count_j);
         //        if(count_i > 100 || count_j > 100)
         //        	error("Sending data for excessive n parts %i %i",
@@ -2181,19 +2179,15 @@ void runner_dopair1_launch_f4_g_one_memcpy(
 
     int max_parts_i = 0;
     int max_parts_j = 0;
-    int parts_in_bundle_ci = 0;
-    int parts_in_bundle_cj = 0;
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
       if (tid < tasks_packed) {
         /*Get an estimate for the max number of parts per cell in each bundle.
          *  Used for determining the number of GPU CUDA blocks*/
         int count_i = fparti_fpartj_lparti_lpartj[tid].z -
                       fparti_fpartj_lparti_lpartj[tid].x;
-        parts_in_bundle_ci += count_i;
         max_parts_i = max(max_parts_i, count_i);
         int count_j = fparti_fpartj_lparti_lpartj[tid].w -
                       fparti_fpartj_lparti_lpartj[tid].y;
-        parts_in_bundle_cj += count_j;
         max_parts_j = max(max_parts_j, count_j);
       }
     }
@@ -2406,19 +2400,15 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
 
     int max_parts_i = 0;
     int max_parts_j = 0;
-    int parts_in_bundle_ci = 0;
-    int parts_in_bundle_cj = 0;
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
       if (tid < tasks_packed) {
         /*Get an estimate for the max number of parts per cell in each bundle.
          *  Used for determining the number of GPU CUDA blocks*/
         int count_i = fparti_fpartj_lparti_lpartj_grad[tid].z -
                       fparti_fpartj_lparti_lpartj_grad[tid].x;
-        parts_in_bundle_ci += count_i;
         max_parts_i = max(max_parts_i, count_i);
         int count_j = fparti_fpartj_lparti_lpartj_grad[tid].w -
                       fparti_fpartj_lparti_lpartj_grad[tid].y;
-        parts_in_bundle_cj += count_j;
         max_parts_j = max(max_parts_j, count_j);
       }
     }

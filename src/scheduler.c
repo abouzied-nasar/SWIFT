@@ -41,7 +41,6 @@
 
 /* Local headers. */
 #include "atomic.h"
-#include "cuda/BLOCK_SIZE.h"
 #include "cycle.h"
 #include "engine.h"
 #include "error.h"
@@ -57,6 +56,11 @@
 #include "threadpool.h"
 #include "timers.h"
 #include "version.h"
+
+#ifdef WITH_CUDA
+#include "cuda/cuda_config.h"
+#endif
+
 /**
  * @brief Re-set the list of active tasks.
  */
@@ -2269,8 +2273,13 @@ void scheduler_reset(struct scheduler *s, int size) {
   s->completed_unlock_writes = 0;
   s->active_count = 0;
   s->total_ticks = 0;
+#if defined(WITH_CUDA) || defined (WITH_HIP)
   s->pack_size = N_TASKS_PER_PACK_SELF;
   s->pack_size_pair = N_TASKS_PER_PACK_PAIR;
+#else
+  s->pack_size = 0;
+  s->pack_size_pair = 0;
+#endif
   /* Set the task pointers in the queues. */
   for (int k = 0; k < s->nr_queues; k++) s->queues[k].tasks = s->tasks;
 }

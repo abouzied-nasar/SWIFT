@@ -76,7 +76,7 @@ include_HEADERS += statistics.h memswap.h cache.h runner_doiact_hydro_vec.h runn
 include_HEADERS += csds.h active.h timeline.h xmf.h gravity_properties.h gravity_derivatives.h
 include_HEADERS += gravity_softened_derivatives.h vector_power.h collectgroup.h hydro_space.h sort_part.h
 include_HEADERS += chemistry.h chemistry_additions.h chemistry_io.h chemistry_struct.h chemistry_debug.h
-include_HEADERS += cosmology.h restart.h space_getsid.h utilities.h
+include_HEADERS += cosmology.h restart.h space_getsid.h utilities.h part_type.h 
 include_HEADERS += cbrt.h exp10.h velociraptor_interface.h swift_velociraptor_part.h output_list.h
 include_HEADERS += csds_io.h
 include_HEADERS += tracers_io.h tracers.h tracers_triggers.h tracers_struct.h tracers_debug.h
@@ -105,6 +105,7 @@ include_HEADERS += forcing.h
 include_HEADERS += power_spectrum.h
 include_HEADERS += ghost_stats.h
 include_HEADERS += swift_lustre_api.h
+include_HEADERS += runner_gpu_pack_functions.h cuda/GPU_data_buffers.h cuda/GPU_utils.h cuda/cuda_config.h
 
 # source files for EAGLE extra I/O
 EAGLE_EXTRA_IO_SOURCES=
@@ -186,10 +187,9 @@ endif
 GPU_SOURCES = 
 if HAVECUDA
 # list here files to be compiled without nvcc, but needed for execution with GPU
-GPU_CUDA_SOURCES = runner_gpu_pack_functions.c
-GPU_CUDA_SOURCES += runner_main_cuda.c cuda/GPU_data_buffers.c
+GPU_CUDA_SOURCES = runner_gpu_pack_functions.c runner_main_cuda.c
+GPU_CUDA_SOURCES += cuda/GPU_data_buffers.c cuda/GPU_utils.c
 # TODO????
-# GPU_CUDA_SOURCES += runner_doiact_functions_hydro_gpu.h
 GPU_SOURCES+=$(GPU_CUDA_SOURCES)
 endif
 
@@ -258,13 +258,14 @@ AM_SOURCES += $(GEAR_RT_SOURCES)
 AM_SOURCES += swift_lustre_api.c
 
 # Include files for distribution, not installation.
-nobase_noinst_HEADERS = align.h approx_math.h atomic.h barrier.h cycle.h error.h inline.h kernel_hydro.h kernel_gravity.h runner_gpu_pack_functions.h
+nobase_noinst_HEADERS = align.h approx_math.h atomic.h barrier.h cycle.h error.h inline.h kernel_hydro.h kernel_gravity.h
 nobase_noinst_HEADERS += gravity_iact.h kernel_long_gravity.h vector.h accumulate.h cache.h exp.h log.h
 nobase_noinst_HEADERS += runner_doiact_nosort.h runner_doiact_hydro.h runner_doiact_stars.h runner_doiact_black_holes.h runner_doiact_grav.h
 nobase_noinst_HEADERS += runner_doiact_functions_hydro.h runner_doiact_functions_stars.h runner_doiact_functions_black_holes.h
 nobase_noinst_HEADERS += runner_doiact_functions_limiter.h runner_doiact_functions_sinks.h runner_doiact_limiter.h units.h swift_intrinsics.h minmax.h
 nobase_noinst_HEADERS += runner_doiact_sinks.h
-nobase_noinst_HEADERS += kick.h timestep.h drift.h adiabatic_index.h io_properties.h dimension.h part_type.h periodic.h memswap.h
+nobase_noinst_HEADERS += black_holes_part.h gravity_part.h hydro_part.h sink_part.h stars_part.h
+nobase_noinst_HEADERS += kick.h timestep.h drift.h adiabatic_index.h io_properties.h dimension.h periodic.h memswap.h
 nobase_noinst_HEADERS += timestep_limiter.h timestep_limiter_iact.h timestep_sync.h timestep_sync_part.h timestep_limiter_struct.h
 nobase_noinst_HEADERS += csds.h sign.h csds_io.h hashmap.h gravity.h gravity_io.h gravity_csds.h  gravity_cache.h output_options.h
 nobase_noinst_HEADERS += gravity/Default/gravity.h gravity/Default/gravity_iact.h gravity/Default/gravity_io.h
@@ -556,10 +557,12 @@ nobase_noinst_HEADERS += fvpm_geometry.h fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/None/fvpm_geometry.h fvpm_geometry/None/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/fvpm_geometry.h fvpm_geometry/Gizmo/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/MFM/fvpm_geometry.h fvpm_geometry/Gizmo/MFV/fvpm_geometry.h
-nobase_noinst_HEADERS += gpu_pack_vars.h
-nobase_noinst_HEADERS += cuda/BLOCK_SIZE.h cuda/GPU_data_buffers.h
-nobase_noinst_HEADERS += cuda/GPU_runner_functions.h  cuda/part_gpu.h
-nobase_noinst_HEADERS += gpu_pack_vars.h runner_gpu_pack_functions.h
+nobase_noinst_HEADERS += GPU_pack_vars.h 
+nobase_noinst_HEADERS += cuda/GPU_part_structs.h
+nobase_noinst_HEADERS += runner_doiact_functions_hydro_gpu.h
+nobase_noinst_HEADERS += cuda/device_functions.h cuda/GPU_runner_functions.h
+
+# TODO: Add HIP C-headers without base files here
 
 # Sources and special flags for the gravity library
 libgrav_la_SOURCES = runner_doiact_grav.c
@@ -671,3 +674,9 @@ BUILT_SOURCES = version_string.h
 
 #  And distribute the built files.
 EXTRA_DIST = version_string.h version_string.h.in
+
+
+# Add my suffixes to clean
+clean-local:
+	-rm -rf *.dlink_o cuda/*.dlink_o
+
