@@ -3276,12 +3276,15 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
                   cudaMemcpyHostToDevice);
   int max_n_parts = 0;
   dt = 0;
-  while(dt < 2 * n_leaves_found){
+  while(dt < 2 * n_leaves_found - 2){
 	max_n_parts = max(max_n_parts, c_list_send[dt].count);
 	max_n_parts = max(max_n_parts, c_list_send[dt + 1].count);
+	if(max_n_parts > 100){
+	  message("max_n_parts %i", max_n_parts);
+	  error("");
+	}
 	dt+=2;
   }
-  message("max_n_parts %i", max_n_parts);
 
   int numBlocks_y = n_leaves_found;
   int numBlocks_x = (max_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
