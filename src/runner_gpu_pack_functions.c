@@ -329,9 +329,9 @@ void runner_doself1_gpu_unpack_neat_aos_f4(
   if (local_pack_position + count >= count_max_parts_tmp) {
     fprintf(stderr,
             "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %i, local_pack_position is % i, "
+            "%i pointer to pack_length is %p, local_pack_position is % i, "
             "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count, e);
+            (*pack_length), pack_length, local_pack_position, count);
   }
 #endif
 
@@ -360,9 +360,9 @@ void runner_doself1_gpu_unpack_neat_aos_f4_g(
   if (local_pack_position + count >= count_max_parts_tmp) {
     fprintf(stderr,
             "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %i, local_pack_position is % i, "
+            "%i pointer to pack_length is %p, local_pack_position is % i, "
             "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count, e);
+            (*pack_length), pack_length, local_pack_position, count);
   }
 #endif
 
@@ -391,9 +391,9 @@ void runner_doself1_gpu_unpack_neat_aos_f4_f(
   if (local_pack_position + count >= count_max_parts_tmp) {
     fprintf(stderr,
             "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %i, local_pack_position is % i, "
+            "%i pointer to pack_length is %p, local_pack_position is % i, "
             "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count, e);
+            (*pack_length), pack_length, local_pack_position, count);
   }
 #endif
 
@@ -636,9 +636,9 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
   if (local_pack_position + count_ci + count_cj >= count_max_parts_tmp) {
     fprintf(stderr,
             "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %i, local_pack_position is % i, "
+            "%i pointer to pack_length is %p, local_pack_position is % i, "
             "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count_ci, e);
+            (*pack_length), pack_length, local_pack_position, count_ci);
   }
 #endif
 
@@ -678,9 +678,9 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
   if (local_pack_position + count_ci + count_cj >= count_max_parts_tmp) {
     fprintf(stderr,
             "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %i, local_pack_position is % i, "
+            "%i pointer to pack_length is %p, local_pack_position is % i, "
             "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count_ci, e);
+            (*pack_length), pack_length, local_pack_position, count_ci);
   }
 #endif
 
@@ -720,9 +720,9 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
   if (local_pack_position + count_ci + count_cj >= count_max_parts_tmp) {
     fprintf(stderr,
             "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %i, local_pack_position is % i, "
+            "%i pointer to pack_length is %p, local_pack_position is % i, "
             "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count_ci, e);
+            (*pack_length), pack_length, local_pack_position, count_ci);
   }
 #endif
 
