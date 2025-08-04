@@ -18,4 +18,9 @@
 
 #define CUDA_DEBUG
 
+/* Config parameters. */
+#define GPUOFFLOAD_DENSITY 1   /* off-load hydro density to GPU */
+#define GPUOFFLOAD_GRADIENT 1  /* off-load hydro gradient to GPU */
+#define GPUOFFLOAD_FORCE 1     /* off-load hydro force to GPU */
+
 #endif
