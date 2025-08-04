@@ -3235,55 +3235,54 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
 	            cudaGetErrorString(cu_error), r->cpuid);
   }
 
-  int dt =0;
-  while(dt < n_leaves_found){
-	  c_list_send[dt].count = 0;
-	  c_list_send[dt+1].count = 0;
+  for(int dt = 0; dt < n_leaves_found; dt++){
+      int dtt = dt * 2;
+	  c_list_send[dtt].count = 0;
+	  c_list_send[dtt +1].count = 0;
 	  for(int id = 0; id < ci_d[dt]->hydro.count; id++){
 //		  struct part p = &ci_d[dt]->hydro.parts[id];
 		  const struct part *p = &ci_d[dt]->hydro.parts[id];
 		  const double *x = part_get_const_x(p);
-		  c_list_send[dt].parts[id].x_p_h.x = x[0];
-		  c_list_send[dt].parts[id].x_p_h.y = x[1];
-		  c_list_send[dt].parts[id].x_p_h.z = x[2];
-		  c_list_send[dt].parts[id].x_p_h.w = part_get_h(p);
+		  c_list_send[dtt].parts[id].x_p_h.x = x[0];
+		  c_list_send[dtt].parts[id].x_p_h.y = x[1];
+		  c_list_send[dtt].parts[id].x_p_h.z = x[2];
+		  c_list_send[dtt].parts[id].x_p_h.w = part_get_h(p);
 		  const float *v = part_get_const_v(p);
-		  c_list_send[dt].parts[id].ux_m.x = v[0];
-		  c_list_send[dt].parts[id].ux_m.y = v[1];
-		  c_list_send[dt].parts[id].ux_m.z = v[2];
-		  c_list_send[dt].parts[id].ux_m.w = part_get_mass(p);
-		  c_list_send[dt].count++;
+		  c_list_send[dtt].parts[id].ux_m.x = v[0];
+		  c_list_send[dtt].parts[id].ux_m.y = v[1];
+		  c_list_send[dtt].parts[id].ux_m.z = v[2];
+		  c_list_send[dtt].parts[id].ux_m.w = part_get_mass(p);
+		  c_list_send[dtt].count++;
 	  }
 	  for(int id = 0; id < cj_d[dt]->hydro.count; id++){
-		  const struct part *p = &ci_d[dt]->hydro.parts[id];
+		  const struct part *p = &cj_d[dt]->hydro.parts[id];
 		  const double *x = part_get_const_x(p);
-		  c_list_send[dt + 1].parts[id].x_p_h.x = x[0];
-		  c_list_send[dt + 1].parts[id].x_p_h.y = x[1];
-		  c_list_send[dt + 1].parts[id].x_p_h.z = x[2];
-		  c_list_send[dt + 1].parts[id].x_p_h.w = part_get_h(p);
+		  c_list_send[dtt + 1].parts[id].x_p_h.x = x[0];
+		  c_list_send[dtt + 1].parts[id].x_p_h.y = x[1];
+		  c_list_send[dtt + 1].parts[id].x_p_h.z = x[2];
+		  c_list_send[dtt + 1].parts[id].x_p_h.w = part_get_h(p);
 		  const float *v = part_get_const_v(p);
-		  c_list_send[dt + 1].parts[id].ux_m.x = v[0];
-		  c_list_send[dt + 1].parts[id].ux_m.y = v[1];
-		  c_list_send[dt + 1].parts[id].ux_m.z = v[2];
-		  c_list_send[dt + 1].parts[id].ux_m.w = part_get_mass(p);
-		  c_list_send[dt + 1].count++;
+		  c_list_send[dtt + 1].parts[id].ux_m.x = v[0];
+		  c_list_send[dtt + 1].parts[id].ux_m.y = v[1];
+		  c_list_send[dtt + 1].parts[id].ux_m.z = v[2];
+		  c_list_send[dtt + 1].parts[id].ux_m.w = part_get_mass(p);
+		  c_list_send[dtt + 1].count++;
 	  }
-	  dt+=2;
   }
 
   cudaMemcpy(&d_c_list_send[0], &c_list_send[0],
 		  2 * n_leaves_found * sizeof(struct cell_gpu_send),
                   cudaMemcpyHostToDevice);
   int max_n_parts = 0;
-  dt = 0;
-  while(dt < 2 * n_leaves_found - 2){
-	max_n_parts = max(max_n_parts, c_list_send[dt].count);
-	max_n_parts = max(max_n_parts, c_list_send[dt + 1].count);
+
+  for(int dt = 0; dt < n_leaves_found; dt++){
+    int dtt = dt * 2;
+	max_n_parts = max(max_n_parts, c_list_send[dtt].count);
+	max_n_parts = max(max_n_parts, c_list_send[dtt + 1].count);
 	if(max_n_parts > 100){
-	  message("max_n_parts %i", max_n_parts);
+	  message("max_n_parts %i dt_n %i", max_n_parts);
 	  error("");
 	}
-	dt+=2;
   }
 
   int numBlocks_y = n_leaves_found;
@@ -3390,7 +3389,7 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s, s
     	  if (uniq)
     		  uniQQQ++;
       }
-      message("packed %i indexI %i indexJ %i uniQQQ %i RATIO %f", target_n_tasks_tmp, index_i, index_j, uniQQQ, (float)target_n_tasks_tmp/(float)uniQQQ);
+//      message("packed %i indexI %i indexJ %i uniQQQ %i RATIO %f", target_n_tasks_tmp, index_i, index_j, uniQQQ, (float)target_n_tasks_tmp/(float)uniQQQ);
 ///////////Test code to find duplicates. Keep but comment out as will be useful in future/////////////////////////////
 
       launched = 1;
