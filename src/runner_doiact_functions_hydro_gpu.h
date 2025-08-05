@@ -43,7 +43,7 @@ extern "C" {
  * @param t the associated task to pack
  * @param mode: 0 for density, 1 for gradient, 2 for force
  */
-void runner_doself_gpu_pack( struct cell *ci, struct task *t, struct gpu_data_buffers *buf, int mode) {
+void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_data_buffers *buf, int mode) {
 
   /* Grab a hold of the packing buffers */
   struct gpu_pack_vars* pv = &(buf->pv);
@@ -110,10 +110,18 @@ void runner_doself_gpu_pack( struct cell *ci, struct task *t, struct gpu_data_bu
   buf->pv.launch = 0;
   buf->pv.launch_leftovers = 0;
 
+  /* Have we packed enough tasks to offload to GPU? */
+  if (buf->pv.tasks_packed == buf->pv.target_n_tasks){
+    buf->pv.launch = 1;
+  }
+
+  /* Release the cell. */
+  /* TODO: WHERE IS THIS TREE LOCKED?????????? */
+  cell_unlocktree(ci);
 }
 
 
-void runner_doself_pack_d(struct runner *r, struct scheduler *s, struct
+void runner_doself_gpu_pack_d(struct runner *r, struct scheduler *s, struct
     gpu_data_buffers *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -130,20 +138,10 @@ void runner_doself_pack_d(struct runner *r, struct scheduler *s, struct
   }
   (void)lock_unlock(&s->queues[qid].lock);
 
-  /* Have we packed enough tasks to offload to GPU? */
-  if (buf->pv.tasks_packed == buf->pv.target_n_tasks){
-    buf->pv.launch = 1;
-  }
-
-  /* Release the lock on the cell */
-  /* TODO: WHERE IS THIS TREE LOCKED?????????? */
-  cell_unlocktree(ci);
-  t->gpu_done = 1;
-
-  TIMER_TOC(timer_doself_gpu_pack);
+  TIMER_TOC(timer_doself_gpu_pack_d);
 }
 
-void runner_doself_pack_g(struct runner *r, struct scheduler *s, struct
+void runner_doself_gpu_pack_g(struct runner *r, struct scheduler *s, struct
     gpu_data_buffers *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -160,20 +158,13 @@ void runner_doself_pack_g(struct runner *r, struct scheduler *s, struct
   }
   (void)lock_unlock(&s->queues[qid].lock);
 
-  /* Have we packed enough tasks to offload to GPU? */
-  if (buf->pv.tasks_packed == buf->pv.target_n_tasks){
-    buf->pv.launch = 1;
-  }
-
-  /* Release the lock on the cell */
   /* TODO: WHERE IS THIS TREE LOCKED?????????? */
   cell_unlocktree(ci);
-  /* t->gpu_done = 1; */ /* DENSITY HAS THIS? */
 
-  TIMER_TOC(timer_doself_gpu_pack);
+  TIMER_TOC(timer_doself_gpu_pack_g);
 }
 
-void runner_doself_pack_f(struct runner *r, struct scheduler *s, struct
+void runner_doself_gpu_pack_f(struct runner *r, struct scheduler *s, struct
     gpu_data_buffers *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -190,17 +181,7 @@ void runner_doself_pack_f(struct runner *r, struct scheduler *s, struct
   }
   (void)lock_unlock(&s->queues[qid].lock);
 
-  /* Have we packed enough tasks to offload to GPU? */
-  if (buf->pv.tasks_packed == buf->pv.target_n_tasks){
-    buf->pv.launch = 1;
-  }
-
-  /* Release the lock on the cell */
-  /* TODO: WHERE IS THIS TREE LOCKED?????????? */
-  cell_unlocktree(ci);
-  /* t->gpu_done = 1; */ /* DENSITY HAS THIS? */
-
-  TIMER_TOC(timer_doself_gpu_pack);
+  TIMER_TOC(timer_doself_gpu_pack_f);
 }
 
 
@@ -654,8 +635,6 @@ void runner_doself1_launch_f4(
         enqueue_dependencies(s, tii);
         /*Signal sleeping runners*/
         // MATTHIEU signal_sleeping_runners(s, tii);
-
-        tii->gpu_done = 1;
       }
     }
   }
@@ -859,8 +838,6 @@ void runner_doself1_launch_f4_g(
         enqueue_dependencies(s, tii);
         /*Signal sleeping runners*/
         // MATTHIEU signal_sleeping_runners(s, tii);
-
-        tii->gpu_done = 1;
       }
     }
     /*Time end of unpacking*/
@@ -1057,8 +1034,6 @@ void runner_doself1_launch_f4_f(
 
         /*schedule my dependencies (Only unpacks really)*/
         enqueue_dependencies(s, tii);
-
-        tii->gpu_done = 1;
       }
     }
   }
