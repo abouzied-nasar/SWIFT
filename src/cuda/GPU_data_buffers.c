@@ -126,6 +126,21 @@ void gpu_init_data_buffers(
 
 }
 
+
+/**
+ * @brief perform the initialisations required at the start of each step
+ */
+void gpu_init_data_buffers_step(struct gpu_data_buffers *buf){
+
+  struct gpu_pack_vars* pv = &buf->pv;
+
+  // Initialise packing counters
+  pv->tasks_packed = 0;
+  pv->count_parts = 0;
+  pv->top_tasks_packed = 0; /* Needed only for pair tasks? */
+  pv->n_daughters_total = 0; /* Needed only for pair tasks? */
+}
+
 #ifdef __cplusplus
 }
 #endif

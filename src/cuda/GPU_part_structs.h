@@ -108,7 +108,7 @@ struct part_aos_f {
   /*! Time-step length */
   int time_bin;
   int min_ngb_time_bin;
-} part_aos_f;
+};
 
 /*Container for particle data requierd for force calcs*/
 struct part_aos_f4_f {
@@ -137,7 +137,7 @@ struct part_aos_f4_f {
 };
 
 /*Container for particle data requierd for force calcs*/
-struct part_aos_f4_f_send {
+struct part_aos_f4_send_f {
 
   /*Data required for the calculation:
   Values read to local GPU memory*/
@@ -158,7 +158,7 @@ struct part_aos_f4_f_send {
 };
 
 /*Container for particle data requierd for force calcs*/
-struct part_aos_f4_f_recv {
+struct part_aos_f4_recv_f {
 
   /*Result: Values output to global GPU memory*/
   /* change of u and h with dt, v_sig and returned value of
@@ -221,7 +221,7 @@ struct part_aos_f4_g {
 };
 
 /*Container for particle data requierd for gradient calcs*/
-struct part_aos_f4_g_send {
+struct part_aos_f4_send_g {
 
   /*! Particle position & smoothing length */
   float4 x_h;
@@ -241,7 +241,7 @@ struct part_aos_f4_g_send {
 };
 
 /*Container for particle data requierd for gradient calcs*/
-struct part_aos_f4_g_recv {
+struct part_aos_f4_recv_g {
 
   /* viscosity information results */
   float3 vsig_lapu_aviscmax;

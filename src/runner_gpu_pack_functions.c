@@ -12,33 +12,40 @@
 /* #include <stdatomic.h> */
 
 
-void pack_aos_d(struct cell *__restrict__ c,
+/**
+ * @brief packs particle data for density tasks into CPU-side buffers for self
+ * tasks
+ */
+void gpu_pack_density_self(struct cell* restrict c,
                 struct gpu_data_buffers *buf) {
 
   const int count = c->hydro.count;
-  const size_t tid = buf->pv.tasks_packed;
-  size_t local_pack_position = buf->pv.count_parts;
+  const size_t local_pack_position = buf->pv.count_parts;
 
+  /* TODO: WHY ARE WE MEMCPYING HERE???? */
   struct part ptmps[count];
   memcpy(ptmps, (c->hydro.parts), count * sizeof(struct part));
-  //  ptmps = c->hydro.parts;
+
   const float cellx = c->loc[0];
   const float celly = c->loc[1];
   const float cellz = c->loc[2];
+
   for (int i = 0; i < count; i++) {
+
     const int id_in_pack = i + local_pack_position;
-    //    const struct part p = ptmps[i];
-    /*Data to be copied to GPU*/
+
+    /* Data to be copied to GPU */
     const double *x = part_get_const_x(&ptmps[i]);
-    parts_aos_buffer[id_in_pack].x_p_h.x = x[0] - cellx;
-    parts_aos_buffer[id_in_pack].x_p_h.y = x[1] - celly;
-    parts_aos_buffer[id_in_pack].x_p_h.z = x[2] - cellz;
-    parts_aos_buffer[id_in_pack].x_p_h.w = part_get_h(&ptmps[i]);
+    buf->send_d[id_in_pack].x_p_h.x = x[0] - cellx;
+    buf->send_d[id_in_pack].x_p_h.y = x[1] - celly;
+    buf->send_d[id_in_pack].x_p_h.z = x[2] - cellz;
+    buf->send_d[id_in_pack].x_p_h.w = part_get_h(&ptmps[i]);
     const float *v = part_get_const_v(&ptmps[i]);
-    parts_aos_buffer[id_in_pack].ux_m.x = v[0];
-    parts_aos_buffer[id_in_pack].ux_m.y = v[1];
-    parts_aos_buffer[id_in_pack].ux_m.z = v[2];
-    parts_aos_buffer[id_in_pack].ux_m.w = part_get_mass(&ptmps[i]);
+    buf->send_d[id_in_pack].ux_m.x = v[0];
+    buf->send_d[id_in_pack].ux_m.y = v[1];
+    buf->send_d[id_in_pack].ux_m.z = v[2];
+    buf->send_d[id_in_pack].ux_m.w = part_get_mass(&ptmps[i]);
+
     //    /*Initialise sums to zero before CPU/GPU copy*/
     //    const float4 zeroes = {0.0, 0.0, 0.0, 0.0};
     //    parts_aos_buffer[id_in_pack].rho_dh_wcount = zeroes;
@@ -46,91 +53,100 @@ void pack_aos_d(struct cell *__restrict__ c,
   }
 }
 
-void pack_neat_aos_f4_g(struct cell *c,
-                        struct part_aos_f4_g_send *parts_aos_buffer, int tid,
-                        int local_pack_position, int count) {
+/**
+ * @brief packs particle data for gradient tasks into CPU-side buffers for self
+ * tasks
+ */
+void gpu_pack_gradient_self(struct cell* restrict c,
+                struct gpu_data_buffers *buf) {
+
+  const int count = c->hydro.count;
+  const size_t local_pack_position = buf->pv.count_parts;
 
   const struct part *ptmps = c->hydro.parts;
   const float cellx = c->loc[0];
   const float celly = c->loc[1];
   const float cellz = c->loc[2];
   for (int i = 0; i < count; i++) {
+
     int id_in_pack = i + local_pack_position;
     const struct part *p = &ptmps[i];
-    /*Data to be copied to GPU*/
+
+    /* Data to be copied to GPU */
     const double *x = part_get_const_x(p);
-    parts_aos_buffer[id_in_pack].x_h.x = x[0] - cellx;
-    parts_aos_buffer[id_in_pack].x_h.y = x[1] - celly;
-    parts_aos_buffer[id_in_pack].x_h.z = x[2] - cellz;
-    parts_aos_buffer[id_in_pack].x_h.w = part_get_h(p);
+    buf->send_g[id_in_pack].x_h.x = x[0] - cellx;
+    buf->send_g[id_in_pack].x_h.y = x[1] - celly;
+    buf->send_g[id_in_pack].x_h.z = x[2] - cellz;
+    buf->send_g[id_in_pack].x_h.w = part_get_h(p);
     const float *v = part_get_const_v(&ptmps[i]);
-    parts_aos_buffer[id_in_pack].ux_m.x = v[0];
-    parts_aos_buffer[id_in_pack].ux_m.y = v[1];
-    parts_aos_buffer[id_in_pack].ux_m.z = v[2];
-    parts_aos_buffer[id_in_pack].ux_m.w = part_get_mass(p);
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.x = part_get_rho(p);
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.y = part_get_alpha_av(p);
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.z =
-        part_get_u(p);  // p.density.rot_v[0];
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.w = part_get_soundspeed(p);
+    buf->send_g[id_in_pack].ux_m.x = v[0];
+    buf->send_g[id_in_pack].ux_m.y = v[1];
+    buf->send_g[id_in_pack].ux_m.z = v[2];
+    buf->send_g[id_in_pack].ux_m.w = part_get_mass(p);
+    buf->send_g[id_in_pack].rho_avisc_u_c.x = part_get_rho(p);
+    buf->send_g[id_in_pack].rho_avisc_u_c.y = part_get_alpha_av(p);
+    buf->send_g[id_in_pack].rho_avisc_u_c.z = part_get_u(p);  // p.density.rot_v[0];
+    buf->send_g[id_in_pack].rho_avisc_u_c.w = part_get_soundspeed(p);
     //        p.force.soundspeed;  // p.density.rot_v[0];
   }
 }
 
-void pack_neat_aos_f4_f(const struct cell *restrict c,
-                        struct part_aos_f4_f_send *restrict parts_aos, int tid,
-                        int local_pack_position, int count) {
+/**
+ * @brief packs particle data for force tasks into CPU-side buffers for self
+ * tasks
+ */
+void gpu_pack_force_self(struct cell* restrict c,
+                struct gpu_data_buffers *buf) {
 
-  //  const struct part *restrict ptmps;
-  //  ptmps = c->hydro.parts;
+  const int count = c->hydro.count;
+  const size_t local_pack_position = buf->pv.count_parts;
+
   const int pp = local_pack_position;
   const float cellx = c->loc[0];
   const float celly = c->loc[1];
   const float cellz = c->loc[2];
-  /*Data to be copied to GPU local memory*/
+
+  /* Data to be copied to GPU local memory */
   const struct part *ptmps = c->hydro.parts;
+
   for (int i = 0; i < count; i++) {
     const struct part *p = &ptmps[i];
     const double *x = part_get_const_x(p);
     const int id_in_pack = i + pp;
-    parts_aos[id_in_pack].x_h.x = x[0] - cellx;
-    parts_aos[id_in_pack].x_h.y = x[1] - celly;
-    parts_aos[id_in_pack].x_h.z = x[2] - cellz;
-    //    parts_aos[i + pp].x_h.x = c->hydro.parts[i].x[0] - cellx;
-    //    parts_aos[i + pp].x_h.y = c->hydro.parts[i].x[1] - celly;
-    //    parts_aos[i + pp].x_h.z = c->hydro.parts[i].x[2] - cellz;
-    parts_aos[id_in_pack].x_h.w = part_get_h(p);
+    buf->send_f[id_in_pack].x_h.x = x[0] - cellx;
+    buf->send_f[id_in_pack].x_h.y = x[1] - celly;
+    buf->send_f[id_in_pack].x_h.z = x[2] - cellz;
+    buf->send_f[id_in_pack].x_h.w = part_get_h(p);
 
     const float *v = part_get_const_v(p);
-    parts_aos[id_in_pack].ux_m.x = v[0];
-    parts_aos[id_in_pack].ux_m.y = v[1];
-    parts_aos[id_in_pack].ux_m.z = v[2];
-    parts_aos[id_in_pack].ux_m.w = part_get_mass(p);
-    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
-    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
-    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.z =
-        part_get_time_bin(p);
+    buf->send_f[id_in_pack].ux_m.x = v[0];
+    buf->send_f[id_in_pack].ux_m.y = v[1];
+    buf->send_f[id_in_pack].ux_m.z = v[2];
+    buf->send_f[id_in_pack].ux_m.w = part_get_mass(p);
+    buf->send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
+    buf->send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
+    buf->send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.z = part_get_time_bin(p);
 
-    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.w =
+    buf->send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.w =
         part_get_timestep_limiter_min_ngb_time_bin(p);
-    parts_aos[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
-    parts_aos[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
-    parts_aos[id_in_pack].rho_p_c_vsigi.z = part_get_soundspeed(p);
-    parts_aos[id_in_pack].rho_p_c_vsigi.w = part_get_v_sig(p);
-    parts_aos[id_in_pack].u_alphavisc_alphadiff.x = part_get_u(p);
-    parts_aos[id_in_pack].u_alphavisc_alphadiff.y = part_get_alpha_av(p);
-    parts_aos[id_in_pack].u_alphavisc_alphadiff.z = part_get_alpha_diff(p);
+    buf->send_f[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
+    buf->send_f[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
+    buf->send_f[id_in_pack].rho_p_c_vsigi.z = part_get_soundspeed(p);
+    buf->send_f[id_in_pack].rho_p_c_vsigi.w = part_get_v_sig(p);
+    buf->send_f[id_in_pack].u_alphavisc_alphadiff.x = part_get_u(p);
+    buf->send_f[id_in_pack].u_alphavisc_alphadiff.y = part_get_alpha_av(p);
+    buf->send_f[id_in_pack].u_alphavisc_alphadiff.z = part_get_alpha_diff(p);
   }
 }
 
 void unpack_neat_aos_f4(struct cell *c,
-                        struct part_aos_f4_recv *parts_aos_buffer, int tid,
+                        struct part_aos_f4_recv_d *parts_aos_buffer, int tid,
                         int local_pack_position, int count, struct engine *e) {
 
-  struct part_aos_f4_recv *parts_tmp = &parts_aos_buffer[local_pack_position];
+  struct part_aos_f4_recv_d *parts_tmp = &parts_aos_buffer[local_pack_position];
   for (int i = 0; i < count; i++) {
 
-    struct part_aos_f4_recv p_tmp = parts_tmp[i];
+    struct part_aos_f4_recv_d p_tmp = parts_tmp[i];
     float4 rho_dh_wcount = p_tmp.rho_dh_wcount;
     float4 rot_ux_div_v = p_tmp.rot_ux_div_v;
     struct part *p = &c->hydro.parts[i];
@@ -152,13 +168,13 @@ void unpack_neat_aos_f4(struct cell *c,
 }
 
 void unpack_neat_aos_f4_g(struct cell *c,
-                          struct part_aos_f4_g_recv *parts_aos_buffer, int tid,
+                          struct part_aos_f4_recv_g *parts_aos_buffer, int tid,
                           int local_pack_position, int count,
                           struct engine *e) {
 
-  struct part_aos_f4_g_recv *parts_tmp = &parts_aos_buffer[local_pack_position];
+  struct part_aos_f4_recv_g *parts_tmp = &parts_aos_buffer[local_pack_position];
   for (int i = 0; i < count; i++) {
-    struct part_aos_f4_g_recv p_tmp = parts_tmp[i];
+    struct part_aos_f4_recv_g p_tmp = parts_tmp[i];
     struct part *p = &c->hydro.parts[i];
     if (!PART_IS_ACTIVE(p, e)) continue;
 
@@ -170,13 +186,13 @@ void unpack_neat_aos_f4_g(struct cell *c,
 }
 
 void unpack_neat_aos_f4_f(struct cell *restrict c,
-                          struct part_aos_f4_f_recv *restrict parts_aos_buffer,
+                          struct part_aos_f4_recv_f *restrict parts_aos_buffer,
                           int tid, int local_pack_position, int count,
                           struct engine *e) {
   /* int pp = local_pack_position; */
-  struct part_aos_f4_f_recv *parts_tmp = &parts_aos_buffer[local_pack_position];
+  struct part_aos_f4_recv_f *parts_tmp = &parts_aos_buffer[local_pack_position];
   for (int i = 0; i < count; i++) {
-    struct part_aos_f4_f_recv p_tmp = parts_tmp[i];
+    struct part_aos_f4_recv_f p_tmp = parts_tmp[i];
     struct part *p = &c->hydro.parts[i];
     if (!PART_IS_ACTIVE(p, e)) continue;
     float *a = part_get_a_hydro(p);
@@ -198,14 +214,14 @@ void unpack_neat_aos_f4_f(struct cell *restrict c,
 }
 
 void unpack_neat_pair_aos_f4(struct runner *r, struct cell *c,
-                             struct part_aos_f4_recv *parts_aos_buffer, int tid,
+                             struct part_aos_f4_recv_d *parts_aos_buffer, int tid,
                              int local_pack_position, int count,
                              struct engine *e) {
 
-  struct part_aos_f4_recv *parts_tmp = &parts_aos_buffer[local_pack_position];
+  struct part_aos_f4_recv_d *parts_tmp = &parts_aos_buffer[local_pack_position];
   if (cell_is_active_hydro(c, e)) {
     for (int i = 0; i < count; i++) {
-      struct part_aos_f4_recv p_tmp = parts_tmp[i];
+      struct part_aos_f4_recv_d p_tmp = parts_tmp[i];
       struct part *p = &c->hydro.parts[i];
       //      c->hydro.parts[i].rho += parts_aos_buffer[j].rho_dh_wcount.x;
       part_set_rho(p, part_get_rho(p) + p_tmp.rho_dh_wcount.x);
@@ -237,15 +253,15 @@ void unpack_neat_pair_aos_f4(struct runner *r, struct cell *c,
 
 void unpack_neat_pair_aos_f4_g(
     struct runner *r, struct cell *restrict c,
-    struct part_aos_f4_g_recv *restrict parts_aos_buffer, int tid,
+    struct part_aos_f4_recv_g *restrict parts_aos_buffer, int tid,
     int local_pack_position, int count, struct engine *e) {
 
   if (cell_is_active_hydro(c, e)) {
 
-    struct part_aos_f4_g_recv *parts_tmp =
+    struct part_aos_f4_recv_g *parts_tmp =
         &parts_aos_buffer[local_pack_position];
     for (int i = 0; i < count; i++) {
-      struct part_aos_f4_g_recv p_tmp = parts_tmp[i];
+      struct part_aos_f4_recv_g p_tmp = parts_tmp[i];
       struct part *p = &c->hydro.parts[i];
       //      const float v_sig = p->viscosity.v_sig;
       //      p->viscosity.v_sig = fmaxf(p_tmp.vsig_lapu_aviscmax.x, v_sig);
@@ -264,15 +280,15 @@ void unpack_neat_pair_aos_f4_g(
 
 void unpack_neat_pair_aos_f4_f(
     struct runner *r, struct cell *restrict c,
-    struct part_aos_f4_f_recv *restrict parts_aos_buffer, int tid,
+    struct part_aos_f4_recv_f *restrict parts_aos_buffer, int tid,
     int local_pack_position, int count, struct engine *e) {
 
-  struct part_aos_f4_f_recv *restrict parts_tmp =
+  struct part_aos_f4_recv_f *restrict parts_tmp =
       &parts_aos_buffer[local_pack_position];
   if (cell_is_active_hydro(c, e)) {
     /* int pp = local_pack_position; */
     for (int i = 0; i < count; i++) {
-      struct part_aos_f4_f_recv p_tmp = parts_tmp[i];
+      struct part_aos_f4_recv_f p_tmp = parts_tmp[i];
       struct part *restrict p = &c->hydro.parts[i];
 
       //      c->hydro.parts[i].a_hydro[0] += parts_aos_buffer[j].a_hydro.x;
@@ -313,7 +329,7 @@ void unpack_neat_pair_aos_f4_f(
 
 
 extern inline void pack_neat_pair_aos_f4(
-    struct cell *c, struct part_aos_f4_send *parts_aos_buffer, int tid,
+    struct cell *c, struct part_aos_f4_send_d *parts_aos_buffer, int tid,
     const int local_pack_position, const int count, const double3 shift,
     const int2 cstarts) {
   /*Data to be copied to GPU*/
@@ -337,7 +353,7 @@ extern inline void pack_neat_pair_aos_f4(
 
 extern inline void pack_neat_pair_aos_f4_g(
     struct cell *__restrict c,
-    struct part_aos_f4_g_send *__restrict parts_aos_buffer, int tid,
+    struct part_aos_f4_send_g *__restrict parts_aos_buffer, int tid,
     const int local_pack_position, const int count, const float3 shift,
     const int2 cstarts) {
   /*Data to be copied to GPU*/
@@ -367,7 +383,7 @@ extern inline void pack_neat_pair_aos_f4_g(
 }
 
 extern inline void pack_neat_pair_aos_f4_f(
-    struct cell *__restrict c, struct part_aos_f4_f_send *__restrict parts_aos,
+    struct cell *__restrict c, struct part_aos_f4_send_f *__restrict parts_aos,
     int tid, const int local_pack_position, const int count, const float3 shift,
     const int2 cstarts) {
   //  const struct part *restrict ptmps;
@@ -411,109 +427,19 @@ extern inline void pack_neat_pair_aos_f4_f(
   }
 }
 
-/**
-  * This re-arranges the particle data from cell->hydro->parts into a
-  * long array of part structs
-  * @param timer: Are we timing this?
-  */
-void runner_doself1_gpu_pack_d(
-    struct runner *r,
-    struct gpu_data_buffers *buf,
-    struct cell *__restrict__ c,
-    int timer) {
-
-  TIMER_TIC;
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-
-
-#ifdef SWIFT_DEBUG_CHECKS
-  const size_t count = c->hydro.count;
-  const size_t local_pack_position = buf->pv.count_parts;
-  const size_t count_max_parts_tmp = buf->pv.count_max_parts;
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    error("Exceeded count_max_parts_tmp. Make arrays bigger! "
-          "count_max %i count %i\n",
-          count_max_parts_tmp, local_pack_position + count);
-  }
-#endif
-
-  /* Pack the particle data into CPU-side buffers*/
-  pack_aos_d(c, parts_aos_buffer, local_pack_position, count);
-
-  /* Increment pack length accordingly */
-  buf->pv.count_parts += count;
-
-  if (timer) TIMER_TOC(timer_doself_gpu_pack);
-}
-
-void runner_doself1_gpu_pack_neat_aos_f4_g(
-    struct runner *r, struct cell *c,
-    struct part_aos_f4_g_send *parts_aos_buffer, int timer, int *pack_length,
-    int tid, int count_max_parts_tmp) {
-
-  TIMER_TIC;
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr, "Exceeded count_max_parts_tmp. Make arrays bigger!\n");
-    exit(0);
-  }
-#endif
-
-  /* Pack the particle data into CPU-side buffers*/
-  pack_neat_aos_f4_g(c, parts_aos_buffer, tid, local_pack_position, count);
-  /* Increment pack length accordingly */
-  (*pack_length) += count;
-
-  if (timer) TIMER_TOC(timer_doself_gpu_pack);
-}
-
-void runner_doself1_gpu_pack_neat_aos_f4_f(
-    struct runner *r, struct cell *restrict c,
-    struct part_aos_f4_f_send *restrict parts_aos_buffer, int timer,
-    int *pack_length, int tid, int count_max_parts_tmp) {
-
-  TIMER_TIC;
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr, "Exceeded count_max_parts_tmp. Make arrays bigger!\n");
-    exit(0);
-  }
-#endif
-
-  /* Pack the particle data into CPU-side buffers*/
-  pack_neat_aos_f4_f(c, parts_aos_buffer, tid, local_pack_position, count);
-  /* Increment pack length accordingly */
-  (*pack_length) += count;
-
-  if (timer) TIMER_TOC(timer_doself_gpu_pack);
-}
 
 void runner_doself1_gpu_unpack_neat_aos_f4(
-    struct runner *r, struct cell *c, struct part_aos_f4_recv *parts_aos_buffer,
-    int timer, int *pack_length, int tid, int count_max_parts_tmp,
+    struct runner *r, struct cell *c,
+    struct part_aos_f4_recv_d *parts_aos_buffer,
+    int timer, size_t *pack_length, int tid, int
+    count_max_parts_tmp,
     struct engine *e) {
   TIMER_TIC;
 
   /* Anything to do here? */
   if (c->hydro.count == 0) return;
   if (!cell_is_active_hydro(c, e)) {
-    message("Inactive cell\n");
+    message("Inactive cell");
     return;
   }
   int count = c->hydro.count;
@@ -521,11 +447,10 @@ void runner_doself1_gpu_unpack_neat_aos_f4(
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %p, local_pack_position is % i, "
-            "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count);
+    error("Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
+          "%lu pointer to pack_length is %p, local_pack_position is % i, "
+          "count is %i",
+          (*pack_length), pack_length, local_pack_position, count);
   }
 #endif
 
@@ -537,14 +462,15 @@ void runner_doself1_gpu_unpack_neat_aos_f4(
 
 void runner_doself1_gpu_unpack_neat_aos_f4_g(
     struct runner *r, struct cell *c,
-    struct part_aos_f4_g_recv *parts_aos_buffer, int timer, int *pack_length,
+    struct part_aos_f4_recv_g *parts_aos_buffer,
+    int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, struct engine *e) {
   TIMER_TIC;
 
   /* Anything to do here? */
   if (c->hydro.count == 0) return;
   if (!cell_is_active_hydro(c, e)) {
-    message("Inactive cell\n");
+    message("Inactive cell");
     return;
   }
   int count = c->hydro.count;
@@ -552,11 +478,10 @@ void runner_doself1_gpu_unpack_neat_aos_f4_g(
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %p, local_pack_position is % i, "
-            "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count);
+    error("Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
+          "%lu pointer to pack_length is %p, local_pack_position is % i, "
+          "count is %i",
+          (*pack_length), pack_length, local_pack_position, count);
   }
 #endif
 
@@ -568,14 +493,15 @@ void runner_doself1_gpu_unpack_neat_aos_f4_g(
 
 void runner_doself1_gpu_unpack_neat_aos_f4_f(
     struct runner *r, struct cell *c,
-    struct part_aos_f4_f_recv *parts_aos_buffer, int timer, int *pack_length,
+    struct part_aos_f4_recv_f *parts_aos_buffer,
+    int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, struct engine *e) {
   TIMER_TIC;
 
   /* Anything to do here? */
   if (c->hydro.count == 0) return;
   if (!cell_is_active_hydro(c, e)) {
-    message("Inactive cell\n");
+    message("Inactive cell");
     return;
   }
   int count = c->hydro.count;
@@ -583,11 +509,10 @@ void runner_doself1_gpu_unpack_neat_aos_f4_f(
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %p, local_pack_position is % i, "
-            "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count);
+    error("Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
+          "%lu pointer to pack_length is %p, local_pack_position is % i, "
+          "count is %i",
+          (*pack_length), pack_length, local_pack_position, count);
   }
 #endif
 
@@ -599,14 +524,14 @@ void runner_doself1_gpu_unpack_neat_aos_f4_f(
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
     struct runner *r, struct cell *ci, struct cell *cj,
-    struct part_aos_f4_recv *parts_aos_buffer, int timer, int *pack_length,
+    struct part_aos_f4_recv_d *parts_aos_buffer, int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, struct engine *e) {
 
   /* Anything to do here? */
   //    if (ci->hydro.count == 0 || cj->hydro.count == 0)
   //      return;
   if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) {
-    message("Inactive cell\n");
+    message("Inactive cell");
     return;
   }
   int count_ci = ci->hydro.count;
@@ -615,11 +540,10 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (local_pack_position + count_ci + count_cj >= count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %p, local_pack_position is % i, "
-            "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count_ci);
+    error("Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
+          "%lu pointer to pack_length is %p, local_pack_position is % i, "
+          "count is %i",
+          (*pack_length), pack_length, local_pack_position, count_ci);
   }
 #endif
 
@@ -635,12 +559,12 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
     struct runner *r, struct cell *ci, struct cell *cj,
-    struct part_aos_f4_g_recv *parts_aos_buffer, int timer, int *pack_length,
+    struct part_aos_f4_recv_g *parts_aos_buffer, int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, struct engine *e) {
 
   /* Anything to do here? */
   if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) {
-    message("Inactive cell\n");
+    message("Inactive cell");
     return;
   }
   int count_ci = ci->hydro.count;
@@ -649,11 +573,10 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (local_pack_position + count_ci + count_cj >= count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %p, local_pack_position is % i, "
-            "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count_ci);
+    error("Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
+          "%lu pointer to pack_length is %p, local_pack_position is % i, "
+          "count is %i",
+           (*pack_length), pack_length, local_pack_position, count_ci);
   }
 #endif
 
@@ -670,14 +593,14 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
     struct runner *r, struct cell *ci, struct cell *cj,
-    struct part_aos_f4_f_recv *parts_aos_buffer, int timer, int *pack_length,
+    struct part_aos_f4_recv_f *parts_aos_buffer, int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, struct engine *e) {
 
   /* Anything to do here? */
   //  if (c->hydro.count == 0)
   //    return;
   if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) {
-    message("Inactive cell\n");
+    message("Inactive cell");
     return;
   }
   int count_ci = ci->hydro.count;
@@ -686,11 +609,10 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (local_pack_position + count_ci + count_cj >= count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %p, local_pack_position is % i, "
-            "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count_ci);
+    error("Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
+          "%lu pointer to pack_length is %p, local_pack_position is % i, "
+          "count is %i",
+          (*pack_length), pack_length, local_pack_position, count_ci);
   }
 #endif
 
@@ -707,7 +629,7 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
 
 void runner_do_ci_cj_gpu_pack_neat_aos_f4(
     struct runner *r, struct cell *ci, struct cell *cj,
-    struct part_aos_f4_send *parts_aos_buffer, int timer, int *pack_length,
+    struct part_aos_f4_send_d *parts_aos_buffer, int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, const int count_ci, const int count_cj,
     double3 shift_tmp) {
 
@@ -723,7 +645,7 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4(
   if (local_pack_position + count_ci + count_cj >= 2 * count_max_parts_tmp) {
     fprintf(stderr,
             "Exceeded count_max_parts_tmp. Make arrays bigger! Pack pos %i"
-            "ci %i cj %i count_max %i\n",
+            "ci %i cj %i count_max %i",
             local_pack_position, count_ci, count_cj, count_max_parts_tmp);
     error();
   }
@@ -764,8 +686,8 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4(
 
 void runner_do_ci_cj_gpu_pack_neat_aos_f4_g(
     struct runner *r, struct cell *restrict ci, struct cell *restrict cj,
-    struct part_aos_f4_g_send *restrict parts_aos_buffer, int timer,
-    int *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
+    struct part_aos_f4_send_g *restrict parts_aos_buffer, int timer,
+    size_t *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
     const int count_cj, double3 shift_tmp) {
 
   TIMER_TIC;
@@ -777,11 +699,9 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4_g(
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (local_pack_position + count_ci + count_cj >= 2 * count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! Pack pos %i"
-            "ci %i cj %i count_max %i\n",
-            local_pack_position, count_ci, count_cj, count_max_parts_tmp);
-    error();
+    error("Exceeded count_max_parts_tmp. Make arrays bigger! Pack pos %i"
+          "ci %i cj %i count_max %i",
+          local_pack_position, count_ci, count_cj, count_max_parts_tmp);
   }
 #endif
 
@@ -813,8 +733,8 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4_g(
 
 void runner_do_ci_cj_gpu_pack_neat_aos_f4_f(
     struct runner *r, struct cell *restrict ci, struct cell *restrict cj,
-    struct part_aos_f4_f_send *restrict parts_aos_buffer, int timer,
-    int *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
+    struct part_aos_f4_send_f *restrict parts_aos_buffer, int timer,
+    size_t *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
     const int count_cj, double3 shift_tmp) {
 
   TIMER_TIC;
@@ -826,11 +746,9 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4_f(
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (local_pack_position + count_ci + count_cj >= 2 * count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! Pack pos %i"
-            "ci %i cj %i count_max %i\n",
-            local_pack_position, count_ci, count_cj, count_max_parts_tmp);
-    error();
+    error("Exceeded count_max_parts_tmp. Make arrays bigger! Pack pos %i"
+          "ci %i cj %i count_max %i",
+          local_pack_position, count_ci, count_cj, count_max_parts_tmp);
   }
 #endif
 

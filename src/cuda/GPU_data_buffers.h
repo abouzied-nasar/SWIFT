@@ -73,6 +73,9 @@ void gpu_init_data_buffers(
     const char is_pair_task);
 
 
+void gpu_init_data_buffers_step(struct gpu_data_buffers *buf);
+
+
 #ifdef __cplusplus
 }
 #endif

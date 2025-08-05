@@ -17,68 +17,64 @@
 #include "hip/GPU_part_structs.h"
 #endif
 
-void runner_doself1_gpu_pack_d(
-    struct runner *r,
-    struct gpu_data_buffers *buf,
-    struct cell *__restrict__ c,
-    int timer);
+void gpu_pack_density_self(
+    struct cell* restrict c,
+    struct gpu_data_buffers *buf);
+void gpu_pack_gradient_self(
+    struct cell* restrict c,
+    struct gpu_data_buffers *buf);
+void gpu_pack_force_self(
+    struct cell* restrict c,
+    struct gpu_data_buffers *buf);
 
-void runner_doself1_gpu_pack_neat_aos_f4_g(struct runner *r, struct cell *c,
-                                           struct part_aos_f4_g_send *parts_aos,
-                                           int timer, int *pack_length, int tid,
-                                           int count_max_parts_tmp);
-
-void runner_doself1_gpu_pack_neat_aos_f4_f(
-    struct runner *r, struct cell *restrict c,
-    struct part_aos_f4_f_send *restrict parts_aos, int timer, int *pack_length,
-    int tid, int count_max_parts_tmp);
-
+/* ------------------------------------------ */
 void runner_doself1_gpu_unpack_neat_aos_f4(
-    struct runner *r, struct cell *c, struct part_aos_f4_recv *parts_aos_buffer,
-    int timer, int *pack_length, int tid, int count_max_parts_tmp,
+    struct runner *r, struct cell *c,
+    struct part_aos_f4_recv_d *parts_aos_buffer, int timer, size_t *pack_length, int tid,
+    int count_max_parts_tmp,
     struct engine *e);
 
 void runner_doself1_gpu_unpack_neat_aos_f4_g(
     struct runner *r, struct cell *c,
-    struct part_aos_f4_g_recv *parts_aos_buffer, int timer, int *pack_length,
+    struct part_aos_f4_recv_g *parts_aos_buffer, int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, struct engine *e);
 
 void runner_doself1_gpu_unpack_neat_aos_f4_f(
     struct runner *r, struct cell *restrict c,
-    struct part_aos_f4_f_recv *restrict parts_aos_buffer, int timer,
-    int *pack_length, int tid, int count_max_parts_tmp, struct engine *e);
+    struct part_aos_f4_recv_f *restrict parts_aos_buffer, int timer,
+    size_t *pack_length, int tid, int count_max_parts_tmp, struct engine *e);
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
     struct runner *r, struct cell *ci, struct cell *cj,
-    struct part_aos_f4_recv *parts_aos_buffer, int timer, int *pack_length,
+    struct part_aos_f4_recv_d *parts_aos_buffer, int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, struct engine *e);
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
     struct runner *r, struct cell *ci, struct cell *cj,
-    struct part_aos_f4_g_recv *parts_aos_buffer, int timer, int *pack_length,
+    struct part_aos_f4_recv_g *parts_aos_buffer, int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, struct engine *e);
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
     struct runner *r, struct cell *ci, struct cell *cj,
-    struct part_aos_f4_f_recv *parts_aos_buffer, int timer, int *pack_length,
+    struct part_aos_f4_recv_f *parts_aos_buffer, int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, struct engine *e);
 
 void runner_do_ci_cj_gpu_pack_neat_aos_f4(
     struct runner *r, struct cell *restrict ci, struct cell *restrict cj,
-    struct part_aos_f4_send *restrict parts_aos_buffer, int timer,
-    int *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
+    struct part_aos_f4_send_d *restrict parts_aos_buffer, int timer,
+    size_t *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
     const int count_cj, double3 shift_tmp);
 
 void runner_do_ci_cj_gpu_pack_neat_aos_f4_g(
     struct runner *r, struct cell *restrict ci, struct cell *restrict cj,
-    struct part_aos_f4_g_send *restrict parts_aos_buffer, int timer,
-    int *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
+    struct part_aos_f4_send_g *restrict parts_aos_buffer, int timer,
+    size_t *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
     const int count_cj, double3 shift_tmp);
 
 void runner_do_ci_cj_gpu_pack_neat_aos_f4_f(
     struct runner *r, struct cell *restrict ci, struct cell *restrict cj,
-    struct part_aos_f4_f_send *restrict parts_aos_buffer, int timer,
-    int *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
+    struct part_aos_f4_send_f *restrict parts_aos_buffer, int timer,
+    size_t *pack_length, int tid, int count_max_parts_tmp, const int count_ci,
     const int count_cj, double3 shift_tmp);
 
 

@@ -116,37 +116,6 @@ __attribute__((always_inline)) inline void gpu_init_pack_vars(struct gpu_pack_va
   pv->n_leaves_total = 0;
 }
 
-/**
- * TODO Abouzeid: documentation
- */
-struct pack_vars_pair_f4 {
-  /*List of tasks and respective cells to be packed*/
-  struct task **task_list;
-  struct cell **ci_list;
-  struct cell **cj_list;
-  /*List of cell shifts*/
-  float3 *shift;
-  /*List of cell shifts*/
-  float3 *d_shift;
-  int bundle_size;
-  /*How many particles in a bundle*/
-  int count_parts;
-  /**/
-  int tasks_packed;
-  int4 *fparti_fpartj_lparti_lpartj;
-  int4 *d_fparti_fpartj_lparti_lpartj;
-  int *bundle_first_part;
-  int *bundle_last_part;
-  int *bundle_first_task_list;
-  int count_max_parts;
-  int launch;
-  int launch_leftovers;
-  int target_n_tasks;
-  int nBundles;
-  int tasksperbundle;
-
-};
-
 #ifdef __cplusplus
 }
 #endif

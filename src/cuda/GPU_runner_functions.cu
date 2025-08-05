@@ -49,8 +49,8 @@ void Initialise_GPU() {
 }
 
 __global__ void DOSELF_GPU_AOS_F4(
-    struct part_aos_f4_send *__restrict__ parts_send,
-    struct part_aos_f4_recv *__restrict__ parts_recv, const float d_a,
+    struct part_aos_f4_send_d* __restrict__ parts_send,
+    struct part_aos_f4_recv_d* __restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
     const int2 *__restrict__ d_task_first_part_f4) {
 
@@ -70,10 +70,11 @@ __global__ void DOSELF_GPU_AOS_F4(
 
   float4 res_rho = {0.0, 0.0, 0.0, 0.0};
   float4 res_rot = {0.0, 0.0, 0.0, 0.0};
-  const part_aos_f4_send pi = parts_send[pid];
+  const struct part_aos_f4_send_d pi = parts_send[pid];
   const float4 x_pi = pi.x_p_h;
   const float4 ux_pi = pi.ux_m;
-  const float hi = x_pi.w, hig2 = hi * hi * kernel_gamma2;
+  const float hi = x_pi.w;
+  const float hig2 = hi * hi * kernel_gamma2;
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
@@ -83,7 +84,7 @@ __global__ void DOSELF_GPU_AOS_F4(
   for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks;
        b += BLOCK_SIZE) {
     int j = b + threadIdx.x;
-    struct part_aos_f4_send pj = parts_send[j];
+    struct part_aos_f4_send_d pj = parts_send[j];
     x_p_h_tmp[threadIdx.x] = pj.x_p_h;
     ux_m_tmp[threadIdx.x] = pj.ux_m;
     __syncthreads();
@@ -93,8 +94,9 @@ __global__ void DOSELF_GPU_AOS_F4(
         /* Compute the pairwise distance. */
         const float4 x_p_h_j = x_p_h_tmp[j_block];
         const float4 ux_m_j = ux_m_tmp[j_block];
-        const float xij = x_pi.x - x_p_h_j.x, yij = x_pi.y - x_p_h_j.y,
-                    zij = x_pi.z - x_p_h_j.z;
+        const float xij = x_pi.x - x_p_h_j.x;
+        const float yij = x_pi.y - x_p_h_j.y;
+        const float zij = x_pi.z - x_p_h_j.z;
         const float r2 = xij * xij + yij * yij + zij * zij;
         if (r2 < hig2 && r2 > (0.01f / 128.f) * (0.01f / 128.f)) {
           const float r = sqrtf(r2);
@@ -116,8 +118,9 @@ __global__ void DOSELF_GPU_AOS_F4(
           const float faci = mj * wi_dx * r_inv;
 
           /* Compute dv dot r */
-          const float dvx = ux_pi.x - ux_m_j.x, dvy = ux_pi.y - ux_m_j.y,
-                      dvz = ux_pi.z - ux_m_j.z;
+          const float dvx = ux_pi.x - ux_m_j.x;
+          const float dvy = ux_pi.y - ux_m_j.y;
+          const float dvz = ux_pi.z - ux_m_j.z;
           const float dvdr = dvx * xij + dvy * yij + dvz * zij;
 
           /* Compute dv cross r */
@@ -140,8 +143,8 @@ __global__ void DOSELF_GPU_AOS_F4(
   }
 }
 
-void launch_density_aos_f4(struct part_aos_f4_send *parts_send,
-                           struct part_aos_f4_recv *parts_recv, float d_a,
+void launch_density_aos_f4(struct part_aos_f4_send_d *parts_send,
+                           struct part_aos_f4_recv_d *parts_recv, float d_a,
                            float d_H, cudaStream_t stream, int numBlocks_x,
                            int numBlocks_y, int bundle_first_task,
                            int2 *d_task_first_part_f4) {
@@ -153,8 +156,8 @@ void launch_density_aos_f4(struct part_aos_f4_send *parts_send,
 }
 
 __global__ void DOSELF_GPU_AOS_F4_G(
-    struct part_aos_f4_g_send *__restrict__ parts_send,
-    struct part_aos_f4_g_recv *__restrict__ parts_recv, const float d_a,
+    struct part_aos_f4_send_g *__restrict__ parts_send,
+    struct part_aos_f4_recv_g *__restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
     const int2 *__restrict__ d_task_first_part_f4) {
 
@@ -170,13 +173,14 @@ __global__ void DOSELF_GPU_AOS_F4_G(
   //  __syncthreads();
   const int pid = threadid + first_part_in_task_blocks;
 
-  struct part_aos_f4_g_send pi = parts_send[pid];
+  struct part_aos_f4_send_g pi = parts_send[pid];
   float4 x_h_i = pi.x_h;
   float4 ux_m_i = pi.ux_m;
   float4 rho_avisc_u_c_i = pi.rho_avisc_u_c;
   float3 vsig_lapu_aviscmax_i = {0.f, 0.f, 0.f};
 
-  const float hi = x_h_i.w, hig2 = hi * hi * kernel_gamma2;
+  const float hi = x_h_i.w;
+  const float hig2 = hi * hi * kernel_gamma2;
 
   /*Here we use different pointers "x_p_tmp", etc. to point to different regions
    * of the single shared memory space "vars" which we allocate in kernel
@@ -191,7 +195,7 @@ __global__ void DOSELF_GPU_AOS_F4_G(
 
     int j = b + threadIdx.x;
 
-    struct part_aos_f4_g_send pj = parts_send[j];
+    struct part_aos_f4_send_g pj = parts_send[j];
     x_h_tmp[threadIdx.x] = pj.x_h;
     ux_m_tmp[threadIdx.x] = pj.ux_m;
     rho_avisc_u_c_tmp[threadIdx.x] = pj.rho_avisc_u_c;
@@ -204,8 +208,9 @@ __global__ void DOSELF_GPU_AOS_F4_G(
         float4 ux_m_j = ux_m_tmp[j_block];
         float4 rho_avisc_u_c_j = rho_avisc_u_c_tmp[j_block];
         /* Compute the pairwise distance. */
-        const float xij = x_h_i.x - x_h_j.x, yij = x_h_i.y - x_h_j.y,
-                    zij = x_h_i.z - x_h_j.z;
+        const float xij = x_h_i.x - x_h_j.x;
+        const float yij = x_h_i.y - x_h_j.y;
+        const float zij = x_h_i.z - x_h_j.z;
         const float r2 = xij * xij + yij * yij + zij * zij;
 
         if (r2 < hig2 && r2 > (0.01f / 128.f) * (0.01f / 128.f)) {
@@ -220,8 +225,9 @@ __global__ void DOSELF_GPU_AOS_F4_G(
           const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
           const float a2_Hubble = d_a * d_a * d_H;
           /* Compute dv dot r */
-          float dvx = ux_m_i.x - ux_m_j.x, dvy = ux_m_i.y - ux_m_j.y,
-                dvz = ux_m_i.z - ux_m_j.z;
+          float dvx = ux_m_i.x - ux_m_j.x;
+          float dvy = ux_m_i.y - ux_m_j.y;
+          float dvz = ux_m_i.z - ux_m_j.z;
           const float dvdr = dvx * xij + dvy * yij + dvz * zij;
           /* Add Hubble flow */
           const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -262,8 +268,8 @@ __global__ void DOSELF_GPU_AOS_F4_G(
 }
 
 __global__ void DOSELF_GPU_AOS_F4_F(
-    struct part_aos_f4_f_send *__restrict__ parts_send,
-    struct part_aos_f4_f_recv *__restrict__ parts_recv, const float d_a,
+    struct part_aos_f4_send_f*__restrict__ parts_send,
+    struct part_aos_f4_recv_f *__restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
     const int2 *__restrict__ d_task_first_part_f4) {
 
@@ -281,7 +287,7 @@ __global__ void DOSELF_GPU_AOS_F4_F(
 
   const int pid = threadid + first_part_in_task_blocks;
 
-  const part_aos_f4_f_send pi = parts_send[pid];
+  const part_aos_f4_send_f pi = parts_send[pid];
   float4 x_h_i = pi.x_h;
   float4 ux_m_i = pi.ux_m;
   float4 f_b_t_mintbinngb_i = pi.f_bals_timebin_mintimebin_ngb;
@@ -312,7 +318,7 @@ __global__ void DOSELF_GPU_AOS_F4_F(
   for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks;
        b += BLOCK_SIZE) {
     int j = b + threadIdx.x;
-    struct part_aos_f4_f_send pj = parts_send[j];
+    struct part_aos_f4_send_f pj = parts_send[j];
     x_h_tmp[threadIdx.x] = pj.x_h;
     ux_m_tmp[threadIdx.x] = pj.ux_m;
     f_b_t_mintbinngb_tmp[threadIdx.x] = pj.f_bals_timebin_mintimebin_ngb;
@@ -329,8 +335,9 @@ __global__ void DOSELF_GPU_AOS_F4_F(
         float4 f_b_t_mintbinngb_j = f_b_t_mintbinngb_tmp[j_block];
         float4 rho_p_c_vsig_j = rho_p_c_vsig_tmp[j_block];
         float3 u_avisc_adiff_j = u_avisc_adiff_tmp[j_block];
-        const float xij = x_h_i.x - x_h_j.x, yij = x_h_i.y - x_h_j.y,
-                    zij = x_h_i.z - x_h_j.z;
+        const float xij = x_h_i.x - x_h_j.x;
+        const float yij = x_h_i.y - x_h_j.y;
+        const float zij = x_h_i.z - x_h_j.z;
         const float r2 = xij * xij + yij * yij + zij * zij;
         if (r2 < hig2 && r2 > (0.01f / 128.f) * (0.01f / 128.f)) {
           //          /* Cosmology terms for the signal velocity */
@@ -358,8 +365,9 @@ __global__ void DOSELF_GPU_AOS_F4_F(
           d_kernel_deval(xj, &wj, &wj_dx);
           const float wj_dr = hjd_inv * wj_dx;
           //          /* Compute dv dot r */
-          float dvx = ux_m_i.x - ux_m_j.x, dvy = ux_m_i.y - ux_m_j.y,
-                dvz = ux_m_i.z - ux_m_j.z;
+          float dvx = ux_m_i.x - ux_m_j.x;
+          float dvy = ux_m_i.y - ux_m_j.y;
+          float dvz = ux_m_i.z - ux_m_j.z;
           const float dvdr = dvx * xij + dvy * yij + dvz * zij;
           //          /* Add Hubble flow */
           const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -458,12 +466,13 @@ __global__ void DOSELF_GPU_AOS_F4_F(
 }
 
 __device__ void DOPAIR2NAIVEGPUAOSF4(
-    const struct part_aos_f4_send pi,
-    struct part_aos_f4_send *__restrict__ parts_send,
-    struct part_aos_f4_recv *__restrict__ parts_recv, int pid,
+    const struct part_aos_f4_send_d pi,
+    struct part_aos_f4_send_d *__restrict__ parts_send,
+    struct part_aos_f4_recv_d *__restrict__ parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
-  float hi = 0.0, hig2 = 0.0;
+  float hi = 0.0;
+  float hig2 = 0.0;
 
   float4 res_rho = {0.0, 0.0, 0.0, 0.0};
   float4 res_rot = {0.0, 0.0, 0.0, 0.0};
@@ -482,17 +491,18 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
   //  printf("js %i je %i\n", cj_start, cj_end);
   /*Particles copied in blocks to shared memory*/
   for (int j = cj_start; j < cj_end; j++) {
-    struct part_aos_f4_send pj = parts_send[j];
+    struct part_aos_f4_send_d pj = parts_send[j];
 
     const float4 x_p_h_j = pj.x_p_h;
     const float4 ux_m_j = pj.ux_m;
 
-    const float xij = x_pi.x - x_p_h_j.x, yij = x_pi.y - x_p_h_j.y,
-                zij = x_pi.z - x_p_h_j.z;
+    const float xij = x_pi.x - x_p_h_j.x;
+    const float yij = x_pi.y - x_p_h_j.y;
+    const float zij = x_pi.z - x_p_h_j.z;
     const float r2 = xij * xij + yij * yij + zij * zij;
     //	printf("r2 %f \n", r2);
     if (r2 < hig2) {
-      interacted ++;
+      interacted++;
       /* Recover some data */
       const float mj = ux_m_j.w;
       const float r = sqrt(r2);
@@ -513,8 +523,9 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
       const float r_inv = 1.f / r;
       const float faci = mj * wi_dx * r_inv;
       /* Compute dv dot r */
-      const float dvx = ux_pi.x - ux_m_j.x, dvy = ux_pi.y - ux_m_j.y,
-                  dvz = ux_pi.z - ux_m_j.z;
+      const float dvx = ux_pi.x - ux_m_j.x;
+      const float dvy = ux_pi.y - ux_m_j.y;
+      const float dvz = ux_pi.z - ux_m_j.z;
       const float dvdr = dvx * xij + dvy * yij + dvz * zij;
       /* Compute dv cross r */
       const float curlvrx = dvy * zij - dvz * yij;
@@ -528,8 +539,10 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
 //      if(mj < 0.0000001)
 //      	printf("zero mass");
     }
-    else if(r2 > 0.5)
+    else if(r2 > 0.5) {
+      /* TODO: WHY ARE WE PRINTING IN THE N^2 BIT???? */
       printf("Distance is %f\n", sqrt(r2));
+    }
   } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
   //  if (pid >= ci_start && pid < ci_end) {
 
@@ -539,12 +552,13 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
 }
 
 __device__ void DOPAIR2NAIVEGPUAOSF4G(
-    const struct part_aos_f4_g_send pi,
-    struct part_aos_f4_g_send *__restrict__ parts_send,
-    struct part_aos_f4_g_recv *__restrict__ parts_recv, int pid,
+    const struct part_aos_f4_send_g pi,
+    struct part_aos_f4_send_g *__restrict__ parts_send,
+    struct part_aos_f4_recv_g *__restrict__ parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
-  float hi = 0.0, hig2 = 0.0;
+  float hi = 0.0;
+  float hig2 = 0.0;
 
   const float4 x_h_i = pi.x_h;
   const float4 ux_m_i = pi.ux_m;
@@ -562,13 +576,14 @@ __device__ void DOPAIR2NAIVEGPUAOSF4G(
   //  printf("js %i je %i\n", cj_start, cj_end);
   /*Particles copied in blocks to shared memory*/
   for (int j = cj_start; j < cj_end; j++) {
-    struct part_aos_f4_g_send pj = parts_send[j];
+    struct part_aos_f4_send_g pj = parts_send[j];
 
     const float4 x_h_j = pj.x_h;
     const float4 ux_m_j = pj.ux_m;
     const float4 rho_avisc_u_c_j = pj.rho_avisc_u_c;
-    const float xij = x_h_i.x - x_h_j.x, yij = x_h_i.y - x_h_j.y,
-                zij = x_h_i.z - x_h_j.z;
+    const float xij = x_h_i.x - x_h_j.x;
+    const float yij = x_h_i.y - x_h_j.y;
+    const float zij = x_h_i.z - x_h_j.z;
     const float r2 = xij * xij + yij * yij + zij * zij;
     //	printf("r2 %f \n", r2);
     if (r2 < hig2) {
@@ -583,8 +598,9 @@ __device__ void DOPAIR2NAIVEGPUAOSF4G(
       const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
       const float a2_Hubble = d_a * d_a * d_H;
       /* Compute dv dot r */
-      float dvx = ux_m_i.x - ux_m_j.x, dvy = ux_m_i.y - ux_m_j.y,
-            dvz = ux_m_i.z - ux_m_j.z;
+      float dvx = ux_m_i.x - ux_m_j.x;
+      float dvy = ux_m_i.y - ux_m_j.y;
+      float dvz = ux_m_i.z - ux_m_j.z;
       const float dvdr = dvx * xij + dvy * yij + dvz * zij;
       /* Add Hubble flow */
       const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -618,9 +634,9 @@ __device__ void DOPAIR2NAIVEGPUAOSF4G(
 }
 
 __device__ void DOPAIR2NAIVEGPUAOSF4F(
-    const struct part_aos_f4_f_send pi,
-    struct part_aos_f4_f_send *__restrict__ parts_send,
-    struct part_aos_f4_f_recv *__restrict__ parts_recv, int pid,
+    const struct part_aos_f4_send_f pi,
+    struct part_aos_f4_send_f *__restrict__ parts_send,
+    struct part_aos_f4_recv_f *__restrict__ parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
   const float4 x_h_i = pi.x_h;
@@ -644,15 +660,16 @@ __device__ void DOPAIR2NAIVEGPUAOSF4F(
   //  printf("js %i je %i\n", cj_start, cj_end);
   /*Particles copied in blocks to shared memory*/
   for (int j = cj_start; j < cj_end; j++) {
-    struct part_aos_f4_f_send pj = parts_send[j];
+    struct part_aos_f4_send_f pj = parts_send[j];
     const float4 x_h_j = pj.x_h;
     const float4 ux_m_j = pj.ux_m;
     const float4 f_b_t_mintbinngb_j = pj.f_bals_timebin_mintimebin_ngb;
     const float4 rho_p_c_vsig_j = pj.rho_p_c_vsigi;
     //    alpha_tmp[threadIdx.x] = parts_aos[j].visc_alpha;
     const float3 u_avisc_adiff_j = pj.u_alphavisc_alphadiff;
-    const float xij = x_h_i.x - x_h_j.x, yij = x_h_i.y - x_h_j.y,
-                zij = x_h_i.z - x_h_j.z;
+    const float xij = x_h_i.x - x_h_j.x;
+    const float yij = x_h_i.y - x_h_j.y;
+    const float zij = x_h_i.z - x_h_j.z;
     const float r2 = xij * xij + yij * yij + zij * zij;
     //	printf("r2 %f \n", r2);
     if (r2 < hig2) {
@@ -679,8 +696,9 @@ __device__ void DOPAIR2NAIVEGPUAOSF4F(
       d_kernel_deval(xj, &wj, &wj_dx);
       const float wj_dr = hjd_inv * wj_dx;
       //          /* Compute dv dot r */
-      float dvx = ux_m_i.x - ux_m_j.x, dvy = ux_m_i.y - ux_m_j.y,
-            dvz = ux_m_i.z - ux_m_j.z;
+      float dvx = ux_m_i.x - ux_m_j.x;
+      float dvy = ux_m_i.y - ux_m_j.y;
+      float dvz = ux_m_i.z - ux_m_j.z;
       const float dvdr = dvx * xij + dvy * yij + dvz * zij;
       //          /* Add Hubble flow */
       const float dvdr_Hubble = dvdr + a2_Hubble * r2;
@@ -771,7 +789,7 @@ __device__ void DOPAIR2NAIVEGPUAOSF4F(
 }
 
 __global__ void runner_do_pair_density_GPU_aos_f4(
-    struct part_aos_f4_send *parts_send, struct part_aos_f4_recv *parts_recv,
+    struct part_aos_f4_send_d *parts_send, struct part_aos_f4_recv_d *parts_recv,
     float d_a, float d_H, int bundle_first_part, int bundle_n_parts) {
 
   //  extern __shared__ float4 vars_pair_i_f4[];
@@ -784,7 +802,7 @@ __global__ void runner_do_pair_density_GPU_aos_f4(
   //  int first_part_in_task_blocks_ci, last_part_in_task_blocks_ci;
   //  int first_part_in_task_blocks_cj, last_part_in_task_blocks_cj;
   if (pid < bundle_first_part + bundle_n_parts) {
-    const struct part_aos_f4_send pi = parts_send[pid];
+    const struct part_aos_f4_send_d pi = parts_send[pid];
     const int cj_start = pi.cjs_cje.x;
     const int cj_end = pi.cjs_cje.y;
     /* Start calculations for particles in cell i*/
@@ -794,8 +812,8 @@ __global__ void runner_do_pair_density_GPU_aos_f4(
 }
 
 __global__ void runner_do_pair_gradient_GPU_aos_f4(
-    struct part_aos_f4_g_send *parts_send,
-    struct part_aos_f4_g_recv *parts_recv, float d_a, float d_H,
+    struct part_aos_f4_send_g *parts_send,
+    struct part_aos_f4_recv_g *parts_recv, float d_a, float d_H,
     int bundle_first_part, int bundle_n_parts) {
 
   //  extern __shared__ float4 vars_pair_i_f4[];
@@ -806,7 +824,7 @@ __global__ void runner_do_pair_gradient_GPU_aos_f4(
 
   //	printf("task_id is %i, count_tasks is %i\n", task_id, count_tasks);
   if (pid < bundle_first_part + bundle_n_parts) {
-    const struct part_aos_f4_g_send pi = parts_send[pid];
+    const struct part_aos_f4_send_g pi = parts_send[pid];
     const int cj_start = pi.cjs_cje.x;
     const int cj_end = pi.cjs_cje.y;
     /* Start calculations for particles in cell i*/
@@ -816,8 +834,8 @@ __global__ void runner_do_pair_gradient_GPU_aos_f4(
 }
 
 __global__ void runner_do_pair_force_GPU_aos_f4(
-    struct part_aos_f4_f_send *parts_send,
-    struct part_aos_f4_f_recv *parts_recv, float d_a, float d_H,
+    struct part_aos_f4_send_f *parts_send,
+    struct part_aos_f4_recv_f *parts_recv, float d_a, float d_H,
     int bundle_first_part, int bundle_n_parts) {
 
   //  extern __shared__ float4 vars_pair_i_f4[];
@@ -828,7 +846,7 @@ __global__ void runner_do_pair_force_GPU_aos_f4(
 
   //	printf("task_id is %i, count_tasks is %i\n", task_id, count_tasks);
   if (pid < bundle_first_part + bundle_n_parts) {
-    const struct part_aos_f4_f_send pi = parts_send[pid];
+    const struct part_aos_f4_send_f pi = parts_send[pid];
     const int cj_start = pi.cjs_cje.x;
     const int cj_end = pi.cjs_cje.y;
     /* Start calculations for particles in cell i */
@@ -838,7 +856,7 @@ __global__ void runner_do_pair_force_GPU_aos_f4(
 }
 
 void runner_dopair_branch_density_gpu_aos_f4(
-    struct part_aos_f4_send *parts_send, struct part_aos_f4_recv *parts_recv,
+    struct part_aos_f4_send_d *parts_send, struct part_aos_f4_recv_d *parts_recv,
     float d_a, float d_H, cudaStream_t stream, int numBlocks_x, int numBlocks_y,
     int bundle_first_part, int bundle_n_parts) {
 
@@ -849,8 +867,8 @@ void runner_dopair_branch_density_gpu_aos_f4(
 }
 
 void runner_dopair_branch_gradient_gpu_aos_f4(
-    struct part_aos_f4_g_send *parts_send,
-    struct part_aos_f4_g_recv *parts_recv, float d_a, float d_H,
+    struct part_aos_f4_send_g *parts_send,
+    struct part_aos_f4_recv_g *parts_recv, float d_a, float d_H,
     cudaStream_t stream, int numBlocks_x, int numBlocks_y,
     int bundle_first_part, int bundle_n_parts) {
 
@@ -861,8 +879,8 @@ void runner_dopair_branch_gradient_gpu_aos_f4(
 }
 
 void runner_dopair_branch_force_gpu_aos_f4(
-    struct part_aos_f4_f_send *parts_send,
-    struct part_aos_f4_f_recv *parts_recv, float d_a, float d_H,
+    struct part_aos_f4_send_f *parts_send,
+    struct part_aos_f4_recv_f *parts_recv, float d_a, float d_H,
     cudaStream_t stream, int numBlocks_x, int numBlocks_y,
     int bundle_first_part, int bundle_n_parts) {
 
@@ -873,8 +891,8 @@ void runner_dopair_branch_force_gpu_aos_f4(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
-void launch_gradient_aos_f4(struct part_aos_f4_g_send *parts_send,
-                            struct part_aos_f4_g_recv *parts_recv, float d_a,
+void launch_gradient_aos_f4(struct part_aos_f4_send_g *parts_send,
+                            struct part_aos_f4_recv_g *parts_recv, float d_a,
                             float d_H, cudaStream_t stream, int numBlocks_x,
                             int numBlocks_y, int bundle_first_task,
                             int2 *d_task_first_part_f4) {
@@ -885,8 +903,8 @@ void launch_gradient_aos_f4(struct part_aos_f4_g_send *parts_send,
                                   bundle_first_task, d_task_first_part_f4);
 }
 
-void launch_force_aos_f4(struct part_aos_f4_f_send *d_parts_send,
-                         struct part_aos_f4_f_recv *d_parts_recv, float d_a,
+void launch_force_aos_f4(struct part_aos_f4_send_f *d_parts_send,
+                         struct part_aos_f4_recv_f *d_parts_recv, float d_a,
                          float d_H, cudaStream_t stream, int numBlocks_x,
                          int numBlocks_y, int bundle_first_task,
                          int2 *d_task_first_part_f4) {
