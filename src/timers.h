@@ -149,6 +149,12 @@ enum {
   timer_do_rt_collect_times,
   timer_do_sync,
   timer_neutrino_weighting,
+  timer_doself_gpu_pack_d,
+  timer_doself_gpu_pack_g,
+  timer_doself_gpu_pack_f,
+  timer_doself_gpu_unpack_d,
+  timer_doself_gpu_unpack_g,
+  timer_doself_gpu_unpack_f,
   timer_count,
 };
 
