@@ -477,22 +477,16 @@ double runner_dopair1_pack_f4_ff(struct runner *r, struct scheduler *s,
   return (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
 };
 
-void runner_doself1_launch_f4(
+
+void runner_doself_gpu_launch_density(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
     struct cell *ci, struct task *t, struct part_aos_f4_send_d *parts_send,
     struct part_aos_f4_recv_d *parts_recv, struct part_aos_f4_send_d *d_parts_send,
     struct part_aos_f4_recv_d *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int devId, int2 *task_first_part_f4,
+    float d_H, struct engine *e, int devId, int2 *task_first_part_f4,
     int2 *d_task_first_part_f4, cudaEvent_t *self_end) {
 
-  struct timespec t0;
-  struct timespec t1;
-  struct timespec tp0;
-  struct timespec tp1;  //
-  clock_gettime(CLOCK_REALTIME, &t0);
-
-  /* Identify the number of GPU bundles to run in ideal case*/
+  /* Identify the number of GPU bundles to run in ideal case */
   int n_bundles_temp = pack_vars->n_bundles;
 
   /*How many tasks have we packed?*/
@@ -507,22 +501,23 @@ void runner_doself1_launch_f4(
     n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
     if (tasks_packed == 0)
       error("zero tasks packed but somehow got into GPU loop");
-    //	  pack_vars->bundle_first_part[n_bundles_temp] =
-    // pack_vars->task_first_part[tasks_packed - 1];
     pack_vars->bundle_first_part[n_bundles_temp] =
         task_first_part_f4[tasks_packed - 1].x;
   }
+
   /* Identify the last particle for each bundle of tasks */
   for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
+
   /* special treatment for the last bundle */
   if (n_bundles_temp > 1)
     pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
+
   /* Launch the copies for each bundle and run the GPU kernel */
-  /*We don't go into this loop if tasks_left_self == 1 as
+  /* We don't go into this loop if tasks_left_self == 1 as
    n_bundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
   int max_parts;
   for (int bid = 0; bid < n_bundles_temp; bid++) {
@@ -532,8 +527,8 @@ void runner_doself1_launch_f4(
     int last_task = (bid + 1) * bundle_size;
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
       if (tid < tasks_packed) {
-        /*Get an estimate for the max number of parts per cell in the bundle.
-         *  Used for determining the number of GPU CUDA blocks*/
+        /* Get an estimate for the max number of parts per cell in the bundle.
+         * Used for determining the number of GPU CUDA blocks*/
         int count = task_first_part_f4[tid].y - task_first_part_f4[tid].x;
         max_parts = max(max_parts, count);
         last_task = tid;
@@ -556,13 +551,14 @@ void runner_doself1_launch_f4(
     if (bid == n_bundles_temp - 1) {
       tasks_left = tasks_packed - (n_bundles_temp - 1) * tasksperbundle;
     }
-    // Will launch a 2d grid of GPU thread blocks (number of tasks is
-    // the y dimension and max_parts is the x dimension
+
+    /* Will launch a 2d grid of GPU thread blocks (number of tasks is
+       the y dimension and max_parts is the x dimension */
     int numBlocks_y = tasks_left;
     int numBlocks_x = (max_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int bundle_first_task = pack_vars->bundle_first_task_list[bid];
 
-    // Launch the kernel
+    /* Launch the kernel */
     launch_density_aos_f4(d_parts_send, d_parts_recv, d_a, d_H, stream[bid],
                           numBlocks_x, numBlocks_y, bundle_first_task,
                           d_task_first_part_f4);
@@ -574,12 +570,7 @@ void runner_doself1_launch_f4(
 
   } /*End of looping over bundles to launch in streams*/
   /* Make sure all the kernels and copies back are finished */
-  //	cudaDeviceSynchronize();
-
-  /*Time end of GPU work*/
-  clock_gettime(CLOCK_REALTIME, &t1);
-  *gpu_time +=
-      (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
+  /* cudaDeviceSynchronize(); */
 
   /* Now copy the data back from the CPU thread-local buffers to the cells */
   /* Pack length counter for use in unpacking */
@@ -587,24 +578,15 @@ void runner_doself1_launch_f4(
   ticks total_cpu_unpack_ticks = 0.;
   for (int bid = 0; bid < n_bundles_temp; bid++) {
 
-    clock_gettime(CLOCK_REALTIME, &t0);
-
-    //		cudaStreamSynchronize(stream[bid]);
+    /* cudaStreamSynchronize(stream[bid]); */
     cudaEventSynchronize(self_end[bid]);
 
-    clock_gettime(CLOCK_REALTIME, &t1);
-    *gpu_time +=
-        (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-
-    /*Time unpacking*/
-
+    /* Time unpacking */
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
 
       if (tid < tasks_packed) {
         struct cell *cii = pack_vars->ci_list[tid];
         struct task *tii = pack_vars->task_list[tid];
-
-        clock_gettime(CLOCK_REALTIME, &tp0);
 
         while (cell_locktree(cii)) {
           ; /* spin until we acquire the lock */
@@ -618,49 +600,43 @@ void runner_doself1_launch_f4(
         const ticks toc = getticks();
 
         total_cpu_unpack_ticks += toc - tic;
+
         /* Record things for debugging */
         cii->gpu_done++;
-        /*Time end of unpacking*/
-        clock_gettime(CLOCK_REALTIME, &tp1);
-        *unpack_time += (tp1.tv_sec - tp0.tv_sec) +
-                        (tp1.tv_nsec - tp0.tv_nsec) / 1000000000.0;
+
+        /* Time end of unpacking */
         pthread_mutex_lock(&s->sleep_mutex);
         atomic_dec(&s->waiting);
         pthread_cond_broadcast(&s->sleep_cond);
         pthread_mutex_unlock(&s->sleep_mutex);
+
         /* Release the lock */
         cell_unlocktree(cii);
 
-        /*schedule my dependencies (Only unpacks really)*/
+        /* schedule my dependencies (Only unpacks really) */
         enqueue_dependencies(s, tii);
-        /*Signal sleeping runners*/
+        /* Signal sleeping runners */
         // MATTHIEU signal_sleeping_runners(s, tii);
       }
     }
   }
+
   /* Zero counters for the next pack operations */
   pack_vars->count_parts = 0;
   pack_vars->tasks_packed = 0;
 
   t->total_cpu_unpack_ticks += total_cpu_unpack_ticks;
 
-} /*End of GPU work Self*/
+}
 
-void runner_doself1_launch_f4_g(
+void runner_doself_launch_gradient(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
     struct cell *ci, struct task *t, struct part_aos_f4_send_g *parts_send,
     struct part_aos_f4_recv_g *parts_recv,
     struct part_aos_f4_send_g *d_parts_send,
     struct part_aos_f4_recv_g *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    int2 *task_first_part_f4, int2 *d_task_first_part_f4, cudaEvent_t *self_end,
-    double *unpack_time) {
-
-  struct timespec t0;
-  struct timespec t1;
-  struct timespec tp0;
-  struct timespec tp1;
-  clock_gettime(CLOCK_REALTIME, &t0);
+    float d_H, struct engine *e,
+    int2 *task_first_part_f4, int2 *d_task_first_part_f4, cudaEvent_t *self_end) {
 
   /* Identify the number of GPU bundles to run in ideal case*/
   int n_bundles_temp = pack_vars->n_bundles;
@@ -680,10 +656,12 @@ void runner_doself1_launch_f4_g(
     pack_vars->bundle_first_part[n_bundles_temp] =
         task_first_part_f4[tasks_packed - 1].x;
   }
+
   /* Identify the last particle for each bundle of tasks */
   for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
+
   /* special treatment for the last bundle */
   if (n_bundles_temp > 1)
     pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
@@ -691,7 +669,7 @@ void runner_doself1_launch_f4_g(
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
 
   /* Launch the copies for each bundle and run the GPU kernel */
-  /*We don't go into this loop if tasks_left_self == 1 as
+  /* We don't go into this loop if tasks_left_self == 1 as
    n_bundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
   int max_parts;
   for (int bid = 0; bid < n_bundles_temp; bid++) {
@@ -721,13 +699,9 @@ void runner_doself1_launch_f4_g(
     cudaMemcpyAsync(&d_parts_send[first_part_tmp], &parts_send[first_part_tmp],
                     bundle_n_parts * sizeof(struct part_aos_f4_send_g),
                     cudaMemcpyHostToDevice, stream[bid]);
-    //	  fprintf(stderr, "bid %i first_part %i nparts %i\n", bid,
-    // first_part_tmp, bundle_n_parts);
 
 #ifdef CUDA_DEBUG
-    cudaError_t cu_error =
-        cudaPeekAtLastError();  // cudaGetLastError();        //
-                                // Get error code
+    cudaError_t cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error("CUDA error in gradient self host 2 device memcpy: %s cpuid id is: %i",
           cudaGetErrorString(cu_error), r->cpuid);
@@ -769,14 +743,8 @@ void runner_doself1_launch_f4_g(
     }
 #endif
   } /*End of looping over bundles to launch in streams*/
-  //	exit(0);
   /* Make sure all the kernels and copies back are finished */
-  //	cudaDeviceSynchronize();
-
-  /*Time end of GPU work*/
-  clock_gettime(CLOCK_REALTIME, &t1);
-  *gpu_time +=
-      (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
+  /* cudaDeviceSynchronize(); */
 
   /* Now copy the data back from the CPU thread-local buffers to the cells */
   /* Pack length counter for use in unpacking */
@@ -784,17 +752,8 @@ void runner_doself1_launch_f4_g(
   ticks total_cpu_unpack_ticks = 0.;
   for (int bid = 0; bid < n_bundles_temp; bid++) {
 
-    clock_gettime(CLOCK_REALTIME, &t0);
-
-    //		cudaStreamSynchronize(stream[bid]);
+    /* cudaStreamSynchronize(stream[bid]); */
     cudaEventSynchronize(self_end[bid]);
-
-    clock_gettime(CLOCK_REALTIME, &t1);
-    *gpu_time +=
-        (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-
-    /*Time unpacking*/
-    //		clock_gettime(CLOCK_REALTIME, &tp0);
 
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
 
@@ -803,14 +762,9 @@ void runner_doself1_launch_f4_g(
         struct cell *cii = pack_vars->ci_list[tid];
         struct task *tii = pack_vars->task_list[tid];
 
-        //              struct cell *cii = ci_list_self_dens[tid];
-        //              struct task *tii = task_list_self_dens[tid];
-
         while (cell_locktree(cii)) {
           ; /* spin until we acquire the lock */
         }
-        /*Time unpacking*/
-        clock_gettime(CLOCK_REALTIME, &tp0);
         const ticks tic = getticks();
 
         /* Do the copy */
@@ -821,9 +775,6 @@ void runner_doself1_launch_f4_g(
 
         total_cpu_unpack_ticks += toc - tic;
         /*Time end of unpacking*/
-        clock_gettime(CLOCK_REALTIME, &tp1);
-        *unpack_time += (tp1.tv_sec - tp0.tv_sec) +
-                        (tp1.tv_nsec - tp0.tv_nsec) / 1000000000.0;
 
         /* Record things for debugging */
         cii->gpu_done_g++;
@@ -834,18 +785,12 @@ void runner_doself1_launch_f4_g(
         /* Release the lock */
         cell_unlocktree(cii);
 
-        /*schedule my dependencies (Only unpacks really)*/
+        /* schedule my dependencies (Only unpacks really) */
         enqueue_dependencies(s, tii);
-        /*Signal sleeping runners*/
+        /* Signal sleeping runners */
         // MATTHIEU signal_sleeping_runners(s, tii);
       }
     }
-    /*Time end of unpacking*/
-    //		clock_gettime(CLOCK_REALTIME, &tp1);
-    //		*unpack_time += (tp1.tv_sec - tp0.tv_sec) +
-    //		(tp1.tv_nsec - tp0.tv_nsec) / 1000000000.0;
-    //		*packing_time += (tp1.tv_sec - tp0.tv_sec) +
-    //		(tp1.tv_nsec - tp0.tv_nsec) / 1000000000.0;
   }
   /* Zero counters for the next pack operations */
   pack_vars->count_parts = 0;
@@ -853,23 +798,17 @@ void runner_doself1_launch_f4_g(
 
   t->total_cpu_unpack_ticks += total_cpu_unpack_ticks;
 
-} /*End of GPU work Self Gradient*/
+}
 
-void runner_doself1_launch_f4_f(
+void runner_doself_launch_force(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
     struct cell *ci, struct task *t, struct part_aos_f4_send_f *parts_send,
     struct part_aos_f4_recv_f *parts_recv,
     struct part_aos_f4_send_f *d_parts_send,
     struct part_aos_f4_recv_f *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
+    float d_H, struct engine *e,
     int2 *task_first_part_f4_f, int2 *d_task_first_part_f4_f,
-    cudaEvent_t *self_end, double *unpack_time) {
-
-  struct timespec t0;
-  struct timespec t1;
-  struct timespec tp0;
-  struct timespec tp1;
-  clock_gettime(CLOCK_REALTIME, &t0);
+    cudaEvent_t *self_end) {
 
   /* Identify the number of GPU bundles to run in ideal case*/
   int n_bundles_temp = pack_vars->n_bundles;
@@ -889,17 +828,20 @@ void runner_doself1_launch_f4_f(
     pack_vars->bundle_first_part[n_bundles_temp] =
         task_first_part_f4_f[tasks_packed - 1].x;
   }
+
   /* Identify the last particle for each bundle of tasks */
   for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
+
   /* special treatment for the last bundle */
   if (n_bundles_temp > 1)
     pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
+
   /* Launch the copies for each bundle and run the GPU kernel */
-  /*We don't go into this loop if tasks_left_self == 1 as
+  /* We don't go into this loop if tasks_left_self == 1 as
    n_bundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
   int max_parts = 0;
   for (int bid = 0; bid < n_bundles_temp; bid++) {
@@ -930,9 +872,7 @@ void runner_doself1_launch_f4_f(
                     cudaMemcpyHostToDevice, stream[bid]);
 
 #ifdef CUDA_DEBUG
-    cudaError_t cu_error =
-        cudaPeekAtLastError();  // cudaGetLastError();        //
-                                // Get error code
+    cudaError_t cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error("CUDA error in density self host 2 device memcpy: %s cpuid id "
               "is: %i", cudaGetErrorString(cu_error), r->cpuid);
@@ -948,6 +888,7 @@ void runner_doself1_launch_f4_f(
     int numBlocks_y = tasks_left;
     int numBlocks_x = (max_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int bundle_first_task = pack_vars->bundle_first_task_list[bid];
+
     // Launch the kernel
     launch_force_aos_f4(d_parts_send, d_parts_recv, d_a, d_H, stream[bid],
                         numBlocks_x, numBlocks_y, bundle_first_task,
@@ -965,8 +906,7 @@ void runner_doself1_launch_f4_f(
     cudaEventRecord(self_end[bid], stream[bid]);
 
 #ifdef CUDA_DEBUG
-    cu_error = cudaPeekAtLastError();  // cudaGetLastError();        //
-                                       // Get error code
+    cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error("CUDA error with self firce D2H memcpy: %s cpuid id is: %i"
             "Something's up with your cuda code",
@@ -978,28 +918,14 @@ void runner_doself1_launch_f4_f(
   /* Make sure all the kernels and copies back are finished */
   //	cudaDeviceSynchronize();
 
-  /*Time end of GPU work*/
-  clock_gettime(CLOCK_REALTIME, &t1);
-  *gpu_time +=
-      (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-
   /* Now copy the data back from the CPU thread-local buffers to the cells */
   /* Pack length counter for use in unpacking */
   size_t pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0.;
   for (int bid = 0; bid < n_bundles_temp; bid++) {
 
-    clock_gettime(CLOCK_REALTIME, &t0);
-
     //		cudaStreamSynchronize(stream[bid]);
     cudaEventSynchronize(self_end[bid]);
-
-    clock_gettime(CLOCK_REALTIME, &t1);
-    *gpu_time +=
-        (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-
-    /*Time unpacking*/
-    //		clock_gettime(CLOCK_REALTIME, &tp0);
 
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
 
@@ -1010,7 +936,6 @@ void runner_doself1_launch_f4_f(
         while (cell_locktree(cii)) {
           ; /* spin until we acquire the lock */
         }
-        clock_gettime(CLOCK_REALTIME, &tp0);
         const ticks tic = getticks();
 
         /* Do the copy */
@@ -1022,9 +947,6 @@ void runner_doself1_launch_f4_f(
         total_cpu_unpack_ticks += toc - tic;
         /* Record things for debugging */
         cii->gpu_done_f++;
-        clock_gettime(CLOCK_REALTIME, &tp1);
-        *unpack_time += (tp1.tv_sec - tp0.tv_sec) +
-                        (tp1.tv_nsec - tp0.tv_nsec) / 1000000000.0;
         pthread_mutex_lock(&s->sleep_mutex);
         atomic_dec(&s->waiting);
         pthread_cond_broadcast(&s->sleep_cond);
@@ -1043,20 +965,15 @@ void runner_doself1_launch_f4_f(
   pack_vars->tasks_packed = 0;
 
   t->total_cpu_unpack_ticks += total_cpu_unpack_ticks;
-} /*End of GPU work Self Gradient*/
+}
 
-void runner_dopair1_launch_f4_one_memcpy_no_unpack(
+void runner_dopair_launch_d(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
     struct task *t, struct part_aos_f4_send_d *parts_send,
     struct part_aos_f4_recv_d *parts_recv, struct part_aos_f4_send_d *d_parts_send,
     struct part_aos_f4_recv_d *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
+    float d_H, struct engine *e, int4 *fparti_fpartj_lparti_lpartj_dens,
     cudaEvent_t *pair_end) {
-
-  struct timespec t0;
-  struct timespec t1;  //
-  clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
   int n_bundles_temp = pack_vars->n_bundles;
@@ -1163,11 +1080,6 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
 #endif
   } /*End of looping over bundles to launch in streams*/
 
-  /*Time end of GPU work*/
-  clock_gettime(CLOCK_REALTIME, &t1);
-  *gpu_time +=
-      (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-
   /* Issue synchronisation commands for all events recorded by GPU
    * Should swap with one cuda Device Synchronise really if we decide to go this
    * way with unpacking done separately */
@@ -1175,26 +1087,19 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack(
 
   for (int bid = 0; bid < n_bundles_temp; bid++) {
     /*Time unpacking*/
-    clock_gettime(CLOCK_REALTIME, &t0);
-    //		cudaStreamSynchronize(stream[bid]);
     cudaEventSynchronize(pair_end[bid]);
-
-    clock_gettime(CLOCK_REALTIME, &t1);
-    *gpu_time +=
-        (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
   }
   /* Write the timers back to the task */
   t->total_cpu_unpack_ticks += total_cpu_unpack_ticks;
 
 } /*End of GPU work*/
 
-void runner_dopair1_unpack_f4(
+void runner_dopair_unpack_d(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
     struct task *t, struct part_aos_f4_send_d *parts_send,
     struct part_aos_f4_recv_d *parts_recv, struct part_aos_f4_send_d *d_parts_send,
     struct part_aos_f4_recv_d *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
+    float d_H, struct engine *e, int4 *fparti_fpartj_lparti_lpartj_dens,
     cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
     , struct cell ** ci_top, struct cell ** cj_top) {
 
@@ -1238,7 +1143,8 @@ void runner_dopair1_unpack_f4(
   }
 }
 
-void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s,
+
+void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *s,
     struct cell * ci, struct cell * cj,
     struct gpu_pack_vars *pack_vars, struct task *t,
     struct part_aos_f4_send_d *parts_send,
@@ -1246,31 +1152,37 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s,
     struct part_aos_f4_send_d *d_parts_send,
     struct part_aos_f4_recv_d *d_parts_recv,
     cudaStream_t *stream, float d_a, float d_H,
-    struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
-    cudaEvent_t *pair_end, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
-    , struct cell ** ci_top, struct cell ** cj_top){
-  //Everything from here on needs moving to runner_doiact_functions_hydro_gpu.h
+    struct engine *e, int4 *fparti_fpartj_lparti_lpartj_dens,
+    cudaEvent_t *pair_end, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters,
+    struct cell ** ci_top, struct cell ** cj_top){
+
+  /* Everything from here on needs moving to runner_doiact_functions_hydro_gpu.h */
   ticks tic_cpu_pack = getticks();
   pack_vars->n_daughters_total += n_leaves_found;
   int top_tasks_packed = pack_vars->top_tasks_packed;
+
   //Keep separate
   f_l_daughters[top_tasks_packed][0] = pack_vars->n_daughters_packed_index;
+
   //Keep separate
   ci_top[top_tasks_packed] = ci;
   cj_top[top_tasks_packed] = cj;
   pack_vars->n_leaves_total += n_leaves_found;
   int first_cell_to_move = pack_vars->n_daughters_packed_index;
   int n_daughters_left = pack_vars->n_daughters_total;
+
   /*Get pointer to top level task. Needed to enqueue deps*/
   pack_vars->top_task_list[top_tasks_packed] = t;
+
   /*Increment how many top tasks we've packed*/
   pack_vars->top_tasks_packed++;
   top_tasks_packed++;
+
   //A. Nasar: Remove this from struct as not needed. Was only used for de-bugging
-  /*How many daughter tasks do we want to offload at once?*/
+  /* How many daughter tasks do we want to offload at once?*/
   size_t target_n_tasks_tmp = pack_vars->target_n_tasks;
   t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
+
   // A. Nasar: Check to see if this is the last task in the queue.
   // If so, set launch_leftovers to 1 and recursively pack and launch daughter tasks on GPU
   unsigned int qid = r->qid;
@@ -1278,9 +1190,10 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s,
   s->queues[qid].n_packs_pair_left_d--;
   if (s->queues[qid].n_packs_pair_left_d < 1) pack_vars->launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
-  /*Counter for how many tasks we've packed*/
+  /* Counter for how many tasks we've packed */
   int npacked = 0;
   int launched = 0;
+
   //A. Nasar: Loop through the daughter tasks we found
   int copy_index = pack_vars->n_daughters_packed_index;
   //not strictly true!!! Could be that we packed and moved on without launching
@@ -1299,11 +1212,13 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s,
     runner_dopair1_pack_f4(
         r, s, pack_vars, cii, cjj, t,
         parts_send, e, fparti_fpartj_lparti_lpartj_dens);
+
     //record number of tasks we've copied from last launch
     copy_index++;
     //Record how many daughters we've packed in total for while loop
     npacked++;
     first_cell_to_move++;
+
     /*Re-think this. Probably not necessary to have this if statement and we can just use the form in the else statement*/
     if(had_prev_task)
       f_l_daughters[top_tasks_packed - 1][1] = f_l_daughters[top_tasks_packed - 1][0] + copy_index - pack_vars->n_daughters_packed_index;
@@ -1315,20 +1230,18 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s,
     if(pack_vars->launch || (pack_vars->launch_leftovers && npacked == n_leaves_found)){
 
       launched = 1;
-      //Here we only launch the tasks. No unpacking! This is done in next function ;)
-      runner_dopair1_launch_f4_one_memcpy_no_unpack(
+      /* Here we only launch the tasks. No unpacking! This is done in next function ;) */
+      runner_dopair_launch_d(
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            packing_time, gpu_time,
-            unpack_time, fparti_fpartj_lparti_lpartj_dens,
+            fparti_fpartj_lparti_lpartj_dens,
             pair_end);
-      runner_dopair1_unpack_f4(
+      runner_dopair_unpack_d(
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            packing_time, gpu_time,
-            unpack_time, fparti_fpartj_lparti_lpartj_dens,
+            fparti_fpartj_lparti_lpartj_dens,
             pair_end, npacked, n_leaves_found, ci_d, cj_d, f_l_daughters, ci_top, cj_top);
       if(npacked == n_leaves_found){
         pack_vars->n_daughters_total = 0;
@@ -1390,18 +1303,13 @@ void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s,
 
 }
 
-void runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
+void runner_dopair_launch_g(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
     struct task *t, struct part_aos_f4_send_g *parts_send,
     struct part_aos_f4_recv_g *parts_recv, struct part_aos_f4_send_g *d_parts_send,
     struct part_aos_f4_recv_g *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_grad,
+    float d_H, struct engine *e, int4 *fparti_fpartj_lparti_lpartj_grad,
     cudaEvent_t *pair_end) {
-
-  struct timespec t0;
-  struct timespec t1;
-  clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
   int n_bundles_temp = pack_vars->n_bundles;
@@ -1456,8 +1364,7 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
 
 #ifdef CUDA_DEBUG
     cudaError_t cu_error =
-        cudaPeekAtLastError();  // cudaGetLastError();        //
-                                // Get error code
+        cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error(
               "CUDA error with pair density H2D async  memcpy ci: %s cpuid id is: %i\n"
@@ -1507,11 +1414,6 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
 #endif
   } /*End of looping over bundles to launch in streams*/
 
-  /*Time end of GPU work*/
-  clock_gettime(CLOCK_REALTIME, &t1);
-  *gpu_time +=
-      (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-
   /* Issue synchronisation commands for all events recorded by GPU
    * Should swap with one cuda Device Synchronise really if we decide to go this
    * way with unpacking done separately */
@@ -1519,25 +1421,24 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
 
   for (int bid = 0; bid < n_bundles_temp; bid++) {
     /*Time unpacking*/
-    clock_gettime(CLOCK_REALTIME, &t0);
+    /* clock_gettime(CLOCK_REALTIME, &t0); */
     cudaEventSynchronize(pair_end[bid]);
 
-    clock_gettime(CLOCK_REALTIME, &t1);
-    *gpu_time +=
-        (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
+    /* clock_gettime(CLOCK_REALTIME, &t1); */
+    /* *gpu_time += */
+    /*     (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0; */
   }
   /* Write the timers back to the task */
   t->total_cpu_unpack_ticks += total_cpu_unpack_ticks;
 
-} /*End of GPU work*/
+}
 
 void runner_dopair1_unpack_f4_g(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
     struct task *t, struct part_aos_f4_send_g *parts_send,
     struct part_aos_f4_recv_g *parts_recv, struct part_aos_f4_send_g *d_parts_send,
     struct part_aos_f4_recv_g *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_grad,
+    float d_H, struct engine *e, int4 *fparti_fpartj_lparti_lpartj_grad,
     cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
     , struct cell ** ci_top, struct cell ** cj_top) {
 
@@ -1581,12 +1482,11 @@ void runner_dopair1_unpack_f4_g(
   }
 }
 
-void runner_pack_daughters_and_launch_g(struct runner *r, struct scheduler *s, struct cell * ci, struct cell * cj, struct gpu_pack_vars *pack_vars,
+void runner_gpu_pack_daughters_and_launch_g(struct runner *r, struct scheduler *s, struct cell * ci, struct cell * cj, struct gpu_pack_vars *pack_vars,
     struct task *t, struct part_aos_f4_send_g *parts_send,
     struct part_aos_f4_recv_g *parts_recv, struct part_aos_f4_send_g *d_parts_send,
     struct part_aos_f4_recv_g *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_grad,
+    float d_H, struct engine *e, int4 *fparti_fpartj_lparti_lpartj_grad,
     cudaEvent_t *pair_end, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
     , struct cell ** ci_top, struct cell ** cj_top){
   //Everything from here on needs moving to runner_doiact_functions_hydro_gpu.h
@@ -1654,19 +1554,17 @@ void runner_pack_daughters_and_launch_g(struct runner *r, struct scheduler *s, s
 //      message("tasks packed gradient %i", pack_vars->tasks_packed);
       launched = 1;
       //Here we only launch the tasks. No unpacking! This is done in next function ;)
-      runner_dopair1_launch_f4_one_memcpy_no_unpack_g(
+      runner_dopair_launch_g(
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            packing_time, gpu_time,
-            unpack_time, fparti_fpartj_lparti_lpartj_grad,
+            fparti_fpartj_lparti_lpartj_grad,
             pair_end);
       runner_dopair1_unpack_f4_g(
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            packing_time, gpu_time,
-            unpack_time, fparti_fpartj_lparti_lpartj_grad,
+            fparti_fpartj_lparti_lpartj_grad,
             pair_end, npacked, n_leaves_found, ci_d, cj_d, f_l_daughters, ci_top, cj_top);
       if(npacked == n_leaves_found){
         pack_vars->n_daughters_total = 0;
@@ -1728,18 +1626,13 @@ void runner_pack_daughters_and_launch_g(struct runner *r, struct scheduler *s, s
 
 }
 
-void runner_dopair1_launch_f4_one_memcpy_no_unpack_f(
+void runner_dopair_launch_f(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
     struct task *t, struct part_aos_f4_send_f *parts_send,
     struct part_aos_f4_recv_f *parts_recv, struct part_aos_f4_send_f *d_parts_send,
     struct part_aos_f4_recv_f *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_forc,
+    float d_H, struct engine *e, int4 *fparti_fpartj_lparti_lpartj_forc,
     cudaEvent_t *pair_end) {
-
-  struct timespec t0;
-  struct timespec t1;  //
-  clock_gettime(CLOCK_REALTIME, &t0);
 
   /* Identify the number of GPU bundles to run in ideal case*/
   int n_bundles_temp = pack_vars->n_bundles;
@@ -1753,12 +1646,8 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_f(
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
     n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
-//    message("tasks packed %i nbundles % i", tasks_packed, n_bundles_temp);
-//    if (tasks_packed == 0)
-//      error("zero pair tasks packed but somehow got into GPU loop");
     pack_vars->bundle_first_part[n_bundles_temp] =
         fparti_fpartj_lparti_lpartj_forc[tasks_packed - 1].x;
-    //    message("Incomplete buundle");
   }
   /* Identify the last particle for each bundle of tasks */
   for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
@@ -1848,11 +1737,6 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_f(
 #endif
   } /*End of looping over bundles to launch in streams*/
 
-  /*Time end of GPU work*/
-  clock_gettime(CLOCK_REALTIME, &t1);
-  *gpu_time +=
-      (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
-
   /* Issue synchronisation commands for all events recorded by GPU
    * Should swap with one cuda Device Synchronise really if we decide to go this
    * way with unpacking done separately */
@@ -1861,25 +1745,24 @@ void runner_dopair1_launch_f4_one_memcpy_no_unpack_f(
 
   for (int bid = 0; bid < n_bundles_temp; bid++) {
     /*Time unpacking*/
-    clock_gettime(CLOCK_REALTIME, &t0);
+    /* clock_gettime(CLOCK_REALTIME, &t0); */
     cudaEventSynchronize(pair_end[bid]);
 
-    clock_gettime(CLOCK_REALTIME, &t1);
-    *gpu_time +=
-        (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0;
+    /* clock_gettime(CLOCK_REALTIME, &t1); */
+    /* *gpu_time += */
+    /*     (t1.tv_sec - t0.tv_sec) + (t1.tv_nsec - t0.tv_nsec) / 1000000000.0; */
   }
   /* Write the timers back to the task */
   t->total_cpu_unpack_ticks += total_cpu_unpack_ticks;
 
 } /*End of GPU work*/
 
-void runner_dopair1_unpack_f4_f(
+void runner_dopair_unpack_f(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
     struct task *t, struct part_aos_f4_send_f *parts_send,
     struct part_aos_f4_recv_f *parts_recv, struct part_aos_f4_send_f *d_parts_send,
     struct part_aos_f4_recv_f *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_forc,
+    float d_H, struct engine *e, int4 *fparti_fpartj_lparti_lpartj_forc,
     cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
     , struct cell ** ci_top, struct cell ** cj_top) {
 
@@ -1922,13 +1805,12 @@ void runner_dopair1_unpack_f4_f(
   }
 }
 
-void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s,
+void runner_gpu_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s,
     struct cell * ci, struct cell * cj, struct gpu_pack_vars *pack_vars, struct
     task *t, struct part_aos_f4_send_f *parts_send,
     struct part_aos_f4_recv_f *parts_recv, struct part_aos_f4_send_f *d_parts_send,
     struct part_aos_f4_recv_f *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
-    double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_forc,
+    float d_H, struct engine *e, int4 *fparti_fpartj_lparti_lpartj_forc,
     cudaEvent_t *pair_end, int n_leaves_found, struct cell ** ci_d, struct cell
     ** cj_d, int ** f_l_daughters , struct cell ** ci_top, struct cell ** cj_top){
   //Everything from here on needs moving to runner_doiact_functions_hydro_gpu.h
@@ -1995,19 +1877,17 @@ void runner_pack_daughters_and_launch_f(struct runner *r, struct scheduler *s,
 
       launched = 1;
       //Here we only launch the tasks. No unpacking! This is done in next function ;)
-      runner_dopair1_launch_f4_one_memcpy_no_unpack_f(
+      runner_dopair_launch_f(
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            packing_time, gpu_time,
-            unpack_time, fparti_fpartj_lparti_lpartj_forc,
+            fparti_fpartj_lparti_lpartj_forc,
             pair_end);
-      runner_dopair1_unpack_f4_f(
+      runner_dopair_unpack_f(
             r, s, pack_vars, t, parts_send,
             parts_recv, d_parts_send,
             d_parts_recv, stream, d_a, d_H, e,
-            packing_time, gpu_time,
-            unpack_time, fparti_fpartj_lparti_lpartj_forc,
+            fparti_fpartj_lparti_lpartj_forc,
             pair_end, npacked, n_leaves_found, ci_d, cj_d, f_l_daughters, ci_top, cj_top);
       if(npacked == n_leaves_found){
         pack_vars->n_daughters_total = 0;
