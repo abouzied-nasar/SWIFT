@@ -53,11 +53,10 @@ double runner_doself1_pack_d(struct runner *r, struct scheduler *s,
 
   /* Identify row in particle arrays where this task starts*/
   buf->task_first_part_f4[tasks_packed].x = pv->count_parts;
-  size_t *count_parts_self = &pv->count_parts;
 
   /* This re-arranges the particle data from cell->hydro->parts into a
   long array of part structs*/
-  runner_doself1_gpu_pack_d(r, ci, buf, /*timer=*/0);
+  runner_doself1_gpu_pack_d(r, buf, ci, /*timer=*/0);
 
   /* Identify the row in the array where this task ends (row id of its
      last particle)*/

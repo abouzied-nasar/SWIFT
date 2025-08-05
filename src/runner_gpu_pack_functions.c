@@ -9,13 +9,15 @@
 #include "space_getsid.h"
 #include "timers.h"
 
-#include <stdatomic.h>
+/* #include <stdatomic.h> */
 
 
-void pack_neat_aos_f4(struct cell *__restrict__ c,
-                      struct part_aos_f4_send *__restrict__ parts_aos_buffer,
-                      int tid, int local_pack_position, int count,
-                      int2 frst_lst_prts) {
+void pack_aos_d(struct cell *__restrict__ c,
+                struct gpu_data_buffers *buf) {
+
+  const int count = c->hydro.count;
+  const size_t tid = buf->pv.tasks_packed;
+  size_t local_pack_position = buf->pv.count_parts;
 
   struct part ptmps[count];
   memcpy(ptmps, (c->hydro.parts), count * sizeof(struct part));
@@ -182,26 +184,12 @@ void unpack_neat_aos_f4_f(struct cell *restrict c,
     part_set_a_hydro_ind(p, 1, a[1] + p_tmp.a_hydro.y);
     part_set_a_hydro_ind(p, 2, a[2] + p_tmp.a_hydro.z);
 
-    //    c->hydro.parts[i].u_dt +=
-    //        parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.x;
-
     part_set_u_dt(p, p_tmp.udt_hdt_vsig_mintimebin_ngb.x + part_get_u_dt(p));
-
-    //    c->hydro.parts[i].force.h_dt +=
-    //        parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.y;
 
     part_set_h_dt(p, p_tmp.udt_hdt_vsig_mintimebin_ngb.y + part_get_h_dt(p));
 
-    //    c->hydro.parts[i].viscosity.v_sig =
-    //        fmaxf(parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.z,
-    //              c->hydro.parts[i].viscosity.v_sig);
-
     part_set_v_sig(
         p, fmaxf(p_tmp.udt_hdt_vsig_mintimebin_ngb.z, part_get_v_sig(p)));
-
-    //    c->hydro.parts[i].limiter_data.min_ngb_time_bin =
-    //        (int)(parts_aos_buffer[i + pp].udt_hdt_vsig_mintimebin_ngb.w +
-    //        0.5f);
 
     timebin_t min_ngb_time_bin =
         (int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
@@ -251,17 +239,7 @@ void unpack_neat_pair_aos_f4_g(
     struct runner *r, struct cell *restrict c,
     struct part_aos_f4_g_recv *restrict parts_aos_buffer, int tid,
     int local_pack_position, int count, struct engine *e) {
-  //  struct part_aos_f4_recv * restrict parts_tmp =
-  //  &parts_aos_buffer[local_pack_position]; int pp = local_pack_position; for
-  //  (int i = 0; i < count; i++) {
-  //	  int j = i + pp;
-  //	  c->hydro.parts[i].viscosity.v_sig =
-  // parts_aos_buffer[j].vsig_lapu_aviscmax.x;
-  //	  c->hydro.parts[i].diffusion.laplace_u +=
-  // parts_aos_buffer[j].vsig_lapu_aviscmax.y;
-  //	  c->hydro.parts[i].force.alpha_visc_max_ngb =
-  // parts_aos_buffer[j].vsig_lapu_aviscmax.z;
-  //  }
+
   if (cell_is_active_hydro(c, e)) {
 
     struct part_aos_f4_g_recv *parts_tmp =
@@ -434,8 +412,10 @@ extern inline void pack_neat_pair_aos_f4_f(
 }
 
 /**
- * @param timer: Are we timing this?
- */
+  * This re-arranges the particle data from cell->hydro->parts into a
+  * long array of part structs
+  * @param timer: Are we timing this?
+  */
 void runner_doself1_gpu_pack_d(
     struct runner *r,
     struct gpu_data_buffers *buf,
@@ -447,28 +427,23 @@ void runner_doself1_gpu_pack_d(
   /* Anything to do here? */
   if (c->hydro.count == 0) return;
 
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-  size_t count_max_parts_tmp = buf->pv.count_max_parts;
-  size_t tid = buf->pv.tasks_packed;
-  size_t* pack_length = &buf->pv.count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
+  const size_t count = c->hydro.count;
+  const size_t local_pack_position = buf->pv.count_parts;
+  const size_t count_max_parts_tmp = buf->pv.count_max_parts;
   if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! count_max %i "
-            "count %i\n",
-            count_max_parts_tmp, local_pack_position + count);
-    error("0");
+    error("Exceeded count_max_parts_tmp. Make arrays bigger! "
+          "count_max %i count %i\n",
+          count_max_parts_tmp, local_pack_position + count);
   }
 #endif
 
-  int2 frst_lst_prts = {local_pack_position, local_pack_position + count};
   /* Pack the particle data into CPU-side buffers*/
-  pack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count,
-                   frst_lst_prts);
+  pack_aos_d(c, parts_aos_buffer, local_pack_position, count);
+
   /* Increment pack length accordingly */
-  (*pack_length) += count;
+  buf->pv.count_parts += count;
 
   if (timer) TIMER_TOC(timer_doself_gpu_pack);
 }
@@ -648,20 +623,14 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
   }
 #endif
 
-  /* Pack the particle data into CPU-side buffers*/
-  //  if(r->cpuid == 0)fprintf(stderr, "unpacking ci l_pos %i count_i %i count_j
-  //  %i\n", local_pack_position, count_ci, count_cj);
   unpack_neat_pair_aos_f4(r, ci, parts_aos_buffer, tid, local_pack_position,
                           count_ci, e);
   local_pack_position += count_ci;
   /* Pack the particle data into CPU-side buffers*/
-  //  if(r->cpuid == 0)fprintf(stderr, "unpacking ci l_pos %i count_i %i count_j
-  //  %i\n", local_pack_position, count_ci, count_cj);
   unpack_neat_pair_aos_f4(r, cj, parts_aos_buffer, tid, local_pack_position,
                           count_cj, e);
   /* Increment pack length accordingly */
   (*pack_length) += count_ci + count_cj;
-  //  if(r->cpuid == 0)exit(0);
 }
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
@@ -670,8 +639,6 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
     int tid, int count_max_parts_tmp, struct engine *e) {
 
   /* Anything to do here? */
-  //  if (c->hydro.count == 0)
-  //    return;
   if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) {
     message("Inactive cell\n");
     return;
@@ -691,19 +658,14 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
 #endif
 
   /* Pack the particle data into CPU-side buffers*/
-  //  if(r->cpuid == 0)fprintf(stderr, "unpacking ci l_pos %i count_i %i count_j
-  //  %i\n", local_pack_position, count_ci, count_cj);
   unpack_neat_pair_aos_f4_g(r, ci, parts_aos_buffer, tid, local_pack_position,
                             count_ci, e);
   local_pack_position += count_ci;
   /* Pack the particle data into CPU-side buffers*/
-  //  if(r->cpuid == 0)fprintf(stderr, "unpacking ci l_pos %i count_i %i count_j
-  //  %i\n", local_pack_position, count_ci, count_cj);
   unpack_neat_pair_aos_f4_g(r, cj, parts_aos_buffer, tid, local_pack_position,
                             count_cj, e);
   /* Increment pack length accordingly */
   (*pack_length) += count_ci + count_cj;
-  //  if(r->cpuid == 0)exit(0);
 }
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
@@ -733,19 +695,14 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
 #endif
 
   /* Pack the particle data into CPU-side buffers*/
-  //  if(r->cpuid == 0)fprintf(stderr, "unpacking ci l_pos %i count_i %i count_j
-  //  %i\n", local_pack_position, count_ci, count_cj);
   unpack_neat_pair_aos_f4_f(r, ci, parts_aos_buffer, tid, local_pack_position,
                             count_ci, e);
   local_pack_position += count_ci;
   /* Pack the particle data into CPU-side buffers*/
-  //  if(r->cpuid == 0)fprintf(stderr, "unpacking ci l_pos %i count_i %i count_j
-  //  %i\n", local_pack_position, count_ci, count_cj);
   unpack_neat_pair_aos_f4_f(r, cj, parts_aos_buffer, tid, local_pack_position,
                             count_cj, e);
   /* Increment pack length accordingly */
   (*pack_length) += count_ci + count_cj;
-  //  if(r->cpuid == 0)exit(0);
 }
 
 void runner_do_ci_cj_gpu_pack_neat_aos_f4(
