@@ -3,6 +3,7 @@ extern "C" {
 #endif
 
 #include "GPU_data_buffers.h"
+#include "task.h"
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -16,8 +17,12 @@ extern "C" {
  *
  * @brief TODO: parameter docu
  *
+ * @param target_n_tasks defines the total number of leaf-level tasks we will
+ *    compute for each GPU off-load cycle
  * @param bundle_size defines the number of leaf-level tasks we will
  *    compute in each stream
+ * @params n_bundles the number of task bundles each thread has.
+ *    Used to loop through bundles
  * @param is_pair_task: Whether we allocate enough space for pair tasks
  * @param send_struct_size: size of struct used for send arrays (both host and device)
  * @param recv_struct_size: size of struct used for recv arrays (both host and device)
@@ -26,35 +31,27 @@ void gpu_init_data_buffers(
     struct gpu_data_buffers *buf,
     const size_t target_n_tasks,
     const size_t bundle_size,
-    const size_t n_bundles, /* differs for pair or self */
+    const size_t n_bundles,
     const size_t count_max_parts_tmp,
     const size_t send_struct_size,
     const size_t recv_struct_size,
     const char is_pair_task
     ) {
 
-  /* A. Nasar: n_bundles is the number of task bundles each
-  thread has ==> Used to loop through bundles */
-  /* const size_t n_bundles = (target_n_tasks + bundle_size - 1) / bundle_size; */
-
-  /* A. Nasar: target_n_tasks defines the total number of leaf-level tasks we will
-   * compute for each GPU off-load cycle */
   const size_t tasksperbundle = (target_n_tasks + n_bundles - 1) / n_bundles;
+
   /* Multiplication factor depending on whether this is for a self or a pair task */
   const size_t self_pair_fact = is_pair_task ? 2 : 1;
 
   /* Initialise and set up pack_vars */
-  struct gpu_pack_vars* pv = &buf->pv;
+  struct gpu_pack_vars* pv = &(buf->pv);
   gpu_init_pack_vars(pv);
-
-  cudaError_t cu_error = cudaErrorMemoryAllocation;
-  cu_error = cudaMallocHost((void **)&pv, sizeof(struct gpu_pack_vars));
-  swift_assert(cu_error == cudaSuccess);
 
   pv->target_n_tasks = target_n_tasks;
   pv->bundle_size = bundle_size;
   pv->n_bundles = n_bundles;
 
+  cudaError_t cu_error = cudaErrorMemoryAllocation;
   cu_error=cudaMallocHost((void **)&pv->bundle_first_part, self_pair_fact * n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
 
@@ -68,8 +65,15 @@ void gpu_init_data_buffers(
   pv->count_parts = 0;
   pv->count_max_parts = count_max_parts_tmp;
 
-  pv->task_list = (struct task **)calloc(target_n_tasks, sizeof(struct task *));
-  pv->ci_list = (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
+  if (is_pair_task) {
+    pv->task_list = NULL;
+    pv->ci_list = NULL;
+    pv->top_task_list = (struct task**)calloc(target_n_tasks, sizeof(struct task*));
+  } else {
+    pv->task_list = (struct task **)calloc(target_n_tasks, sizeof(struct task *));
+    pv->ci_list = (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
+    pv->top_task_list = NULL;
+  }
 
   /* A. Nasar: Keep track of first and last particles for each self task (particle data is
    * arranged in long arrays containing particles from all the tasks we will
@@ -121,7 +125,7 @@ void gpu_init_data_buffers(
   buf->event_end = (cudaEvent_t*)malloc(n_bundles * sizeof(cudaEvent_t));
 
   for (size_t i = 0; i < n_bundles; i++){
-    cudaEventCreate(&buf->event_end[i]);
+    cudaEventCreate(&(buf->event_end[i]));
   }
 
 }

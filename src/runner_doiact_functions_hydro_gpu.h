@@ -43,17 +43,10 @@ extern "C" {
  * @param t the associated task to pack
  * @param mode: 0 for density, 1 for gradient, 2 for force
  */
-void runner_doself_gpu_pack(struct runner *r, struct scheduler *s,
-                          struct gpu_data_buffers *buf,
-                          struct cell *ci, struct task *t,
-                          int mode) {
-  TIMER_TIC;
-
-  /* Find my queue for use later */
-  int qid = r->qid;
+void runner_doself_gpu_pack( struct cell *ci, struct task *t, struct gpu_data_buffers *buf, int mode) {
 
   /* Grab a hold of the packing buffers */
-  struct gpu_pack_vars* pv = &buf->pv;
+  struct gpu_pack_vars* pv = &(buf->pv);
 
   /* Place pointers to the task and cells packed in an array for use later
    * when unpacking after the GPU offload */
@@ -117,8 +110,19 @@ void runner_doself_gpu_pack(struct runner *r, struct scheduler *s,
   buf->pv.launch = 0;
   buf->pv.launch_leftovers = 0;
 
+}
+
+
+void runner_doself_pack_d(struct runner *r, struct scheduler *s, struct
+    gpu_data_buffers *buf, struct cell *ci, struct task *t) {
+
+  TIMER_TIC;
+
+  runner_doself_gpu_pack(ci, t, buf, 0);
+
   /* Get a lock to the queue so we can safely decrement counter and check for
    * launch leftover condition*/
+  int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_self_left_d--;
   if (s->queues[qid].n_packs_self_left_d < 1) {
@@ -132,26 +136,71 @@ void runner_doself_gpu_pack(struct runner *r, struct scheduler *s,
   }
 
   /* Release the lock on the cell */
+  /* TODO: WHERE IS THIS TREE LOCKED?????????? */
   cell_unlocktree(ci);
   t->gpu_done = 1;
 
   TIMER_TOC(timer_doself_gpu_pack);
 }
 
-
-void runner_doself_pack_d(struct runner *r, struct scheduler *s, struct
-    gpu_data_buffers *buf, struct cell *ci, struct task *t) {
-  runner_doself_gpu_pack(r, s, buf, ci, t, 0);
-}
-
 void runner_doself_pack_g(struct runner *r, struct scheduler *s, struct
     gpu_data_buffers *buf, struct cell *ci, struct task *t) {
-  runner_doself_gpu_pack(r, s, buf, ci, t, 1);
+
+  TIMER_TIC;
+
+  runner_doself_gpu_pack(ci, t, buf, 1);
+
+  /* Get a lock to the queue so we can safely decrement counter and check for
+   * launch leftover condition*/
+  int qid = r->qid;
+  lock_lock(&s->queues[qid].lock);
+  s->queues[qid].n_packs_self_left_g--;
+  if (s->queues[qid].n_packs_self_left_g < 1) {
+    buf->pv.launch_leftovers = 1;
+  }
+  (void)lock_unlock(&s->queues[qid].lock);
+
+  /* Have we packed enough tasks to offload to GPU? */
+  if (buf->pv.tasks_packed == buf->pv.target_n_tasks){
+    buf->pv.launch = 1;
+  }
+
+  /* Release the lock on the cell */
+  /* TODO: WHERE IS THIS TREE LOCKED?????????? */
+  cell_unlocktree(ci);
+  /* t->gpu_done = 1; */ /* DENSITY HAS THIS? */
+
+  TIMER_TOC(timer_doself_gpu_pack);
 }
 
 void runner_doself_pack_f(struct runner *r, struct scheduler *s, struct
     gpu_data_buffers *buf, struct cell *ci, struct task *t) {
-  runner_doself_gpu_pack(r, s, buf, ci, t, 2);
+
+  TIMER_TIC;
+
+  runner_doself_gpu_pack(ci, t, buf, 2);
+
+  /* Get a lock to the queue so we can safely decrement counter and check for
+   * launch leftover condition*/
+  int qid = r->qid;
+  lock_lock(&s->queues[qid].lock);
+  s->queues[qid].n_packs_self_left_f--;
+  if (s->queues[qid].n_packs_self_left_f < 1) {
+    buf->pv.launch_leftovers = 1;
+  }
+  (void)lock_unlock(&s->queues[qid].lock);
+
+  /* Have we packed enough tasks to offload to GPU? */
+  if (buf->pv.tasks_packed == buf->pv.target_n_tasks){
+    buf->pv.launch = 1;
+  }
+
+  /* Release the lock on the cell */
+  /* TODO: WHERE IS THIS TREE LOCKED?????????? */
+  cell_unlocktree(ci);
+  /* t->gpu_done = 1; */ /* DENSITY HAS THIS? */
+
+  TIMER_TOC(timer_doself_gpu_pack);
 }
 
 
@@ -1215,11 +1264,14 @@ void runner_dopair1_unpack_f4(
 }
 
 void runner_pack_daughters_and_launch(struct runner *r, struct scheduler *s,
-    struct cell * ci, struct cell * cj, struct gpu_pack_vars *pack_vars, struct task *t,
-    struct part_aos_f4_send_d *parts_send, struct part_aos_f4_recv_d *parts_recv,
+    struct cell * ci, struct cell * cj,
+    struct gpu_pack_vars *pack_vars, struct task *t,
+    struct part_aos_f4_send_d *parts_send,
+    struct part_aos_f4_recv_d *parts_recv,
     struct part_aos_f4_send_d *d_parts_send,
-    struct part_aos_f4_recv_d *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, double *packing_time, double *gpu_time,
+    struct part_aos_f4_recv_d *d_parts_recv,
+    cudaStream_t *stream, float d_a, float d_H,
+    struct engine *e, double *packing_time, double *gpu_time,
     double *unpack_time, int4 *fparti_fpartj_lparti_lpartj_dens,
     cudaEvent_t *pair_end, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
     , struct cell ** ci_top, struct cell ** cj_top){
