@@ -1384,7 +1384,8 @@ int cell_activate_subcell_grav_tasks(struct cell *restrict ci,
       const double ri_max = multi_i->r_max;
       const double rj_max = multi_j->r_max;
 
-      int ci_number_children = 0, cj_number_children = 0;
+      int ci_number_children = 0;
+      int cj_number_children = 0;
       int progenies_all_processed = 0;
 
       /* Let's open up the largest of the two cells,
@@ -1912,9 +1913,6 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
     }
     for (struct link *l = c->hydro.density_unpack; l != NULL; l = l->next) {
       scheduler_activate(s, l->t);
-#ifdef SWIFT_DEBUG_CHECKS
-      l->t->gpu_done = 0;
-#endif
     }
     for (struct link *l = c->hydro.gradient; l != NULL; l = l->next) {
       scheduler_activate(s, l->t);
@@ -1946,9 +1944,6 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
     }
     for (struct link *l = c->hydro.force_unpack; l != NULL; l = l->next) {
       scheduler_activate(s, l->t);
-#ifdef SWIFT_DEBUG_CHECKS
-      l->t->gpu_done = 0;
-#endif
     }
 
 #ifdef EXTRA_HYDRO_LOOP
@@ -1973,9 +1968,6 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
     }
     for (struct link *l = c->hydro.gradient_unpack; l != NULL; l = l->next) {
       scheduler_activate(s, l->t);
-#ifdef SWIFT_DEBUG_CHECKS
-      l->t->gpu_done = 0;
-#endif
     }
 #endif
 
