@@ -50,6 +50,7 @@ extern "C" {
 #include "cuda/GPU_part_structs.h"
 #include "cuda/GPU_runner_functions.h"
 #include "cuda/GPU_utils.h"
+#include "cuda/cuda_config.h"
 #include "engine.h"
 #include "feedback.h"
 #include "runner_doiact_functions_hydro_gpu.h"
@@ -331,13 +332,18 @@ void *runner_main_cuda(void *data) {
         /* Did I get anything? */
         if (t == NULL) break;
       }
+
+/* message("RUNNING TASK %s/%s", taskID_names[t->type], subtaskID_names[t->subtype]); */
+/* fflush(stdout); */
+
       /* Get the cells. */
       struct cell *ci = t->ci;
       struct cell *cj = t->cj;
 
-      if (ci == NULL && (t->subtype != task_subtype_gpu_unpack_d
-    		  && t->subtype != task_subtype_gpu_unpack_g
-			  && t->subtype != task_subtype_gpu_unpack_f))
+      if (ci == NULL &&
+          (t->subtype != task_subtype_gpu_unpack_d &&
+           t->subtype != task_subtype_gpu_unpack_g &&
+           t->subtype != task_subtype_gpu_unpack_f))
         error("This cannot be");
 
 #ifdef SWIFT_DEBUG_TASKS
@@ -387,6 +393,8 @@ void *runner_main_cuda(void *data) {
           } else if (t->subtype == task_subtype_gpu_pack_d) {
             /* GPU WORK */
 #ifdef GPUOFFLOAD_DENSITY
+/* message("PACKING DENSITY SELF"); */
+/* fflush(stdout); */
             runner_doself_pack_d(r, sched, &gpu_buf_self_dens, ci, t);
             /* No pack tasks left in queue, flag that we want to run */
             char launch_leftovers = gpu_buf_self_dens.pv.launch_leftovers;
@@ -395,6 +403,8 @@ void *runner_main_cuda(void *data) {
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
               /* Launch GPU tasks */
+/* message("LAUNCHING DENSITY SELF"); */
+/* fflush(stdout); */
               runner_doself1_launch_f4(
                   r, sched,
                   &gpu_buf_self_dens.pv, ci, t,
@@ -407,19 +417,23 @@ void *runner_main_cuda(void *data) {
                   gpu_buf_self_dens.task_first_part_f4,
                   gpu_buf_self_dens.d_task_first_part_f4,
                   gpu_buf_self_dens.event_end);
+/* message("DONE DENSITY SELF"); */
+/* fflush(stdout); */
             } /*End of GPU work Self*/
 #endif
           } /* self / pack */
           else if (t->subtype == task_subtype_gpu_pack_g) {
 #ifdef GPUOFFLOAD_GRADIENT
-            runner_doself_pack_g(r, sched, &gpu_buf_self_dens, ci, t);
+            runner_doself_pack_g(r, sched, &gpu_buf_self_grad, ci, t);
             /* No pack tasks left in queue, flag that we want to run */
             char launch_leftovers = gpu_buf_self_grad.pv.launch_leftovers;
             /*Packed enough tasks let's go*/
             char launch = gpu_buf_self_grad.pv.launch;
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
-              /*Launch GPU tasks*/
+/* message("LAUNCHING GRADIENT SELF"); */
+/* fflush(stdout); */
+              /* Launch GPU tasks */
               runner_doself1_launch_f4_g(
                   r, sched,
                   &gpu_buf_self_grad.pv, ci, t,
@@ -433,17 +447,23 @@ void *runner_main_cuda(void *data) {
                   gpu_buf_self_grad.d_task_first_part_f4,
                   gpu_buf_self_grad.event_end,
                   &unpack_time_self_g);
+/* message("DONE GRADIENT SELF"); */
+/* fflush(stdout); */
             } /*End of GPU work Self*/
 #endif  // GPUGRADSELF
           } else if (t->subtype == task_subtype_gpu_pack_f) {
 #ifdef GPUOFFLOAD_FORCE
+/* message("PACKING FORCE SELF"); */
+/* fflush(stdout); */
             runner_doself_pack_f(r, sched, &gpu_buf_self_forc, ci, t);
             /* No pack tasks left in queue, flag that we want to run */
-            int launch_leftovers = gpu_buf_self_forc.pv.launch_leftovers;
+            char launch_leftovers = gpu_buf_self_forc.pv.launch_leftovers;
             /*Packed enough tasks let's go*/
-            int launch = gpu_buf_self_forc.pv.launch;
+            char launch = gpu_buf_self_forc.pv.launch;
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
+/* message("LAUNCHING FORCE SELF"); */
+/* fflush(stdout); */
               /*Launch GPU tasks*/
               runner_doself1_launch_f4_f(
                   r, sched,
@@ -459,6 +479,8 @@ void *runner_main_cuda(void *data) {
                   gpu_buf_self_forc.event_end,
                   &unpack_time_self_f);
             } /*End of GPU work Self*/
+/* message("DONE FORCE SELF"); */
+/* fflush(stdout); */
 #endif
           }
 #ifdef EXTRA_HYDRO_LOOP
@@ -559,12 +581,16 @@ void *runner_main_cuda(void *data) {
             int depth = 0;
             gpu_buf_pair_dens.pv.n_daughters_packed_index = gpu_buf_pair_dens.pv.n_daughters_total;
             int n_leaves_found = 0;
-            runner_recurse_gpu(r, sched, &gpu_buf_pair_dens.pv, ci, cj, t,
+/* message("RUNNER_RECURSE DENSITY"); */
+/* fflush(stdout); */
+            runner_recurse_gpu(r, sched, &(gpu_buf_pair_dens.pv), ci, cj, t,
                       e, gpu_buf_pair_dens.fparti_fpartj_lparti_lpartj, &n_leaves_found,
                       depth, n_expected_tasks, ci_dd, cj_dd,
                       gpu_buf_pair_dens.pv.n_daughters_total);
 
-            runner_pack_daughters_and_launch(r, sched, ci, cj, &gpu_buf_pair_dens.pv,
+/* message("RUNNER_PACK_DAUGHTERS DENSITY"); */
+/* fflush(stdout); */
+            runner_pack_daughters_and_launch(r, sched, ci, cj, &(gpu_buf_pair_dens.pv),
                   t, gpu_buf_pair_dens.send_d, gpu_buf_pair_dens.recv_d,
                   gpu_buf_pair_dens.d_send_d, gpu_buf_pair_dens.d_recv_d,
                   stream_pairs, d_a, d_H, e, &packing_time_pair,
@@ -572,6 +598,9 @@ void *runner_main_cuda(void *data) {
                   gpu_buf_pair_dens.fparti_fpartj_lparti_lpartj, gpu_buf_pair_dens.event_end, n_leaves_found,
                   ci_dd, cj_dd, first_and_last_daughters_d, ci_top_d,
                   cj_top_d);
+/* message("RUNNER_PACK_DAUGHTERS DENSITY DONE"); */
+/* fflush(stdout); */
+
 #endif  //RECURSE
 #endif  // GPUOFFLOAD_DENSITY
           } /* pair / pack */
@@ -611,11 +640,15 @@ void *runner_main_cuda(void *data) {
               int depth = 0;
               gpu_buf_pair_grad.pv.n_daughters_packed_index = gpu_buf_pair_grad.pv.n_daughters_total;
               int n_leaves_found = 0;
+/* message("RUNNER_RECURSE GRAD"); */
+/* fflush(stdout); */
               runner_recurse_gpu(r, sched, &gpu_buf_pair_grad.pv, ci, cj, t,
                         e, gpu_buf_pair_grad.fparti_fpartj_lparti_lpartj, &n_leaves_found,
                         depth, n_expected_tasks, ci_dg, cj_dg,
                         gpu_buf_pair_grad.pv.n_daughters_total);
 
+/* message("RUNNER_PACK_DAUGHTERS GRAD"); */
+/* fflush(stdout); */
               runner_pack_daughters_and_launch_g(r, sched, ci, cj,
                   &gpu_buf_pair_grad.pv, t,
                   gpu_buf_pair_grad.send_g, gpu_buf_pair_grad.recv_g,
@@ -625,6 +658,8 @@ void *runner_main_cuda(void *data) {
                     &unpacking_time_pair_g, gpu_buf_pair_grad.fparti_fpartj_lparti_lpartj,
                     gpu_buf_pair_grad.event_end, n_leaves_found, ci_dg, cj_dg,
                     first_and_last_daughters_g, ci_top_g, cj_top_g);
+/* message("FINISHED PAIR GRAD"); */
+/* fflush(stdout); */
 #endif
 #endif  // GPUOFFLOAD_GRADIENT
           } else if (t->subtype == task_subtype_gpu_pack_f) {
@@ -664,11 +699,16 @@ void *runner_main_cuda(void *data) {
               int depth = 0;
               gpu_buf_pair_forc.pv.n_daughters_packed_index = gpu_buf_pair_forc.pv.n_daughters_total;
               int n_leaves_found = 0;
+
+/* message("RUNNER_RECURSE FORCE"); */
+/* fflush(stdout); */
               runner_recurse_gpu(r, sched, &gpu_buf_pair_forc.pv, ci, cj, t,
                         e, gpu_buf_pair_forc.fparti_fpartj_lparti_lpartj, &n_leaves_found,
                         depth, n_expected_tasks, ci_df, cj_df,
                         gpu_buf_pair_forc.pv.n_daughters_total);
 
+/* message("RUNNER_PACK DAUGHTERS FORCE"); */
+/* fflush(stdout); */
               runner_pack_daughters_and_launch_f(r, sched, ci, cj, &gpu_buf_pair_forc.pv,
                     t,
                     gpu_buf_pair_forc.send_f, gpu_buf_pair_forc.recv_f,
@@ -677,6 +717,8 @@ void *runner_main_cuda(void *data) {
                     &unpacking_time_pair_f, gpu_buf_pair_forc.fparti_fpartj_lparti_lpartj,
                     gpu_buf_pair_forc.event_end, n_leaves_found, ci_df, cj_df,
                     first_and_last_daughters_f, ci_top_f, cj_top_f);
+/* message("RUNNER FINISHED PAIR FORCE"); */
+/* fflush(stdout); */
 #endif
 #endif  // GPUOFFLOAD_FORCE
           } else if (t->subtype == task_subtype_gpu_unpack_d) {
