@@ -158,9 +158,6 @@ void runner_doself_gpu_pack_g(struct runner *r, struct scheduler *s, struct
   }
   (void)lock_unlock(&s->queues[qid].lock);
 
-  /* TODO: WHERE IS THIS TREE LOCKED?????????? */
-  cell_unlocktree(ci);
-
   TIMER_TOC(timer_doself_gpu_pack_g);
 }
 
