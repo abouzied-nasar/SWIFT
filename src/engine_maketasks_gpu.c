@@ -4194,7 +4194,6 @@ void engine_maketasks(struct engine *e) {
       if (count_current_self % pack_size == 0) {
         last_created_self_unpack = scheduler_addtask(
             sched, task_type_self, task_subtype_gpu_unpack_d, 0, 0, NULL, NULL);
-        last_created_self_unpack->gpu_done = 0;
       }
 
       /* pack -> unpack -> ghost_in */
@@ -4257,7 +4256,6 @@ void engine_maketasks(struct engine *e) {
       if (count_current_self % pack_size == 0) {
         last_created_self_unpack = scheduler_addtask(
             sched, task_type_self, task_subtype_gpu_unpack_g, 0, 0, NULL, NULL);
-        last_created_self_unpack->gpu_done = 0;
       }
 
       /* pack -> unpack -> ghost_in */

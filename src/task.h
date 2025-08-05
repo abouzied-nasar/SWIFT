@@ -248,10 +248,6 @@ struct task {
 
   int done;  // A. Nasar
 
-  int gpu_done;
-
-  int corner_pair;
-
   /*! Pointers to the cells this task acts upon */
   struct cell **ci_unpack;  //, **cj;
 

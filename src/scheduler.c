@@ -2680,26 +2680,6 @@ void scheduler_rewait_mapper(void *map_data, int num_elements,
     /* Increment the task's own wait counter for the enqueueing. */
     atomic_inc(&t->wait);
     t->done = 0;
-    t->gpu_done = 0;
-
-    //    if (t->type == task_type_self){ // A. Nasar increment number of
-    //    waiting tasks
-    //      if(t->subtype == task_subtype_gpu_pack_d)
-    //        atomic_inc(&s->queues[t->ci->hydro.super->owner].n_packs_self_left);
-    //      if (t->subtype == task_subtype_gpu_pack_f)
-    //        atomic_inc(&s->queues[t->ci->hydro.super->owner].n_packs_self_left_f);
-    //      if (t->subtype == task_subtype_gpu_pack_g)
-    //        atomic_inc(&s->queues[t->ci->hydro.super->owner].n_packs_self_left_g);
-    //    }
-    //
-    //    if (t->type == task_type_pair){
-    //      if(t->subtype == task_subtype_gpu_pack_d)
-    //        atomic_inc(&s->queues[t->ci->hydro.super->owner].n_packs_pair_left);
-    //      if (t->subtype == task_subtype_gpu_pack_f)
-    //        atomic_inc(&s->queues[t->ci->hydro.super->owner].n_packs_pair_left_f);
-    //      if (t->subtype == task_subtype_gpu_pack_g)
-    //        atomic_inc(&s->queues[t->ci->hydro.super->owner].n_packs_pair_left_g);
-    //    }
 
 #ifdef SWIFT_DEBUG_CHECKS
     /* Check that we don't have more waits that what can be stored. */
