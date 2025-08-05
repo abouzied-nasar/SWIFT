@@ -578,10 +578,8 @@ void runner_doself_gpu_launch_density(
   ticks total_cpu_unpack_ticks = 0.;
   for (int bid = 0; bid < n_bundles_temp; bid++) {
 
-    /* cudaStreamSynchronize(stream[bid]); */
     cudaEventSynchronize(self_end[bid]);
 
-    /* Time unpacking */
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
 
       if (tid < tasks_packed) {
@@ -629,7 +627,7 @@ void runner_doself_gpu_launch_density(
 
 }
 
-void runner_doself_launch_gradient(
+void runner_doself_gpu_launch_gradient(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
     struct cell *ci, struct task *t, struct part_aos_f4_send_g *parts_send,
     struct part_aos_f4_recv_g *parts_recv,
@@ -800,7 +798,7 @@ void runner_doself_launch_gradient(
 
 }
 
-void runner_doself_launch_force(
+void runner_doself_gpu_launch_force(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
     struct cell *ci, struct task *t, struct part_aos_f4_send_f *parts_send,
     struct part_aos_f4_recv_f *parts_recv,

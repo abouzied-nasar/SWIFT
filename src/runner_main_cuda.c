@@ -418,7 +418,7 @@ void *runner_main_cuda(void *data) {
 /* message("LAUNCHING GRADIENT SELF"); */
 /* fflush(stdout); */
               /* Launch GPU tasks */
-              runner_doself_launch_gradient(
+              runner_doself_gpu_launch_gradient(
                   r, sched,
                   &gpu_buf_self_grad.pv, ci, t,
                   gpu_buf_self_grad.send_g,
@@ -450,7 +450,7 @@ void *runner_main_cuda(void *data) {
 /* message("LAUNCHING FORCE SELF"); */
 /* fflush(stdout); */
               /*Launch GPU tasks*/
-              runner_doself_launch_force(
+              runner_doself_gpu_launch_force(
                   r, sched,
                   &gpu_buf_self_forc.pv, ci, t,
                   gpu_buf_self_forc.send_f,
@@ -592,6 +592,32 @@ void *runner_main_cuda(void *data) {
           } /* pair / pack */
           else if (t->subtype == task_subtype_gpu_pack_g) {
 #ifdef GPUOFFLOAD_GRADIENT
+#ifndef RECURSE
+              ticks tic_cpu_pack = getticks();
+              packing_time_pair_g +=
+                  runner_dopair1_pack_f4_g(r, sched, pack_vars_pair_grad, ci,
+                                           cj, t, parts_aos_pair_f4_g_send, e,
+                                           fparti_fpartj_lparti_lpartj_grad);
+              t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
+              /* No pack tasks left in queue, flag that we want to run */
+              int launch_leftovers = pack_vars_pair_grad->launch_leftovers;
+              /*Packed enough tasks, let's go*/
+              int launch = pack_vars_pair_grad->launch;
+              /* Do we have enough stuff to run the GPU ? */
+              if (launch || launch_leftovers) {
+                /*Launch GPU tasks*/
+                int t_packed = pack_vars_pair_grad->tasks_packed;
+                //                signal_sleeping_runners(sched, t, t_packed);
+                runner_dopair1_launch_f4_g_one_memcpy(
+                    r, sched, pack_vars_pair_grad, t, parts_aos_pair_f4_g_send,
+                    parts_aos_pair_f4_g_recv, d_parts_aos_pair_f4_g_send,
+                    d_parts_aos_pair_f4_g_recv, stream_pairs, d_a, d_H, e,
+                    &packing_time_pair_g, &time_for_gpu_pair_g,
+                    &unpacking_time_pair_g, fparti_fpartj_lparti_lpartj_grad,
+                    pair_end_g);
+              }
+              pack_vars_pair_grad->launch_leftovers = 0;
+#else
               /////////////////////W.I.P!!!////////////////////////////////////////////////////////
               /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
               * We are recursing separately to find out how much work we have before offloading*/
@@ -622,9 +648,37 @@ void *runner_main_cuda(void *data) {
 /* TODO MLADEN: REMOVE */
 /* message("FINISHED PAIR GRAD"); */
 /* fflush(stdout); */
+#endif
 #endif  // GPUOFFLOAD_GRADIENT
           } else if (t->subtype == task_subtype_gpu_pack_f) {
 #ifdef GPUOFFLOAD_FORCE
+#ifndef RECURSE
+              ticks tic_cpu_pack = getticks();
+              /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
+              packing_time_pair_f +=
+                  runner_dopair1_pack_f4_f(r, sched, pack_vars_pair_forc, ci,
+                                           cj, t, parts_aos_pair_f4_f_send, e,
+                                           fparti_fpartj_lparti_lpartj_forc);
+              /* No pack tasks left in queue, flag that we want to run */
+              int launch_leftovers = pack_vars_pair_forc->launch_leftovers;
+              /*Packed enough tasks let's go*/
+              int launch = pack_vars_pair_forc->launch;
+              /* Do we have enough stuff to run the GPU ? */
+              if (launch || launch_leftovers) {
+                /*Launch GPU tasks*/
+                int t_packed = pack_vars_pair_forc->tasks_packed;
+                //                signal_sleeping_runners(sched, t, t_packed);
+                runner_dopair1_launch_f4_f_one_memcpy(
+                    r, sched, pack_vars_pair_forc, t, parts_aos_pair_f4_f_send,
+                    parts_aos_pair_f4_f_recv, d_parts_aos_pair_f4_f_send,
+                    d_parts_aos_pair_f4_f_recv, stream_pairs, d_a, d_H, e,
+                    &packing_time_pair_f, &time_for_gpu_pair_f,
+                    &unpacking_time_pair_f, fparti_fpartj_lparti_lpartj_forc,
+                    pair_end_f);
+
+                pack_vars_pair_forc->launch_leftovers = 0;
+              } /* End of GPU work Pairs */
+#else
               /////////////////////W.I.P!!!////////////////////////////////////////////////////////
               /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
               * We are recursing separately to find out how much work we have before offloading*/
@@ -654,6 +708,7 @@ void *runner_main_cuda(void *data) {
 /* TODO MLADEN: REMOVE */
 /* message("RUNNER FINISHED PAIR FORCE"); */
 /* fflush(stdout); */
+#endif
 #endif  // GPUOFFLOAD_FORCE
           } else if (t->subtype == task_subtype_gpu_unpack_d) {
           } else if (t->subtype == task_subtype_gpu_unpack_g) {
