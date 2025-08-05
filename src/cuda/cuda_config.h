@@ -23,4 +23,8 @@
 #define GPUOFFLOAD_GRADIENT 1  /* off-load hydro gradient to GPU */
 #define GPUOFFLOAD_FORCE 1     /* off-load hydro force to GPU */
 
+
+//A. Nasar: Remove as will no longer be necessary. Leaving for now during dev
+#define RECURSE 1 //Allow recursion through sub-tasks before offloading
+
 #endif

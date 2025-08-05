@@ -22,9 +22,6 @@
 
 #ifdef WITH_CUDA
 
-//A. Nasar: Remove as will no longer be necessary. Leaving for now during dev
-#define RECURSE 1 //Allow recursion through sub-tasks before offloading
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -175,21 +172,27 @@ void *runner_main_cuda(void *data) {
 
   /* Get estimates for array sizes et al. */
   const int cuda_dev_id = engine_rank;
-  const int target_n_tasks = sched->pack_size;
-  const int target_n_tasks_pair = sched->pack_size_pair;
-  const int bundle_size = N_TASKS_BUNDLE_SELF;
-  const int bundle_size_pair = N_TASKS_BUNDLE_PAIR;
-  const int n_bundles = (target_n_tasks + bundle_size - 1) / bundle_size;
-  const int n_bundles_pair = (target_n_tasks_pair + bundle_size_pair - 1) / bundle_size_pair;
+  const size_t target_n_tasks = sched->pack_size;
+  const size_t target_n_tasks_pair = sched->pack_size_pair;
+  const size_t bundle_size = N_TASKS_BUNDLE_SELF;
+  const size_t bundle_size_pair = N_TASKS_BUNDLE_PAIR;
+
+  /* A. Nasar: n_bundles is the number of task bundles each thread has. Used to loop through bundles */
+  const size_t n_bundles = (target_n_tasks + bundle_size - 1) / bundle_size;
+  const size_t n_bundles_pair = (target_n_tasks_pair + bundle_size_pair - 1) / bundle_size_pair;
+
   /* A. Nasar: Try to estimate average number of particles per leaf-level cell */
   /* Get smoothing length/particle spacing */
   const float eta_neighbours = e->s->eta_neighbours;
   int np_per_cell = ceil(2.0 * eta_neighbours);
+
   /* Cube to find average number of particles in 3D */
   np_per_cell *= np_per_cell * np_per_cell;
+
   /* A. Nasar: Increase parts per recursed task-level cell by buffer to
     ensure we allocate enough memory */
   const int buff = ceil(0.5 * np_per_cell);
+
   /*A. Nasar: Multiplication by 2 is also to ensure we do not over-run
    *  the allocated memory on buffers and GPU. This can happen if calculated h
    * is larger than cell width and splitting makes bigger than target cells */
@@ -200,178 +203,36 @@ void *runner_main_cuda(void *data) {
 
 
   /* Declare and allocate GPU launch control data structures */
-  /* pack_vars contain data required for self and pair packing tasks destined
-   * for the GPU*/
-  struct pack_vars_self *pack_vars_self_dens = NULL;
-  struct pack_vars_self *pack_vars_self_grad = NULL;
-  struct pack_vars_self *pack_vars_self_forc = NULL;
-  struct pack_vars_pair *pack_vars_pair_dens = NULL;
-  struct pack_vars_pair *pack_vars_pair_grad = NULL;
-  struct pack_vars_pair *pack_vars_pair_forc = NULL;
+  struct gpu_data_buffers gpu_buf_self_dens;
+  struct gpu_data_buffers gpu_buf_self_grad;
+  struct gpu_data_buffers gpu_buf_self_forc;
+  struct gpu_data_buffers gpu_buf_pair_dens;
+  struct gpu_data_buffers gpu_buf_pair_grad;
+  struct gpu_data_buffers gpu_buf_pair_forc;
 
-  gpu_init_pack_vars_self(&pack_vars_self_dens, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp);
-  gpu_init_pack_vars_self(&pack_vars_self_grad, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp);
-  gpu_init_pack_vars_self(&pack_vars_self_forc, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp);
-  gpu_init_pack_vars_pair(&pack_vars_pair_dens, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp);
-  gpu_init_pack_vars_pair(&pack_vars_pair_grad, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp);
-  gpu_init_pack_vars_pair(&pack_vars_pair_forc, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp);
+  gpu_init_data_buffers(&gpu_buf_self_dens, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp,
+      sizeof(struct part_aos_f4_send_d), sizeof(struct part_aos_f4_recv_d), /*is_pair_task=*/0);
+  gpu_init_data_buffers(&gpu_buf_self_grad, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp,
+      sizeof(struct part_aos_f4_send_g), sizeof(struct part_aos_f4_recv_g), /*is_pair_task=*/0);
+  gpu_init_data_buffers(&gpu_buf_self_forc, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp,
+      sizeof(struct part_aos_f4_send_f), sizeof(struct part_aos_f4_recv_f), /*is_pair_task=*/0);
+  gpu_init_data_buffers(&gpu_buf_pair_dens, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp,
+      sizeof(struct part_aos_f4_send_d), sizeof(struct part_aos_f4_recv_d), /*is_pair_task=*/1);
+  gpu_init_data_buffers(&gpu_buf_pair_grad, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp,
+      sizeof(struct part_aos_f4_send_g), sizeof(struct part_aos_f4_recv_g), /*is_pair_task=*/1);
+  gpu_init_data_buffers(&gpu_buf_pair_forc, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp,
+      sizeof(struct part_aos_f4_send_f), sizeof(struct part_aos_f4_recv_f), /*is_pair_task=*/1);
 
 
-  /* A. Nasar: Keep track of first and last particles for each self task
-   * (particle data is arranged in long arrays containing particles from all
-   * the tasks we will work with) */
-  /* A. N.: Needed for offloading self tasks as we use these to sort through
-   *        which parts need to interact with which */
-  int2 *task_first_part_f4_d = NULL;
-  int2 *task_first_part_f4_g = NULL;
-  int2 *task_first_part_f4_f = NULL;
-  int2 *d_task_first_part_f4_d = NULL;
-  int2 *d_task_first_part_f4_g = NULL;
-  int2 *d_task_first_part_f4_f = NULL;
-
-  cudaMallocHost((void **)&task_first_part_f4_d, target_n_tasks * sizeof(int2));
-  cudaMalloc((void **)&d_task_first_part_f4_d, target_n_tasks * sizeof(int2));
-  cudaMallocHost((void **)&task_first_part_f4_f, target_n_tasks * sizeof(int2));
-  cudaMalloc((void **)&d_task_first_part_f4_f, target_n_tasks * sizeof(int2));
-  cudaMallocHost((void **)&task_first_part_f4_g, target_n_tasks * sizeof(int2));
-  cudaMalloc((void **)&d_task_first_part_f4_g, target_n_tasks * sizeof(int2));
-
-  /*A. N.: Needed but only for small part in launch functions. Might
-           be useful for recursion on the GPU so keep for now     */
-  int4 *fparti_fpartj_lparti_lpartj_dens;
-  int4 *fparti_fpartj_lparti_lpartj_forc;
-  int4 *fparti_fpartj_lparti_lpartj_grad;
-  cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_dens,
-		  target_n_tasks_pair * sizeof(int4));
-  cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_forc,
-          target_n_tasks_pair * sizeof(int4));
-  cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_grad,
-          target_n_tasks_pair * sizeof(int4));
-
-  /*Create streams so that we can off-load different batches of work in
-   * different streams and get some con-CURRENCY! Events used to maximise
-   * asynchrony further*/
-
+  /* TODO: MOVE TO CUDA_INIT_STREAMS ? */
   cudaStream_t stream[n_bundles];
   cudaStream_t stream_pairs[n_bundles_pair];
-
-  cudaEvent_t self_end[n_bundles];
-  for (int i = 0; i < n_bundles; i++) cudaEventCreate(&self_end[i]);
-  cudaEvent_t self_end_g[n_bundles];
-  for (int i = 0; i < n_bundles; i++) cudaEventCreate(&self_end_g[i]);
-  cudaEvent_t self_end_f[n_bundles];
-  for (int i = 0; i < n_bundles; i++) cudaEventCreate(&self_end_f[i]);
-
-  cudaEvent_t pair_end[n_bundles_pair];
-  for (int i = 0; i < n_bundles_pair; i++) cudaEventCreate(&pair_end[i]);
-  cudaEvent_t pair_end_g[n_bundles_pair];
-  for (int i = 0; i < n_bundles_pair; i++) cudaEventCreate(&pair_end_g[i]);
-  cudaEvent_t pair_end_f[n_bundles_pair];
-  for (int i = 0; i < n_bundles_pair; i++) cudaEventCreate(&pair_end_f[i]);
 
   for (int i = 0; i < n_bundles; ++i)
     cudaStreamCreateWithFlags(&stream[i], cudaStreamNonBlocking);
   for (int i = 0; i < n_bundles_pair; ++i)
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
-
-  /* Declare Buffer and GPU particle arrays*/
-  struct part_aos_f4_send *parts_aos_f4_send;
-  struct part_aos_f4_recv *parts_aos_f4_recv;
-
-  struct part_aos_f4_f_send *parts_aos_forc_f4_send;
-  struct part_aos_f4_f_recv *parts_aos_forc_f4_recv;
-
-  struct part_aos_f4_g_send *parts_aos_grad_f4_send;
-  struct part_aos_f4_g_recv *parts_aos_grad_f4_recv;
-
-  struct part_aos_f4_send *d_parts_aos_f4_send;
-  struct part_aos_f4_recv *d_parts_aos_f4_recv;
-
-  struct part_aos_f4_f_send *d_parts_aos_forc_f4_send;
-  struct part_aos_f4_f_recv *d_parts_aos_forc_f4_recv;
-
-  struct part_aos_f4_g_send *d_parts_aos_grad_f4_send;
-  struct part_aos_f4_g_recv *d_parts_aos_grad_f4_recv;
-
-  struct part_aos_f4_send *parts_aos_pair_f4_send;
-  struct part_aos_f4_recv *parts_aos_pair_f4_recv;
-
-  struct part_aos_f4_send *d_parts_aos_pair_f4_send;
-  struct part_aos_f4_recv *d_parts_aos_pair_f4_recv;
-
-  struct part_aos_f4_f_send *parts_aos_pair_f4_f_send;
-  struct part_aos_f4_f_recv *parts_aos_pair_f4_f_recv;
-
-  struct part_aos_f4_f_send *d_parts_aos_pair_f4_f_send;
-  struct part_aos_f4_f_recv *d_parts_aos_pair_f4_f_recv;
-
-  struct part_aos_f4_g_send *parts_aos_pair_f4_g_send;
-  struct part_aos_f4_g_recv *parts_aos_pair_f4_g_recv;
-
-  struct part_aos_f4_g_send *d_parts_aos_pair_f4_g_send;
-  struct part_aos_f4_g_recv *d_parts_aos_pair_f4_g_recv;
-
-  /*Now allocate memory for Buffer and GPU particle arrays*/
-  cudaMalloc((void **)&d_parts_aos_f4_send,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_send));
-  cudaMalloc((void **)&d_parts_aos_f4_recv,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_recv));
-
-  cudaMalloc((void **)&d_parts_aos_forc_f4_send,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_f_send));
-  cudaMalloc((void **)&d_parts_aos_forc_f4_recv,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_f_recv));
-
-  cudaMalloc((void **)&d_parts_aos_grad_f4_send,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_g_send));
-  cudaMalloc((void **)&d_parts_aos_grad_f4_recv,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
-
-  cudaMallocHost((void **)&parts_aos_f4_send,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_send));
-  cudaMallocHost((void **)&parts_aos_f4_recv,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_recv));
-
-  cudaMallocHost((void **)&parts_aos_forc_f4_send,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_f_send));
-  cudaMallocHost((void **)&parts_aos_forc_f4_recv,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_f_recv));
-
-  cudaMallocHost((void **)&parts_aos_grad_f4_send,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_g_send));
-  cudaMallocHost((void **)&parts_aos_grad_f4_recv,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
-
-  cudaMalloc((void **)&d_parts_aos_pair_f4_send,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_send));
-  cudaMalloc((void **)&d_parts_aos_pair_f4_recv,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_recv));
-
-  cudaMalloc((void **)&d_parts_aos_pair_f4_f_send,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_f_send));
-  cudaMalloc((void **)&d_parts_aos_pair_f4_f_recv,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_f_recv));
-
-  cudaMalloc((void **)&d_parts_aos_pair_f4_g_send,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_g_send));
-  cudaMalloc((void **)&d_parts_aos_pair_f4_g_recv,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
-
-  cudaMallocHost((void **)&parts_aos_pair_f4_send,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_send));
-  cudaMallocHost((void **)&parts_aos_pair_f4_recv,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_recv));
-
-  cudaMallocHost((void **)&parts_aos_pair_f4_g_send,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_g_send));
-  cudaMallocHost((void **)&parts_aos_pair_f4_g_recv,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
-
-  cudaMallocHost((void **)&parts_aos_pair_f4_f_send,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_f_send));
-  cudaMallocHost((void **)&parts_aos_pair_f4_f_recv,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_f_recv));
 
   /*Declare some global variables*/
   float d_a = e->cosmology->a;
@@ -526,24 +387,26 @@ void *runner_main_cuda(void *data) {
           else if (t->subtype == task_subtype_external_grav)
             runner_do_grav_external(r, ci, 1);
           else if (t->subtype == task_subtype_gpu_unpack_d) {
-          } else if (t->subtype == task_subtype_gpu_unpack_g) {
-          } else if (t->subtype == task_subtype_gpu_unpack_f) {
-          } else if (t->subtype == task_subtype_density) {
+          }
+          else if (t->subtype == task_subtype_gpu_unpack_g) {
+          }
+          else if (t->subtype == task_subtype_gpu_unpack_f) {
+          }
+          else if (t->subtype == task_subtype_density) {
 #ifndef GPUOFFLOAD_DENSITY
             runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
 #endif
             /* GPU WORK */
           } else if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
-            runner_doself1_pack_f4(r, sched, pack_vars_self_dens, ci, t,
-                                       parts_aos_f4_send, task_first_part_f4);
+            runner_doself1_pack_d(r, sched, &gpu_buf_self_dens, ci, t, task_first_part_f4);
             /* No pack tasks left in queue, flag that we want to run */
-            int launch_leftovers = pack_vars_self_dens->launch_leftovers;
-            /*Packed enough tasks. Let's go*/
-            int launch = pack_vars_self_dens->launch;
+            char launch_leftovers = gpu_buf_self_dens.pv.launch_leftovers;
+            /* Packed enough tasks. Let's go*/
+            char launch = gpu_buf_self_dens.pv.launch;
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
-              /*Launch GPU tasks*/
+              /* Launch GPU tasks */
               runner_doself1_launch_f4(
                   r, sched, pack_vars_self_dens, ci, t, parts_aos_f4_send,
                   parts_aos_f4_recv, d_parts_aos_f4_send, d_parts_aos_f4_recv,
@@ -1161,121 +1024,8 @@ void *runner_main_cuda(void *data) {
     /* Wait at the wait barrier. */
     //    swift_barrier_wait(&e->wait_barrier);
   }
-  // Free all data
-  //  cudaFree(d_tid_p);
-  //  cudaFree(d_id);
-  //  cudaFree(d_x_p);
-  //  cudaFree(d_y_p);
-  //  cudaFree(d_z_p);
-  //  cudaFree(d_ux);
-  //  cudaFree(d_uy);
-  //  cudaFree(d_uz);
-  //  cudaFree(d_a_hydrox);
-  //  cudaFree(d_a_hydroy);
-  //  cudaFree(d_a_hydroz);
-  //  cudaFree(d_mass);
-  //  cudaFree(d_h);
-  //  cudaFree(d_u);
-  //  cudaFree(d_u_dt);
-  //  cudaFree(d_rho);
-  //  cudaFree(d_SPH_sum);
-  //  cudaFree(d_locx);
-  //  cudaFree(d_locy);
-  //  cudaFree(d_locz);
-  //  cudaFree(d_widthx);
-  //  cudaFree(d_widthy);
-  //  cudaFree(d_widthz);
-  //  cudaFree(d_h_max);
-  //  cudaFree(d_count_p);
-  //  cudaFree(d_wcount);
-  //  cudaFree(d_wcount_dh);
-  //  cudaFree(d_rho_dh);
-  //  cudaFree(d_rot_ux);
-  //  cudaFree(d_rot_uy);
-  //  cudaFree(d_rot_uz);
-  //  cudaFree(d_div_v);
-  //  cudaFree(d_div_v_previous_step);
-  //  cudaFree(d_alpha_visc);
-  //  cudaFree(d_v_sig);
-  //  cudaFree(d_laplace_u);
-  //  cudaFree(d_alpha_diff);
-  //  cudaFree(d_f);
-  //  cudaFree(d_soundspeed);
-  //  cudaFree(d_h_dt);
-  //  cudaFree(d_balsara);
-  //  cudaFree(d_pressure);
-  //  cudaFree(d_alpha_visc_max_ngb);
-  //  cudaFree(d_time_bin);
-  //  cudaFree(d_wakeup);
-  //  cudaFree(d_min_ngb_time_bin);
-  //  cudaFree(d_to_be_synchronized);
-  //  cudaFree(tid_p);
-  //  cudaFree(id);
-  //  cudaFree(mass);
-  //  cudaFree(h);
-  //  cudaFree(u);
-  //  cudaFree(u_dt);
-  //  cudaFree(rho);
-  //  cudaFree(SPH_sum);
-  //  cudaFree(x_p);
-  //  cudaFree(y_p);
-  //  cudaFree(z_p);
-  //  cudaFree(ux);
-  //  cudaFree(uy);
-  //  cudaFree(uz);
-  //  cudaFree(a_hydrox);
-  //  cudaFree(a_hydroy);
-  //  cudaFree(a_hydroz);
-  //  cudaFree(locx);
-  //  cudaFree(locy);
-  //  cudaFree(locz);
-  //  cudaFree(widthx);
-  //  cudaFree(widthy);
-  //  cudaFree(widthz);
-  //  cudaFree(h_max);
-  //  cudaFree(count_p);
-  //  cudaFree(wcount);
-  //  cudaFree(wcount_dh);
-  //  cudaFree(rho_dh);
-  //  cudaFree(rot_ux);
-  //  cudaFree(rot_uy);
-  //  cudaFree(rot_uz);
-  //  cudaFree(div_v);
-  //  cudaFree(div_v_previous_step);
-  //  cudaFree(alpha_visc);
-  //  cudaFree(v_sig);
-  //  cudaFree(laplace_u);
-  //  cudaFree(alpha_diff);
-  //  cudaFree(f);
-  //  cudaFree(soundspeed);
-  //  cudaFree(h_dt);
-  //  cudaFree(balsara);
-  //  cudaFree(pressure);
-  //  cudaFree(alpha_visc_max_ngb);
-  //  cudaFree(time_bin);
-  //  cudaFree(wakeup);
-  //  cudaFree(min_ngb_time_bin);
-  //  cudaFree(to_be_synchronized);
-  //  cudaFree(partid_p);
-  //  cudaFree(d_task_first_part);
-  //  cudaFree(d_task_last_part);
-  //  cudaFree(task_first_part_self_dens);
-  //  cudaFree(task_last_part_self_dens);
-  //  cudaFree(task_first_part_pair_ci);
-  //  cudaFree(task_last_part_pair_ci);
-  //  cudaFree(task_first_part_pair_cj);
-  //  cudaFree(task_last_part_pair_cj);
-  //  cudaFree(d_bundle_first_part_self_dens);
-  //  cudaFree(d_bundle_last_part_self_dens);
-  //  cudaFree(bundle_first_part_self_dens);
-  //  cudaFree(bundle_last_part_self_dens);
-  //  cudaFree(bundle_first_part_pair_ci);
-  //  cudaFree(bundle_last_part_pair_ci);
-  //  cudaFree(bundle_first_part_pair_cj);
-  //  cudaFree(bundle_last_part_pair_cj);
-  //  free(ci_list_self_dens);
-  //  free(ci_list_pair);
-  //  free(cj_list_pair);
+
+  /* TODO: clear/free alloc'd stuff here. */
 
   /* Be kind, rewind. */
   return NULL;

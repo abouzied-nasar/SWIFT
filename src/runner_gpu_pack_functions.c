@@ -1,129 +1,16 @@
-// #include "active.h"
-// #include <cuda_runtime.h>
-// #include <vector>
-// #include "cuda/cell_gpu.h"
-// #include "runner_gpu_functions.cuh"
 /* This object's header. */
-#include "runner.h"
+#include "runner_gpu_pack_functions.h"
+
 /* Local headers. */
 #include "active.h"
 #include "engine.h"
 #include "runner_doiact_hydro.h"
-#include "runner_gpu_pack_functions.h"
 #include "scheduler.h"
 #include "space_getsid.h"
 #include "timers.h"
 
-void runner_doself1_gpu_pack_neat_aos_f4(
-    struct runner *r, struct cell *__restrict__ c,
-    struct part_aos_f4_send *__restrict__ parts_aos_buffer, int timer,
-    int *pack_length, int tid, int count_max_parts_tmp) {
+#include <stdatomic.h>
 
-  TIMER_TIC;
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! count_max %i "
-            "count %i\n",
-            count_max_parts_tmp, local_pack_position + count);
-    error("0");
-  }
-#endif
-  int2 frst_lst_prts = {local_pack_position, local_pack_position + count};
-  /* Pack the particle data into CPU-side buffers*/
-  pack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count,
-                   frst_lst_prts);
-  /* Increment pack length accordingly */
-  (*pack_length) += count;
-
-  if (timer) TIMER_TOC(timer_doself_gpu_pack);
-}
-
-void runner_doself1_gpu_pack_neat_aos_f4_g(
-    struct runner *r, struct cell *c,
-    struct part_aos_f4_g_send *parts_aos_buffer, int timer, int *pack_length,
-    int tid, int count_max_parts_tmp) {
-
-  TIMER_TIC;
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr, "Exceeded count_max_parts_tmp. Make arrays bigger!\n");
-    exit(0);
-  }
-#endif
-
-  /* Pack the particle data into CPU-side buffers*/
-  pack_neat_aos_f4_g(c, parts_aos_buffer, tid, local_pack_position, count);
-  /* Increment pack length accordingly */
-  (*pack_length) += count;
-
-  if (timer) TIMER_TOC(timer_doself_gpu_pack);
-}
-
-void runner_doself1_gpu_pack_neat_aos_f4_f(
-    struct runner *r, struct cell *restrict c,
-    struct part_aos_f4_f_send *restrict parts_aos_buffer, int timer,
-    int *pack_length, int tid, int count_max_parts_tmp) {
-
-  TIMER_TIC;
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr, "Exceeded count_max_parts_tmp. Make arrays bigger!\n");
-    exit(0);
-  }
-#endif
-
-  /* Pack the particle data into CPU-side buffers*/
-  pack_neat_aos_f4_f(c, parts_aos_buffer, tid, local_pack_position, count);
-  /* Increment pack length accordingly */
-  (*pack_length) += count;
-
-  if (timer) TIMER_TOC(timer_doself_gpu_pack);
-}
-
-extern inline void pack_neat_pair_aos_f4(
-    struct cell *c, struct part_aos_f4_send *parts_aos_buffer, int tid,
-    const int local_pack_position, const int count, const double3 shift,
-    const int2 cstarts) {
-  /*Data to be copied to GPU*/
-  for (int i = 0; i < count; i++) {
-    const int id_in_pack = i + local_pack_position;
-    const struct part *p = &c->hydro.parts[i];
-    const double *x = part_get_const_x(p);
-    parts_aos_buffer[id_in_pack].x_p_h.x = x[0] - shift.x;
-    parts_aos_buffer[id_in_pack].x_p_h.y = x[1] - shift.y;
-    parts_aos_buffer[id_in_pack].x_p_h.z = x[2] - shift.z;
-    parts_aos_buffer[id_in_pack].x_p_h.w = part_get_h(p);
-    const float *v = part_get_const_v(p);
-    parts_aos_buffer[id_in_pack].ux_m.x = v[0];
-    parts_aos_buffer[id_in_pack].ux_m.y = v[1];
-    parts_aos_buffer[id_in_pack].ux_m.z = v[2];
-    parts_aos_buffer[id_in_pack].ux_m.w = part_get_mass(p);
-    parts_aos_buffer[id_in_pack].cjs_cje.x = cstarts.x;
-    parts_aos_buffer[id_in_pack].cjs_cje.y = cstarts.y;
-  }
-}
 
 void pack_neat_aos_f4(struct cell *__restrict__ c,
                       struct part_aos_f4_send *__restrict__ parts_aos_buffer,
@@ -188,37 +75,6 @@ void pack_neat_aos_f4_g(struct cell *c,
   }
 }
 
-extern inline void pack_neat_pair_aos_f4_g(
-    struct cell *__restrict c,
-    struct part_aos_f4_g_send *__restrict parts_aos_buffer, int tid,
-    const int local_pack_position, const int count, const float3 shift,
-    const int2 cstarts) {
-  /*Data to be copied to GPU*/
-  const struct part *ptmps = c->hydro.parts;
-  for (int i = 0; i < count; i++) {
-    const int id_in_pack = i + local_pack_position;
-    const struct part *p = &ptmps[i];
-    const double *x = part_get_const_x(p);
-    parts_aos_buffer[id_in_pack].x_h.x = x[0] - shift.x;
-    parts_aos_buffer[id_in_pack].x_h.y = x[1] - shift.y;
-    parts_aos_buffer[id_in_pack].x_h.z = x[2] - shift.z;
-    parts_aos_buffer[id_in_pack].x_h.w = part_get_h(p);
-    const float *v = part_get_const_v(&ptmps[i]);
-    parts_aos_buffer[id_in_pack].ux_m.x = v[0];
-    parts_aos_buffer[id_in_pack].ux_m.y = v[1];
-    parts_aos_buffer[id_in_pack].ux_m.z = v[2];
-    parts_aos_buffer[id_in_pack].ux_m.w = part_get_mass(p);
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.x = part_get_rho(p);
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.y = part_get_alpha_av(p);
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.z =
-        part_get_u(p);  // p.density.rot_v[0];
-    parts_aos_buffer[id_in_pack].rho_avisc_u_c.w = part_get_soundspeed(p);
-
-    parts_aos_buffer[id_in_pack].cjs_cje.x = cstarts.x;
-    parts_aos_buffer[id_in_pack].cjs_cje.y = cstarts.y;
-  }
-}
-
 void pack_neat_aos_f4_f(const struct cell *restrict c,
                         struct part_aos_f4_f_send *restrict parts_aos, int tid,
                         int local_pack_position, int count) {
@@ -265,145 +121,6 @@ void pack_neat_aos_f4_f(const struct cell *restrict c,
   }
 }
 
-extern inline void pack_neat_pair_aos_f4_f(
-    struct cell *__restrict c, struct part_aos_f4_f_send *__restrict parts_aos,
-    int tid, const int local_pack_position, const int count, const float3 shift,
-    const int2 cstarts) {
-  //  const struct part *restrict ptmps;
-  //  ptmps = c->hydro.parts;
-  const int pp = local_pack_position;
-  const struct part *ptmps = c->hydro.parts;
-  /*Data to be copied to GPU local memory*/
-  for (int i = 0; i < count; i++) {
-    const struct part *p = &ptmps[i];
-    const double *x = part_get_const_x(p);
-    const int id_in_pack = i + pp;
-    parts_aos[id_in_pack].x_h.x = x[0] - shift.x;
-    parts_aos[id_in_pack].x_h.y = x[1] - shift.y;
-    parts_aos[id_in_pack].x_h.z = x[2] - shift.z;
-    //    parts_aos[i + pp].x_h.x = c->hydro.parts[i].x[0] - cellx;
-    //    parts_aos[i + pp].x_h.y = c->hydro.parts[i].x[1] - celly;
-    //    parts_aos[i + pp].x_h.z = c->hydro.parts[i].x[2] - cellz;
-
-    parts_aos[id_in_pack].x_h.w = part_get_h(p);
-
-    const float *v = part_get_const_v(p);
-    parts_aos[id_in_pack].ux_m.x = v[0];
-    parts_aos[id_in_pack].ux_m.y = v[1];
-    parts_aos[id_in_pack].ux_m.z = v[2];
-    parts_aos[id_in_pack].ux_m.w = part_get_mass(p);
-    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
-    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
-    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.z =
-        part_get_time_bin(p);
-    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.w =
-        part_get_timestep_limiter_min_ngb_time_bin(p);
-    parts_aos[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
-    parts_aos[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
-    parts_aos[id_in_pack].rho_p_c_vsigi.z = part_get_soundspeed(p);
-    parts_aos[id_in_pack].rho_p_c_vsigi.w = part_get_v_sig(p);
-    parts_aos[id_in_pack].u_alphavisc_alphadiff.x = part_get_u(p);
-    parts_aos[id_in_pack].u_alphavisc_alphadiff.y = part_get_alpha_av(p);
-    parts_aos[id_in_pack].u_alphavisc_alphadiff.z = part_get_alpha_diff(p);
-    parts_aos[id_in_pack].cjs_cje.x = cstarts.x;
-    parts_aos[id_in_pack].cjs_cje.y = cstarts.y;
-  }
-}
-
-void runner_doself1_gpu_unpack_neat_aos_f4(
-    struct runner *r, struct cell *c, struct part_aos_f4_recv *parts_aos_buffer,
-    int timer, int *pack_length, int tid, int count_max_parts_tmp,
-    struct engine *e) {
-  TIMER_TIC;
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-  if (!cell_is_active_hydro(c, e)) {
-    message("Inactive cell\n");
-    return;
-  }
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %p, local_pack_position is % i, "
-            "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count);
-  }
-#endif
-
-  /* Copy particle data from CPU buffers to cells */
-  unpack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count, e);
-  // Increment pack length accordingly
-  (*pack_length) += count;
-}
-
-void runner_doself1_gpu_unpack_neat_aos_f4_g(
-    struct runner *r, struct cell *c,
-    struct part_aos_f4_g_recv *parts_aos_buffer, int timer, int *pack_length,
-    int tid, int count_max_parts_tmp, struct engine *e) {
-  TIMER_TIC;
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-  if (!cell_is_active_hydro(c, e)) {
-    message("Inactive cell\n");
-    return;
-  }
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %p, local_pack_position is % i, "
-            "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count);
-  }
-#endif
-
-  /* Copy particle data from CPU buffers to cells */
-  unpack_neat_aos_f4_g(c, parts_aos_buffer, tid, local_pack_position, count, e);
-  // Increment pack length accordingly
-  (*pack_length) += count;
-}
-
-void runner_doself1_gpu_unpack_neat_aos_f4_f(
-    struct runner *r, struct cell *c,
-    struct part_aos_f4_f_recv *parts_aos_buffer, int timer, int *pack_length,
-    int tid, int count_max_parts_tmp, struct engine *e) {
-  TIMER_TIC;
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-  if (!cell_is_active_hydro(c, e)) {
-    message("Inactive cell\n");
-    return;
-  }
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    fprintf(stderr,
-            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-            "%i pointer to pack_length is %p, local_pack_position is % i, "
-            "count is %i\n",
-            (*pack_length), pack_length, local_pack_position, count);
-  }
-#endif
-
-  /* Copy particle data from CPU buffers to cells */
-  unpack_neat_aos_f4_f(c, parts_aos_buffer, tid, local_pack_position, count, e);
-  // Increment pack length accordingly
-  (*pack_length) += count;
-}
-
-#include <stdatomic.h>
 void unpack_neat_aos_f4(struct cell *c,
                         struct part_aos_f4_recv *parts_aos_buffer, int tid,
                         int local_pack_position, int count, struct engine *e) {
@@ -614,6 +331,295 @@ void unpack_neat_pair_aos_f4_f(
       part_set_timestep_limiter_min_ngb_time_bin(p, min_ngb_time_bin);
     }
   }
+}
+
+
+extern inline void pack_neat_pair_aos_f4(
+    struct cell *c, struct part_aos_f4_send *parts_aos_buffer, int tid,
+    const int local_pack_position, const int count, const double3 shift,
+    const int2 cstarts) {
+  /*Data to be copied to GPU*/
+  for (int i = 0; i < count; i++) {
+    const int id_in_pack = i + local_pack_position;
+    const struct part *p = &c->hydro.parts[i];
+    const double *x = part_get_const_x(p);
+    parts_aos_buffer[id_in_pack].x_p_h.x = x[0] - shift.x;
+    parts_aos_buffer[id_in_pack].x_p_h.y = x[1] - shift.y;
+    parts_aos_buffer[id_in_pack].x_p_h.z = x[2] - shift.z;
+    parts_aos_buffer[id_in_pack].x_p_h.w = part_get_h(p);
+    const float *v = part_get_const_v(p);
+    parts_aos_buffer[id_in_pack].ux_m.x = v[0];
+    parts_aos_buffer[id_in_pack].ux_m.y = v[1];
+    parts_aos_buffer[id_in_pack].ux_m.z = v[2];
+    parts_aos_buffer[id_in_pack].ux_m.w = part_get_mass(p);
+    parts_aos_buffer[id_in_pack].cjs_cje.x = cstarts.x;
+    parts_aos_buffer[id_in_pack].cjs_cje.y = cstarts.y;
+  }
+}
+
+extern inline void pack_neat_pair_aos_f4_g(
+    struct cell *__restrict c,
+    struct part_aos_f4_g_send *__restrict parts_aos_buffer, int tid,
+    const int local_pack_position, const int count, const float3 shift,
+    const int2 cstarts) {
+  /*Data to be copied to GPU*/
+  const struct part *ptmps = c->hydro.parts;
+  for (int i = 0; i < count; i++) {
+    const int id_in_pack = i + local_pack_position;
+    const struct part *p = &ptmps[i];
+    const double *x = part_get_const_x(p);
+    parts_aos_buffer[id_in_pack].x_h.x = x[0] - shift.x;
+    parts_aos_buffer[id_in_pack].x_h.y = x[1] - shift.y;
+    parts_aos_buffer[id_in_pack].x_h.z = x[2] - shift.z;
+    parts_aos_buffer[id_in_pack].x_h.w = part_get_h(p);
+    const float *v = part_get_const_v(&ptmps[i]);
+    parts_aos_buffer[id_in_pack].ux_m.x = v[0];
+    parts_aos_buffer[id_in_pack].ux_m.y = v[1];
+    parts_aos_buffer[id_in_pack].ux_m.z = v[2];
+    parts_aos_buffer[id_in_pack].ux_m.w = part_get_mass(p);
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.x = part_get_rho(p);
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.y = part_get_alpha_av(p);
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.z =
+        part_get_u(p);  // p.density.rot_v[0];
+    parts_aos_buffer[id_in_pack].rho_avisc_u_c.w = part_get_soundspeed(p);
+
+    parts_aos_buffer[id_in_pack].cjs_cje.x = cstarts.x;
+    parts_aos_buffer[id_in_pack].cjs_cje.y = cstarts.y;
+  }
+}
+
+extern inline void pack_neat_pair_aos_f4_f(
+    struct cell *__restrict c, struct part_aos_f4_f_send *__restrict parts_aos,
+    int tid, const int local_pack_position, const int count, const float3 shift,
+    const int2 cstarts) {
+  //  const struct part *restrict ptmps;
+  //  ptmps = c->hydro.parts;
+  const int pp = local_pack_position;
+  const struct part *ptmps = c->hydro.parts;
+  /*Data to be copied to GPU local memory*/
+  for (int i = 0; i < count; i++) {
+    const struct part *p = &ptmps[i];
+    const double *x = part_get_const_x(p);
+    const int id_in_pack = i + pp;
+    parts_aos[id_in_pack].x_h.x = x[0] - shift.x;
+    parts_aos[id_in_pack].x_h.y = x[1] - shift.y;
+    parts_aos[id_in_pack].x_h.z = x[2] - shift.z;
+    //    parts_aos[i + pp].x_h.x = c->hydro.parts[i].x[0] - cellx;
+    //    parts_aos[i + pp].x_h.y = c->hydro.parts[i].x[1] - celly;
+    //    parts_aos[i + pp].x_h.z = c->hydro.parts[i].x[2] - cellz;
+
+    parts_aos[id_in_pack].x_h.w = part_get_h(p);
+
+    const float *v = part_get_const_v(p);
+    parts_aos[id_in_pack].ux_m.x = v[0];
+    parts_aos[id_in_pack].ux_m.y = v[1];
+    parts_aos[id_in_pack].ux_m.z = v[2];
+    parts_aos[id_in_pack].ux_m.w = part_get_mass(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.z =
+        part_get_time_bin(p);
+    parts_aos[id_in_pack].f_bals_timebin_mintimebin_ngb.w =
+        part_get_timestep_limiter_min_ngb_time_bin(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.z = part_get_soundspeed(p);
+    parts_aos[id_in_pack].rho_p_c_vsigi.w = part_get_v_sig(p);
+    parts_aos[id_in_pack].u_alphavisc_alphadiff.x = part_get_u(p);
+    parts_aos[id_in_pack].u_alphavisc_alphadiff.y = part_get_alpha_av(p);
+    parts_aos[id_in_pack].u_alphavisc_alphadiff.z = part_get_alpha_diff(p);
+    parts_aos[id_in_pack].cjs_cje.x = cstarts.x;
+    parts_aos[id_in_pack].cjs_cje.y = cstarts.y;
+  }
+}
+
+/**
+ * @param timer: Are we timing this?
+ */
+void runner_doself1_gpu_pack_d(
+    struct runner *r,
+    struct gpu_data_buffers *buf,
+    struct cell *__restrict__ c,
+    int timer) {
+
+  TIMER_TIC;
+
+  /* Anything to do here? */
+  if (c->hydro.count == 0) return;
+
+  int count = c->hydro.count;
+  int local_pack_position = (*pack_length);
+  size_t count_max_parts_tmp = buf->pv.count_max_parts;
+  size_t tid = buf->pv.tasks_packed;
+  size_t* pack_length = &buf->pv.count_parts;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (local_pack_position + count >= count_max_parts_tmp) {
+    fprintf(stderr,
+            "Exceeded count_max_parts_tmp. Make arrays bigger! count_max %i "
+            "count %i\n",
+            count_max_parts_tmp, local_pack_position + count);
+    error("0");
+  }
+#endif
+
+  int2 frst_lst_prts = {local_pack_position, local_pack_position + count};
+  /* Pack the particle data into CPU-side buffers*/
+  pack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count,
+                   frst_lst_prts);
+  /* Increment pack length accordingly */
+  (*pack_length) += count;
+
+  if (timer) TIMER_TOC(timer_doself_gpu_pack);
+}
+
+void runner_doself1_gpu_pack_neat_aos_f4_g(
+    struct runner *r, struct cell *c,
+    struct part_aos_f4_g_send *parts_aos_buffer, int timer, int *pack_length,
+    int tid, int count_max_parts_tmp) {
+
+  TIMER_TIC;
+
+  /* Anything to do here? */
+  if (c->hydro.count == 0) return;
+
+  int count = c->hydro.count;
+  int local_pack_position = (*pack_length);
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (local_pack_position + count >= count_max_parts_tmp) {
+    fprintf(stderr, "Exceeded count_max_parts_tmp. Make arrays bigger!\n");
+    exit(0);
+  }
+#endif
+
+  /* Pack the particle data into CPU-side buffers*/
+  pack_neat_aos_f4_g(c, parts_aos_buffer, tid, local_pack_position, count);
+  /* Increment pack length accordingly */
+  (*pack_length) += count;
+
+  if (timer) TIMER_TOC(timer_doself_gpu_pack);
+}
+
+void runner_doself1_gpu_pack_neat_aos_f4_f(
+    struct runner *r, struct cell *restrict c,
+    struct part_aos_f4_f_send *restrict parts_aos_buffer, int timer,
+    int *pack_length, int tid, int count_max_parts_tmp) {
+
+  TIMER_TIC;
+
+  /* Anything to do here? */
+  if (c->hydro.count == 0) return;
+
+  int count = c->hydro.count;
+  int local_pack_position = (*pack_length);
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (local_pack_position + count >= count_max_parts_tmp) {
+    fprintf(stderr, "Exceeded count_max_parts_tmp. Make arrays bigger!\n");
+    exit(0);
+  }
+#endif
+
+  /* Pack the particle data into CPU-side buffers*/
+  pack_neat_aos_f4_f(c, parts_aos_buffer, tid, local_pack_position, count);
+  /* Increment pack length accordingly */
+  (*pack_length) += count;
+
+  if (timer) TIMER_TOC(timer_doself_gpu_pack);
+}
+
+void runner_doself1_gpu_unpack_neat_aos_f4(
+    struct runner *r, struct cell *c, struct part_aos_f4_recv *parts_aos_buffer,
+    int timer, int *pack_length, int tid, int count_max_parts_tmp,
+    struct engine *e) {
+  TIMER_TIC;
+
+  /* Anything to do here? */
+  if (c->hydro.count == 0) return;
+  if (!cell_is_active_hydro(c, e)) {
+    message("Inactive cell\n");
+    return;
+  }
+  int count = c->hydro.count;
+  int local_pack_position = (*pack_length);
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (local_pack_position + count >= count_max_parts_tmp) {
+    fprintf(stderr,
+            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
+            "%i pointer to pack_length is %p, local_pack_position is % i, "
+            "count is %i\n",
+            (*pack_length), pack_length, local_pack_position, count);
+  }
+#endif
+
+  /* Copy particle data from CPU buffers to cells */
+  unpack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count, e);
+  // Increment pack length accordingly
+  (*pack_length) += count;
+}
+
+void runner_doself1_gpu_unpack_neat_aos_f4_g(
+    struct runner *r, struct cell *c,
+    struct part_aos_f4_g_recv *parts_aos_buffer, int timer, int *pack_length,
+    int tid, int count_max_parts_tmp, struct engine *e) {
+  TIMER_TIC;
+
+  /* Anything to do here? */
+  if (c->hydro.count == 0) return;
+  if (!cell_is_active_hydro(c, e)) {
+    message("Inactive cell\n");
+    return;
+  }
+  int count = c->hydro.count;
+  int local_pack_position = (*pack_length);
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (local_pack_position + count >= count_max_parts_tmp) {
+    fprintf(stderr,
+            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
+            "%i pointer to pack_length is %p, local_pack_position is % i, "
+            "count is %i\n",
+            (*pack_length), pack_length, local_pack_position, count);
+  }
+#endif
+
+  /* Copy particle data from CPU buffers to cells */
+  unpack_neat_aos_f4_g(c, parts_aos_buffer, tid, local_pack_position, count, e);
+  // Increment pack length accordingly
+  (*pack_length) += count;
+}
+
+void runner_doself1_gpu_unpack_neat_aos_f4_f(
+    struct runner *r, struct cell *c,
+    struct part_aos_f4_f_recv *parts_aos_buffer, int timer, int *pack_length,
+    int tid, int count_max_parts_tmp, struct engine *e) {
+  TIMER_TIC;
+
+  /* Anything to do here? */
+  if (c->hydro.count == 0) return;
+  if (!cell_is_active_hydro(c, e)) {
+    message("Inactive cell\n");
+    return;
+  }
+  int count = c->hydro.count;
+  int local_pack_position = (*pack_length);
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (local_pack_position + count >= count_max_parts_tmp) {
+    fprintf(stderr,
+            "Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
+            "%i pointer to pack_length is %p, local_pack_position is % i, "
+            "count is %i\n",
+            (*pack_length), pack_length, local_pack_position, count);
+  }
+#endif
+
+  /* Copy particle data from CPU buffers to cells */
+  unpack_neat_aos_f4_f(c, parts_aos_buffer, tid, local_pack_position, count, e);
+  // Increment pack length accordingly
+  (*pack_length) += count;
 }
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
@@ -896,6 +902,3 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4_f(
 
   if (timer) TIMER_TOC(timer_doself_gpu_pack);
 }
-// #ifdef WITHCUDA
-// }
-// #endif
