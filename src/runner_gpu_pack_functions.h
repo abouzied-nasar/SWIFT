@@ -8,7 +8,7 @@
 #endif
 
 #ifdef WITH_CUDA
-#include "cuda/GPU_data_buffers.h"
+#include "cuda/GPU_offload_data.h"
 #include "cuda/GPU_part_structs.h"
 #endif
 
@@ -19,13 +19,13 @@
 
 void gpu_pack_density_self(
     struct cell* restrict c,
-    struct gpu_data_buffers *buf);
+    struct gpu_offload_data *buf);
 void gpu_pack_gradient_self(
     struct cell* restrict c,
-    struct gpu_data_buffers *buf);
+    struct gpu_offload_data *buf);
 void gpu_pack_force_self(
     struct cell* restrict c,
-    struct gpu_data_buffers *buf);
+    struct gpu_offload_data *buf);
 
 /* ------------------------------------------ */
 void runner_doself1_gpu_unpack_neat_aos_f4(

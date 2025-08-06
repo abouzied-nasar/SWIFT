@@ -105,7 +105,7 @@ include_HEADERS += forcing.h
 include_HEADERS += power_spectrum.h
 include_HEADERS += ghost_stats.h
 include_HEADERS += swift_lustre_api.h
-include_HEADERS += runner_gpu_pack_functions.h cuda/GPU_data_buffers.h cuda/GPU_utils.h cuda/cuda_config.h
+include_HEADERS += runner_gpu_pack_functions.h cuda/GPU_offload_data.h cuda/GPU_utils.h cuda/cuda_config.h
 
 # source files for EAGLE extra I/O
 EAGLE_EXTRA_IO_SOURCES=
@@ -188,7 +188,7 @@ GPU_SOURCES =
 if HAVECUDA
 # list here files to be compiled without nvcc, but needed for execution with GPU
 GPU_CUDA_SOURCES = runner_gpu_pack_functions.c runner_main_cuda.c
-GPU_CUDA_SOURCES += cuda/GPU_data_buffers.c cuda/GPU_utils.c
+GPU_CUDA_SOURCES += cuda/GPU_offload_data.c cuda/GPU_utils.c
 # TODO????
 GPU_SOURCES+=$(GPU_CUDA_SOURCES)
 endif

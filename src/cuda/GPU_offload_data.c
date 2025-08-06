@@ -2,7 +2,7 @@
 extern "C" {
 #endif
 
-#include "GPU_data_buffers.h"
+#include "GPU_offload_data.h"
 #include "task.h"
 
 #include <cuda.h>
@@ -28,7 +28,7 @@ extern "C" {
  * @param recv_struct_size: size of struct used for recv arrays (both host and device)
  */
 void gpu_init_data_buffers(
-    struct gpu_data_buffers *buf,
+    struct gpu_offload_data *buf,
     const size_t target_n_tasks,
     const size_t bundle_size,
     const size_t n_bundles,
@@ -134,7 +134,7 @@ void gpu_init_data_buffers(
 /**
  * @brief perform the initialisations required at the start of each step
  */
-void gpu_init_data_buffers_step(struct gpu_data_buffers *buf){
+void gpu_init_data_buffers_step(struct gpu_offload_data *buf){
 
   struct gpu_pack_vars* pv = &buf->pv;
 

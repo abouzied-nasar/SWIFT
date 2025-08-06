@@ -1,5 +1,5 @@
-#ifndef CUDA_GPU_DATA_BUFFERS_H
-#define CUDA_GPU_DATA_BUFFERS_H
+#ifndef CUDA_gpu_offload_data_H
+#define CUDA_gpu_offload_data_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,7 +17,7 @@ extern "C" {
 #include "error.h"
 
 /*! Struct to hold all data for the transfer of a single task (sub)type */
-struct gpu_data_buffers{
+struct gpu_offload_data{
 
   /*! data required for self and pair packing tasks destined for the GPU*/
   struct gpu_pack_vars pv;
@@ -63,7 +63,7 @@ struct gpu_data_buffers{
 
 
 void gpu_init_data_buffers(
-    struct gpu_data_buffers *buf,
+    struct gpu_offload_data *buf,
     const size_t target_n_tasks,
     const size_t bundle_size,
     const size_t n_bundles,
@@ -73,7 +73,7 @@ void gpu_init_data_buffers(
     const char is_pair_task);
 
 
-void gpu_init_data_buffers_step(struct gpu_data_buffers *buf);
+void gpu_init_data_buffers_step(struct gpu_offload_data *buf);
 
 
 #ifdef __cplusplus

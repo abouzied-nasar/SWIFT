@@ -19,7 +19,7 @@ extern "C" {
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#include "cuda/GPU_data_buffers.h"
+#include "cuda/GPU_offload_data.h"
 #include "cuda/GPU_runner_functions.h"
 #include "cuda/cuda_config.h"
 #else
@@ -43,7 +43,7 @@ extern "C" {
  * @param t the associated task to pack
  * @param mode: 0 for density, 1 for gradient, 2 for force
  */
-void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_data_buffers *buf, int mode) {
+void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_data *buf, int mode) {
 
   /* Grab a hold of the packing buffers */
   struct gpu_pack_vars* pv = &(buf->pv);
@@ -122,7 +122,7 @@ void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_data_buf
 
 
 void runner_doself_gpu_pack_d(struct runner *r, struct scheduler *s, struct
-    gpu_data_buffers *buf, struct cell *ci, struct task *t) {
+    gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
 
@@ -142,7 +142,7 @@ void runner_doself_gpu_pack_d(struct runner *r, struct scheduler *s, struct
 }
 
 void runner_doself_gpu_pack_g(struct runner *r, struct scheduler *s, struct
-    gpu_data_buffers *buf, struct cell *ci, struct task *t) {
+    gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
 
@@ -162,7 +162,7 @@ void runner_doself_gpu_pack_g(struct runner *r, struct scheduler *s, struct
 }
 
 void runner_doself_gpu_pack_f(struct runner *r, struct scheduler *s, struct
-    gpu_data_buffers *buf, struct cell *ci, struct task *t) {
+    gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
 

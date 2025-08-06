@@ -13,11 +13,18 @@ extern "C" {
  */
 struct gpu_pack_vars {
 
-  /* List of tasks and respective cells to be packed */
+  /*! List of tasks and respective cells to be packed */
   struct task **task_list;
+
+  /*! TODO: documentation */
   struct task **top_task_list;
+
+  /*! TODO: documentation */
   struct cell **ci_list;
+
+  /*! TODO: documentation */
   struct cell **cj_list;
+
   /* List of cell shifts and positions. Shifts are used for pair tasks,
    * while cell positions are used for self tasks.*/
   union {
@@ -46,31 +53,68 @@ struct gpu_pack_vars {
     double *d_cellz;
     double *d_shiftz;
   };
+
+  /*! TODO: documentation */
   size_t bundle_size;
-  /*How many particles in a bundle*/
-  /* TODO: make size_t?*/
+
+  /*! How many particles in a bundle*/
   size_t count_parts;
   /**/
   size_t tasks_packed;
-  size_t top_tasks_packed;
-  int *task_first_part;
-  int *task_last_part;
-  int *d_task_first_part;
-  int *d_task_last_part;
-  int *bundle_first_part;
-  int *bundle_last_part;
-  int *bundle_first_task_list;
-  size_t count_max_parts;
-  char launch;
-  char launch_leftovers;
-  size_t target_n_tasks;
-  size_t n_bundles;
-  size_t tasksperbundle;
-  size_t n_daughters_total;
-  size_t n_daughters_packed_index;
-  size_t n_leaves_found;
-  size_t n_leaves_total;
 
+  /*! TODO: documentation */
+  size_t top_tasks_packed;
+
+  /*! TODO: documentation */
+  int *task_first_part;
+
+  /*! TODO: documentation */
+  int *task_last_part;
+
+  /*! TODO: documentation */
+  int *d_task_first_part;
+
+  /*! TODO: documentation */
+  int *d_task_last_part;
+
+  /*! TODO: documentation */
+  int *bundle_first_part;
+
+  /*! TODO: documentation */
+  int *bundle_last_part;
+
+  /*! TODO: documentation */
+  int *bundle_first_task_list;
+
+  /*! TODO: documentation */
+  size_t count_max_parts;
+
+  /*! TODO: documentation */
+  char launch;
+
+  /*! TODO: documentation */
+  char launch_leftovers;
+
+  /*! TODO: documentation */
+  size_t target_n_tasks;
+
+  /*! TODO: documentation */
+  size_t n_bundles;
+
+  /*! TODO: documentation */
+  size_t tasksperbundle;
+
+  /*! TODO: documentation */
+  size_t n_daughters_total;
+
+  /*! TODO: documentation */
+  size_t n_daughters_packed_index;
+
+  /*! TODO: documentation */
+  size_t n_leaves_found;
+
+  /*! TODO: documentation */
+  size_t n_leaves_total;
 };
 
 /**

@@ -46,7 +46,7 @@ extern "C" {
 
 /* Local headers. */
 #include "cell.h" // TODO(mivkov): Check if necessary after refactor
-#include "cuda/GPU_data_buffers.h"
+#include "cuda/GPU_offload_data.h"
 #include "cuda/GPU_part_structs.h"
 #include "cuda/GPU_runner_functions.h"
 #include "cuda/GPU_utils.h"
@@ -204,12 +204,12 @@ void *runner_main_cuda(void *data) {
 
 
   /* Declare and allocate GPU launch control data structures */
-  struct gpu_data_buffers gpu_buf_self_dens;
-  struct gpu_data_buffers gpu_buf_self_grad;
-  struct gpu_data_buffers gpu_buf_self_forc;
-  struct gpu_data_buffers gpu_buf_pair_dens;
-  struct gpu_data_buffers gpu_buf_pair_grad;
-  struct gpu_data_buffers gpu_buf_pair_forc;
+  struct gpu_offload_data gpu_buf_self_dens;
+  struct gpu_offload_data gpu_buf_self_grad;
+  struct gpu_offload_data gpu_buf_self_forc;
+  struct gpu_offload_data gpu_buf_pair_dens;
+  struct gpu_offload_data gpu_buf_pair_grad;
+  struct gpu_offload_data gpu_buf_pair_forc;
 
   gpu_init_data_buffers(&gpu_buf_self_dens, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp,
       sizeof(struct part_aos_f4_send_d), sizeof(struct part_aos_f4_recv_d), /*is_pair_task=*/0);

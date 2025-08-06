@@ -17,7 +17,7 @@
  * tasks
  */
 void gpu_pack_density_self(struct cell* restrict c,
-                struct gpu_data_buffers *buf) {
+                struct gpu_offload_data *buf) {
 
   const int count = c->hydro.count;
   const size_t local_pack_position = buf->pv.count_parts;
@@ -58,7 +58,7 @@ void gpu_pack_density_self(struct cell* restrict c,
  * tasks
  */
 void gpu_pack_gradient_self(struct cell* restrict c,
-                struct gpu_data_buffers *buf) {
+                struct gpu_offload_data *buf) {
 
   const int count = c->hydro.count;
   const size_t local_pack_position = buf->pv.count_parts;
@@ -96,7 +96,7 @@ void gpu_pack_gradient_self(struct cell* restrict c,
  * tasks
  */
 void gpu_pack_force_self(struct cell* restrict c,
-                struct gpu_data_buffers *buf) {
+                struct gpu_offload_data *buf) {
 
   const int count = c->hydro.count;
   const size_t local_pack_position = buf->pv.count_parts;
