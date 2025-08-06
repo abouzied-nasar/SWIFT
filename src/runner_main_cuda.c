@@ -235,43 +235,9 @@ void *runner_main_cuda(void *data) {
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
 
-  /*Declare some global variables*/
-  float d_a = e->cosmology->a;
-  float d_H = e->cosmology->H;
+  /* Declare some global variables */
   int step = 0;
 
-  // a list of the cells and tasks the GPU will work on
-
-  /* A. Nasar: Over-setimate better than under-estimate
-   * Over-allocated for now but a good guess is multiply by 2 to ensure we
-   * always have room for recursing through more tasks than we plan to
-   * offload. */
-  int max_length = 2 * target_n_tasks_pair * 2;
-  struct cell **ci_dd = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_dd = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **ci_dg = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_dg = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **ci_df = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_df = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  int **first_and_last_daughters_d;
-  int **first_and_last_daughters_g;
-  int **first_and_last_daughters_f;
-
-  //A. Nasar: This is over-kill but it's necessary in case we start of with top level cells that are all leaf cells
-  struct cell **ci_top_d = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_d = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **ci_top_g = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_g = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **ci_top_f = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_f = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  first_and_last_daughters_d = (int**)malloc(target_n_tasks_pair * 2ul * sizeof(int *));
-  first_and_last_daughters_g = (int**)malloc(target_n_tasks_pair * 2ul * sizeof(int *));
-  first_and_last_daughters_f = (int**)malloc(target_n_tasks_pair * 2ul * sizeof(int *));
-  for (size_t i = 0; i < target_n_tasks_pair * 2; i++){
-	  first_and_last_daughters_d[i] = (int*)malloc(2 * sizeof(int));
-	  first_and_last_daughters_g[i] = (int*)malloc(2 * sizeof(int));
-	  first_and_last_daughters_f[i] = (int*)malloc(2 * sizeof(int));
-  }
 
   /* Tell me how much memory we're using. */
   gpu_print_free_mem(e, r->cpuid);
@@ -287,6 +253,10 @@ void *runner_main_cuda(void *data) {
     gpu_init_data_buffers_step(&gpu_buf_pair_dens);
     gpu_init_data_buffers_step(&gpu_buf_pair_grad);
     gpu_init_data_buffers_step(&gpu_buf_pair_forc);
+
+    /* Declare some global variables */
+    const float d_a = e->cosmology->a;
+    const float d_H = e->cosmology->H;
 
     /* Can we go home yet? */
     if (e->step_props & engine_step_prop_done) break;
@@ -570,7 +540,7 @@ void *runner_main_cuda(void *data) {
 /* fflush(stdout); */
             runner_recurse_gpu(r, sched, &(gpu_buf_pair_dens.pv), ci, cj, t,
                       e, gpu_buf_pair_dens.fparti_fpartj_lparti_lpartj, &n_leaves_found,
-                      depth, n_expected_tasks, ci_dd, cj_dd,
+                      depth, n_expected_tasks, gpu_buf_pair_dens.ci_d, gpu_buf_pair_dens.cj_d,
                       gpu_buf_pair_dens.pv.n_daughters_total);
 
 /* TODO MLADEN: REMOVE */
@@ -581,8 +551,8 @@ void *runner_main_cuda(void *data) {
                   gpu_buf_pair_dens.d_send_d, gpu_buf_pair_dens.d_recv_d,
                   stream_pairs, d_a, d_H, e,
                   gpu_buf_pair_dens.fparti_fpartj_lparti_lpartj, gpu_buf_pair_dens.event_end, n_leaves_found,
-                  ci_dd, cj_dd, first_and_last_daughters_d, ci_top_d,
-                  cj_top_d);
+                  gpu_buf_pair_dens.ci_d, gpu_buf_pair_dens.cj_d, gpu_buf_pair_dens.first_and_last_daughters, gpu_buf_pair_dens.ci_top,
+                  gpu_buf_pair_dens.cj_top);
 /* TODO MLADEN: REMOVE */
 /* message("RUNNER_PACK_DAUGHTERS DENSITY DONE"); */
 /* fflush(stdout); */
@@ -631,7 +601,7 @@ void *runner_main_cuda(void *data) {
 /* fflush(stdout); */
               runner_recurse_gpu(r, sched, &gpu_buf_pair_grad.pv, ci, cj, t,
                         e, gpu_buf_pair_grad.fparti_fpartj_lparti_lpartj, &n_leaves_found,
-                        depth, n_expected_tasks, ci_dg, cj_dg,
+                        depth, n_expected_tasks, gpu_buf_pair_grad.ci_d, gpu_buf_pair_grad.cj_d,
                         gpu_buf_pair_grad.pv.n_daughters_total);
 
 /* TODO MLADEN: REMOVE */
@@ -643,8 +613,8 @@ void *runner_main_cuda(void *data) {
                   gpu_buf_pair_grad.d_send_g, gpu_buf_pair_grad.d_recv_g,
                     stream_pairs, d_a, d_H, e,
                     gpu_buf_pair_grad.fparti_fpartj_lparti_lpartj,
-                    gpu_buf_pair_grad.event_end, n_leaves_found, ci_dg, cj_dg,
-                    first_and_last_daughters_g, ci_top_g, cj_top_g);
+                    gpu_buf_pair_grad.event_end, n_leaves_found, gpu_buf_pair_grad.ci_d, gpu_buf_pair_grad.cj_d,
+                    gpu_buf_pair_grad.first_and_last_daughters, gpu_buf_pair_grad.ci_top, gpu_buf_pair_grad.cj_top);
 /* TODO MLADEN: REMOVE */
 /* message("FINISHED PAIR GRAD"); */
 /* fflush(stdout); */
@@ -693,7 +663,7 @@ void *runner_main_cuda(void *data) {
 /* fflush(stdout); */
               runner_recurse_gpu(r, sched, &gpu_buf_pair_forc.pv, ci, cj, t,
                         e, gpu_buf_pair_forc.fparti_fpartj_lparti_lpartj, &n_leaves_found,
-                        depth, n_expected_tasks, ci_df, cj_df,
+                        depth, n_expected_tasks, gpu_buf_pair_forc.ci_d, gpu_buf_pair_forc.cj_d,
                         gpu_buf_pair_forc.pv.n_daughters_total);
 
 /* TODO MLADEN: REMOVE */
@@ -703,8 +673,8 @@ void *runner_main_cuda(void *data) {
                     gpu_buf_pair_forc.send_f, gpu_buf_pair_forc.recv_f,
                     gpu_buf_pair_forc.d_send_f, gpu_buf_pair_forc.d_recv_f,
                     stream_pairs, d_a, d_H, e, gpu_buf_pair_forc.fparti_fpartj_lparti_lpartj,
-                    gpu_buf_pair_forc.event_end, n_leaves_found, ci_df, cj_df,
-                    first_and_last_daughters_f, ci_top_f, cj_top_f);
+                    gpu_buf_pair_forc.event_end, n_leaves_found, gpu_buf_pair_forc.ci_d, gpu_buf_pair_forc.cj_d,
+                    gpu_buf_pair_forc.first_and_last_daughters, gpu_buf_pair_forc.ci_top, gpu_buf_pair_forc.cj_top);
 /* TODO MLADEN: REMOVE */
 /* message("RUNNER FINISHED PAIR FORCE"); */
 /* fflush(stdout); */

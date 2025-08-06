@@ -7,6 +7,7 @@ extern "C" {
 
 #include "GPU_pack_vars.h"
 #include "GPU_part_structs.h"
+#include "cell.h"
 
 #include <stddef.h>
 
@@ -29,33 +30,44 @@ struct gpu_offload_data{
   /*! First and last particles of cells i and j for pair interactions */
   int4 *fparti_fpartj_lparti_lpartj;
 
-  /*! Documentation?? */
+  /*! TODO: Documentation?? */
   union {
     struct part_aos_f4_send_d *d_send_d;
     struct part_aos_f4_send_g *d_send_g;
     struct part_aos_f4_send_f *d_send_f;
   };
 
-  /*! Documentation?? */
+  /*! TODO: Documentation?? */
   union {
     struct part_aos_f4_recv_d *d_recv_d;
     struct part_aos_f4_recv_g *d_recv_g;
     struct part_aos_f4_recv_f *d_recv_f;
   };
 
-  /*! Documentation?? */
+  /*! TODO: Documentation?? */
   union {
     struct part_aos_f4_send_d *send_d;
     struct part_aos_f4_send_g *send_g;
     struct part_aos_f4_send_f *send_f;
   };
 
-  /*! Documentation?? */
+  /*! TODO: Documentation?? */
   union {
     struct part_aos_f4_recv_d *recv_d;
     struct part_aos_f4_recv_g *recv_g;
     struct part_aos_f4_recv_f *recv_f;
   };
+
+  /*! TODO: Documentation */
+  struct cell **ci_d;
+  struct cell **cj_d;
+
+  /*! TODO: Documentation */
+  int **first_and_last_daughters;
+
+  /*! TODO: Documentation */
+  struct cell **ci_top;
+  struct cell **cj_top;
 
   /* cudaStream_t *stream; */
   cudaEvent_t* event_end;

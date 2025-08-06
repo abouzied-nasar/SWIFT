@@ -116,6 +116,33 @@ void gpu_init_data_buffers(
   swift_assert(cu_error == cudaSuccess);
 
 
+  if (is_pair_task) {
+
+  /* A. Nasar: Over-setimate better than under-estimate
+   * Over-allocated for now but a good guess is multiply by 2 to ensure we
+   * always have room for recursing through more tasks than we plan to
+   * offload. */
+    size_t max_length = 2 * target_n_tasks * 2;
+
+    buf->ci_d = (struct cell**)malloc(max_length * sizeof(struct cell *));
+    buf->cj_d = (struct cell**)malloc(max_length * sizeof(struct cell *));
+    buf->first_and_last_daughters = (int**)malloc(target_n_tasks * 2 * sizeof(int *));
+    for (size_t i = 0; i < target_n_tasks * 2; i++){
+      buf->first_and_last_daughters[i] = (int*)malloc(2 * sizeof(int));
+    }
+
+    buf->ci_top = (struct cell**)malloc(2ul * target_n_tasks * sizeof(struct cell *));
+    buf->cj_top = (struct cell**)malloc(2ul * target_n_tasks * sizeof(struct cell *));
+
+  } else {
+    buf->ci_d = NULL;
+    buf->cj_d = NULL;
+    buf->first_and_last_daughters = NULL;
+    buf->ci_top = NULL;
+    buf->cj_top = NULL;
+  }
+
+
   /* Create streams so that we can off-load different batches of work in
    * different streams and get some con-CURRENCY! Events used to maximise
    * asynchrony further*/
