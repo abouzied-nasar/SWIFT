@@ -187,7 +187,7 @@ endif
 GPU_SOURCES = 
 if HAVECUDA
 # list here files to be compiled without nvcc, but needed for execution with GPU
-GPU_CUDA_SOURCES = runner_gpu_pack_functions.c runner_main_cuda.c
+GPU_CUDA_SOURCES = runner_gpu_pack_functions.c runner_main_cuda.c GPU_pack_vars.c
 GPU_CUDA_SOURCES += cuda/GPU_offload_data.c cuda/GPU_utils.c
 # TODO????
 GPU_SOURCES+=$(GPU_CUDA_SOURCES)

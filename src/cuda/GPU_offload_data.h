@@ -15,7 +15,7 @@ extern "C" {
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#include "error.h"
+
 
 /*! Struct to hold all data for the transfer of a single task (sub)type */
 struct gpu_offload_data{
@@ -76,10 +76,7 @@ struct gpu_offload_data{
 
 void gpu_init_data_buffers(
     struct gpu_offload_data *buf,
-    const size_t target_n_tasks,
-    const size_t bundle_size,
-    const size_t n_bundles,
-    const size_t count_max_parts_tmp,
+    const struct gpu_global_pack_params* params,
     const size_t send_struct_size,
     const size_t recv_struct_size,
     const char is_pair_task);

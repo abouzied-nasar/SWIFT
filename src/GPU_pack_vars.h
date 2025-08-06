@@ -1,5 +1,25 @@
+/*******************************************************************************
+ * This file is part of SWIFT.
+ * Copyright (c) 2025 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
+ *                    Mladen Ivkovic
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ ******************************************************************************/
 #ifndef GPU_PACK_VARS_H
 #define GPU_PACK_VARS_H
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -7,6 +27,22 @@ extern "C" {
 
 #include <stddef.h>
 #include <vector_types.h>
+
+#include "scheduler.h"
+
+
+/*! Struct holding global packing parameters. */
+struct gpu_global_pack_params{
+
+  size_t target_n_tasks;
+  size_t target_n_tasks_pair;
+  size_t bundle_size;
+  size_t bundle_size_pair;
+  size_t n_bundles;
+  size_t n_bundles_pair;
+  int count_max_parts;
+};
+
 
 /**
  * TODO Abouzeid: documentation
@@ -117,48 +153,9 @@ struct gpu_pack_vars {
   size_t n_leaves_total;
 };
 
-/**
- * Initialise empty gpu_pack_vars struct
- *
- * TODO: This doesn't need to be inlined or in the header.
- */
-__attribute__((always_inline)) inline void gpu_init_pack_vars(struct gpu_pack_vars* pv){
 
-  pv->task_list = NULL;
-  pv->top_task_list = NULL;
-  pv->ci_list = NULL;
-  pv->cj_list = NULL;
-  pv->cellx = NULL;
-  pv->celly = NULL;
-  pv->cellz = NULL;
-  pv->d_cellx = NULL;
-  pv->d_celly = NULL;
-  pv->d_cellz = NULL;
-
-  pv->bundle_size = 0;
-  pv->count_parts = 0;
-  pv->tasks_packed = 0;
-
-  pv->task_first_part = NULL;
-  pv->task_last_part = NULL;
-  pv->d_task_first_part = NULL;
-  pv->d_task_last_part = NULL;
-  pv->bundle_first_part = NULL;
-  pv->bundle_last_part = NULL;
-  pv->bundle_first_task_list = NULL;
-
-  pv->count_max_parts = 0;
-  pv->launch = 0;
-  pv->launch_leftovers = 0;
-
-  pv->target_n_tasks = 0;
-  pv->n_bundles = 0;
-  pv->tasksperbundle = 0;
-  pv->n_daughters_total = 0;
-  pv->n_daughters_packed_index = 0;
-  pv->n_leaves_found = 0;
-  pv->n_leaves_total = 0;
-}
+void gpu_init_pack_vars(struct gpu_pack_vars* pv);
+void gpu_get_pack_params(struct gpu_global_pack_params* pars, const struct scheduler* sched, const float eta_neighbours);
 
 #ifdef __cplusplus
 }

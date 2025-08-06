@@ -17,36 +17,40 @@ extern "C" {
  *
  * @brief TODO: parameter docu
  *
- * @param target_n_tasks defines the total number of leaf-level tasks we will
- *    compute for each GPU off-load cycle
- * @param bundle_size defines the number of leaf-level tasks we will
- *    compute in each stream
- * @params n_bundles the number of task bundles each thread has.
- *    Used to loop through bundles
+ * @params params: global gpu packing parameters
  * @param is_pair_task: Whether we allocate enough space for pair tasks
  * @param send_struct_size: size of struct used for send arrays (both host and device)
  * @param recv_struct_size: size of struct used for recv arrays (both host and device)
  */
 void gpu_init_data_buffers(
     struct gpu_offload_data *buf,
-    const size_t target_n_tasks,
-    const size_t bundle_size,
-    const size_t n_bundles,
-    const size_t count_max_parts_tmp,
+    const struct gpu_global_pack_params* params,
     const size_t send_struct_size,
     const size_t recv_struct_size,
     const char is_pair_task
     ) {
 
-  const size_t tasksperbundle = (target_n_tasks + n_bundles - 1) / n_bundles;
+  size_t target_n_tasks = params->target_n_tasks;
+  size_t n_bundles = params->n_bundles;
+  size_t bundle_size = params->bundle_size;
+  size_t count_max_parts = params->count_max_parts;
+
+  if (is_pair_task) {
+    target_n_tasks = params->target_n_tasks_pair;
+    n_bundles = params->n_bundles_pair;
+    bundle_size = params->bundle_size_pair;
+  }
 
   /* Multiplication factor depending on whether this is for a self or a pair task */
   const size_t self_pair_fact = is_pair_task ? 2 : 1;
+
+  const size_t tasksperbundle = (target_n_tasks + n_bundles - 1) / n_bundles;
 
   /* Initialise and set up pack_vars */
   struct gpu_pack_vars* pv = &(buf->pv);
   gpu_init_pack_vars(pv);
 
+  /* Now fill out contents */
   pv->target_n_tasks = target_n_tasks;
   pv->bundle_size = bundle_size;
   pv->n_bundles = n_bundles;
@@ -63,7 +67,7 @@ void gpu_init_data_buffers(
 
   pv->tasksperbundle = tasksperbundle;
   pv->count_parts = 0;
-  pv->count_max_parts = count_max_parts_tmp;
+  pv->count_max_parts = count_max_parts;
 
   if (is_pair_task) {
     pv->task_list = NULL;
@@ -101,18 +105,18 @@ void gpu_init_data_buffers(
   }
 
   /* Now allocate memory for Buffer and GPU particle arrays */
-  cu_error = cudaMalloc((void **)&buf->d_send_d, self_pair_fact * count_max_parts_tmp * send_struct_size);
+  cu_error = cudaMalloc((void **)&buf->d_send_d, self_pair_fact * count_max_parts* send_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaMalloc((void **)&buf->d_recv_d, self_pair_fact * count_max_parts_tmp * recv_struct_size);
+  cu_error = cudaMalloc((void **)&buf->d_recv_d, self_pair_fact * count_max_parts * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
   cu_error = cudaMallocHost((void **)&buf->send_d,
-                 self_pair_fact * count_max_parts_tmp * send_struct_size);
+                 self_pair_fact * count_max_parts * send_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
   cu_error = cudaMallocHost((void **)&buf->recv_d,
-                 self_pair_fact * count_max_parts_tmp * recv_struct_size);
+                 self_pair_fact * count_max_parts * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
 

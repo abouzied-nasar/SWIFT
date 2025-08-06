@@ -4,6 +4,7 @@
  *                    Matthieu Schaller (schaller@strw.leidenuniv.nl)
  *               2015 Peter W. Draper (p.w.draper@durham.ac.uk)
  *               2022 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
+ *               2025 Mladen Ivkovic (mladen.ivkovic@durham.ac.uk)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -171,37 +172,11 @@ void *runner_main_cuda(void *data) {
   /* Initialise cuda context for this thread. */
   gpu_init_thread(e, r->cpuid);
 
+  const int cuda_dev_id = engine_rank; // TODO(mivkov): move this to gpu_offload_data
+
   /* Get estimates for array sizes et al. */
-  const int cuda_dev_id = engine_rank;
-  const size_t target_n_tasks = sched->pack_size;
-  const size_t target_n_tasks_pair = sched->pack_size_pair;
-  const size_t bundle_size = N_TASKS_BUNDLE_SELF;
-  const size_t bundle_size_pair = N_TASKS_BUNDLE_PAIR;
-
-  /* A. Nasar: n_bundles is the number of task bundles each thread has. Used to loop through bundles */
-  const size_t n_bundles = (target_n_tasks + bundle_size - 1) / bundle_size;
-  const size_t n_bundles_pair = (target_n_tasks_pair + bundle_size_pair - 1) / bundle_size_pair;
-
-  /* A. Nasar: Try to estimate average number of particles per leaf-level cell */
-  /* Get smoothing length/particle spacing */
-  const float eta_neighbours = e->s->eta_neighbours;
-  int np_per_cell = ceil(2.0 * eta_neighbours);
-
-  /* Cube to find average number of particles in 3D */
-  np_per_cell *= np_per_cell * np_per_cell;
-
-  /* A. Nasar: Increase parts per recursed task-level cell by buffer to
-    ensure we allocate enough memory */
-  const int buff = ceil(0.5 * np_per_cell);
-
-  /*A. Nasar: Multiplication by 2 is also to ensure we do not over-run
-   *  the allocated memory on buffers and GPU. This can happen if calculated h
-   * is larger than cell width and splitting makes bigger than target cells */
-
-  /* Leave this until we implement recursive self tasks -> Exaggerated as we will
-   * off-load really big cells since we don't recurse */
-  const int count_max_parts_tmp = 64 * 8 * target_n_tasks * (np_per_cell + buff);
-
+  struct gpu_global_pack_params gpu_pack_params;
+  gpu_get_pack_params(&gpu_pack_params, sched, e->s->eta_neighbours);
 
   /* Declare and allocate GPU launch control data structures */
   struct gpu_offload_data gpu_buf_self_dens;
@@ -211,27 +186,27 @@ void *runner_main_cuda(void *data) {
   struct gpu_offload_data gpu_buf_pair_grad;
   struct gpu_offload_data gpu_buf_pair_forc;
 
-  gpu_init_data_buffers(&gpu_buf_self_dens, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp,
+  gpu_init_data_buffers(&gpu_buf_self_dens, &gpu_pack_params,
       sizeof(struct part_aos_f4_send_d), sizeof(struct part_aos_f4_recv_d), /*is_pair_task=*/0);
-  gpu_init_data_buffers(&gpu_buf_self_grad, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp,
+  gpu_init_data_buffers(&gpu_buf_self_grad, &gpu_pack_params,
       sizeof(struct part_aos_f4_send_g), sizeof(struct part_aos_f4_recv_g), /*is_pair_task=*/0);
-  gpu_init_data_buffers(&gpu_buf_self_forc, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp,
+  gpu_init_data_buffers(&gpu_buf_self_forc, &gpu_pack_params,
       sizeof(struct part_aos_f4_send_f), sizeof(struct part_aos_f4_recv_f), /*is_pair_task=*/0);
-  gpu_init_data_buffers(&gpu_buf_pair_dens, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp,
+  gpu_init_data_buffers(&gpu_buf_pair_dens, &gpu_pack_params,
       sizeof(struct part_aos_f4_send_d), sizeof(struct part_aos_f4_recv_d), /*is_pair_task=*/1);
-  gpu_init_data_buffers(&gpu_buf_pair_grad, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp,
+  gpu_init_data_buffers(&gpu_buf_pair_grad, &gpu_pack_params,
       sizeof(struct part_aos_f4_send_g), sizeof(struct part_aos_f4_recv_g), /*is_pair_task=*/1);
-  gpu_init_data_buffers(&gpu_buf_pair_forc, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp,
+  gpu_init_data_buffers(&gpu_buf_pair_forc, &gpu_pack_params,
       sizeof(struct part_aos_f4_send_f), sizeof(struct part_aos_f4_recv_f), /*is_pair_task=*/1);
 
 
   /* TODO: MOVE TO CUDA_INIT_STREAMS ? */
-  cudaStream_t stream[n_bundles];
-  cudaStream_t stream_pairs[n_bundles_pair];
+  cudaStream_t stream[gpu_pack_params.n_bundles];
+  cudaStream_t stream_pairs[gpu_pack_params.n_bundles_pair];
 
-  for (size_t i = 0; i < n_bundles; ++i)
+  for (size_t i = 0; i < gpu_pack_params.n_bundles; ++i)
     cudaStreamCreateWithFlags(&stream[i], cudaStreamNonBlocking);
-  for (size_t i = 0; i < n_bundles_pair; ++i)
+  for (size_t i = 0; i < gpu_pack_params.n_bundles_pair; ++i)
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
 
