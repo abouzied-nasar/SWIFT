@@ -35,6 +35,7 @@ void gpu_init_thread(const struct engine* e, const int cpuid){
   /*Get my rank*/
   int mpi_rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+  error("GOT INTO WITH_MPI region");
 #endif
   if (n_devices == 1){
 	  cudaSetDevice(dev_id);
@@ -44,6 +45,7 @@ void gpu_init_thread(const struct engine* e, const int cpuid){
     cudaSetDevice(mpi_rank);
     fprintf(stderr, "%i devices available device id is %i\n", n_devices,
             mpi_rank);
+    error("GOT INTO WITH_MPI region");
     dev_id = mpi_rank;
   }
 #endif
