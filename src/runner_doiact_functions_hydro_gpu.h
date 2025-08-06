@@ -144,7 +144,7 @@ void runner_doself_gpu_pack_g(struct runner *r, struct scheduler *s, struct
 
   TIMER_TIC;
 
-  runner_doself_gpu_pack(ci, t, buf, 1);
+  runner_doself_gpu_pack(ci, t, buf, t->subtype);
 
   /* Get a lock to the queue so we can safely decrement counter and check for
    * launch leftover condition*/
@@ -164,7 +164,7 @@ void runner_doself_gpu_pack_f(struct runner *r, struct scheduler *s, struct
 
   TIMER_TIC;
 
-  runner_doself_gpu_pack(ci, t, buf, 2);
+  runner_doself_gpu_pack(ci, t, buf, t->subtype);
 
   /* Get a lock to the queue so we can safely decrement counter and check for
    * launch leftover condition*/
