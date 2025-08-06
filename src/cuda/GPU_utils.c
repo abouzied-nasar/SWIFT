@@ -36,12 +36,14 @@ void gpu_init_thread(const struct engine* e, const int cpuid){
   int mpi_rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
 #endif
-  if (n_devices == 1) {
-    cudaSetDevice(dev_id);
+  if (n_devices == 1){
+	  cudaSetDevice(dev_id);
   }
 #ifdef WITH_MPI
   else {
     cudaSetDevice(mpi_rank);
+    fprintf(stderr, "%i devices available device id is %i\n", n_devices,
+            mpi_rank);
     dev_id = mpi_rank;
   }
 #endif
