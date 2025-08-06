@@ -7,6 +7,9 @@
 #include "cuda_config.h"
 #include "runner.h"
 
+#ifdef WITH_MPI
+#include <mpi.h>
+#endif
 #include <cuda.h>
 #include <cuda_runtime.h>
 
@@ -32,9 +35,12 @@ void gpu_init_thread(const struct engine* e, const int cpuid){
     cudaSetDevice(dev_id);
   }
 #ifdef WITH_MPI
+  /*Get my rank*/
+  int mpi_rank = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
   else {
-    cudaSetDevice(engine_rank);
-    dev_id = engine_rank;
+    cudaSetDevice(mpi_rank);
+    dev_id = mpirank;
   }
 #endif
 
