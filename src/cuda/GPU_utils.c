@@ -31,16 +31,18 @@ void gpu_init_thread(const struct engine* e, const int cpuid){
   cudaGetDeviceCount(&n_devices);
   /* A. Nasar: If running on MPI we set code to use one MPI rank per GPU
    * This was found to work very well and simplifies writing slurm scipts */
-  if (n_devices == 1) {
-    cudaSetDevice(dev_id);
-  }
 #ifdef WITH_MPI
   /*Get my rank*/
   int mpi_rank = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+#endif
+  if (n_devices == 1) {
+    cudaSetDevice(dev_id);
+  }
+#ifdef WITH_MPI
   else {
     cudaSetDevice(mpi_rank);
-    dev_id = mpirank;
+    dev_id = mpi_rank;
   }
 #endif
 
