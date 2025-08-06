@@ -11,7 +11,7 @@ extern "C" {
 #include "runner_gpu_pack_functions.h"
 #include "scheduler.h"
 #include "space_getsid.h"
-/* #include "task.h" */
+#include "task.h"
 #include "timers.h"
 
 
@@ -43,7 +43,7 @@ extern "C" {
  * @param t the associated task to pack
  * @param mode: 0 for density, 1 for gradient, 2 for force
  */
-void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_data *buf, int mode) {
+void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_data *buf, enum task_subtypes task_subtype) {
 
   /* Grab a hold of the packing buffers */
   struct gpu_pack_vars* pv = &(buf->pv);
@@ -73,18 +73,16 @@ void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_
 
     /* This re-arranges the particle data from cell->hydro->parts into a
        long array of part structs */
-    if (mode == 0) {
+    if (task_subtype == task_subtype_gpu_pack_d) {
       gpu_pack_density_self(ci, buf);
-    } else if (mode == 1) {
+    } else if (task_subtype == task_subtype_gpu_pack_g) {
       gpu_pack_gradient_self(ci, buf);
-    } else if (mode == 2){
+    } else if (task_subtype == task_subtype_gpu_pack_f){
       gpu_pack_force_self(ci, buf);
+    } else {
+      error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
-#ifdef SWIFT_DEBUG_CHECKS
-    else {
-      error("Unknown mode %d", mode);
-    }
-#endif
+
     /* Increment pack length accordingly */
     buf->pv.count_parts += count;
   }
@@ -126,7 +124,7 @@ void runner_doself_gpu_pack_d(struct runner *r, struct scheduler *s, struct
 
   TIMER_TIC;
 
-  runner_doself_gpu_pack(ci, t, buf, 0);
+  runner_doself_gpu_pack(ci, t, buf, t->subtype);
 
   /* Get a lock to the queue so we can safely decrement counter and check for
    * launch leftover condition*/

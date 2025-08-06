@@ -162,7 +162,7 @@ enum task_subtypes {
   task_subtype_sink_do_gas_swallow,
   task_subtype_rt_gradient,
   task_subtype_rt_transport,
-  task_subtype_gpu_pack_d,  // A. Nasar
+  task_subtype_gpu_pack_d,
   task_subtype_gpu_pack_g,
   task_subtype_gpu_pack_f,
   task_subtype_gpu_unpack_d,

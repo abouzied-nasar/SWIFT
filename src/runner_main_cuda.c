@@ -178,7 +178,7 @@ void *runner_main_cuda(void *data) {
   struct gpu_global_pack_params gpu_pack_params;
   gpu_get_pack_params(&gpu_pack_params, sched, e->s->eta_neighbours);
 
-  /* Declare and allocate GPU launch control data structures */
+  /* Declare and allocate GPU launch control data structures which need to be in scope */
   struct gpu_offload_data gpu_buf_self_dens;
   struct gpu_offload_data gpu_buf_self_grad;
   struct gpu_offload_data gpu_buf_self_forc;
@@ -209,10 +209,8 @@ void *runner_main_cuda(void *data) {
   for (size_t i = 0; i < gpu_pack_params.n_bundles_pair; ++i)
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
-
   /* Declare some global variables */
   int step = 0;
-
 
   /* Tell me how much memory we're using. */
   gpu_print_free_mem(e, r->cpuid);
@@ -222,6 +220,9 @@ void *runner_main_cuda(void *data) {
     /* Wait at the barrier. */
     engine_barrier(e);
 
+    /* Can we go home yet? */
+    if (e->step_props & engine_step_prop_done) break;
+
     gpu_init_data_buffers_step(&gpu_buf_self_dens);
     gpu_init_data_buffers_step(&gpu_buf_self_grad);
     gpu_init_data_buffers_step(&gpu_buf_self_forc);
@@ -229,12 +230,9 @@ void *runner_main_cuda(void *data) {
     gpu_init_data_buffers_step(&gpu_buf_pair_grad);
     gpu_init_data_buffers_step(&gpu_buf_pair_forc);
 
-    /* Declare some global variables */
+    /* Get some global variables' values for this step */
     const float d_a = e->cosmology->a;
     const float d_H = e->cosmology->H;
-
-    /* Can we go home yet? */
-    if (e->step_props & engine_step_prop_done) break;
 
     /* Re-set the pointer to the previous task, as there is none. */
     struct task *t = NULL;
@@ -319,9 +317,11 @@ void *runner_main_cuda(void *data) {
           } else if (t->subtype == task_subtype_gpu_pack_d) {
             /* GPU WORK */
 #ifdef GPUOFFLOAD_DENSITY
+
 /* TODO MLADEN: REMOVE */
 /* message("PACKING DENSITY SELF"); */
 /* fflush(stdout); */
+
             runner_doself_gpu_pack_d(r, sched, &gpu_buf_self_dens, ci, t);
             /* No pack tasks left in queue, flag that we want to run */
             char launch_leftovers = gpu_buf_self_dens.pv.launch_leftovers;
@@ -330,6 +330,7 @@ void *runner_main_cuda(void *data) {
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
               /* Launch GPU tasks */
+
 /* TODO MLADEN: REMOVE */
 /* message("LAUNCHING DENSITY SELF"); */
 /* fflush(stdout); */
@@ -344,6 +345,7 @@ void *runner_main_cuda(void *data) {
                   gpu_buf_self_dens.task_first_part_f4,
                   gpu_buf_self_dens.d_task_first_part_f4,
                   gpu_buf_self_dens.event_end);
+
 /* TODO MLADEN: REMOVE */
 /* message("DONE DENSITY SELF"); */
 /* fflush(stdout); */
