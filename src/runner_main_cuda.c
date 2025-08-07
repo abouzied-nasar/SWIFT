@@ -334,17 +334,7 @@ void *runner_main_cuda(void *data) {
 /* TODO MLADEN: REMOVE */
 /* message("LAUNCHING DENSITY SELF"); */
 /* fflush(stdout); */
-              runner_doself_gpu_launch_density(
-                  r, sched,
-                  &gpu_buf_self_dens.pv, ci, t,
-                  gpu_buf_self_dens.send_d,
-                  gpu_buf_self_dens.recv_d,
-                  gpu_buf_self_dens.d_send_d,
-                  gpu_buf_self_dens.d_recv_d,
-                  stream, d_a, d_H, e, cuda_dev_id,
-                  gpu_buf_self_dens.task_first_part_f4,
-                  gpu_buf_self_dens.d_task_first_part_f4,
-                  gpu_buf_self_dens.event_end);
+              runner_doself_gpu_launch_density(r, sched, &gpu_buf_self_dens, ci, t, stream, d_a, d_H, cuda_dev_id);
 
 /* TODO MLADEN: REMOVE */
 /* message("DONE DENSITY SELF"); */
@@ -368,10 +358,10 @@ void *runner_main_cuda(void *data) {
               runner_doself_gpu_launch_gradient(
                   r, sched,
                   &gpu_buf_self_grad.pv, ci, t,
-                  gpu_buf_self_grad.send_g,
-                  gpu_buf_self_grad.recv_g,
-                  gpu_buf_self_grad.d_send_g,
-                  gpu_buf_self_grad.d_recv_g,
+                  gpu_buf_self_grad.parts_send_g,
+                  gpu_buf_self_grad.parts_recv_g,
+                  gpu_buf_self_grad.d_parts_send_g,
+                  gpu_buf_self_grad.d_parts_recv_g,
                   stream, d_a, d_H, e,
                   gpu_buf_self_grad.task_first_part_f4,
                   gpu_buf_self_grad.d_task_first_part_f4,
@@ -400,10 +390,10 @@ void *runner_main_cuda(void *data) {
               runner_doself_gpu_launch_force(
                   r, sched,
                   &gpu_buf_self_forc.pv, ci, t,
-                  gpu_buf_self_forc.send_f,
-                  gpu_buf_self_forc.recv_f,
-                  gpu_buf_self_forc.d_send_f,
-                  gpu_buf_self_forc.d_recv_f,
+                  gpu_buf_self_forc.parts_send_f,
+                  gpu_buf_self_forc.parts_recv_f,
+                  gpu_buf_self_forc.d_parts_send_f,
+                  gpu_buf_self_forc.d_parts_recv_f,
                   stream, d_a, d_H, e,
                   gpu_buf_self_forc.task_first_part_f4,
                   gpu_buf_self_forc.d_task_first_part_f4,
@@ -524,8 +514,8 @@ void *runner_main_cuda(void *data) {
 /* message("RUNNER_PACK_DAUGHTERS DENSITY"); */
 /* fflush(stdout); */
             runner_gpu_pack_daughters_and_launch_d(r, sched, ci, cj, &(gpu_buf_pair_dens.pv),
-                  t, gpu_buf_pair_dens.send_d, gpu_buf_pair_dens.recv_d,
-                  gpu_buf_pair_dens.d_send_d, gpu_buf_pair_dens.d_recv_d,
+                  t, gpu_buf_pair_dens.parts_send_d, gpu_buf_pair_dens.parts_recv_d,
+                  gpu_buf_pair_dens.d_parts_send_d, gpu_buf_pair_dens.d_parts_recv_d,
                   stream_pairs, d_a, d_H, e,
                   gpu_buf_pair_dens.fparti_fpartj_lparti_lpartj, gpu_buf_pair_dens.event_end, n_leaves_found,
                   gpu_buf_pair_dens.ci_d, gpu_buf_pair_dens.cj_d, gpu_buf_pair_dens.first_and_last_daughters, gpu_buf_pair_dens.ci_top,
@@ -586,8 +576,8 @@ void *runner_main_cuda(void *data) {
 /* fflush(stdout); */
               runner_gpu_pack_daughters_and_launch_g(r, sched, ci, cj,
                   &gpu_buf_pair_grad.pv, t,
-                  gpu_buf_pair_grad.send_g, gpu_buf_pair_grad.recv_g,
-                  gpu_buf_pair_grad.d_send_g, gpu_buf_pair_grad.d_recv_g,
+                  gpu_buf_pair_grad.parts_send_g, gpu_buf_pair_grad.parts_recv_g,
+                  gpu_buf_pair_grad.d_parts_send_g, gpu_buf_pair_grad.d_parts_recv_g,
                     stream_pairs, d_a, d_H, e,
                     gpu_buf_pair_grad.fparti_fpartj_lparti_lpartj,
                     gpu_buf_pair_grad.event_end, n_leaves_found, gpu_buf_pair_grad.ci_d, gpu_buf_pair_grad.cj_d,
@@ -647,8 +637,8 @@ void *runner_main_cuda(void *data) {
 /* message("RUNNER_PACK DAUGHTERS FORCE"); */
 /* fflush(stdout); */
               runner_gpu_pack_daughters_and_launch_f(r, sched, ci, cj, &gpu_buf_pair_forc.pv, t,
-                    gpu_buf_pair_forc.send_f, gpu_buf_pair_forc.recv_f,
-                    gpu_buf_pair_forc.d_send_f, gpu_buf_pair_forc.d_recv_f,
+                    gpu_buf_pair_forc.parts_send_f, gpu_buf_pair_forc.parts_recv_f,
+                    gpu_buf_pair_forc.d_parts_send_f, gpu_buf_pair_forc.d_parts_recv_f,
                     stream_pairs, d_a, d_H, e, gpu_buf_pair_forc.fparti_fpartj_lparti_lpartj,
                     gpu_buf_pair_forc.event_end, n_leaves_found, gpu_buf_pair_forc.ci_d, gpu_buf_pair_forc.cj_d,
                     gpu_buf_pair_forc.first_and_last_daughters, gpu_buf_pair_forc.ci_top, gpu_buf_pair_forc.cj_top);

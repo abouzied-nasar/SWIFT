@@ -36,15 +36,15 @@ void gpu_pack_density_self(struct cell* restrict c,
 
     /* Data to be copied to GPU */
     const double *x = part_get_const_x(&ptmps[i]);
-    buf->send_d[id_in_pack].x_p_h.x = x[0] - cellx;
-    buf->send_d[id_in_pack].x_p_h.y = x[1] - celly;
-    buf->send_d[id_in_pack].x_p_h.z = x[2] - cellz;
-    buf->send_d[id_in_pack].x_p_h.w = part_get_h(&ptmps[i]);
+    buf->parts_send_d[id_in_pack].x_p_h.x = x[0] - cellx;
+    buf->parts_send_d[id_in_pack].x_p_h.y = x[1] - celly;
+    buf->parts_send_d[id_in_pack].x_p_h.z = x[2] - cellz;
+    buf->parts_send_d[id_in_pack].x_p_h.w = part_get_h(&ptmps[i]);
     const float *v = part_get_const_v(&ptmps[i]);
-    buf->send_d[id_in_pack].ux_m.x = v[0];
-    buf->send_d[id_in_pack].ux_m.y = v[1];
-    buf->send_d[id_in_pack].ux_m.z = v[2];
-    buf->send_d[id_in_pack].ux_m.w = part_get_mass(&ptmps[i]);
+    buf->parts_send_d[id_in_pack].ux_m.x = v[0];
+    buf->parts_send_d[id_in_pack].ux_m.y = v[1];
+    buf->parts_send_d[id_in_pack].ux_m.z = v[2];
+    buf->parts_send_d[id_in_pack].ux_m.w = part_get_mass(&ptmps[i]);
 
     //    /*Initialise sums to zero before CPU/GPU copy*/
     //    const float4 zeroes = {0.0, 0.0, 0.0, 0.0};
@@ -74,19 +74,19 @@ void gpu_pack_gradient_self(struct cell* restrict c,
 
     /* Data to be copied to GPU */
     const double *x = part_get_const_x(p);
-    buf->send_g[id_in_pack].x_h.x = x[0] - cellx;
-    buf->send_g[id_in_pack].x_h.y = x[1] - celly;
-    buf->send_g[id_in_pack].x_h.z = x[2] - cellz;
-    buf->send_g[id_in_pack].x_h.w = part_get_h(p);
+    buf->parts_send_g[id_in_pack].x_h.x = x[0] - cellx;
+    buf->parts_send_g[id_in_pack].x_h.y = x[1] - celly;
+    buf->parts_send_g[id_in_pack].x_h.z = x[2] - cellz;
+    buf->parts_send_g[id_in_pack].x_h.w = part_get_h(p);
     const float *v = part_get_const_v(&ptmps[i]);
-    buf->send_g[id_in_pack].ux_m.x = v[0];
-    buf->send_g[id_in_pack].ux_m.y = v[1];
-    buf->send_g[id_in_pack].ux_m.z = v[2];
-    buf->send_g[id_in_pack].ux_m.w = part_get_mass(p);
-    buf->send_g[id_in_pack].rho_avisc_u_c.x = part_get_rho(p);
-    buf->send_g[id_in_pack].rho_avisc_u_c.y = part_get_alpha_av(p);
-    buf->send_g[id_in_pack].rho_avisc_u_c.z = part_get_u(p);  // p.density.rot_v[0];
-    buf->send_g[id_in_pack].rho_avisc_u_c.w = part_get_soundspeed(p);
+    buf->parts_send_g[id_in_pack].ux_m.x = v[0];
+    buf->parts_send_g[id_in_pack].ux_m.y = v[1];
+    buf->parts_send_g[id_in_pack].ux_m.z = v[2];
+    buf->parts_send_g[id_in_pack].ux_m.w = part_get_mass(p);
+    buf->parts_send_g[id_in_pack].rho_avisc_u_c.x = part_get_rho(p);
+    buf->parts_send_g[id_in_pack].rho_avisc_u_c.y = part_get_alpha_av(p);
+    buf->parts_send_g[id_in_pack].rho_avisc_u_c.z = part_get_u(p);  // p.density.rot_v[0];
+    buf->parts_send_g[id_in_pack].rho_avisc_u_c.w = part_get_soundspeed(p);
     //        p.force.soundspeed;  // p.density.rot_v[0];
   }
 }
@@ -113,35 +113,35 @@ void gpu_pack_force_self(struct cell* restrict c,
     const struct part *p = &ptmps[i];
     const double *x = part_get_const_x(p);
     const int id_in_pack = i + pp;
-    buf->send_f[id_in_pack].x_h.x = x[0] - cellx;
-    buf->send_f[id_in_pack].x_h.y = x[1] - celly;
-    buf->send_f[id_in_pack].x_h.z = x[2] - cellz;
-    buf->send_f[id_in_pack].x_h.w = part_get_h(p);
+    buf->parts_send_f[id_in_pack].x_h.x = x[0] - cellx;
+    buf->parts_send_f[id_in_pack].x_h.y = x[1] - celly;
+    buf->parts_send_f[id_in_pack].x_h.z = x[2] - cellz;
+    buf->parts_send_f[id_in_pack].x_h.w = part_get_h(p);
 
     const float *v = part_get_const_v(p);
-    buf->send_f[id_in_pack].ux_m.x = v[0];
-    buf->send_f[id_in_pack].ux_m.y = v[1];
-    buf->send_f[id_in_pack].ux_m.z = v[2];
-    buf->send_f[id_in_pack].ux_m.w = part_get_mass(p);
-    buf->send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
-    buf->send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
-    buf->send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.z = part_get_time_bin(p);
+    buf->parts_send_f[id_in_pack].ux_m.x = v[0];
+    buf->parts_send_f[id_in_pack].ux_m.y = v[1];
+    buf->parts_send_f[id_in_pack].ux_m.z = v[2];
+    buf->parts_send_f[id_in_pack].ux_m.w = part_get_mass(p);
+    buf->parts_send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.x = part_get_f_gradh(p);
+    buf->parts_send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.y = part_get_balsara(p);
+    buf->parts_send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.z = part_get_time_bin(p);
 
-    buf->send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.w =
+    buf->parts_send_f[id_in_pack].f_bals_timebin_mintimebin_ngb.w =
         part_get_timestep_limiter_min_ngb_time_bin(p);
-    buf->send_f[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
-    buf->send_f[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
-    buf->send_f[id_in_pack].rho_p_c_vsigi.z = part_get_soundspeed(p);
-    buf->send_f[id_in_pack].rho_p_c_vsigi.w = part_get_v_sig(p);
-    buf->send_f[id_in_pack].u_alphavisc_alphadiff.x = part_get_u(p);
-    buf->send_f[id_in_pack].u_alphavisc_alphadiff.y = part_get_alpha_av(p);
-    buf->send_f[id_in_pack].u_alphavisc_alphadiff.z = part_get_alpha_diff(p);
+    buf->parts_send_f[id_in_pack].rho_p_c_vsigi.x = part_get_rho(p);
+    buf->parts_send_f[id_in_pack].rho_p_c_vsigi.y = part_get_pressure(p);
+    buf->parts_send_f[id_in_pack].rho_p_c_vsigi.z = part_get_soundspeed(p);
+    buf->parts_send_f[id_in_pack].rho_p_c_vsigi.w = part_get_v_sig(p);
+    buf->parts_send_f[id_in_pack].u_alphavisc_alphadiff.x = part_get_u(p);
+    buf->parts_send_f[id_in_pack].u_alphavisc_alphadiff.y = part_get_alpha_av(p);
+    buf->parts_send_f[id_in_pack].u_alphavisc_alphadiff.z = part_get_alpha_diff(p);
   }
 }
 
 void unpack_neat_aos_f4(struct cell *c,
                         struct part_aos_f4_recv_d *parts_aos_buffer, int tid,
-                        int local_pack_position, int count, struct engine *e) {
+                        int local_pack_position, int count, const struct engine *e) {
 
   struct part_aos_f4_recv_d *parts_tmp = &parts_aos_buffer[local_pack_position];
   for (int i = 0; i < count; i++) {
@@ -170,7 +170,7 @@ void unpack_neat_aos_f4(struct cell *c,
 void unpack_neat_aos_f4_g(struct cell *c,
                           struct part_aos_f4_recv_g *parts_aos_buffer, int tid,
                           int local_pack_position, int count,
-                          struct engine *e) {
+                          const struct engine *e) {
 
   struct part_aos_f4_recv_g *parts_tmp = &parts_aos_buffer[local_pack_position];
   for (int i = 0; i < count; i++) {
@@ -188,7 +188,7 @@ void unpack_neat_aos_f4_g(struct cell *c,
 void unpack_neat_aos_f4_f(struct cell *restrict c,
                           struct part_aos_f4_recv_f *restrict parts_aos_buffer,
                           int tid, int local_pack_position, int count,
-                          struct engine *e) {
+                          const struct engine *e) {
   /* int pp = local_pack_position; */
   struct part_aos_f4_recv_f *parts_tmp = &parts_aos_buffer[local_pack_position];
   for (int i = 0; i < count; i++) {
@@ -216,7 +216,7 @@ void unpack_neat_aos_f4_f(struct cell *restrict c,
 void unpack_neat_pair_aos_f4(struct runner *r, struct cell *c,
                              struct part_aos_f4_recv_d *parts_aos_buffer, int tid,
                              int local_pack_position, int count,
-                             struct engine *e) {
+                             const struct engine *e) {
 
   struct part_aos_f4_recv_d *parts_tmp = &parts_aos_buffer[local_pack_position];
   if (cell_is_active_hydro(c, e)) {
@@ -254,7 +254,7 @@ void unpack_neat_pair_aos_f4(struct runner *r, struct cell *c,
 void unpack_neat_pair_aos_f4_g(
     struct runner *r, struct cell *restrict c,
     struct part_aos_f4_recv_g *restrict parts_aos_buffer, int tid,
-    int local_pack_position, int count, struct engine *e) {
+    int local_pack_position, int count, const struct engine *e) {
 
   if (cell_is_active_hydro(c, e)) {
 
@@ -281,7 +281,7 @@ void unpack_neat_pair_aos_f4_g(
 void unpack_neat_pair_aos_f4_f(
     struct runner *r, struct cell *restrict c,
     struct part_aos_f4_recv_f *restrict parts_aos_buffer, int tid,
-    int local_pack_position, int count, struct engine *e) {
+    int local_pack_position, int count, const struct engine *e) {
 
   struct part_aos_f4_recv_f *restrict parts_tmp =
       &parts_aos_buffer[local_pack_position];
@@ -328,7 +328,7 @@ void unpack_neat_pair_aos_f4_f(
 }
 
 
-extern inline void pack_neat_pair_aos_f4(
+void pack_neat_pair_aos_f4(
     struct cell *c, struct part_aos_f4_send_d *parts_aos_buffer, int tid,
     const int local_pack_position, const int count, const double3 shift,
     const int2 cstarts) {
@@ -351,7 +351,7 @@ extern inline void pack_neat_pair_aos_f4(
   }
 }
 
-extern inline void pack_neat_pair_aos_f4_g(
+void pack_neat_pair_aos_f4_g(
     struct cell *__restrict c,
     struct part_aos_f4_send_g *__restrict parts_aos_buffer, int tid,
     const int local_pack_position, const int count, const float3 shift,
@@ -382,7 +382,7 @@ extern inline void pack_neat_pair_aos_f4_g(
   }
 }
 
-extern inline void pack_neat_pair_aos_f4_f(
+void pack_neat_pair_aos_f4_f(
     struct cell *__restrict c, struct part_aos_f4_send_f *__restrict parts_aos,
     int tid, const int local_pack_position, const int count, const float3 shift,
     const int2 cstarts) {
@@ -431,9 +431,9 @@ extern inline void pack_neat_pair_aos_f4_f(
 void runner_doself1_gpu_unpack_neat_aos_f4(
     struct runner *r, struct cell *c,
     struct part_aos_f4_recv_d *parts_aos_buffer,
-    int timer, size_t *pack_length, int tid, int
-    count_max_parts_tmp,
-    struct engine *e) {
+    int timer, size_t *pack_length, int tid, int count_max_parts_tmp,
+    const struct engine *e
+    ) {
   TIMER_TIC;
 
   /* Anything to do here? */
@@ -464,7 +464,7 @@ void runner_doself1_gpu_unpack_neat_aos_f4_g(
     struct runner *r, struct cell *c,
     struct part_aos_f4_recv_g *parts_aos_buffer,
     int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, struct engine *e) {
+    int tid, int count_max_parts_tmp, const struct engine *e) {
   TIMER_TIC;
 
   /* Anything to do here? */
@@ -495,7 +495,7 @@ void runner_doself1_gpu_unpack_neat_aos_f4_f(
     struct runner *r, struct cell *c,
     struct part_aos_f4_recv_f *parts_aos_buffer,
     int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, struct engine *e) {
+    int tid, int count_max_parts_tmp, const struct engine *e) {
   TIMER_TIC;
 
   /* Anything to do here? */
@@ -525,11 +525,8 @@ void runner_doself1_gpu_unpack_neat_aos_f4_f(
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
     struct runner *r, struct cell *ci, struct cell *cj,
     struct part_aos_f4_recv_d *parts_aos_buffer, int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, struct engine *e) {
+    int tid, int count_max_parts_tmp, const struct engine *e) {
 
-  /* Anything to do here? */
-  //    if (ci->hydro.count == 0 || cj->hydro.count == 0)
-  //      return;
   if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) {
     message("Inactive cell");
     return;
@@ -560,11 +557,10 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
     struct runner *r, struct cell *ci, struct cell *cj,
     struct part_aos_f4_recv_g *parts_aos_buffer, int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, struct engine *e) {
+    int tid, int count_max_parts_tmp, const struct engine *e) {
 
   /* Anything to do here? */
   if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) {
-    message("Inactive cell");
     return;
   }
   int count_ci = ci->hydro.count;
@@ -594,11 +590,8 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
     struct runner *r, struct cell *ci, struct cell *cj,
     struct part_aos_f4_recv_f *parts_aos_buffer, int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, struct engine *e) {
+    int tid, int count_max_parts_tmp, const struct engine *e) {
 
-  /* Anything to do here? */
-  //  if (c->hydro.count == 0)
-  //    return;
   if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) {
     message("Inactive cell");
     return;

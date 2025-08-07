@@ -32,30 +32,30 @@ struct gpu_offload_data{
 
   /*! TODO: Documentation?? */
   union {
-    struct part_aos_f4_send_d *d_send_d;
-    struct part_aos_f4_send_g *d_send_g;
-    struct part_aos_f4_send_f *d_send_f;
+    struct part_aos_f4_send_d *d_parts_send_d;
+    struct part_aos_f4_send_g *d_parts_send_g;
+    struct part_aos_f4_send_f *d_parts_send_f;
   };
 
   /*! TODO: Documentation?? */
   union {
-    struct part_aos_f4_recv_d *d_recv_d;
-    struct part_aos_f4_recv_g *d_recv_g;
-    struct part_aos_f4_recv_f *d_recv_f;
+    struct part_aos_f4_recv_d *d_parts_recv_d;
+    struct part_aos_f4_recv_g *d_parts_recv_g;
+    struct part_aos_f4_recv_f *d_parts_recv_f;
   };
 
   /*! TODO: Documentation?? */
   union {
-    struct part_aos_f4_send_d *send_d;
-    struct part_aos_f4_send_g *send_g;
-    struct part_aos_f4_send_f *send_f;
+    struct part_aos_f4_send_d *parts_send_d;
+    struct part_aos_f4_send_g *parts_send_g;
+    struct part_aos_f4_send_f *parts_send_f;
   };
 
   /*! TODO: Documentation?? */
   union {
-    struct part_aos_f4_recv_d *recv_d;
-    struct part_aos_f4_recv_g *recv_g;
-    struct part_aos_f4_recv_f *recv_f;
+    struct part_aos_f4_recv_d *parts_recv_d;
+    struct part_aos_f4_recv_g *parts_recv_g;
+    struct part_aos_f4_recv_f *parts_recv_f;
   };
 
   /*! TODO: Documentation */

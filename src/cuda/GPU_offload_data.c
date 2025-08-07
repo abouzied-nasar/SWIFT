@@ -105,17 +105,17 @@ void gpu_init_data_buffers(
   }
 
   /* Now allocate memory for Buffer and GPU particle arrays */
-  cu_error = cudaMalloc((void **)&buf->d_send_d, self_pair_fact * count_max_parts* send_struct_size);
+  cu_error = cudaMalloc((void **)&buf->d_parts_send_d, self_pair_fact * count_max_parts* send_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaMalloc((void **)&buf->d_recv_d, self_pair_fact * count_max_parts * recv_struct_size);
+  cu_error = cudaMalloc((void **)&buf->d_parts_recv_d, self_pair_fact * count_max_parts * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaMallocHost((void **)&buf->send_d,
+  cu_error = cudaMallocHost((void **)&buf->parts_send_d,
                  self_pair_fact * count_max_parts * send_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaMallocHost((void **)&buf->recv_d,
+  cu_error = cudaMallocHost((void **)&buf->parts_recv_d,
                  self_pair_fact * count_max_parts * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
 

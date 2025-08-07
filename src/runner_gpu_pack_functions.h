@@ -32,32 +32,32 @@ void runner_doself1_gpu_unpack_neat_aos_f4(
     struct runner *r, struct cell *c,
     struct part_aos_f4_recv_d *parts_aos_buffer, int timer, size_t *pack_length, int tid,
     int count_max_parts_tmp,
-    struct engine *e);
+    const struct engine *e);
 
 void runner_doself1_gpu_unpack_neat_aos_f4_g(
     struct runner *r, struct cell *c,
     struct part_aos_f4_recv_g *parts_aos_buffer, int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, struct engine *e);
+    int tid, int count_max_parts_tmp, const struct engine *e);
 
 void runner_doself1_gpu_unpack_neat_aos_f4_f(
     struct runner *r, struct cell *restrict c,
     struct part_aos_f4_recv_f *restrict parts_aos_buffer, int timer,
-    size_t *pack_length, int tid, int count_max_parts_tmp, struct engine *e);
+    size_t *pack_length, int tid, int count_max_parts_tmp, const struct engine *e);
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
     struct runner *r, struct cell *ci, struct cell *cj,
     struct part_aos_f4_recv_d *parts_aos_buffer, int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, struct engine *e);
+    int tid, int count_max_parts_tmp, const struct engine *e);
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
     struct runner *r, struct cell *ci, struct cell *cj,
     struct part_aos_f4_recv_g *parts_aos_buffer, int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, struct engine *e);
+    int tid, int count_max_parts_tmp, const struct engine *e);
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
     struct runner *r, struct cell *ci, struct cell *cj,
     struct part_aos_f4_recv_f *parts_aos_buffer, int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, struct engine *e);
+    int tid, int count_max_parts_tmp, const struct engine *e);
 
 void runner_do_ci_cj_gpu_pack_neat_aos_f4(
     struct runner *r, struct cell *restrict ci, struct cell *restrict cj,

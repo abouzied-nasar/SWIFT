@@ -474,96 +474,103 @@ double runner_dopair1_pack_f4_ff(struct runner *r, struct scheduler *s,
 
 
 void runner_doself_gpu_launch_density(
-    struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
-    struct cell *ci, struct task *t, struct part_aos_f4_send_d *parts_send,
-    struct part_aos_f4_recv_d *parts_recv, struct part_aos_f4_send_d *d_parts_send,
-    struct part_aos_f4_recv_d *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, int devId, int2 *task_first_part_f4,
-    int2 *d_task_first_part_f4, cudaEvent_t *self_end) {
+    struct runner *r,
+    struct scheduler *s,
+    struct gpu_offload_data *buf,
+    const struct cell *ci,
+    struct task *t,
+    cudaStream_t *stream,
+    const float d_a,
+    const float d_H
+    ) {
+
+  const struct engine* e = r->e;
+
+  /* Grab pack_vars */
+  struct gpu_pack_vars *pack_vars = &buf->pv;
 
   /* Identify the number of GPU bundles to run in ideal case */
-  int n_bundles_temp = pack_vars->n_bundles;
+  size_t n_bundles = pack_vars->n_bundles;
 
   /*How many tasks have we packed?*/
-  const int tasks_packed = pack_vars->tasks_packed;
+  const size_t tasks_packed = pack_vars->tasks_packed;
 
   /*How many tasks should be in a bundle?*/
-  const int bundle_size = pack_vars->bundle_size;
+  const size_t bundle_size = pack_vars->bundle_size;
 
   /* Special case for incomplete bundles (when having leftover tasks not enough
    * to fill a bundle) */
   if (pack_vars->launch_leftovers) {
-    n_bundles_temp = (tasks_packed + bundle_size - 1) / bundle_size;
+    n_bundles = (tasks_packed + bundle_size - 1) / bundle_size;
     if (tasks_packed == 0)
       error("zero tasks packed but somehow got into GPU loop");
-    pack_vars->bundle_first_part[n_bundles_temp] =
-        task_first_part_f4[tasks_packed - 1].x;
+    pack_vars->bundle_first_part[n_bundles] = buf->task_first_part_f4[tasks_packed - 1].x;
   }
 
   /* Identify the last particle for each bundle of tasks */
-  for (int bid = 0; bid < n_bundles_temp - 1; bid++) {
+  for (size_t bid = 0; bid < n_bundles - 1; bid++) {
     pack_vars->bundle_last_part[bid] = pack_vars->bundle_first_part[bid + 1];
   }
 
   /* special treatment for the last bundle */
-  if (n_bundles_temp > 1)
-    pack_vars->bundle_last_part[n_bundles_temp - 1] = pack_vars->count_parts;
+  if (n_bundles > 1)
+    pack_vars->bundle_last_part[n_bundles - 1] = pack_vars->count_parts;
   else
     pack_vars->bundle_last_part[0] = pack_vars->count_parts;
 
   /* Launch the copies for each bundle and run the GPU kernel */
   /* We don't go into this loop if tasks_left_self == 1 as
-   n_bundles_temp will be zero DUHDUHDUHDUHHHHHH!!!!!*/
-  int max_parts;
-  for (int bid = 0; bid < n_bundles_temp; bid++) {
+   n_bundles will be zero DUHDUHDUHDUHHHHHH!!!!!*/
+  size_t max_parts;
+  for (size_t bid = 0; bid < n_bundles; bid++) {
 
     max_parts = 0;
-    const int first_task = bid * bundle_size;
-    int last_task = (bid + 1) * bundle_size;
-    for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
+    const size_t first_task = bid * bundle_size;
+    size_t last_task = (bid + 1) * bundle_size;
+    for (size_t tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
       if (tid < tasks_packed) {
         /* Get an estimate for the max number of parts per cell in the bundle.
          * Used for determining the number of GPU CUDA blocks*/
-        int count = task_first_part_f4[tid].y - task_first_part_f4[tid].x;
+        size_t count = buf->task_first_part_f4[tid].y - buf->task_first_part_f4[tid].x;
         max_parts = max(max_parts, count);
         last_task = tid;
       }
     }
 
-    const int first_part_tmp = pack_vars->bundle_first_part[bid];
-    const int bundle_n_parts =
-        pack_vars->bundle_last_part[bid] - first_part_tmp;
-    cudaMemcpyAsync(&d_task_first_part_f4[first_task],
-                    &task_first_part_f4[first_task],
+    const size_t first_part_tmp = pack_vars->bundle_first_part[bid];
+    const size_t bundle_n_parts = pack_vars->bundle_last_part[bid] - first_part_tmp;
+    cudaMemcpyAsync(&buf->d_task_first_part_f4[first_task],
+                    &buf->task_first_part_f4[first_task],
                     (last_task + 1 - first_task) * sizeof(int2),
                     cudaMemcpyHostToDevice, stream[bid]);
-    cudaMemcpyAsync(&d_parts_send[first_part_tmp], &parts_send[first_part_tmp],
+    cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp], &buf->parts_send_d[first_part_tmp],
                     bundle_n_parts * sizeof(struct part_aos_f4_send_d),
                     cudaMemcpyHostToDevice, stream[bid]);
 
-    const int tasksperbundle = pack_vars->tasksperbundle;
-    int tasks_left = tasksperbundle;
-    if (bid == n_bundles_temp - 1) {
-      tasks_left = tasks_packed - (n_bundles_temp - 1) * tasksperbundle;
+    const size_t tasksperbundle = pack_vars->tasksperbundle;
+    size_t tasks_left = tasksperbundle;
+    if (bid == n_bundles - 1) {
+      tasks_left = tasks_packed - (n_bundles - 1) * tasksperbundle;
     }
 
     /* Will launch a 2d grid of GPU thread blocks (number of tasks is
        the y dimension and max_parts is the x dimension */
-    int numBlocks_y = tasks_left;
-    int numBlocks_x = (max_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
-    int bundle_first_task = pack_vars->bundle_first_task_list[bid];
+    size_t numBlocks_y = tasks_left;
+    size_t numBlocks_x = (max_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    size_t bundle_first_task = pack_vars->bundle_first_task_list[bid];
 
     /* Launch the kernel */
-    launch_density_aos_f4(d_parts_send, d_parts_recv, d_a, d_H, stream[bid],
+    launch_density_aos_f4(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H, stream[bid],
                           numBlocks_x, numBlocks_y, bundle_first_task,
-                          d_task_first_part_f4);
+                          buf->d_task_first_part_f4);
 
-    cudaMemcpyAsync(&parts_recv[first_part_tmp], &d_parts_recv[first_part_tmp],
+    cudaMemcpyAsync(&buf->parts_recv_d[first_part_tmp], &buf->d_parts_recv_d[first_part_tmp],
                     bundle_n_parts * sizeof(struct part_aos_f4_recv_d),
                     cudaMemcpyDeviceToHost, stream[bid]);
-    cudaEventRecord(self_end[bid], stream[bid]);
+    cudaEventRecord(buf->event_end[bid], stream[bid]);
 
   } /*End of looping over bundles to launch in streams*/
+
   /* Make sure all the kernels and copies back are finished */
   /* cudaDeviceSynchronize(); */
 
@@ -571,11 +578,11 @@ void runner_doself_gpu_launch_density(
   /* Pack length counter for use in unpacking */
   size_t pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0.;
-  for (int bid = 0; bid < n_bundles_temp; bid++) {
+  for (size_t bid = 0; bid < n_bundles; bid++) {
 
-    cudaEventSynchronize(self_end[bid]);
+    cudaEventSynchronize(buf->event_end[bid]);
 
-    for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
+    for (size_t tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
 
       if (tid < tasks_packed) {
         struct cell *cii = pack_vars->ci_list[tid];
@@ -587,7 +594,7 @@ void runner_doself_gpu_launch_density(
 
         const ticks tic = getticks();
         /* Do the copy */
-        runner_doself1_gpu_unpack_neat_aos_f4(r, cii, parts_recv, 0,
+        runner_doself1_gpu_unpack_neat_aos_f4(r, cii, buf->parts_recv_d, 0,
                                               &pack_length_unpack, tid,
                                               pack_vars->count_max_parts, e);
         const ticks toc = getticks();
@@ -619,7 +626,6 @@ void runner_doself_gpu_launch_density(
   pack_vars->tasks_packed = 0;
 
   t->total_cpu_unpack_ticks += total_cpu_unpack_ticks;
-
 }
 
 void runner_doself_gpu_launch_gradient(
