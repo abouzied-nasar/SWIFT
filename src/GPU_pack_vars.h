@@ -137,6 +137,10 @@ struct gpu_pack_vars {
   /*! TODO: documentation */
   size_t n_bundles;
 
+  /*! number of bundles to use for unpacking. May differ from n_bundles if
+   * we're launching leftovers. */
+  size_t n_bundles_unpack;
+
   /*! TODO: documentation */
   size_t tasksperbundle;
 

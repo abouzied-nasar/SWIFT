@@ -473,7 +473,7 @@ double runner_dopair1_pack_f4_ff(struct runner *r, struct scheduler *s,
 };
 
 
-void runner_doself_gpu_launch_density(
+void runner_doself_gpu_launch(
     struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data *buf,
@@ -483,8 +483,6 @@ void runner_doself_gpu_launch_density(
     const float d_a,
     const float d_H
     ) {
-
-  const struct engine* e = r->e;
 
   /* Grab pack_vars */
   struct gpu_pack_vars *pack_vars = &buf->pv;
@@ -506,6 +504,7 @@ void runner_doself_gpu_launch_density(
       error("zero tasks packed but somehow got into GPU loop");
     pack_vars->bundle_first_part[n_bundles] = buf->task_first_part_f4[tasks_packed - 1].x;
   }
+  pack_vars->n_bundles_unpack = n_bundles;
 
   /* Identify the last particle for each bundle of tasks */
   for (size_t bid = 0; bid < n_bundles - 1; bid++) {
@@ -573,8 +572,35 @@ void runner_doself_gpu_launch_density(
 
   /* Make sure all the kernels and copies back are finished */
   /* cudaDeviceSynchronize(); */
+}
 
-  /* Now copy the data back from the CPU thread-local buffers to the cells */
+
+void runner_doself_gpu_unpack(
+    struct runner *r,
+    struct scheduler *s,
+    struct gpu_offload_data *buf,
+    const struct cell *ci,
+    struct task *t,
+    cudaStream_t *stream,
+    const float d_a,
+    const float d_H
+    ) {
+
+  const struct engine* e = r->e;
+
+  /* Grab pack_vars */
+  struct gpu_pack_vars *pack_vars = &buf->pv;
+
+  /* Identify the number of GPU bundles to run in ideal case */
+  size_t n_bundles = pack_vars->n_bundles_unpack;
+
+  /*How many tasks have we packed?*/
+  const size_t tasks_packed = pack_vars->tasks_packed;
+
+  /*How many tasks should be in a bundle?*/
+  const size_t bundle_size = pack_vars->bundle_size;
+
+  /* Copy the data back from the CPU thread-local buffers to the cells */
   /* Pack length counter for use in unpacking */
   size_t pack_length_unpack = 0;
   ticks total_cpu_unpack_ticks = 0.;
@@ -627,6 +653,25 @@ void runner_doself_gpu_launch_density(
 
   t->total_cpu_unpack_ticks += total_cpu_unpack_ticks;
 }
+
+
+void runner_doself_gpu_launch_density(
+    struct runner *r,
+    struct scheduler *s,
+    struct gpu_offload_data *buf,
+    const struct cell *ci,
+    struct task *t,
+    cudaStream_t *stream,
+    const float d_a,
+    const float d_H
+    ) {
+
+  runner_doself_gpu_launch(r, s, buf, ci, t, stream, d_a, d_H);
+  runner_doself_gpu_unpack(r, s, buf, ci, t, stream, d_a, d_H);
+
+}
+
+
 
 void runner_doself_gpu_launch_gradient(
     struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
