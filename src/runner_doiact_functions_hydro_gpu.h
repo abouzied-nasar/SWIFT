@@ -686,7 +686,7 @@ void runner_doself_gpu_unpack(
           runner_doself1_gpu_unpack_neat_aos_f4(r, cii, buf->parts_recv_d, 0,
                                               &pack_length_unpack, tid,
                                               pack_vars->count_max_parts, e);
-        } else if (task_subtype == task_subtype_gpu_pack_d){
+        } else if (task_subtype == task_subtype_gpu_pack_g){
           runner_doself1_gpu_unpack_neat_aos_f4_g(r, cii, buf->parts_recv_g, 0,
                                                 &pack_length_unpack, tid,
                                                 pack_vars->count_max_parts, e);
