@@ -172,8 +172,6 @@ void *runner_main_cuda(void *data) {
   /* Initialise cuda context for this thread. */
   gpu_init_thread(e, r->cpuid);
 
-  const int cuda_dev_id = engine_rank; // TODO(mivkov): move this to gpu_offload_data
-
   /* Get estimates for array sizes et al. */
   struct gpu_global_pack_params gpu_pack_params;
   gpu_get_pack_params(&gpu_pack_params, sched, e->s->eta_neighbours);
@@ -334,7 +332,7 @@ void *runner_main_cuda(void *data) {
 /* TODO MLADEN: REMOVE */
 /* message("LAUNCHING DENSITY SELF"); */
 /* fflush(stdout); */
-              runner_doself_gpu_launch_density(r, sched, &gpu_buf_self_dens, ci, t, stream, d_a, d_H, cuda_dev_id);
+              runner_doself_gpu_launch_density(r, sched, &gpu_buf_self_dens, ci, t, stream, d_a, d_H);
 
 /* TODO MLADEN: REMOVE */
 /* message("DONE DENSITY SELF"); */
