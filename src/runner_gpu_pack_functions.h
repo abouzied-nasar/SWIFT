@@ -17,27 +17,38 @@
 #include "hip/GPU_part_structs.h"
 #endif
 
-void gpu_pack_self_density(
-    struct cell* restrict c,
+void gpu_pack_self_density_cell(
+    const struct cell* restrict c,
     struct gpu_offload_data *buf);
-void gpu_pack_self_gradient(
-    struct cell* restrict c,
+void gpu_pack_self_gradient_cell(
+    const struct cell* restrict c,
     struct gpu_offload_data *buf);
-void gpu_pack_self_force(
-    struct cell* restrict c,
+void gpu_pack_self_force_cell(
+    const struct cell* restrict c,
     struct gpu_offload_data *buf);
-void gpu_unpack_self_density(struct cell* restrict c,
-    struct part_aos_f4_recv_d* restrict parts_aos_buffer,
-    int tid, size_t pack_position,
-    size_t count, const struct engine *e);
-void gpu_unpack_self_gradient(struct cell* restrict c,
-    struct part_aos_f4_recv_g* restrict parts_aos_buffer,
-    int tid, size_t pack_position,
-    size_t count, const struct engine *e);
-void gpu_unpack_self_force(struct cell* restrict c,
-    struct part_aos_f4_recv_f* restrict parts_aos_buffer,
-    int tid, size_t pack_position,
-    size_t count, const struct engine *e);
+void gpu_unpack_self_density_cell(struct cell* restrict c,
+    const struct part_aos_f4_recv_d* restrict parts_aos_buffer,
+    const int tid, const size_t pack_position,
+    const size_t count, const struct engine *e);
+void gpu_unpack_self_gradient_cell(struct cell* restrict c,
+    const struct part_aos_f4_recv_g* restrict parts_aos_buffer,
+    const int tid, const size_t pack_position,
+    const size_t count, const struct engine *e);
+void gpu_unpack_self_force_cell(struct cell* restrict c,
+    const struct part_aos_f4_recv_f* restrict parts_aos_buffer,
+    const int tid, const size_t pack_position,
+    const size_t count, const struct engine *e);
+
+void gpu_pack_pair_density_cell(
+    const struct cell *c, struct part_aos_f4_send_d *parts_aos_buffer,
+    const int tid, const int local_pack_position,
+    const int count, const double3 shift, const int2 cstarts);
+void gpu_pack_pair_density(struct gpu_offload_data* buf,
+    const struct runner *r, const struct cell *ci, const struct cell *cj,
+    const double3 shift_tmp, const int tid);
+
+
+
 /* ------------------------------------------ */
 void runner_doself1_gpu_unpack_neat_aos_f4(
     const struct runner *r, struct cell *c,

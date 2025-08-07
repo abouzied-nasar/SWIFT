@@ -158,6 +158,15 @@ const char* timers_names[timer_count] = {
     "gpu_self_launch_density",
     "gpu_self_launch_gradient",
     "gpu_self_launch_force",
+    "gpu_pair_pack_density",
+    "gpu_pair_pack_gradient",
+    "gpu_pair_pack_force",
+    "gpu_pair_unpack_density",
+    "gpu_pair_unpack_gradient",
+    "gpu_pair_unpack_force",
+    "gpu_pair_launch_density",
+    "gpu_pair_launch_gradient",
+    "gpu_pair_launch_force",
     "gpu_pair_recurse",
 };
 
