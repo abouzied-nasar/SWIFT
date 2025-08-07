@@ -178,7 +178,9 @@ void *runner_main_cuda(void *data) {
 
   /* Initialise cuda context for this thread. */
   gpu_init_thread(e, r->cpuid);
-
+  int n_devices = 0;
+  cudaGetDeviceCount(&n_devices);
+  message("In runner_main device count is %i", n_devices);
   //////////Declare and allocate GPU launch control data structures/////////
   /*pack_vars contain data required for self and pair packing tasks destined
    *  for the GPU*/
