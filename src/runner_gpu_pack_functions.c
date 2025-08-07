@@ -548,7 +548,9 @@ void runner_do_ci_cj_gpu_unpack_neat_aos_f4_f(
 
 
 
-
+/**
+ * @brief packs up two cells for the pair density GPU task
+ */
 void gpu_pack_pair_density(struct gpu_offload_data* buf,
     const struct runner *r, const struct cell *ci, const struct cell *cj,
     const double3 shift_tmp, const int tid) {

@@ -862,18 +862,18 @@ void runner_doself_gpu_force(
 }
 
 
-
-void runner_dopair_launch_d(
-    struct runner *r, struct scheduler *s,
+/**
+ * Generic function to launch GPU pair tasks
+ */
+void runner_dopair_gpu_launch(
+    const struct runner *r, const struct scheduler *s,
     struct gpu_offload_data* restrict buf,
-    struct task *t,
-    cudaStream_t *stream, float d_a,
-    float d_H) {
+    cudaStream_t *stream, const float d_a,
+    const float d_H,
+    const enum task_subtypes task_subtype) {
 
   /* Grab handles */
   struct gpu_pack_vars* pack_vars = &buf->pv;
-  struct part_aos_f4_send_d *parts_send = buf->parts_send_d;
-  struct part_aos_f4_recv_d *parts_recv = buf->parts_recv_d;
   struct part_aos_f4_send_d *d_parts_send = buf->d_parts_send_d;
   struct part_aos_f4_recv_d *d_parts_recv = buf->d_parts_recv_d;
   int4* fparti_fpartj_lparti_lpartj_dens = buf->fparti_fpartj_lparti_lpartj;
@@ -881,7 +881,8 @@ void runner_dopair_launch_d(
 
   /* Identify the number of GPU bundles to run in ideal case*/
   size_t n_bundles = pack_vars->n_bundles;
-  /*How many tasks have we packed?*/
+
+  /* How many tasks have we packed? */
   const size_t tasks_packed = pack_vars->tasks_packed;
 
   /*How many tasks should be in a bundle?*/
@@ -927,60 +928,77 @@ void runner_dopair_launch_d(
     const size_t bundle_n_parts =
         pack_vars->bundle_last_part[bid] - first_part_tmp_i;
 
-    cudaMemcpyAsync(&d_parts_send[first_part_tmp_i],
-                    &parts_send[first_part_tmp_i],
+    if (task_subtype == task_subtype_gpu_launch_d){
+
+      cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp_i],
+                    &buf->parts_send_d[first_part_tmp_i],
                     bundle_n_parts * sizeof(struct part_aos_f4_send_d),
                     cudaMemcpyHostToDevice, stream[bid]);
+    }
+    else {
+      error("Unknown task subtype %s", subtaskID_names[task_subtype]);
+    }
 
 #ifdef CUDA_DEBUG
     cudaError_t cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
-      error("CUDA error with pair density H2D async  memcpy ci: %s cpuid id is: %i"
+      error("CUDA error with task subtype %s H2D async memcpy ci: %s cpuid id is: %i"
             "Something's up with your cuda code first_part %lu bundle size %lu",
-            cudaGetErrorString(cu_error), r->cpuid, first_part_tmp_i, bundle_n_parts);
+            subtaskID_names[task_subtype], cudaGetErrorString(cu_error), r->cpuid, first_part_tmp_i, bundle_n_parts);
     }
 #endif
 
     /* LAUNCH THE GPU KERNELS for ci & cj */
-    // Setup 2d grid of GPU thread blocks for ci (number of tasks is
-    // the y dimension and max_parts is the x dimension
-    int numBlocks_y = 0;  // tasks_left; //Changed this to 1D grid of blocks so
-                          // this is no longer necessary
+    /* Setup 2d grid of GPU thread blocks for ci (number of tasks is
+     * the y dimension and max_parts is the x dimension */
+    int numBlocks_y = 0;  /* tasks_left; //Changed this to 1D grid of blocks so this is no longer necessary */
     int numBlocks_x = (bundle_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int bundle_part_0 = pack_vars->bundle_first_part[bid];
+
     /* Launch the kernel for ci using data for ci and cj */
-    runner_dopair_branch_density_gpu_aos_f4(
-        d_parts_send, d_parts_recv, d_a, d_H, stream[bid], numBlocks_x,
-        numBlocks_y, bundle_part_0, bundle_n_parts);
+    if (task_subtype == task_subtype_gpu_launch_d){
+      runner_dopair_branch_density_gpu_aos_f4(
+          d_parts_send, d_parts_recv, d_a, d_H, stream[bid], numBlocks_x,
+          numBlocks_y, bundle_part_0, bundle_n_parts);
+    }
+    else {
+      error("Unknown task subtype %s", subtaskID_names[task_subtype]);
+    }
 
 #ifdef CUDA_DEBUG
     cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
-      error("CUDA error with pair density kernel launch: %s cpuid id is: %i\n "
+      error("CUDA error with task subtype %s kernel launch: %s cpuid id is: %i\n "
             "nbx %i nby %i max_parts_i %i max_parts_j %i\n"
             "Something's up with kernel launch.",
-            cudaGetErrorString(cu_error), r->cpuid, numBlocks_x, numBlocks_y,
+            subtaskID_names[task_subtype], cudaGetErrorString(cu_error), r->cpuid, numBlocks_x, numBlocks_y,
             max_parts_i, max_parts_j);
     }
 #endif
 
-    // Copy results back to CPU BUFFERS
-    cudaMemcpyAsync(&parts_recv[first_part_tmp_i],
-                    &d_parts_recv[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_recv_d),
-                    cudaMemcpyDeviceToHost, stream[bid]);
-    // Issue event to be recorded by GPU after copy back to CPU
+    /* Copy results back to CPU BUFFERS */
+    if (task_subtype == task_subtype_gpu_launch_d){
+      cudaMemcpyAsync(&buf->parts_recv_d[first_part_tmp_i],
+                      &buf->d_parts_recv_d[first_part_tmp_i],
+                      bundle_n_parts * sizeof(struct part_aos_f4_recv_d),
+                      cudaMemcpyDeviceToHost, stream[bid]);
+    }
+    else {
+      error("Unknown task subtype %s", subtaskID_names[task_subtype]);
+    }
+
+    /* Issue event to be recorded by GPU after copy back to CPU */
     cudaEventRecord(pair_end[bid], stream[bid]);
 
 #ifdef CUDA_DEBUG
-    cu_error = cudaPeekAtLastError();  // cudaGetLastError();        //
-                                       // Get error code
+    cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
-      error("CUDA error with self density D2H memcpy: %s cpuid id is: %i\n"
-            "Something's up with your cuda code",
+      error("CUDA error with task subtype %s D2H memcpy: %s cpuid id is: %i\n"
+            "Something's up with your cuda code", subtaskID_names[task_subtype],
             cudaGetErrorString(cu_error), r->cpuid);
     }
 #endif
+
   } /*End of looping over bundles to launch in streams*/
 
   /* Issue synchronisation commands for all events recorded by GPU
@@ -989,6 +1007,26 @@ void runner_dopair_launch_d(
   for (size_t bid = 0; bid < n_bundles; bid++) {
     cudaEventSynchronize(pair_end[bid]);
   }
+}
+
+
+
+/**
+ * Wrapper to launch density pair tasks on the GPU.
+ */
+void runner_dopair_gpu_launch_density(
+    const struct runner *r,
+    const struct scheduler *s,
+    struct gpu_offload_data* restrict buf,
+    cudaStream_t *stream,
+    const float d_a,
+    const float d_H) {
+
+  TIMER_TIC;
+
+  runner_dopair_gpu_launch(r, s, buf, stream, d_a, d_H, task_subtype_gpu_launch_d);
+
+  TIMER_TOC(timer_dopair_gpu_launch_d);
 }
 
 
@@ -1141,7 +1179,7 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
       launched = 1;
 
       /* Here we only launch the tasks. No unpacking! This is done in next function ;) */
-      runner_dopair_launch_d(r, s, buf, t, stream, d_a, d_H);
+      runner_dopair_gpu_launch_density(r, s, buf, stream, d_a, d_H);
 
       runner_dopair_unpack_d(
             r, s, pack_vars, t, parts_send,
