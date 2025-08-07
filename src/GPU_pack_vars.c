@@ -109,8 +109,19 @@ void gpu_init_pack_vars(struct gpu_pack_vars* pv){
 }
 
 
+/**
+ * @brief perform the initialisations required at the start of each step
+ */
+void gpu_init_pack_vars_step(struct gpu_pack_vars* pv){
 
-
+  // Initialise packing counters
+  pv->tasks_packed = 0;
+  pv->count_parts = 0;
+  pv->top_tasks_packed = 0;
+  pv->n_daughters_total = 0;
+  pv->n_leaves_found = 0;
+  pv->n_leaves_total = 0;
+}
 
 #ifdef __cplusplus
 }

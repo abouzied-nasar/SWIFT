@@ -1,7 +1,7 @@
 /*******************************************************************************
  * This file is part of SWIFT.
  * Copyright (c) 2025 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
- *                    Mladen Ivkovic
+ *                    Mladen Ivkovic (mladen.ivkovic@durham.ac.uk)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -150,16 +150,21 @@ struct gpu_pack_vars {
   /*! TODO: documentation */
   size_t n_daughters_packed_index;
 
-  /*! TODO: documentation */
-  size_t n_leaves_found;
+  /*! Number of leaf cells which require interactions found during a recursive
+   * search */
+  int n_leaves_found;
 
   /*! TODO: documentation */
-  size_t n_leaves_total;
+  int n_leaves_total;
+
+  /*! Number of expected pair tasks. TODO: Needs to be done better. */
+  int n_expected_pair_tasks;
 };
 
 
 void gpu_init_pack_vars(struct gpu_pack_vars* pv);
 void gpu_get_pack_params(struct gpu_global_pack_params* pars, const struct scheduler* sched, const float eta_neighbours);
+void gpu_init_pack_vars_step(struct gpu_pack_vars* pv);
 
 #ifdef __cplusplus
 }

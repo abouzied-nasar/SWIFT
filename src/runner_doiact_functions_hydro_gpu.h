@@ -7,7 +7,7 @@ extern "C" {
 #include "error.h"
 /* #include "GPU_pack_vars.h" */
 #include "runner.h"
-#include "runner_doiact_hydro.h"
+/* #include "runner_doiact_hydro.h" */
 #include "runner_gpu_pack_functions.h"
 #include "scheduler.h"
 #include "space_getsid.h"
@@ -117,6 +117,9 @@ void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_
 }
 
 
+/**
+ * @brief packs the data required for the self density tasks.
+ */
 void runner_doself_gpu_pack_density(struct runner *r, struct scheduler *s, struct
     gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
@@ -137,6 +140,9 @@ void runner_doself_gpu_pack_density(struct runner *r, struct scheduler *s, struc
   TIMER_TOC(timer_doself_gpu_pack_d);
 }
 
+/**
+ * @brief packs the data required for the self gradient tasks.
+ */
 void runner_doself_gpu_pack_gradient(struct runner *r, struct scheduler *s, struct
     gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
@@ -157,6 +163,9 @@ void runner_doself_gpu_pack_gradient(struct runner *r, struct scheduler *s, stru
   TIMER_TOC(timer_doself_gpu_pack_g);
 }
 
+/**
+ * @brief packs the data required for the self force tasks.
+ */
 void runner_doself_gpu_pack_force(struct runner *r, struct scheduler *s, struct
     gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
@@ -179,59 +188,59 @@ void runner_doself_gpu_pack_force(struct runner *r, struct scheduler *s, struct
 
 
 
-void runner_recurse_gpu(struct runner *r, struct scheduler *s,
-                        struct gpu_pack_vars *restrict pack_vars,
+/**
+ * @brief recurse into a (sub-)pair task and identify all cell-cell interactions.
+ */
+void runner_dopair_gpu_recurse(const struct runner *r,
+                        const struct scheduler *s,
+                        struct gpu_offload_data* restrict buf,
                         struct cell *ci, struct cell *cj, struct task *t,
-                        struct engine *e, int4 *fparti_fpartj_lparti_lpartj, int *n_leafs_found,
-                        int depth, int n_expected_tasks, struct cell ** ci_d, struct cell ** cj_d, int n_daughters) {
+                        int depth){
+
 
   /* Should we even bother? A. Nasar: For GPU code we need to be clever about
    * this */
-  if (!CELL_IS_ACTIVE(ci, e) && !CELL_IS_ACTIVE(cj, e)) return;
+  const struct engine *e = r->e;
+  if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) return;
   if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
+
+  /* Grab some handles. */
+  /* packing data and metadata */
+  struct gpu_pack_vars *pack_vars = &buf->pv;
+
+  /* Arrays for daughter cells */
+  struct cell ** ci_d = buf->ci_d;
+  struct cell ** cj_d = buf->cj_d;
+
+  const size_t n_daughters = pack_vars->n_daughters_total;
 
   /* Get the type of pair and flip ci/cj if needed. */
   double shift[3];
   const int sid = space_getsid_and_swap_cells(e->s, &ci, &cj, shift);
 
   /* Recurse? */
-  if (cell_can_recurse_in_pair_hydro_task(ci) &&
-      cell_can_recurse_in_pair_hydro_task(cj)) {
+  if (cell_can_recurse_in_pair_hydro_task(ci) && cell_can_recurse_in_pair_hydro_task(cj)) {
+
     struct cell_split_pair *csp = &cell_split_pairs[sid];
+
     for (int k = 0; k < csp->count; k++) {
       const int pid = csp->pairs[k].pid;
       const int pjd = csp->pairs[k].pjd;
-      /*Do we want to do anything before we recurse?*/
-
-      /*We probably want to record */
       if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL) {
-        runner_recurse_gpu(r, s, pack_vars, ci->progeny[pid], cj->progeny[pjd],
-                           t, e, fparti_fpartj_lparti_lpartj,
-                           n_leafs_found, depth + 1, n_expected_tasks, ci_d, cj_d, n_daughters);
-        //	        message("recursing to depth %i", depth + 1);
+        runner_dopair_gpu_recurse(r, s, buf, ci->progeny[pid], cj->progeny[pjd],
+                           t, depth + 1);
       }
     }
-  } else if (CELL_IS_ACTIVE(ci, e) || CELL_IS_ACTIVE(cj, e)) {
+  } else if (cell_is_active_hydro(ci, e) || cell_is_active_hydro(cj, e)) {
     /* if any cell empty: skip */
     if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
-    int leafs_found = *n_leafs_found;
-    /*for all leafs to be sent add to cell list */
-    //	cells_left[leafs_found] = ci;
-    //	cells_right[leafs_found] = cj;
-    /*Add leaf cells to list for each top_level task*/
+    int leafs_found = pack_vars->n_leaves_found;
     ci_d[n_daughters + leafs_found] = ci;
     cj_d[n_daughters + leafs_found] = cj;
 
-//    error("stop");
-    (*n_leafs_found)++;  //= leafs_found + 1;
-    if (*n_leafs_found >= n_expected_tasks)
-      error("Created %i more than expected leaf cells. depth %i", *n_leafs_found, depth);
-    //	double dist = sqrt(pow(ci->loc[0] - cj->loc[0], 2) + pow(ci->loc[1] -
-    // cj->loc[1], 2)
-    //	        + pow(ci->loc[2] - cj->loc[2], 2));
-    //	if(dist > 0.5)
-    //	  error("Incorect dists %f shifts %f %f %f", dist, shift[0], shift[1],
-    // shift[2]);
+    pack_vars->n_leaves_found++;
+    if (pack_vars->n_leaves_found >= pack_vars->n_expected_pair_tasks)
+      error("Created %i more than expected leaf cells. depth %i", pack_vars->n_leaves_found, depth);
   }
 }
 
@@ -1006,15 +1015,25 @@ void runner_dopair_unpack_d(
 
 void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *s,
     struct cell * ci, struct cell * cj,
-    struct gpu_pack_vars *pack_vars, struct task *t,
-    struct part_aos_f4_send_d *parts_send,
-    struct part_aos_f4_recv_d *parts_recv,
-    struct part_aos_f4_send_d *d_parts_send,
-    struct part_aos_f4_recv_d *d_parts_recv,
-    cudaStream_t *stream, float d_a, float d_H,
-    struct engine *e, int4 *fparti_fpartj_lparti_lpartj_dens,
-    cudaEvent_t *pair_end, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters,
-    struct cell ** ci_top, struct cell ** cj_top){
+    struct gpu_offload_data* restrict buf,
+    struct task *t, cudaStream_t *stream, float d_a, float d_H
+    ){
+
+  struct engine* e = r->e;
+  int n_leaves_found = buf->pv.n_leaves_found;
+  struct part_aos_f4_send_d *parts_send = buf->parts_send_d;
+  struct part_aos_f4_recv_d *parts_recv = buf->parts_recv_d;
+  struct part_aos_f4_send_d *d_parts_send = buf->d_parts_send_d;
+  struct part_aos_f4_recv_d *d_parts_recv = buf->d_parts_recv_d;
+  int** f_l_daughters = buf->first_and_last_daughters;
+  int4* fparti_fpartj_lparti_lpartj_dens = buf->fparti_fpartj_lparti_lpartj;
+
+  struct cell ** ci_d = buf->ci_d;
+  struct cell ** cj_d = buf->cj_d;
+  struct cell ** ci_top = buf->ci_top;
+  struct cell ** cj_top = buf->cj_top;
+  cudaEvent_t *pair_end = buf->event_end;
+  struct gpu_pack_vars* pack_vars = &buf->pv;
 
   /* Everything from here on needs moving to runner_doiact_functions_hydro_gpu.h */
   pack_vars->n_daughters_total += n_leaves_found;

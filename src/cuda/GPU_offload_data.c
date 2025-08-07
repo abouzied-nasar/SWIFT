@@ -1,3 +1,22 @@
+/*******************************************************************************
+ * This file is part of SWIFT.
+ * Copyright (c) 2025 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
+ *                    Mladen Ivkovic (mladen.ivkovic@durham.ac.uk)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ ******************************************************************************/
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -54,6 +73,9 @@ void gpu_init_data_buffers(
   pv->target_n_tasks = target_n_tasks;
   pv->bundle_size = bundle_size;
   pv->n_bundles = n_bundles;
+
+  /* A. Nasar: Need to come up with a good estimate for this */
+  pv->n_expected_pair_tasks = 4096;
 
   cudaError_t cu_error = cudaErrorMemoryAllocation;
   cu_error=cudaMallocHost((void **)&pv->bundle_first_part, self_pair_fact * n_bundles * sizeof(int));
@@ -168,12 +190,8 @@ void gpu_init_data_buffers(
 void gpu_init_data_buffers_step(struct gpu_offload_data *buf){
 
   struct gpu_pack_vars* pv = &buf->pv;
+  gpu_init_pack_vars_step(pv);
 
-  // Initialise packing counters
-  pv->tasks_packed = 0;
-  pv->count_parts = 0;
-  pv->top_tasks_packed = 0; /* Needed only for pair tasks? */
-  pv->n_daughters_total = 0; /* Needed only for pair tasks? */
 }
 
 #ifdef __cplusplus

@@ -313,13 +313,8 @@ void *runner_main_cuda(void *data) {
             runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
 #endif
           } else if (t->subtype == task_subtype_gpu_pack_d) {
-            /* GPU WORK */
 #ifdef GPUOFFLOAD_DENSITY
-
-/* TODO MLADEN: REMOVE */
-/* message("PACKING DENSITY SELF"); */
-/* fflush(stdout); */
-
+            /* GPU Work */
             runner_doself_gpu_pack_density(r, sched, &gpu_buf_self_dens, ci, t);
             /* No pack tasks left in queue, flag that we want to run */
             char launch_leftovers = gpu_buf_self_dens.pv.launch_leftovers;
@@ -327,17 +322,8 @@ void *runner_main_cuda(void *data) {
             char launch = gpu_buf_self_dens.pv.launch;
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
-              /* Launch GPU tasks */
-
-/* TODO MLADEN: REMOVE */
-/* message("LAUNCHING DENSITY SELF"); */
-/* fflush(stdout); */
               runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream, d_a, d_H);
-
-/* TODO MLADEN: REMOVE */
-/* message("DONE DENSITY SELF"); */
-/* fflush(stdout); */
-            } /*End of GPU work Self*/
+            }
 #endif
           } /* self / pack */
           else if (t->subtype == task_subtype_gpu_pack_g) {
@@ -349,21 +335,11 @@ void *runner_main_cuda(void *data) {
             char launch = gpu_buf_self_grad.pv.launch;
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
-/* TODO MLADEN: REMOVE */
-/* message("LAUNCHING GRADIENT SELF"); */
-/* fflush(stdout); */
-              /* Launch GPU tasks */
               runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream, d_a, d_H);
-/* TODO MLADEN: REMOVE */
-/* message("DONE GRADIENT SELF"); */
-/* fflush(stdout); */
-            } /*End of GPU work Self*/
+            }
 #endif  // GPUGRADSELF
           } else if (t->subtype == task_subtype_gpu_pack_f) {
 #ifdef GPUOFFLOAD_FORCE
-/* TODO MLADEN: REMOVE */
-/* message("PACKING FORCE SELF"); */
-/* fflush(stdout); */
             runner_doself_gpu_pack_force(r, sched, &gpu_buf_self_forc, ci, t);
             /* No pack tasks left in queue, flag that we want to run */
             char launch_leftovers = gpu_buf_self_forc.pv.launch_leftovers;
@@ -371,15 +347,9 @@ void *runner_main_cuda(void *data) {
             char launch = gpu_buf_self_forc.pv.launch;
             /* Do we have enough stuff to run the GPU ? */
             if (launch || launch_leftovers) {
-/* TODO MLADEN: REMOVE */
-/* message("LAUNCHING FORCE SELF"); */
-/* fflush(stdout); */
               /*Launch GPU tasks*/
               runner_doself_gpu_force(r, sched, &gpu_buf_self_forc, t, stream, d_a, d_H);
-            } /*End of GPU work Self*/
-/* TODO MLADEN: REMOVE */
-/* message("DONE FORCE SELF"); */
-/* fflush(stdout); */
+            }
 #endif
           }
 #ifdef EXTRA_HYDRO_LOOP
@@ -476,31 +446,13 @@ void *runner_main_cuda(void *data) {
             /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
             * We are recursing separately to find out how much work we have before offloading*/
             //We need to allocate a list to put cell pointers into for each new task
-            int n_expected_tasks = 4096; //A. Nasar: Need to come up with a good estimate for this
-            int depth = 0;
-            gpu_buf_pair_dens.pv.n_daughters_packed_index = gpu_buf_pair_dens.pv.n_daughters_total;
-            int n_leaves_found = 0;
-/* TODO MLADEN: REMOVE */
-/* message("RUNNER_RECURSE DENSITY"); */
-/* fflush(stdout); */
-            runner_recurse_gpu(r, sched, &(gpu_buf_pair_dens.pv), ci, cj, t,
-                      e, gpu_buf_pair_dens.fparti_fpartj_lparti_lpartj, &n_leaves_found,
-                      depth, n_expected_tasks, gpu_buf_pair_dens.ci_d, gpu_buf_pair_dens.cj_d,
-                      gpu_buf_pair_dens.pv.n_daughters_total);
 
-/* TODO MLADEN: REMOVE */
-/* message("RUNNER_PACK_DAUGHTERS DENSITY"); */
-/* fflush(stdout); */
-            runner_gpu_pack_daughters_and_launch_d(r, sched, ci, cj, &(gpu_buf_pair_dens.pv),
-                  t, gpu_buf_pair_dens.parts_send_d, gpu_buf_pair_dens.parts_recv_d,
-                  gpu_buf_pair_dens.d_parts_send_d, gpu_buf_pair_dens.d_parts_recv_d,
-                  stream_pairs, d_a, d_H, e,
-                  gpu_buf_pair_dens.fparti_fpartj_lparti_lpartj, gpu_buf_pair_dens.event_end, n_leaves_found,
-                  gpu_buf_pair_dens.ci_d, gpu_buf_pair_dens.cj_d, gpu_buf_pair_dens.first_and_last_daughters, gpu_buf_pair_dens.ci_top,
-                  gpu_buf_pair_dens.cj_top);
-/* TODO MLADEN: REMOVE */
-/* message("RUNNER_PACK_DAUGHTERS DENSITY DONE"); */
-/* fflush(stdout); */
+            /* TODO: WHERE DO WE ACTUALLY USE THIS??? */
+            gpu_buf_pair_dens.pv.n_daughters_packed_index = gpu_buf_pair_dens.pv.n_daughters_total;
+            gpu_buf_pair_dens.pv.n_leaves_found = 0;
+
+            runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_dens, ci, cj, t, /*depth=*/0);
+            runner_gpu_pack_daughters_and_launch_d(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H);
 
 #endif  //RECURSE
 #endif  // GPUOFFLOAD_DENSITY
@@ -537,32 +489,19 @@ void *runner_main_cuda(void *data) {
               /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
               * We are recursing separately to find out how much work we have before offloading*/
               //We need to allocate a list to put cell pointers into for each new task
-              int n_expected_tasks = 4096; //A. Nasar: Need to come up with a good estimate for this
-              int depth = 0;
-              gpu_buf_pair_grad.pv.n_daughters_packed_index = gpu_buf_pair_grad.pv.n_daughters_total;
-              int n_leaves_found = 0;
-/* TODO MLADEN: REMOVE */
-/* message("RUNNER_RECURSE GRAD"); */
-/* fflush(stdout); */
-              runner_recurse_gpu(r, sched, &gpu_buf_pair_grad.pv, ci, cj, t,
-                        e, gpu_buf_pair_grad.fparti_fpartj_lparti_lpartj, &n_leaves_found,
-                        depth, n_expected_tasks, gpu_buf_pair_grad.ci_d, gpu_buf_pair_grad.cj_d,
-                        gpu_buf_pair_grad.pv.n_daughters_total);
+              gpu_buf_pair_grad.pv.n_daughters_packed_index = gpu_buf_pair_dens.pv.n_daughters_total;
+              gpu_buf_pair_grad.pv.n_leaves_found = 0;
 
-/* TODO MLADEN: REMOVE */
-/* message("RUNNER_PACK_DAUGHTERS GRAD"); */
-/* fflush(stdout); */
+              runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_grad, ci, cj, t, /*depth=*/0);
+
               runner_gpu_pack_daughters_and_launch_g(r, sched, ci, cj,
                   &gpu_buf_pair_grad.pv, t,
                   gpu_buf_pair_grad.parts_send_g, gpu_buf_pair_grad.parts_recv_g,
                   gpu_buf_pair_grad.d_parts_send_g, gpu_buf_pair_grad.d_parts_recv_g,
                     stream_pairs, d_a, d_H, e,
                     gpu_buf_pair_grad.fparti_fpartj_lparti_lpartj,
-                    gpu_buf_pair_grad.event_end, n_leaves_found, gpu_buf_pair_grad.ci_d, gpu_buf_pair_grad.cj_d,
+                    gpu_buf_pair_grad.event_end, gpu_buf_pair_grad.pv.n_leaves_found, gpu_buf_pair_grad.ci_d, gpu_buf_pair_grad.cj_d,
                     gpu_buf_pair_grad.first_and_last_daughters, gpu_buf_pair_grad.ci_top, gpu_buf_pair_grad.cj_top);
-/* TODO MLADEN: REMOVE */
-/* message("FINISHED PAIR GRAD"); */
-/* fflush(stdout); */
 #endif
 #endif  // GPUOFFLOAD_GRADIENT
           } else if (t->subtype == task_subtype_gpu_pack_f) {
@@ -598,31 +537,17 @@ void *runner_main_cuda(void *data) {
               /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
               * We are recursing separately to find out how much work we have before offloading*/
               //We need to allocate a list to put cell pointers into for each new task
-              int n_expected_tasks = 4096; //A. Nasar: Need to come up with a good estimate for this
-              int depth = 0;
               gpu_buf_pair_forc.pv.n_daughters_packed_index = gpu_buf_pair_forc.pv.n_daughters_total;
-              int n_leaves_found = 0;
+              gpu_buf_pair_forc.pv.n_leaves_found = 0;
 
-/* TODO MLADEN: REMOVE */
-/* message("RUNNER_RECURSE FORCE"); */
-/* fflush(stdout); */
-              runner_recurse_gpu(r, sched, &gpu_buf_pair_forc.pv, ci, cj, t,
-                        e, gpu_buf_pair_forc.fparti_fpartj_lparti_lpartj, &n_leaves_found,
-                        depth, n_expected_tasks, gpu_buf_pair_forc.ci_d, gpu_buf_pair_forc.cj_d,
-                        gpu_buf_pair_forc.pv.n_daughters_total);
+              runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_forc, ci, cj, t, /*depth=*/0);
 
-/* TODO MLADEN: REMOVE */
-/* message("RUNNER_PACK DAUGHTERS FORCE"); */
-/* fflush(stdout); */
               runner_gpu_pack_daughters_and_launch_f(r, sched, ci, cj, &gpu_buf_pair_forc.pv, t,
                     gpu_buf_pair_forc.parts_send_f, gpu_buf_pair_forc.parts_recv_f,
                     gpu_buf_pair_forc.d_parts_send_f, gpu_buf_pair_forc.d_parts_recv_f,
                     stream_pairs, d_a, d_H, e, gpu_buf_pair_forc.fparti_fpartj_lparti_lpartj,
-                    gpu_buf_pair_forc.event_end, n_leaves_found, gpu_buf_pair_forc.ci_d, gpu_buf_pair_forc.cj_d,
+                    gpu_buf_pair_forc.event_end, gpu_buf_pair_forc.pv.n_leaves_found, gpu_buf_pair_forc.ci_d, gpu_buf_pair_forc.cj_d,
                     gpu_buf_pair_forc.first_and_last_daughters, gpu_buf_pair_forc.ci_top, gpu_buf_pair_forc.cj_top);
-/* TODO MLADEN: REMOVE */
-/* message("RUNNER FINISHED PAIR FORCE"); */
-/* fflush(stdout); */
 #endif
 #endif  // GPUOFFLOAD_FORCE
           } else if (t->subtype == task_subtype_gpu_unpack_d) {
