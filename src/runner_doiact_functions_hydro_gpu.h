@@ -212,6 +212,12 @@ void runner_dopair_gpu_recurse(const struct runner *r,
   struct cell ** ci_d = buf->ci_d;
   struct cell ** cj_d = buf->cj_d;
 
+  if (depth==0){
+    /* while at the top level, reset counters. */
+    pack_vars->n_daughters_packed_index = pack_vars->n_daughters_total;
+    pack_vars->n_leaves_found = 0;
+  }
+
   const size_t n_daughters = pack_vars->n_daughters_total;
 
   /* Get the type of pair and flip ci/cj if needed. */
@@ -232,11 +238,14 @@ void runner_dopair_gpu_recurse(const struct runner *r,
       }
     }
   } else if (cell_is_active_hydro(ci, e) || cell_is_active_hydro(cj, e)) {
+
     /* if any cell empty: skip */
     if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
-    int leafs_found = pack_vars->n_leaves_found;
-    ci_d[n_daughters + leafs_found] = ci;
-    cj_d[n_daughters + leafs_found] = cj;
+
+    /*Add leaf cells to list for each top_level task*/
+    int leaves_found = pack_vars->n_leaves_found;
+    ci_d[n_daughters + leaves_found] = ci;
+    cj_d[n_daughters + leaves_found] = cj;
 
     pack_vars->n_leaves_found++;
     if (pack_vars->n_leaves_found >= pack_vars->n_expected_pair_tasks)
@@ -1352,13 +1361,24 @@ void runner_dopair1_unpack_f4_g(
   }
 }
 
-void runner_gpu_pack_daughters_and_launch_g(struct runner *r, struct scheduler *s, struct cell * ci, struct cell * cj, struct gpu_pack_vars *pack_vars,
-    struct task *t, struct part_aos_f4_send_g *parts_send,
-    struct part_aos_f4_recv_g *parts_recv, struct part_aos_f4_send_g *d_parts_send,
-    struct part_aos_f4_recv_g *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, struct engine *e, int4 *fparti_fpartj_lparti_lpartj_grad,
-    cudaEvent_t *pair_end, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
-    , struct cell ** ci_top, struct cell ** cj_top){
+void runner_gpu_pack_daughters_and_launch_g(
+    struct runner *r, struct scheduler *s,
+    struct cell * ci, struct cell * cj,
+    struct gpu_pack_vars *pack_vars,
+    struct task *t,
+    struct part_aos_f4_send_g *parts_send,
+    struct part_aos_f4_recv_g *parts_recv,
+    struct part_aos_f4_send_g *d_parts_send,
+    struct part_aos_f4_recv_g *d_parts_recv,
+    cudaStream_t *stream,
+    float d_a, float d_H,
+    struct engine *e,
+    int4 *fparti_fpartj_lparti_lpartj_grad,
+    cudaEvent_t *pair_end,
+    int n_leaves_found,
+    struct cell ** ci_d, struct cell ** cj_d,
+    int ** f_l_daughters,
+    struct cell ** ci_top, struct cell ** cj_top){
   //Everything from here on needs moving to runner_doiact_functions_hydro_gpu.h
   pack_vars->n_daughters_total += n_leaves_found;
   int top_tasks_packed = pack_vars->top_tasks_packed;

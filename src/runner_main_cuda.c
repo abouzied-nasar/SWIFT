@@ -442,15 +442,6 @@ void *runner_main_cuda(void *data) {
             } /* End of GPU work Pairs */
 
 #else //RECURSE
-            /////////////////////W.I.P!!!////////////////////////////////////////////////////////
-            /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
-            * We are recursing separately to find out how much work we have before offloading*/
-            //We need to allocate a list to put cell pointers into for each new task
-
-            /* TODO: WHERE DO WE ACTUALLY USE THIS??? */
-            gpu_buf_pair_dens.pv.n_daughters_packed_index = gpu_buf_pair_dens.pv.n_daughters_total;
-            gpu_buf_pair_dens.pv.n_leaves_found = 0;
-
             runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_dens, ci, cj, t, /*depth=*/0);
             runner_gpu_pack_daughters_and_launch_d(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H);
 
@@ -485,23 +476,25 @@ void *runner_main_cuda(void *data) {
               }
               pack_vars_pair_grad->launch_leftovers = 0;
 #else
-              /////////////////////W.I.P!!!////////////////////////////////////////////////////////
-              /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
-              * We are recursing separately to find out how much work we have before offloading*/
-              //We need to allocate a list to put cell pointers into for each new task
-              gpu_buf_pair_grad.pv.n_daughters_packed_index = gpu_buf_pair_dens.pv.n_daughters_total;
-              gpu_buf_pair_grad.pv.n_leaves_found = 0;
-
               runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_grad, ci, cj, t, /*depth=*/0);
 
               runner_gpu_pack_daughters_and_launch_g(r, sched, ci, cj,
                   &gpu_buf_pair_grad.pv, t,
-                  gpu_buf_pair_grad.parts_send_g, gpu_buf_pair_grad.parts_recv_g,
-                  gpu_buf_pair_grad.d_parts_send_g, gpu_buf_pair_grad.d_parts_recv_g,
-                    stream_pairs, d_a, d_H, e,
+                  gpu_buf_pair_grad.parts_send_g,
+                  gpu_buf_pair_grad.parts_recv_g,
+                  gpu_buf_pair_grad.d_parts_send_g,
+                  gpu_buf_pair_grad.d_parts_recv_g,
+                    stream_pairs,
+                    d_a, d_H,
+                    e,
                     gpu_buf_pair_grad.fparti_fpartj_lparti_lpartj,
-                    gpu_buf_pair_grad.event_end, gpu_buf_pair_grad.pv.n_leaves_found, gpu_buf_pair_grad.ci_d, gpu_buf_pair_grad.cj_d,
-                    gpu_buf_pair_grad.first_and_last_daughters, gpu_buf_pair_grad.ci_top, gpu_buf_pair_grad.cj_top);
+                    gpu_buf_pair_grad.event_end,
+                    gpu_buf_pair_grad.pv.n_leaves_found,
+                    gpu_buf_pair_grad.ci_d,
+                    gpu_buf_pair_grad.cj_d,
+                    gpu_buf_pair_grad.first_and_last_daughters,
+                    gpu_buf_pair_grad.ci_top,
+                    gpu_buf_pair_grad.cj_top);
 #endif
 #endif  // GPUOFFLOAD_GRADIENT
           } else if (t->subtype == task_subtype_gpu_pack_f) {
@@ -533,13 +526,6 @@ void *runner_main_cuda(void *data) {
                 pack_vars_pair_forc->launch_leftovers = 0;
               } /* End of GPU work Pairs */
 #else
-              /////////////////////W.I.P!!!////////////////////////////////////////////////////////
-              /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
-              * We are recursing separately to find out how much work we have before offloading*/
-              //We need to allocate a list to put cell pointers into for each new task
-              gpu_buf_pair_forc.pv.n_daughters_packed_index = gpu_buf_pair_forc.pv.n_daughters_total;
-              gpu_buf_pair_forc.pv.n_leaves_found = 0;
-
               runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_forc, ci, cj, t, /*depth=*/0);
 
               runner_gpu_pack_daughters_and_launch_f(r, sched, ci, cj, &gpu_buf_pair_forc.pv, t,
