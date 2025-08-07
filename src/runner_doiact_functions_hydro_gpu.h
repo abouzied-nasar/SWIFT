@@ -119,7 +119,7 @@ void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_
 }
 
 
-void runner_doself_gpu_pack_d(struct runner *r, struct scheduler *s, struct
+void runner_doself_gpu_pack_density(struct runner *r, struct scheduler *s, struct
     gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -139,7 +139,7 @@ void runner_doself_gpu_pack_d(struct runner *r, struct scheduler *s, struct
   TIMER_TOC(timer_doself_gpu_pack_d);
 }
 
-void runner_doself_gpu_pack_g(struct runner *r, struct scheduler *s, struct
+void runner_doself_gpu_pack_gradient(struct runner *r, struct scheduler *s, struct
     gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -159,7 +159,7 @@ void runner_doself_gpu_pack_g(struct runner *r, struct scheduler *s, struct
   TIMER_TOC(timer_doself_gpu_pack_g);
 }
 
-void runner_doself_gpu_pack_f(struct runner *r, struct scheduler *s, struct
+void runner_doself_gpu_pack_force(struct runner *r, struct scheduler *s, struct
     gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -546,7 +546,7 @@ void runner_doself_gpu_launch(
     size_t numBlocks_x = (max_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     size_t bundle_first_task = pack_vars->bundle_first_task_list[bid];
 
-    if (task_subtype == task_subtype_density){
+    if (task_subtype == task_subtype_gpu_pack_d){
 
       cudaMemcpyAsync(&buf->d_task_first_part_f4[first_task],
                       &buf->task_first_part_f4[first_task],
@@ -616,7 +616,7 @@ void runner_doself_gpu_unpack(
         }
 
         /* Do the copy */
-        if (task_subtype == task_subtype_density){
+        if (task_subtype == task_subtype_gpu_pack_d){
           runner_doself1_gpu_unpack_neat_aos_f4(r, cii, buf->parts_recv_d, 0,
                                               &pack_length_unpack, tid,
                                               pack_vars->count_max_parts, e);

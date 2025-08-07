@@ -320,7 +320,7 @@ void *runner_main_cuda(void *data) {
 /* message("PACKING DENSITY SELF"); */
 /* fflush(stdout); */
 
-            runner_doself_gpu_pack_d(r, sched, &gpu_buf_self_dens, ci, t);
+            runner_doself_gpu_pack_density(r, sched, &gpu_buf_self_dens, ci, t);
             /* No pack tasks left in queue, flag that we want to run */
             char launch_leftovers = gpu_buf_self_dens.pv.launch_leftovers;
             /* Packed enough tasks. Let's go*/
@@ -342,7 +342,7 @@ void *runner_main_cuda(void *data) {
           } /* self / pack */
           else if (t->subtype == task_subtype_gpu_pack_g) {
 #ifdef GPUOFFLOAD_GRADIENT
-            runner_doself_gpu_pack_g(r, sched, &gpu_buf_self_grad, ci, t);
+            runner_doself_gpu_pack_gradient(r, sched, &gpu_buf_self_grad, ci, t);
             /* No pack tasks left in queue, flag that we want to run */
             char launch_leftovers = gpu_buf_self_grad.pv.launch_leftovers;
             /*Packed enough tasks let's go*/
@@ -374,7 +374,7 @@ void *runner_main_cuda(void *data) {
 /* TODO MLADEN: REMOVE */
 /* message("PACKING FORCE SELF"); */
 /* fflush(stdout); */
-            runner_doself_gpu_pack_f(r, sched, &gpu_buf_self_forc, ci, t);
+            runner_doself_gpu_pack_force(r, sched, &gpu_buf_self_forc, ci, t);
             /* No pack tasks left in queue, flag that we want to run */
             char launch_leftovers = gpu_buf_self_forc.pv.launch_leftovers;
             /*Packed enough tasks let's go*/
