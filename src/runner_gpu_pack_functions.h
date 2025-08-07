@@ -40,7 +40,7 @@ void runner_doself1_gpu_unpack_neat_aos_f4_g(
     int tid, int count_max_parts_tmp, const struct engine *e);
 
 void runner_doself1_gpu_unpack_neat_aos_f4_f(
-    struct runner *r, struct cell *restrict c,
+    const struct runner *r, struct cell *restrict c,
     struct part_aos_f4_recv_f *restrict parts_aos_buffer, int timer,
     size_t *pack_length, int tid, int count_max_parts_tmp, const struct engine *e);
 

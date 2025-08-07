@@ -492,11 +492,10 @@ void runner_doself1_gpu_unpack_neat_aos_f4_g(
 }
 
 void runner_doself1_gpu_unpack_neat_aos_f4_f(
-    struct runner *r, struct cell *c,
+    const struct runner *r, struct cell *c,
     struct part_aos_f4_recv_f *parts_aos_buffer,
     int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, const struct engine *e) {
-  TIMER_TIC;
 
   /* Anything to do here? */
   if (c->hydro.count == 0) return;

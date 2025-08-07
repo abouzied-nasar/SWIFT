@@ -375,17 +375,7 @@ void *runner_main_cuda(void *data) {
 /* message("LAUNCHING FORCE SELF"); */
 /* fflush(stdout); */
               /*Launch GPU tasks*/
-              runner_doself_gpu_launch_force(
-                  r, sched,
-                  &gpu_buf_self_forc.pv, ci, t,
-                  gpu_buf_self_forc.parts_send_f,
-                  gpu_buf_self_forc.parts_recv_f,
-                  gpu_buf_self_forc.d_parts_send_f,
-                  gpu_buf_self_forc.d_parts_recv_f,
-                  stream, d_a, d_H, e,
-                  gpu_buf_self_forc.task_first_part_f4,
-                  gpu_buf_self_forc.d_task_first_part_f4,
-                  gpu_buf_self_forc.event_end);
+              runner_doself_gpu_force(r, sched, &gpu_buf_self_forc, t, stream, d_a, d_H);
             } /*End of GPU work Self*/
 /* TODO MLADEN: REMOVE */
 /* message("DONE FORCE SELF"); */
