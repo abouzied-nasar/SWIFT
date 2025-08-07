@@ -563,6 +563,7 @@ void gpu_pack_pair_density(struct gpu_offload_data* buf,
   struct gpu_pack_vars* pack_vars = &buf->pv;
 
   /* Get how many particles we've packed until now */
+  /* DOUBLE-CHECK THIS */
   size_t pack_ind = pack_vars->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -599,7 +600,7 @@ void gpu_pack_pair_density(struct gpu_offload_data* buf,
   pack_ind += count_cj;
 
   /* Update incremented pack length accordingly */
-  pack_vars->count_parts += pack_ind;
+  pack_vars->count_parts = pack_ind;
 
   TIMER_TOC(timer_dopair_gpu_pack_d);
 }

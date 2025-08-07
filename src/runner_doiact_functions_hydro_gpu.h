@@ -258,10 +258,10 @@ void runner_dopair_gpu_recurse(const struct runner *r,
 
 
 
-void runner_dopair_gpu_pack(struct runner *r, struct scheduler *s,
+void runner_dopair_gpu_pack(const struct runner *r, const struct scheduler *s,
                         struct gpu_offload_data *restrict buf,
-                        struct cell *ci, struct cell *cj,
-                        enum task_subtypes task_subtype){
+                        const struct cell *ci, const struct cell *cj,
+                        const enum task_subtypes task_subtype){
 
   /* Grab handles */
   const struct engine* e = r->e;
@@ -314,8 +314,8 @@ void runner_dopair_gpu_pack(struct runner *r, struct scheduler *s,
   fparti_fpartj_lparti_lpartj[tid].w = pack_vars->count_parts;
 
   /* Tell the cells they have been packed */
-  ci->pack_done++;
-  cj->pack_done++;
+  /* ci->pack_done++; */ /* TODO: REMOVE THIS */
+  /* cj->pack_done++; */
 
   /* Identify first particle for each bundle of tasks */
   const int bundle_size = pack_vars->bundle_size;
@@ -333,9 +333,9 @@ void runner_dopair_gpu_pack(struct runner *r, struct scheduler *s,
 
 
 
-void runner_dopair_gpu_pack_density(struct runner *r, struct scheduler *s,
+void runner_dopair_gpu_pack_density(const struct runner *r, const struct scheduler *s,
                               struct gpu_offload_data *restrict buf,
-                              struct cell *ci, struct cell *cj, struct task *t){
+                              const struct cell *ci, const struct cell *cj, const struct task *t){
 
   TIMER_TIC;
   runner_dopair_gpu_pack(r, s, buf, ci, cj, t->subtype);
@@ -899,9 +899,10 @@ void runner_dopair_launch_d(
   }
 
   /* special treatment for the case of 1 bundle */
-  pack_vars->bundle_last_part[0] = pack_vars->count_parts;
   if (n_bundles > 1)
     pack_vars->bundle_last_part[n_bundles - 1] = pack_vars->count_parts;
+  else
+    pack_vars->bundle_last_part[0] = pack_vars->count_parts;
 
   /* Launch the copies for each bundle and run the GPU kernel */
   for (size_t bid = 0; bid < n_bundles; bid++) {
@@ -1064,7 +1065,6 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
 
   struct gpu_pack_vars* pack_vars = &buf->pv;
 
-  /* Everything from here on needs moving to runner_doiact_functions_hydro_gpu.h */
   pack_vars->n_daughters_total += n_leaves_found;
   int top_tasks_packed = pack_vars->top_tasks_packed;
 
@@ -1085,7 +1085,6 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
 
   /* Increment how many top tasks we've packed */
   pack_vars->top_tasks_packed++;
-  top_tasks_packed++;
 
   //A. Nasar: Remove this from struct as not needed. Was only used for de-bugging
   /* How many daughter tasks do we want to offload at once?*/
@@ -1098,12 +1097,14 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
   s->queues[qid].n_packs_pair_left_d--;
   if (s->queues[qid].n_packs_pair_left_d < 1) pack_vars->launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
+
   /* Counter for how many tasks we've packed */
   int npacked = 0;
   int launched = 0;
 
   /* A. Nasar: Loop through the daughter tasks we found */
   int copy_index = pack_vars->n_daughters_packed_index;
+
   /* not strictly true!!! Could be that we packed and moved on without launching */
   int had_prev_task = 0;
   if(pack_vars->n_daughters_packed_index > 0)
@@ -1113,6 +1114,7 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
   cell_unlocktree(cj);
 
   while(npacked < n_leaves_found){
+
     top_tasks_packed = pack_vars->top_tasks_packed;
     struct cell * cii = ci_d[copy_index];
     struct cell * cjj = cj_d[copy_index];
@@ -1120,6 +1122,7 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
 
     /* record number of tasks we've copied from last launch */
     copy_index++;
+
     /* Record how many daughters we've packed in total for while loop */
     npacked++;
     first_cell_to_move++;
@@ -1130,9 +1133,11 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
 
     if(pack_vars->tasks_packed == target_n_tasks_tmp)
         pack_vars->launch = 1;
+
     if(pack_vars->launch || (pack_vars->launch_leftovers && npacked == n_leaves_found)){
 
       launched = 1;
+
       /* Here we only launch the tasks. No unpacking! This is done in next function ;) */
       runner_dopair_launch_d(r, s, buf, t, stream, d_a, d_H);
 
@@ -1146,14 +1151,15 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
         pack_vars->n_daughters_total = 0;
         pack_vars->top_tasks_packed = 0;
       }
-      //Special treatment required here. Launched but have not packed all tasks
-      else{
-        //If we launch but still have daughters left re-set this task to be the first in the list
-        //so that we can continue packing correctly
+      /* Special treatment required here. Launched but have not packed all tasks */
+      else {
+        /* If we launch but still have daughters left re-set this task to be
+         * the first in the list so that we can continue packing correctly */
         pack_vars->top_task_list[0] = t;
-        //Move all tasks forward in list so that the first next task will be packed to index 0
-        //Move remaining cell indices so that their indexing starts from zero and ends in n_daughters_left
-        for(int i = first_cell_to_move; i < n_daughters_left; i++){
+        /* Move all tasks forward in list so that the first next task will be
+         * packed to index 0 Move remaining cell indices so that their indexing
+         * starts from zero and ends in n_daughters_left */
+        for (int i = first_cell_to_move; i < n_daughters_left; i++) {
           int shuffle = i - first_cell_to_move;
           ci_d[shuffle] = ci_d[i];
           cj_d[shuffle] = cj_d[i];
@@ -1175,7 +1181,8 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
       pack_vars->count_parts = 0;
       pack_vars->launch = 0;
     }
-    //case when we have launched then gone back to pack but did not pack enough to launch again
+    /* case when we have launched then gone back to pack but did not pack
+     * enough to launch again */
     else if(npacked == n_leaves_found){
       if(launched == 1){
         pack_vars->n_daughters_total = n_daughters_left;
