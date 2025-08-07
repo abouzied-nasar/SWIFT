@@ -155,6 +155,9 @@ enum {
   timer_doself_gpu_unpack_d,
   timer_doself_gpu_unpack_g,
   timer_doself_gpu_unpack_f,
+  timer_doself_gpu_launch_d,
+  timer_doself_gpu_launch_g,
+  timer_doself_gpu_launch_f,
   timer_count,
 };
 

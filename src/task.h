@@ -168,6 +168,9 @@ enum task_subtypes {
   task_subtype_gpu_unpack_d,
   task_subtype_gpu_unpack_g,
   task_subtype_gpu_unpack_f,
+  task_subtype_gpu_launch_d,
+  task_subtype_gpu_launch_g,
+  task_subtype_gpu_launch_f,
   task_subtype_count
 } __attribute__((packed));
 
@@ -301,9 +304,6 @@ struct task {
 
   /*! Start and end time of this task */
   ticks tic, toc;
-
-  ticks total_cpu_pack_ticks;
-  ticks total_cpu_unpack_ticks;
 
   /* Total time spent running this task */
   ticks total_ticks;

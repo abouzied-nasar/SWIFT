@@ -332,7 +332,7 @@ void *runner_main_cuda(void *data) {
 /* TODO MLADEN: REMOVE */
 /* message("LAUNCHING DENSITY SELF"); */
 /* fflush(stdout); */
-              runner_doself_gpu_launch_density(r, sched, &gpu_buf_self_dens, ci, t, stream, d_a, d_H);
+              runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream, d_a, d_H);
 
 /* TODO MLADEN: REMOVE */
 /* message("DONE DENSITY SELF"); */
