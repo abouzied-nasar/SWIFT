@@ -442,7 +442,7 @@ void *runner_main_cuda(void *data) {
             } /* End of GPU work Pairs */
 
 #else //RECURSE
-            runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_dens, ci, cj, t, /*depth=*/0);
+            runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_dens, ci, cj, t, /*depth=*/0, /*timer=*/1);
             runner_gpu_pack_daughters_and_launch_d(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H);
 
 #endif  //RECURSE
@@ -476,7 +476,7 @@ void *runner_main_cuda(void *data) {
               }
               pack_vars_pair_grad->launch_leftovers = 0;
 #else
-              runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_grad, ci, cj, t, /*depth=*/0);
+              runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_grad, ci, cj, t, /*depth=*/0, /*timer=*/1);
 
               runner_gpu_pack_daughters_and_launch_g(r, sched, ci, cj,
                   &gpu_buf_pair_grad.pv, t,
@@ -526,7 +526,7 @@ void *runner_main_cuda(void *data) {
                 pack_vars_pair_forc->launch_leftovers = 0;
               } /* End of GPU work Pairs */
 #else
-              runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_forc, ci, cj, t, /*depth=*/0);
+              runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_forc, ci, cj, t, /*depth=*/0, /*timer=*/1);
 
               runner_gpu_pack_daughters_and_launch_f(r, sched, ci, cj, &gpu_buf_pair_forc.pv, t,
                     gpu_buf_pair_forc.parts_send_f, gpu_buf_pair_forc.parts_recv_f,

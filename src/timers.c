@@ -158,6 +158,7 @@ const char* timers_names[timer_count] = {
     "gpu_self_launch_density",
     "gpu_self_launch_gradient",
     "gpu_self_launch_force",
+    "gpu_pair_recurse",
 };
 
 /* File to store the timers */

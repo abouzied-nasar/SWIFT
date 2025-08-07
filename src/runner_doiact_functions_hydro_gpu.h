@@ -195,8 +195,9 @@ void runner_dopair_gpu_recurse(const struct runner *r,
                         const struct scheduler *s,
                         struct gpu_offload_data* restrict buf,
                         struct cell *ci, struct cell *cj, struct task *t,
-                        int depth){
+                        int depth, char timer){
 
+  if (timer) TIMER_TIC;
 
   /* Should we even bother? A. Nasar: For GPU code we need to be clever about
    * this */
@@ -234,7 +235,7 @@ void runner_dopair_gpu_recurse(const struct runner *r,
       const int pjd = csp->pairs[k].pjd;
       if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL) {
         runner_dopair_gpu_recurse(r, s, buf, ci->progeny[pid], cj->progeny[pjd],
-                           t, depth + 1);
+                           t, depth + 1, /*timer=*/0);
       }
     }
   } else if (cell_is_active_hydro(ci, e) || cell_is_active_hydro(cj, e)) {
@@ -251,6 +252,8 @@ void runner_dopair_gpu_recurse(const struct runner *r,
     if (pack_vars->n_leaves_found >= pack_vars->n_expected_pair_tasks)
       error("Created %i more than expected leaf cells. depth %i", pack_vars->n_leaves_found, depth);
   }
+
+  if (timer) TIMER_TOC(timer_dopair_gpu_recurse);
 }
 
 double runner_dopair1_pack_f4(struct runner *r, struct scheduler *s,
