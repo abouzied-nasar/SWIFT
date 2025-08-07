@@ -353,17 +353,7 @@ void *runner_main_cuda(void *data) {
 /* message("LAUNCHING GRADIENT SELF"); */
 /* fflush(stdout); */
               /* Launch GPU tasks */
-              runner_doself_gpu_launch_gradient(
-                  r, sched,
-                  &gpu_buf_self_grad.pv, ci, t,
-                  gpu_buf_self_grad.parts_send_g,
-                  gpu_buf_self_grad.parts_recv_g,
-                  gpu_buf_self_grad.d_parts_send_g,
-                  gpu_buf_self_grad.d_parts_recv_g,
-                  stream, d_a, d_H, e,
-                  gpu_buf_self_grad.task_first_part_f4,
-                  gpu_buf_self_grad.d_task_first_part_f4,
-                  gpu_buf_self_grad.event_end);
+              runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream, d_a, d_H);
 /* TODO MLADEN: REMOVE */
 /* message("DONE GRADIENT SELF"); */
 /* fflush(stdout); */

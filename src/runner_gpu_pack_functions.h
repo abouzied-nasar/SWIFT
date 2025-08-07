@@ -35,7 +35,7 @@ void runner_doself1_gpu_unpack_neat_aos_f4(
     const struct engine *e);
 
 void runner_doself1_gpu_unpack_neat_aos_f4_g(
-    struct runner *r, struct cell *c,
+    const struct runner *r, struct cell *c,
     struct part_aos_f4_recv_g *parts_aos_buffer, int timer, size_t *pack_length,
     int tid, int count_max_parts_tmp, const struct engine *e);
 
