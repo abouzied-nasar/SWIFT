@@ -17,16 +17,27 @@
 #include "hip/GPU_part_structs.h"
 #endif
 
-void gpu_pack_density_self(
+void gpu_pack_self_density(
     struct cell* restrict c,
     struct gpu_offload_data *buf);
-void gpu_pack_gradient_self(
+void gpu_pack_self_gradient(
     struct cell* restrict c,
     struct gpu_offload_data *buf);
-void gpu_pack_force_self(
+void gpu_pack_self_force(
     struct cell* restrict c,
     struct gpu_offload_data *buf);
-
+void gpu_unpack_self_density(struct cell* restrict c,
+    struct part_aos_f4_recv_d* restrict parts_aos_buffer,
+    int tid, size_t pack_position,
+    size_t count, const struct engine *e);
+void gpu_unpack_self_gradient(struct cell* restrict c,
+    struct part_aos_f4_recv_g* restrict parts_aos_buffer,
+    int tid, size_t pack_position,
+    size_t count, const struct engine *e);
+void gpu_unpack_self_force(struct cell* restrict c,
+    struct part_aos_f4_recv_f* restrict parts_aos_buffer,
+    int tid, size_t pack_position,
+    size_t count, const struct engine *e);
 /* ------------------------------------------ */
 void runner_doself1_gpu_unpack_neat_aos_f4(
     const struct runner *r, struct cell *c,

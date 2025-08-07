@@ -72,11 +72,11 @@ void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_
     /* This re-arranges the particle data from cell->hydro->parts into a
        long array of part structs */
     if (task_subtype == task_subtype_gpu_pack_d) {
-      gpu_pack_density_self(ci, buf);
+      gpu_pack_self_density(ci, buf);
     } else if (task_subtype == task_subtype_gpu_pack_g) {
-      gpu_pack_gradient_self(ci, buf);
+      gpu_pack_self_gradient(ci, buf);
     } else if (task_subtype == task_subtype_gpu_pack_f){
-      gpu_pack_force_self(ci, buf);
+      gpu_pack_self_force(ci, buf);
     } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
@@ -682,68 +682,74 @@ void runner_doself_gpu_unpack(
 
   /* Copy the data back from the CPU thread-local buffers to the cells */
   /* Pack length counter for use in unpacking */
-  size_t pack_length_unpack = 0;
+  size_t pack_length = 0;
   for (size_t bid = 0; bid < n_bundles; bid++) {
 
     /* cudaStreamSynchronize(stream[bid]); */
     cudaEventSynchronize(buf->event_end[bid]);
 
-    for (size_t tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
+    for (size_t tid = bid * bundle_size; tid < (bid + 1) * bundle_size && tid < tasks_packed; tid++) {
 
-      if (tid < tasks_packed) {
-        struct cell *cii = pack_vars->ci_list[tid];
-        struct task *tii = pack_vars->task_list[tid];
+      struct cell *c = pack_vars->ci_list[tid];
+      struct task *t = pack_vars->task_list[tid];
 
-        while (cell_locktree(cii)) {
-          ; /* spin until we acquire the lock */
-        }
-
-        /* Do the copy */
-        if (task_subtype == task_subtype_gpu_pack_d){
-
-          runner_doself1_gpu_unpack_neat_aos_f4(r, cii, buf->parts_recv_d, 0,
-                                              &pack_length_unpack, tid,
-                                              pack_vars->count_max_parts, e);
-          /* Record things for debugging */
-          cii->gpu_done++;
-
-        } else if (task_subtype == task_subtype_gpu_pack_g){
-
-          runner_doself1_gpu_unpack_neat_aos_f4_g(r, cii, buf->parts_recv_g, 0,
-                                                &pack_length_unpack, tid,
-                                                pack_vars->count_max_parts, e);
-          /* Record things for debugging */
-          cii->gpu_done_g++;
-
-        } else if (task_subtype == task_subtype_gpu_pack_f){
-
-          runner_doself1_gpu_unpack_neat_aos_f4_f(r, cii, buf->parts_recv_f, 0,
-                                                &pack_length_unpack, tid,
-                                                pack_vars->count_max_parts, e);
-          /* Record things for debugging */
-          cii->gpu_done_f++;
-
-        } else {
-          error("Unknown task subtype %s", subtaskID_names[task_subtype]);
-        }
-
-
-        pthread_mutex_lock(&s->sleep_mutex);
-        atomic_dec(&s->waiting);
-        pthread_cond_broadcast(&s->sleep_cond);
-        pthread_mutex_unlock(&s->sleep_mutex);
-
-        /* Release the lock */
-        cell_unlocktree(cii);
-
-        /* schedule my dependencies (Only unpacks really) */
-        enqueue_dependencies(s, tii);
-
-        /* Signal sleeping runners */
-        // MATTHIEU signal_sleeping_runners(s, tii);
+      while (cell_locktree(c)) {
+        ; /* spin until we acquire the lock */
       }
-    }
-  }
+
+      /* Anything to do here? */
+      if (c->hydro.count == 0) return;
+      if (!cell_is_active_hydro(c, e)) return;
+
+      size_t count = c->hydro.count;
+
+#ifdef SWIFT_DEBUG_CHECKS
+      if (pack_length + count >= pack_vars->count_max_parts) {
+        error("Exceeded count_max_parts. Make arrays bigger! pack_length is "
+              "%lu, count is %lu, max_parts is %lu",
+              pack_length, count, pack_vars->count_max_parts);
+      }
+#endif
+
+      /* Do the copy */
+      if (task_subtype == task_subtype_gpu_pack_d){
+
+        gpu_unpack_self_density(c, buf->parts_recv_d, tid, pack_length, count, e);
+        /* Record things for debugging */
+        c->gpu_done++;
+
+      } else if (task_subtype == task_subtype_gpu_pack_g){
+
+        gpu_unpack_self_gradient(c, buf->parts_recv_g, tid, pack_length, count, e);
+        /* Record things for debugging */
+        c->gpu_done_g++;
+
+      } else if (task_subtype == task_subtype_gpu_pack_f){
+
+        gpu_unpack_self_force(c, buf->parts_recv_f, tid, pack_length, count, e);
+        /* Record things for debugging */
+        c->gpu_done_f++;
+
+      } else {
+        error("Unknown task subtype %s", subtaskID_names[task_subtype]);
+      }
+
+      /* Increase our index in the buffer with the newly unpacked size. */
+      pack_length += count;
+
+      pthread_mutex_lock(&s->sleep_mutex);
+      atomic_dec(&s->waiting);
+      pthread_cond_broadcast(&s->sleep_cond);
+      pthread_mutex_unlock(&s->sleep_mutex);
+
+      /* Release the lock */
+      cell_unlocktree(c);
+
+      /* schedule my dependencies (Only unpacks really) */
+      enqueue_dependencies(s, t);
+
+    } /* Loop over tasks in bundle */
+  } /* Loop over bundles */
 
   /* Zero counters for the next pack operations */
   pack_vars->count_parts = 0;

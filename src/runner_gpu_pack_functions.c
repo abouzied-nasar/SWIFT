@@ -16,8 +16,7 @@
  * @brief packs particle data for density tasks into CPU-side buffers for self
  * tasks
  */
-void gpu_pack_density_self(struct cell* restrict c,
-                struct gpu_offload_data *buf) {
+void gpu_pack_self_density(struct cell* restrict c, struct gpu_offload_data *buf) {
 
   const int count = c->hydro.count;
   const size_t local_pack_position = buf->pv.count_parts;
@@ -57,7 +56,7 @@ void gpu_pack_density_self(struct cell* restrict c,
  * @brief packs particle data for gradient tasks into CPU-side buffers for self
  * tasks
  */
-void gpu_pack_gradient_self(struct cell* restrict c,
+void gpu_pack_self_gradient(struct cell* restrict c,
                 struct gpu_offload_data *buf) {
 
   const int count = c->hydro.count;
@@ -95,8 +94,7 @@ void gpu_pack_gradient_self(struct cell* restrict c,
  * @brief packs particle data for force tasks into CPU-side buffers for self
  * tasks
  */
-void gpu_pack_force_self(struct cell* restrict c,
-                struct gpu_offload_data *buf) {
+void gpu_pack_self_force(struct cell* restrict c, struct gpu_offload_data *buf) {
 
   const int count = c->hydro.count;
   const size_t local_pack_position = buf->pv.count_parts;
@@ -139,18 +137,24 @@ void gpu_pack_force_self(struct cell* restrict c,
   }
 }
 
-void unpack_neat_aos_f4(struct cell *c,
-                        struct part_aos_f4_recv_d *parts_aos_buffer, int tid,
-                        int local_pack_position, int count, const struct engine *e) {
+/**
+ * @brief Unpacks the density data from GPU buffers of self tasks into particles
+ */
+void gpu_unpack_self_density(struct cell* restrict c,
+    struct part_aos_f4_recv_d* restrict parts_aos_buffer,
+    int tid, size_t pack_position,
+    size_t count, const struct engine *e){
 
-  struct part_aos_f4_recv_d *parts_tmp = &parts_aos_buffer[local_pack_position];
-  for (int i = 0; i < count; i++) {
+  struct part_aos_f4_recv_d *parts_tmp = &parts_aos_buffer[pack_position];
+  for (size_t i = 0; i < count; i++) {
+
+    struct part *p = &c->hydro.parts[i];
+    if (!part_is_active(p, e)) continue;
 
     struct part_aos_f4_recv_d p_tmp = parts_tmp[i];
     float4 rho_dh_wcount = p_tmp.rho_dh_wcount;
     float4 rot_ux_div_v = p_tmp.rot_ux_div_v;
-    struct part *p = &c->hydro.parts[i];
-    if (!PART_IS_ACTIVE(p, e)) continue;
+
     part_set_rho(p, part_get_rho(p) + rho_dh_wcount.x);
     part_set_rho_dh(p, part_get_rho_dh(p) + rho_dh_wcount.y);
     part_set_wcount(p, part_get_wcount(p) + rho_dh_wcount.z);
@@ -159,6 +163,7 @@ void unpack_neat_aos_f4(struct cell *c,
     //    p->density.rho_dh += rho_dh_wcount.y;
     //    p->density.wcount += rho_dh_wcount.z;
     //    p->density.wcount_dh += rho_dh_wcount.w;
+
     float *rot_v = part_get_rot_v(p);
     rot_v[0] += rot_ux_div_v.x;
     rot_v[1] += rot_ux_div_v.y;
@@ -167,16 +172,22 @@ void unpack_neat_aos_f4(struct cell *c,
   }
 }
 
-void unpack_neat_aos_f4_g(struct cell *c,
-                          struct part_aos_f4_recv_g *parts_aos_buffer, int tid,
-                          int local_pack_position, int count,
-                          const struct engine *e) {
+/**
+ * @brief Unpacks the gradient data from GPU buffers of self tasks into particles
+ */
+void gpu_unpack_self_gradient(struct cell* restrict c,
+    struct part_aos_f4_recv_g* restrict parts_aos_buffer,
+    int tid, size_t pack_position,
+    size_t count, const struct engine *e){
 
-  struct part_aos_f4_recv_g *parts_tmp = &parts_aos_buffer[local_pack_position];
-  for (int i = 0; i < count; i++) {
-    struct part_aos_f4_recv_g p_tmp = parts_tmp[i];
+  struct part_aos_f4_recv_g *parts_tmp = &parts_aos_buffer[pack_position];
+
+  for (size_t i = 0; i < count; i++) {
+
     struct part *p = &c->hydro.parts[i];
-    if (!PART_IS_ACTIVE(p, e)) continue;
+    if (!part_is_active(p, e)) continue;
+
+    struct part_aos_f4_recv_g p_tmp = parts_tmp[i];
 
     part_set_v_sig(p, fmaxf(p_tmp.vsig_lapu_aviscmax.x, part_get_v_sig(p)));
     part_set_laplace_u(p, part_get_laplace_u(p) + p_tmp.vsig_lapu_aviscmax.y);
@@ -185,16 +196,23 @@ void unpack_neat_aos_f4_g(struct cell *c,
   }
 }
 
-void unpack_neat_aos_f4_f(struct cell *restrict c,
-                          struct part_aos_f4_recv_f *restrict parts_aos_buffer,
-                          int tid, int local_pack_position, int count,
-                          const struct engine *e) {
-  /* int pp = local_pack_position; */
-  struct part_aos_f4_recv_f *parts_tmp = &parts_aos_buffer[local_pack_position];
-  for (int i = 0; i < count; i++) {
-    struct part_aos_f4_recv_f p_tmp = parts_tmp[i];
+/**
+ * @brief Unpacks the force data from GPU buffers of self tasks into particles
+ */
+void gpu_unpack_self_force(struct cell* restrict c,
+    struct part_aos_f4_recv_f* restrict parts_aos_buffer,
+    int tid, size_t pack_position,
+    size_t count, const struct engine *e){
+
+  struct part_aos_f4_recv_f *parts_tmp = &parts_aos_buffer[pack_position];
+
+  for (size_t i = 0; i < count; i++) {
+
     struct part *p = &c->hydro.parts[i];
-    if (!PART_IS_ACTIVE(p, e)) continue;
+    if (!part_is_active(p, e)) continue;
+
+    struct part_aos_f4_recv_f p_tmp = parts_tmp[i];
+
     float *a = part_get_a_hydro(p);
     part_set_a_hydro_ind(p, 0, a[0] + p_tmp.a_hydro.x);
     part_set_a_hydro_ind(p, 1, a[1] + p_tmp.a_hydro.y);
@@ -207,11 +225,11 @@ void unpack_neat_aos_f4_f(struct cell *restrict c,
     part_set_v_sig(
         p, fmaxf(p_tmp.udt_hdt_vsig_mintimebin_ngb.z, part_get_v_sig(p)));
 
-    timebin_t min_ngb_time_bin =
-        (int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
+    timebin_t min_ngb_time_bin = (int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
     part_set_timestep_limiter_min_ngb_time_bin(p, min_ngb_time_bin);
   }
 }
+
 
 void unpack_neat_pair_aos_f4(struct runner *r, struct cell *c,
                              struct part_aos_f4_recv_d *parts_aos_buffer, int tid,
@@ -427,99 +445,6 @@ void pack_neat_pair_aos_f4_f(
   }
 }
 
-
-void runner_doself1_gpu_unpack_neat_aos_f4(
-    const struct runner *r, struct cell *c,
-    struct part_aos_f4_recv_d *parts_aos_buffer,
-    int timer, size_t *pack_length, int tid, int count_max_parts_tmp,
-    const struct engine *e
-    ) {
-  TIMER_TIC;
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-  if (!cell_is_active_hydro(c, e)) {
-    message("Inactive cell");
-    return;
-  }
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    error("Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-          "%lu pointer to pack_length is %p, local_pack_position is % i, "
-          "count is %i",
-          (*pack_length), pack_length, local_pack_position, count);
-  }
-#endif
-
-  /* Copy particle data from CPU buffers to cells */
-  unpack_neat_aos_f4(c, parts_aos_buffer, tid, local_pack_position, count, e);
-  // Increment pack length accordingly
-  (*pack_length) += count;
-}
-
-void runner_doself1_gpu_unpack_neat_aos_f4_g(
-    const struct runner *r, struct cell *c,
-    struct part_aos_f4_recv_g *parts_aos_buffer,
-    int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, const struct engine *e) {
-  TIMER_TIC;
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-  if (!cell_is_active_hydro(c, e)) {
-    message("Inactive cell");
-    return;
-  }
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    error("Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-          "%lu pointer to pack_length is %p, local_pack_position is % i, "
-          "count is %i",
-          (*pack_length), pack_length, local_pack_position, count);
-  }
-#endif
-
-  /* Copy particle data from CPU buffers to cells */
-  unpack_neat_aos_f4_g(c, parts_aos_buffer, tid, local_pack_position, count, e);
-  // Increment pack length accordingly
-  (*pack_length) += count;
-}
-
-void runner_doself1_gpu_unpack_neat_aos_f4_f(
-    const struct runner *r, struct cell *c,
-    struct part_aos_f4_recv_f *parts_aos_buffer,
-    int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, const struct engine *e) {
-
-  /* Anything to do here? */
-  if (c->hydro.count == 0) return;
-  if (!cell_is_active_hydro(c, e)) {
-    message("Inactive cell");
-    return;
-  }
-  int count = c->hydro.count;
-  int local_pack_position = (*pack_length);
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count >= count_max_parts_tmp) {
-    error("Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-          "%lu pointer to pack_length is %p, local_pack_position is % i, "
-          "count is %i",
-          (*pack_length), pack_length, local_pack_position, count);
-  }
-#endif
-
-  /* Copy particle data from CPU buffers to cells */
-  unpack_neat_aos_f4_f(c, parts_aos_buffer, tid, local_pack_position, count, e);
-  // Increment pack length accordingly
-  (*pack_length) += count;
-}
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
     struct runner *r, struct cell *ci, struct cell *cj,
