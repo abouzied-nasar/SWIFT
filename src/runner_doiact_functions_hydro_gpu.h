@@ -1,3 +1,26 @@
+/*******************************************************************************
+ * This file is part of SWIFT.
+ * Copyright (c)
+ *               2025 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
+ *                    Mladen Ivkovic (mladen.ivkovic@durham.ac.uk)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ ******************************************************************************/
+#ifndef RUNNER_DOIACT_FUNCTIONS_HYDRO_GPU_H
+#define RUNNER_DOIACT_FUNCTIONS_HYDRO_GPU_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -72,11 +95,11 @@ void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_
     /* This re-arranges the particle data from cell->hydro->parts into a
        long array of part structs */
     if (task_subtype == task_subtype_gpu_pack_d) {
-      gpu_pack_self_density_cell(ci, buf);
+      gpu_pack_part_self_density(ci, buf);
     } else if (task_subtype == task_subtype_gpu_pack_g) {
-      gpu_pack_self_gradient_cell(ci, buf);
+      gpu_pack_part_self_gradient(ci, buf);
     } else if (task_subtype == task_subtype_gpu_pack_f){
-      gpu_pack_self_force_cell(ci, buf);
+      gpu_pack_part_self_force(ci, buf);
     } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
@@ -620,19 +643,19 @@ void runner_doself_gpu_launch(
 
     /* Launch the kernel */
     if (task_subtype == task_subtype_gpu_pack_d){
-      launch_density_aos_f4(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H, stream[bid],
+      gpu_launch_self_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H, stream[bid],
                             numBlocks_x, numBlocks_y, bundle_first_task,
                             buf->d_task_first_part_f4);
 
     } else if (task_subtype == task_subtype_gpu_pack_g){
 
-      launch_gradient_aos_f4(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H, stream[bid],
+      gpu_launch_self_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H, stream[bid],
                              numBlocks_x, numBlocks_y, bundle_first_task,
                              buf->d_task_first_part_f4);
 
     } else if (task_subtype == task_subtype_gpu_pack_f){
 
-      launch_force_aos_f4(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H, stream[bid],
+      gpu_launch_self_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H, stream[bid],
                         numBlocks_x, numBlocks_y, bundle_first_task,
                         buf->d_task_first_part_f4);
     } else {
@@ -746,19 +769,19 @@ void runner_doself_gpu_unpack(
       /* Do the copy */
       if (task_subtype == task_subtype_gpu_pack_d){
 
-        gpu_unpack_self_density_cell(c, buf->parts_recv_d, tid, pack_length, count, e);
+        gpu_unpack_part_self_density(c, buf->parts_recv_d, tid, pack_length, count, e);
         /* Record things for debugging */
         c->gpu_done++;
 
       } else if (task_subtype == task_subtype_gpu_pack_g){
 
-        gpu_unpack_self_gradient_cell(c, buf->parts_recv_g, tid, pack_length, count, e);
+        gpu_unpack_part_self_gradient(c, buf->parts_recv_g, tid, pack_length, count, e);
         /* Record things for debugging */
         c->gpu_done_g++;
 
       } else if (task_subtype == task_subtype_gpu_pack_f){
 
-        gpu_unpack_self_force_cell(c, buf->parts_recv_f, tid, pack_length, count, e);
+        gpu_unpack_part_self_force(c, buf->parts_recv_f, tid, pack_length, count, e);
         /* Record things for debugging */
         c->gpu_done_f++;
 
@@ -957,7 +980,7 @@ void runner_dopair_gpu_launch(
 
     /* Launch the kernel for ci using data for ci and cj */
     if (task_subtype == task_subtype_gpu_launch_d){
-      runner_dopair_branch_density_gpu_aos_f4(
+      gpu_launch_pair_density(
           d_parts_send, d_parts_recv, d_a, d_H, stream[bid], numBlocks_x,
           numBlocks_y, bundle_part_0, bundle_n_parts);
     }
@@ -1330,7 +1353,7 @@ void runner_dopair_launch_g(
     int numBlocks_x = (bundle_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int bundle_part_0 = pack_vars->bundle_first_part[bid];
     /* Launch the kernel for ci using data for ci and cj */
-    runner_dopair_branch_gradient_gpu_aos_f4(
+    gpu_launch_pair_gradient(
         d_parts_send, d_parts_recv, d_a, d_H, stream[bid], numBlocks_x,
         numBlocks_y, bundle_part_0, bundle_n_parts);
 
@@ -1655,7 +1678,7 @@ void runner_dopair_launch_f(
     int numBlocks_x = (bundle_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int bundle_part_0 = pack_vars->bundle_first_part[bid];
     /* Launch the kernel for ci using data for ci and cj */
-    runner_dopair_branch_force_gpu_aos_f4(
+    gpu_launch_pair_force(
         d_parts_send, d_parts_recv, d_a, d_H, stream[bid], numBlocks_x,
         numBlocks_y, bundle_part_0, bundle_n_parts);
 
@@ -1894,3 +1917,5 @@ void runner_gpu_pack_daughters_and_launch_f(struct runner *r, struct scheduler *
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* RUNNER_GPU_PACK_FUNCTIONS_H */

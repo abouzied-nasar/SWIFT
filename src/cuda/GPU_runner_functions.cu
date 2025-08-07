@@ -1,19 +1,19 @@
 /*******************************************************************************
  * This file contains functions used to setup and execute GPU tasks from within
- *runner_main.c. Consider this a translator allowing .cu based functions to be
- *called from within runner_main.c
+ * runner_main.c. Consider this a translator allowing .cu based functions to be
+ * called from within runner_main.c
  ******************************************************************************/
 
 /* Hacky method to make c++ compilers not die. */
 /* TODO: do we still need this..? */
-#ifdef WITH_CUDA
-#ifndef static
-#define static
-#endif
-#ifndef restrict
-#define restrict __restrict__
-#endif
-#endif
+/* #ifdef WITH_CUDA */
+/* #ifndef static */
+/* #define static */
+/* #endif */
+/* #ifndef restrict */
+/* #define restrict __restrict__ */
+/* #endif */
+/* #endif */
 
 /* ifdef __cplusplus prevents name mangling. C code sees exact names
  of functions rather than mangled template names produced by C++ */
@@ -37,18 +37,10 @@ extern "C" {
 #include "device_functions.h"
 
 
-/* function to initialise GPU and printout GPU name */
-void Initialise_GPU() {
-  int devId = 0;
-  // find and print device name
-  cudaDeviceProp prop;
-  cudaGetDeviceProperties(&prop, devId);
-  printf("Device : %s\n", prop.name);
-  cudaSetDevice(devId);
-  // cuda
-}
-
-__global__ void DOSELF_GPU_AOS_F4(
+/**
+ * Does the self density computation on device
+ */
+__global__ void cuda_launch_self_density(
     struct part_aos_f4_send_d* __restrict__ parts_send,
     struct part_aos_f4_recv_d* __restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
@@ -56,15 +48,12 @@ __global__ void DOSELF_GPU_AOS_F4(
 
   extern __shared__ float4 vars_f4[];
 
-  //  auto group = cooperative_groups::this_thread_block();
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int task_id = bundle_first_task + blockIdx.y;
-  //  cuda::barrier<cuda::thread_scope_system> bar;
 
-  int first_part_in_task_blocks, last_part_in_task_blocks;
   int2 first_last_parts = d_task_first_part_f4[task_id];
-  first_part_in_task_blocks = first_last_parts.x;
-  last_part_in_task_blocks = first_last_parts.y;
+  int first_part_in_task_blocks = first_last_parts.x;
+  int last_part_in_task_blocks = first_last_parts.y;
 
   const int pid = threadid + first_part_in_task_blocks;
 
@@ -75,14 +64,14 @@ __global__ void DOSELF_GPU_AOS_F4(
   const float4 ux_pi = pi.ux_m;
   const float hi = x_pi.w;
   const float hig2 = hi * hi * kernel_gamma2;
-  /*Here we use different pointers "x_p_tmp", etc. to point to different regions
-   * of the single shared memory space "vars" which we allocate in kernel
-   * invocation*/
+  /* Here we use different pointers "x_p_tmp", etc. to point to different
+   * regions of the single shared memory space "vars" which we allocate in
+   * kernel invocation */
   float4 *__restrict__ x_p_h_tmp = (float4 *)&vars_f4[0];
   float4 *__restrict__ ux_m_tmp = (float4 *)&vars_f4[BLOCK_SIZE];
-  /*Particles copied in blocks to shared memory*/
-  for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks;
-       b += BLOCK_SIZE) {
+  /* Particles copied in blocks to shared memory */
+  for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks; b += BLOCK_SIZE) {
+
     int j = b + threadIdx.x;
     struct part_aos_f4_send_d pj = parts_send[j];
     x_p_h_tmp[threadIdx.x] = pj.x_p_h;
@@ -143,19 +132,10 @@ __global__ void DOSELF_GPU_AOS_F4(
   }
 }
 
-void launch_density_aos_f4(struct part_aos_f4_send_d *parts_send,
-                           struct part_aos_f4_recv_d *parts_recv, float d_a,
-                           float d_H, cudaStream_t stream, int numBlocks_x,
-                           int numBlocks_y, int bundle_first_task,
-                           int2 *d_task_first_part_f4) {
-
-  dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  DOSELF_GPU_AOS_F4<<<gridShape, BLOCK_SIZE, 2 * BLOCK_SIZE * sizeof(float4),
-                      stream>>>(parts_send, parts_recv, d_a, d_H,
-                                bundle_first_task, d_task_first_part_f4);
-}
-
-__global__ void DOSELF_GPU_AOS_F4_G(
+/**
+ * Does the self density computation on device
+ */
+__global__ void cuda_launch_self_gradient(
     struct part_aos_f4_send_g *__restrict__ parts_send,
     struct part_aos_f4_recv_g *__restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
@@ -166,11 +146,9 @@ __global__ void DOSELF_GPU_AOS_F4_G(
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int task_id = bundle_first_task + blockIdx.y;
 
-  //  __shared__ int first_part_in_task_blocks, last_part_in_task_blocks;
   int2 first_last_parts = d_task_first_part_f4[task_id];
   int first_part_in_task_blocks = first_last_parts.x;
   int last_part_in_task_blocks = first_last_parts.y;
-  //  __syncthreads();
   const int pid = threadid + first_part_in_task_blocks;
 
   struct part_aos_f4_send_g pi = parts_send[pid];
@@ -182,9 +160,9 @@ __global__ void DOSELF_GPU_AOS_F4_G(
   const float hi = x_h_i.w;
   const float hig2 = hi * hi * kernel_gamma2;
 
-  /*Here we use different pointers "x_p_tmp", etc. to point to different regions
-   * of the single shared memory space "vars" which we allocate in kernel
-   * invocation*/
+  /* Here we use different pointers "x_p_tmp", etc. to point to different
+   * regions of the single shared memory space "vars" which we allocate in
+   * kernel invocation */
   float4 *__restrict__ x_h_tmp = (float4 *)&varsf4_g[0];
   float4 *__restrict__ ux_m_tmp = (float4 *)&varsf4_g[BLOCK_SIZE];
   float4 *__restrict__ rho_avisc_u_c_tmp = (float4 *)&varsf4_g[BLOCK_SIZE * 2];
@@ -261,13 +239,14 @@ __global__ void DOSELF_GPU_AOS_F4_G(
     __syncthreads();
   }
   if (pid < last_part_in_task_blocks) {
-    //	  printf("v %f lap %f maxvisc %f\n", vsig_lapu_aviscmax_empty_i.x,
-    // vsig_lapu_aviscmax_empty_i.y, vsig_lapu_aviscmax_empty_i.z);
     parts_recv[pid].vsig_lapu_aviscmax = vsig_lapu_aviscmax_i;
   }
 }
 
-__global__ void DOSELF_GPU_AOS_F4_F(
+/**
+ * Does the self force computation on device
+ */
+__global__ void cuda_launch_self_force(
     struct part_aos_f4_send_f*__restrict__ parts_send,
     struct part_aos_f4_recv_f *__restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
@@ -278,12 +257,9 @@ __global__ void DOSELF_GPU_AOS_F4_F(
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int task_id = bundle_first_task + blockIdx.y;
 
-  int first_part_in_task_blocks, last_part_in_task_blocks;
-  //  first_part_in_task_blocks = d_task_first_part[task_id],
-  //  last_part_in_task_blocks = d_task_last_part[task_id];
   int2 first_last_parts = d_task_first_part_f4[task_id];
-  first_part_in_task_blocks = first_last_parts.x;
-  last_part_in_task_blocks = first_last_parts.y;
+  int first_part_in_task_blocks = first_last_parts.x;
+  int last_part_in_task_blocks = first_last_parts.y;
 
   const int pid = threadid + first_part_in_task_blocks;
 
@@ -310,10 +286,10 @@ __global__ void DOSELF_GPU_AOS_F4_F(
    * invocation*/
   float4 *__restrict__ x_h_tmp = (float4 *)&varsf4_f[0];
   float4 *__restrict__ ux_m_tmp = (float4 *)&varsf4_f[BLOCK_SIZE];
-  float4 *__restrict__ f_b_t_mintbinngb_tmp =
-      (float4 *)&varsf4_f[BLOCK_SIZE * 2];
+  float4 *__restrict__ f_b_t_mintbinngb_tmp = (float4 *)&varsf4_f[BLOCK_SIZE * 2];
   float4 *__restrict__ rho_p_c_vsig_tmp = (float4 *)&varsf4_f[BLOCK_SIZE * 3];
   float3 *__restrict__ u_avisc_adiff_tmp = (float3 *)&varsf4_f[BLOCK_SIZE * 4];
+
   /*Particles copied in blocks to shared memory*/
   for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks;
        b += BLOCK_SIZE) {
@@ -465,7 +441,10 @@ __global__ void DOSELF_GPU_AOS_F4_F(
   }
 }
 
-__device__ void DOPAIR2NAIVEGPUAOSF4(
+/**
+ * Naive kernel computing density interaction for pair task
+ */
+__device__ void cuda_kernel_pair_density(
     const struct part_aos_f4_send_d pi,
     struct part_aos_f4_send_d *__restrict__ parts_send,
     struct part_aos_f4_recv_d *__restrict__ parts_recv, int pid,
@@ -476,20 +455,11 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
 
   float4 res_rho = {0.0, 0.0, 0.0, 0.0};
   float4 res_rot = {0.0, 0.0, 0.0, 0.0};
-  //  const part_aos_f4_send pi = parts_send[pid];
   const float4 x_pi = pi.x_p_h;
   const float4 ux_pi = pi.ux_m;
-  //  printf("first_part_in_task_blocks_cj %i last_part_in_task_blocks_cj %i
-  //  last_part_in_task_blocks_ci %i\n",
-  //		  first_part_in_task_blocks_cj, last_part_in_task_blocks_cj,
-  // last_part_in_task_blocks_ci);
-  //  if (pid < ci_end) {
   hi = x_pi.w, hig2 = hi * hi * kernel_gamma2;
-  //  }
 
-  int interacted = 0;
-  //  printf("js %i je %i\n", cj_start, cj_end);
-  /*Particles copied in blocks to shared memory*/
+  /* Particles copied in blocks to shared memory */
   for (int j = cj_start; j < cj_end; j++) {
     struct part_aos_f4_send_d pj = parts_send[j];
 
@@ -500,9 +470,8 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
     const float yij = x_pi.y - x_p_h_j.y;
     const float zij = x_pi.z - x_p_h_j.z;
     const float r2 = xij * xij + yij * yij + zij * zij;
-    //	printf("r2 %f \n", r2);
+
     if (r2 < hig2) {
-      interacted++;
       /* Recover some data */
       const float mj = ux_m_j.w;
       const float r = sqrt(r2);
@@ -510,11 +479,9 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
       const float h_inv = 1.f / hi;
       const float ui = r * h_inv;
       float wi, wi_dx;
-
       d_kernel_deval(ui, &wi, &wi_dx);
+
       /*Add to sums of rho, rho_dh, wcount and wcount_dh*/
-//      if(wi == 0)
-//    	  printf("r %f h %f\n", r, sqrt(hig2));
       res_rho.x += mj * wi;
       res_rho.y -= mj * (hydro_dimension * wi + ui * wi_dx);
       res_rho.z += wi;
@@ -536,22 +503,17 @@ __device__ void DOPAIR2NAIVEGPUAOSF4(
       res_rot.y += faci * curlvry;
       res_rot.z += faci * curlvrz;
       res_rot.w -= faci * dvdr;
-//      if(mj < 0.0000001)
-//      	printf("zero mass");
-    }
-    else if(r2 > 0.5) {
-      /* TODO: WHY ARE WE PRINTING IN THE N^2 BIT???? */
-      printf("Distance is %f\n", sqrt(r2));
     }
   } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
-  //  if (pid >= ci_start && pid < ci_end) {
 
   parts_recv[pid].rho_dh_wcount = res_rho;
   parts_recv[pid].rot_ux_div_v = res_rot;
-  //  }
 }
 
-__device__ void DOPAIR2NAIVEGPUAOSF4G(
+/**
+ * Naive kernel computing gradient interaction for pair task
+ */
+__device__ void cuda_kernel_pair_gradient(
     const struct part_aos_f4_send_g pi,
     struct part_aos_f4_send_g *__restrict__ parts_send,
     struct part_aos_f4_recv_g *__restrict__ parts_recv, int pid,
@@ -565,16 +527,9 @@ __device__ void DOPAIR2NAIVEGPUAOSF4G(
   const float4 rho_avisc_u_c_i = pi.rho_avisc_u_c;
   float3 vsig_lapu_aviscmax_i = {0.f, 0.f, 0.f};
 
-  //  printf("first_part_in_task_blocks_cj %i last_part_in_task_blocks_cj %i
-  //  last_part_in_task_blocks_ci %i\n",
-  //		  first_part_in_task_blocks_cj, last_part_in_task_blocks_cj,
-  // last_part_in_task_blocks_ci);
-  //  if (pid < ci_end) {
   hi = x_h_i.w, hig2 = hi * hi * kernel_gamma2;
-  //  }
 
-  //  printf("js %i je %i\n", cj_start, cj_end);
-  /*Particles copied in blocks to shared memory*/
+  /* Particles copied in blocks to shared memory */
   for (int j = cj_start; j < cj_end; j++) {
     struct part_aos_f4_send_g pj = parts_send[j];
 
@@ -585,7 +540,7 @@ __device__ void DOPAIR2NAIVEGPUAOSF4G(
     const float yij = x_h_i.y - x_h_j.y;
     const float zij = x_h_i.z - x_h_j.z;
     const float r2 = xij * xij + yij * yij + zij * zij;
-    //	printf("r2 %f \n", r2);
+
     if (r2 < hig2) {
       const float r = sqrt(r2);
       const float r_inv = 1.f / r;
@@ -628,12 +583,14 @@ __device__ void DOPAIR2NAIVEGPUAOSF4G(
       vsig_lapu_aviscmax_i.z = fmaxf(vsig_lapu_aviscmax_i.z, alpha_j);
     }
   } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
-  //  if (pid >= ci_start && pid < ci_end) {
+
   parts_recv[pid].vsig_lapu_aviscmax = vsig_lapu_aviscmax_i;
-  //  }
 }
 
-__device__ void DOPAIR2NAIVEGPUAOSF4F(
+/**
+ * Naive kernel computing force interaction for pair task
+ */
+__device__ void cuda_kernel_pair_force(
     const struct part_aos_f4_send_f pi,
     struct part_aos_f4_send_f *__restrict__ parts_send,
     struct part_aos_f4_recv_f *__restrict__ parts_recv, int pid,
@@ -657,8 +614,7 @@ __device__ void DOPAIR2NAIVEGPUAOSF4F(
   const float hi = x_h_i.w;
   const float hig2 = hi * hi * kernel_gamma2;
 
-  //  printf("js %i je %i\n", cj_start, cj_end);
-  /*Particles copied in blocks to shared memory*/
+  /* Particles copied in blocks to shared memory */
   for (int j = cj_start; j < cj_end; j++) {
     struct part_aos_f4_send_f pj = parts_send[j];
     const float4 x_h_j = pj.x_h;
@@ -671,7 +627,7 @@ __device__ void DOPAIR2NAIVEGPUAOSF4F(
     const float yij = x_h_i.y - x_h_j.y;
     const float zij = x_h_i.z - x_h_j.z;
     const float r2 = xij * xij + yij * yij + zij * zij;
-    //	printf("r2 %f \n", r2);
+
     if (r2 < hig2) {
       //          /* Cosmology terms for the signal velocity */
       const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
@@ -778,95 +734,96 @@ __device__ void DOPAIR2NAIVEGPUAOSF4F(
       unsigned int time_bin_j = (f_b_t_mintbinngb_j.z + 0.5f);
       unsigned int min_tb_i = (f_b_t_mintbinngb_i.w + 0.5f);
       if (time_bin_j > 0) f_b_t_mintbinngb_i.w = min(min_tb_i, time_bin_j);
-      //          printf("Got in\n");
     }
   } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
-  //  if (pid >= ci_start && pid < ci_end) {
+
   udt_hdt_vsig_mintbinngb.w = f_b_t_mintbinngb_i.w;
   parts_recv[pid].udt_hdt_vsig_mintimebin_ngb = udt_hdt_vsig_mintbinngb;
   parts_recv[pid].a_hydro = ahydro;
-  //  }
 }
 
-__global__ void runner_do_pair_density_GPU_aos_f4(
+/**
+ * Launch the pair density computations on the GPU
+ */
+__global__ void cuda_launch_pair_density(
     struct part_aos_f4_send_d *parts_send, struct part_aos_f4_recv_d *parts_recv,
     float d_a, float d_H, int bundle_first_part, int bundle_n_parts) {
 
-  //  extern __shared__ float4 vars_pair_i_f4[];
-  //  __shared__ int first_part_tid_0, last_part_tid_0;
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int pid = bundle_first_part + threadid;
-  //  const int task_id = bundle_first_part + blockIdx.y;
 
-  //	printf("task_id is %i, count_tasks is %i\n", task_id, count_tasks);
-  //  int first_part_in_task_blocks_ci, last_part_in_task_blocks_ci;
-  //  int first_part_in_task_blocks_cj, last_part_in_task_blocks_cj;
   if (pid < bundle_first_part + bundle_n_parts) {
     const struct part_aos_f4_send_d pi = parts_send[pid];
     const int cj_start = pi.cjs_cje.x;
     const int cj_end = pi.cjs_cje.y;
+
     /* Start calculations for particles in cell i*/
-    DOPAIR2NAIVEGPUAOSF4(pi, parts_send, parts_recv, pid, cj_start, cj_end, d_a,
-                         d_H);
+    cuda_kernel_pair_density(pi, parts_send, parts_recv, pid, cj_start, cj_end, d_a, d_H);
   }
 }
 
-__global__ void runner_do_pair_gradient_GPU_aos_f4(
+/**
+ * Launch the pair gradient computations on the GPU
+ */
+__global__ void cuda_launch_pair_gradient(
     struct part_aos_f4_send_g *parts_send,
     struct part_aos_f4_recv_g *parts_recv, float d_a, float d_H,
     int bundle_first_part, int bundle_n_parts) {
 
-  //  extern __shared__ float4 vars_pair_i_f4[];
-  //  __shared__ int first_part_tid_0, last_part_tid_0;
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int pid = bundle_first_part + threadid;
-  //  const int task_id = bundle_first_part + blockIdx.y;
 
-  //	printf("task_id is %i, count_tasks is %i\n", task_id, count_tasks);
   if (pid < bundle_first_part + bundle_n_parts) {
     const struct part_aos_f4_send_g pi = parts_send[pid];
     const int cj_start = pi.cjs_cje.x;
     const int cj_end = pi.cjs_cje.y;
+
     /* Start calculations for particles in cell i*/
-    DOPAIR2NAIVEGPUAOSF4G(pi, parts_send, parts_recv, pid, cj_start, cj_end,
+    cuda_kernel_pair_gradient(pi, parts_send, parts_recv, pid, cj_start, cj_end,
                           d_a, d_H);
   }
 }
 
-__global__ void runner_do_pair_force_GPU_aos_f4(
+/**
+ * Launch the pair force computations on the GPU
+ */
+__global__ void cuda_launch_pair_force(
     struct part_aos_f4_send_f *parts_send,
     struct part_aos_f4_recv_f *parts_recv, float d_a, float d_H,
     int bundle_first_part, int bundle_n_parts) {
 
-  //  extern __shared__ float4 vars_pair_i_f4[];
-  //  __shared__ int first_part_tid_0, last_part_tid_0;
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int pid = bundle_first_part + threadid;
-  //  const int task_id = bundle_first_part + blockIdx.y;
 
-  //	printf("task_id is %i, count_tasks is %i\n", task_id, count_tasks);
   if (pid < bundle_first_part + bundle_n_parts) {
     const struct part_aos_f4_send_f pi = parts_send[pid];
     const int cj_start = pi.cjs_cje.x;
     const int cj_end = pi.cjs_cje.y;
+
     /* Start calculations for particles in cell i */
-    DOPAIR2NAIVEGPUAOSF4F(pi, parts_send, parts_recv, pid, cj_start, cj_end,
+    cuda_kernel_pair_force(pi, parts_send, parts_recv, pid, cj_start, cj_end,
                           d_a, d_H);
   }
 }
 
-void runner_dopair_branch_density_gpu_aos_f4(
+/**
+ * Launch the pair density computation on the GPU.
+ */
+void gpu_launch_pair_density(
     struct part_aos_f4_send_d *parts_send, struct part_aos_f4_recv_d *parts_recv,
     float d_a, float d_H, cudaStream_t stream, int numBlocks_x, int numBlocks_y,
     int bundle_first_part, int bundle_n_parts) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
 
-  runner_do_pair_density_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
+  cuda_launch_pair_density<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
-void runner_dopair_branch_gradient_gpu_aos_f4(
+/**
+ * Launch the pair gradient computation on the GPU.
+ */
+void gpu_launch_pair_gradient(
     struct part_aos_f4_send_g *parts_send,
     struct part_aos_f4_recv_g *parts_recv, float d_a, float d_H,
     cudaStream_t stream, int numBlocks_x, int numBlocks_y,
@@ -874,11 +831,14 @@ void runner_dopair_branch_gradient_gpu_aos_f4(
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
 
-  runner_do_pair_gradient_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
+  cuda_launch_pair_gradient<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
-void runner_dopair_branch_force_gpu_aos_f4(
+/**
+ * Launch the pair force computation on the GPU.
+ */
+void gpu_launch_pair_force(
     struct part_aos_f4_send_f *parts_send,
     struct part_aos_f4_recv_f *parts_recv, float d_a, float d_H,
     cudaStream_t stream, int numBlocks_x, int numBlocks_y,
@@ -886,36 +846,56 @@ void runner_dopair_branch_force_gpu_aos_f4(
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
 
-  //	  fprintf(stderr, "nblocks %i\n", numBlocks_x);
-  runner_do_pair_force_GPU_aos_f4<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
+  cuda_launch_pair_force<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
-void launch_gradient_aos_f4(struct part_aos_f4_send_g *parts_send,
+/**
+ * Launch the self density computation on the GPU.
+ */
+void gpu_launch_self_density(struct part_aos_f4_send_d *parts_send,
+                           struct part_aos_f4_recv_d *parts_recv, float d_a,
+                           float d_H, cudaStream_t stream, int numBlocks_x,
+                           int numBlocks_y, int bundle_first_task,
+                           int2 *d_task_first_part_f4) {
+
+  dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
+  cuda_launch_self_density<<<gridShape, BLOCK_SIZE, 2ul * BLOCK_SIZE * sizeof(float4),
+                      stream>>>(parts_send, parts_recv, d_a, d_H,
+                                bundle_first_task, d_task_first_part_f4);
+}
+
+
+/**
+ * Launch the self gradient computation on the GPU.
+ */
+void gpu_launch_self_gradient(struct part_aos_f4_send_g *parts_send,
                             struct part_aos_f4_recv_g *parts_recv, float d_a,
                             float d_H, cudaStream_t stream, int numBlocks_x,
                             int numBlocks_y, int bundle_first_task,
                             int2 *d_task_first_part_f4) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  DOSELF_GPU_AOS_F4_G<<<gridShape, BLOCK_SIZE, 3 * BLOCK_SIZE * sizeof(float4),
-                        stream>>>(parts_send, parts_recv, d_a, d_H,
-                                  bundle_first_task, d_task_first_part_f4);
-}
+  cuda_launch_self_gradient<<<gridShape, BLOCK_SIZE, 3ul * BLOCK_SIZE * sizeof(float4), stream>>>(parts_send, parts_recv, d_a, d_H,
+        bundle_first_task, d_task_first_part_f4); }
 
-void launch_force_aos_f4(struct part_aos_f4_send_f *d_parts_send,
+/**
+ * Launch the self force computation on the GPU.
+ */
+void gpu_launch_self_force(struct part_aos_f4_send_f *d_parts_send,
                          struct part_aos_f4_recv_f *d_parts_recv, float d_a,
                          float d_H, cudaStream_t stream, int numBlocks_x,
                          int numBlocks_y, int bundle_first_task,
                          int2 *d_task_first_part_f4) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  DOSELF_GPU_AOS_F4_F<<<
+  cuda_launch_self_force<<<
       gridShape, BLOCK_SIZE,
-      4 * BLOCK_SIZE * sizeof(float4) + BLOCK_SIZE * sizeof(float3), stream>>>(
+      4ul * BLOCK_SIZE * sizeof(float4) + BLOCK_SIZE * sizeof(float3), stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H, bundle_first_task,
       d_task_first_part_f4);
 }
+
 #ifdef __cplusplus
 }
 #endif

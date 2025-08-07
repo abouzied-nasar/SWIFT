@@ -16,7 +16,7 @@
  * @brief packs particle data for density tasks into CPU-side buffers for self
  * tasks
  */
-void gpu_pack_self_density_cell(const struct cell* restrict c,
+void gpu_pack_part_self_density(const struct cell* restrict c,
     struct gpu_offload_data *buf) {
 
   const int count = c->hydro.count;
@@ -57,7 +57,7 @@ void gpu_pack_self_density_cell(const struct cell* restrict c,
  * @brief packs particle data for gradient tasks into CPU-side buffers for self
  * tasks
  */
-void gpu_pack_self_gradient_cell(const struct cell* restrict c,
+void gpu_pack_part_self_gradient(const struct cell* restrict c,
                 struct gpu_offload_data *buf) {
 
   const int count = c->hydro.count;
@@ -95,7 +95,7 @@ void gpu_pack_self_gradient_cell(const struct cell* restrict c,
  * @brief packs particle data for force tasks into CPU-side buffers for self
  * tasks
  */
-void gpu_pack_self_force_cell(const struct cell* restrict c, struct gpu_offload_data *buf) {
+void gpu_pack_part_self_force(const struct cell* restrict c, struct gpu_offload_data *buf) {
 
   const int count = c->hydro.count;
   const size_t local_pack_position = buf->pv.count_parts;
@@ -141,7 +141,7 @@ void gpu_pack_self_force_cell(const struct cell* restrict c, struct gpu_offload_
 /**
  * @brief Unpacks the density data from GPU buffers of self tasks into particles
  */
-void gpu_unpack_self_density_cell(struct cell* restrict c,
+void gpu_unpack_part_self_density(struct cell* restrict c,
     const struct part_aos_f4_recv_d* restrict parts_aos_buffer,
     const int tid, const size_t pack_position,
     const size_t count, const struct engine *e){
@@ -176,7 +176,7 @@ void gpu_unpack_self_density_cell(struct cell* restrict c,
 /**
  * @brief Unpacks the gradient data from GPU buffers of self tasks into particles
  */
-void gpu_unpack_self_gradient_cell(struct cell* restrict c,
+void gpu_unpack_part_self_gradient(struct cell* restrict c,
     const struct part_aos_f4_recv_g* restrict parts_aos_buffer,
     const int tid, const size_t pack_position,
     const size_t count, const struct engine *e){
@@ -200,7 +200,7 @@ void gpu_unpack_self_gradient_cell(struct cell* restrict c,
 /**
  * @brief Unpacks the force data from GPU buffers of self tasks into particles
  */
-void gpu_unpack_self_force_cell(struct cell* restrict c,
+void gpu_unpack_part_self_force(struct cell* restrict c,
     const struct part_aos_f4_recv_f* restrict parts_aos_buffer,
     const int tid, const size_t pack_position,
     const size_t count, const struct engine *e){
@@ -608,7 +608,6 @@ void gpu_pack_pair_density(struct gpu_offload_data* buf,
 }
 
 
-
 void runner_do_ci_cj_gpu_pack_neat_aos_f4_g(
     struct runner *r, struct cell *restrict ci, struct cell *restrict cj,
     struct part_aos_f4_send_g *restrict parts_aos_buffer, int timer,
@@ -655,6 +654,7 @@ void runner_do_ci_cj_gpu_pack_neat_aos_f4_g(
 
   if (timer) TIMER_TOC(timer_doself_gpu_pack);
 }
+
 
 void runner_do_ci_cj_gpu_pack_neat_aos_f4_f(
     struct runner *r, struct cell *restrict ci, struct cell *restrict cj,
