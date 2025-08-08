@@ -1249,7 +1249,7 @@ void runner_dopair_gpu_pack_and_launch(
     if (t->subtype == task_subtype_gpu_pack_d){
       runner_dopair_gpu_pack_density(r, s, buf, cii, cjj, t);
     }
-    else if (t->subtype == task_subtype_gpu_pack_d){
+    else if (t->subtype == task_subtype_gpu_pack_g){
       runner_dopair_gpu_pack_gradient(r, s, buf, cii, cjj, t);
     }
     else {
@@ -1280,7 +1280,7 @@ void runner_dopair_gpu_pack_and_launch(
         runner_dopair_gpu_launch_density(r, buf, stream, d_a, d_H);
         runner_dopair_gpu_unpack_density(r, s, buf, npacked, stream);
       }
-      else if (t->subtype == task_subtype_gpu_pack_d){
+      else if (t->subtype == task_subtype_gpu_pack_g){
         runner_dopair_gpu_launch_gradient(r, buf, stream, d_a, d_H);
         runner_dopair_gpu_unpack_gradient(r, s, buf, npacked, stream);
       }
