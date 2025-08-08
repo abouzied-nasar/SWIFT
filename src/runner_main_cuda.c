@@ -303,6 +303,7 @@ void *runner_main_cuda(void *data) {
           else if (t->subtype == task_subtype_external_grav)
             runner_do_grav_external(r, ci, 1);
           else if (t->subtype == task_subtype_gpu_unpack_d) {
+            /* TODO: WHY ARE THESE EMPTY? WHY DO WE HAVE THEM HERE THEN? */
           }
           else if (t->subtype == task_subtype_gpu_unpack_g) {
           }
@@ -329,12 +330,8 @@ void *runner_main_cuda(void *data) {
           else if (t->subtype == task_subtype_gpu_pack_g) {
 #ifdef GPUOFFLOAD_GRADIENT
             runner_doself_gpu_pack_gradient(r, sched, &gpu_buf_self_grad, ci, t);
-            /* No pack tasks left in queue, flag that we want to run */
-            char launch_leftovers = gpu_buf_self_grad.pv.launch_leftovers;
-            /*Packed enough tasks let's go*/
-            char launch = gpu_buf_self_grad.pv.launch;
             /* Do we have enough stuff to run the GPU ? */
-            if (launch || launch_leftovers) {
+            if (gpu_buf_self_grad.pv.launch || gpu_buf_self_grad.pv.launch_leftovers) {
               runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream, d_a, d_H);
             }
 #endif  // GPUGRADSELF
@@ -417,67 +414,13 @@ void *runner_main_cuda(void *data) {
           /* GPU WORK */
           else if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
-#ifndef RECURSE
-            ticks tic_cpu_pack = getticks();
-            /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
-            packing_time_pair +=
-                runner_dopair1_pack_f4_d(r, sched, pack_vars_pair_dens, ci,
-                                         cj, t, parts_aos_pair_f4_send, e,
-                                         fparti_fpartj_lparti_lpartj_dens);
-            /* No pack tasks left in queue, flag that we want to run */
-            int launch_leftovers = pack_vars_pair_dens->launch_leftovers;
-            /*Packed enough tasks let's go*/
-            int launch = pack_vars_pair_dens->launch;
-            /* Do we have enough stuff to run the GPU ? */
-            if (launch || launch_leftovers) {
-              /*Launch GPU tasks*/
-              runner_dopair1_launch_f4_one_memcpy(
-                  r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
-                  parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
-                  d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
-                  &packing_time_pair, &time_for_gpu_pair,
-                  &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-                  pair_end);
-              pack_vars_pair_dens->launch_leftovers = 0;
-            } /* End of GPU work Pairs */
-
-#else //RECURSE
             runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_dens, ci, cj, t, /*depth=*/0, /*timer=*/1);
             runner_gpu_pack_daughters_and_launch_d(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H);
-
-#endif  //RECURSE
 #endif  // GPUOFFLOAD_DENSITY
-          } /* pair / pack */
+          }
           else if (t->subtype == task_subtype_gpu_pack_g) {
 #ifdef GPUOFFLOAD_GRADIENT
-#ifndef RECURSE
-              ticks tic_cpu_pack = getticks();
-              packing_time_pair_g +=
-                  runner_dopair1_pack_f4_g(r, sched, pack_vars_pair_grad, ci,
-                                           cj, t, parts_aos_pair_f4_g_send, e,
-                                           fparti_fpartj_lparti_lpartj_grad);
-              t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
-              /* No pack tasks left in queue, flag that we want to run */
-              int launch_leftovers = pack_vars_pair_grad->launch_leftovers;
-              /*Packed enough tasks, let's go*/
-              int launch = pack_vars_pair_grad->launch;
-              /* Do we have enough stuff to run the GPU ? */
-              if (launch || launch_leftovers) {
-                /*Launch GPU tasks*/
-                int t_packed = pack_vars_pair_grad->tasks_packed;
-                //                signal_sleeping_runners(sched, t, t_packed);
-                runner_dopair1_launch_f4_g_one_memcpy(
-                    r, sched, pack_vars_pair_grad, t, parts_aos_pair_f4_g_send,
-                    parts_aos_pair_f4_g_recv, d_parts_aos_pair_f4_g_send,
-                    d_parts_aos_pair_f4_g_recv, stream_pairs, d_a, d_H, e,
-                    &packing_time_pair_g, &time_for_gpu_pair_g,
-                    &unpacking_time_pair_g, fparti_fpartj_lparti_lpartj_grad,
-                    pair_end_g);
-              }
-              pack_vars_pair_grad->launch_leftovers = 0;
-#else
               runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_grad, ci, cj, t, /*depth=*/0, /*timer=*/1);
-
               runner_gpu_pack_daughters_and_launch_g(r, sched, ci, cj,
                   &gpu_buf_pair_grad.pv, t,
                   gpu_buf_pair_grad.parts_send_g,
@@ -495,37 +438,9 @@ void *runner_main_cuda(void *data) {
                     gpu_buf_pair_grad.first_and_last_daughters,
                     gpu_buf_pair_grad.ci_top,
                     gpu_buf_pair_grad.cj_top);
-#endif
 #endif  // GPUOFFLOAD_GRADIENT
           } else if (t->subtype == task_subtype_gpu_pack_f) {
 #ifdef GPUOFFLOAD_FORCE
-#ifndef RECURSE
-              ticks tic_cpu_pack = getticks();
-              /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
-              packing_time_pair_f +=
-                  runner_dopair1_pack_f4_f(r, sched, pack_vars_pair_forc, ci,
-                                           cj, t, parts_aos_pair_f4_f_send, e,
-                                           fparti_fpartj_lparti_lpartj_forc);
-              /* No pack tasks left in queue, flag that we want to run */
-              int launch_leftovers = pack_vars_pair_forc->launch_leftovers;
-              /*Packed enough tasks let's go*/
-              int launch = pack_vars_pair_forc->launch;
-              /* Do we have enough stuff to run the GPU ? */
-              if (launch || launch_leftovers) {
-                /*Launch GPU tasks*/
-                int t_packed = pack_vars_pair_forc->tasks_packed;
-                //                signal_sleeping_runners(sched, t, t_packed);
-                runner_dopair1_launch_f4_f_one_memcpy(
-                    r, sched, pack_vars_pair_forc, t, parts_aos_pair_f4_f_send,
-                    parts_aos_pair_f4_f_recv, d_parts_aos_pair_f4_f_send,
-                    d_parts_aos_pair_f4_f_recv, stream_pairs, d_a, d_H, e,
-                    &packing_time_pair_f, &time_for_gpu_pair_f,
-                    &unpacking_time_pair_f, fparti_fpartj_lparti_lpartj_forc,
-                    pair_end_f);
-
-                pack_vars_pair_forc->launch_leftovers = 0;
-              } /* End of GPU work Pairs */
-#else
               runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_forc, ci, cj, t, /*depth=*/0, /*timer=*/1);
 
               runner_gpu_pack_daughters_and_launch_f(r, sched, ci, cj, &gpu_buf_pair_forc.pv, t,
@@ -534,7 +449,6 @@ void *runner_main_cuda(void *data) {
                     stream_pairs, d_a, d_H, e, gpu_buf_pair_forc.fparti_fpartj_lparti_lpartj,
                     gpu_buf_pair_forc.event_end, gpu_buf_pair_forc.pv.n_leaves_found, gpu_buf_pair_forc.ci_d, gpu_buf_pair_forc.cj_d,
                     gpu_buf_pair_forc.first_and_last_daughters, gpu_buf_pair_forc.ci_top, gpu_buf_pair_forc.cj_top);
-#endif
 #endif  // GPUOFFLOAD_FORCE
           } else if (t->subtype == task_subtype_gpu_unpack_d) {
           } else if (t->subtype == task_subtype_gpu_unpack_g) {
@@ -548,8 +462,8 @@ void *runner_main_cuda(void *data) {
             runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 1);
 #else
             runner_dosub_pair1_gradient(r, ci, cj, /*below_h_max=*/0, 1);
-#endif
-#endif
+#endif // EXTRA_HYDRO_LOOP_TYPE2
+#endif // GPUOFFLOAD_GRADIENT
           }
 #endif  // EXTRA_HYDRO_LOOP
           else if (t->subtype == task_subtype_force) {
@@ -613,7 +527,7 @@ void *runner_main_cuda(void *data) {
           runner_do_hydro_sort(
               r, ci, t->flags,
               ci->hydro.dx_max_sort_old > space_maxreldx * ci->dmin,
-              /*lock=*/0, /*rt_requests_sorts=*/1, /*clock=*/1);
+              /*lock=*/0, /*rt_requests_sort=*/1, /*clock=*/1);
           /* Reset the sort flags as our work here is done. */
           t->flags = 0;
           break;
