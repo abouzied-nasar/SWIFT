@@ -393,32 +393,12 @@ void *runner_main_cuda(void *data) {
           else if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
             runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H);
-
-#endif  // GPUOFFLOAD_DENSITY
+#endif
           }
           else if (t->subtype == task_subtype_gpu_pack_g) {
 #ifdef GPUOFFLOAD_GRADIENT
-            /* runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H); */
-              runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_grad, ci, cj, t, /*depth=*/0, /*timer=*/1);
-
-              runner_gpu_pack_daughters_and_launch_g(r, sched, ci, cj,
-                  &gpu_buf_pair_grad.pv, t,
-                  gpu_buf_pair_grad.parts_send_g,
-                  gpu_buf_pair_grad.parts_recv_g,
-                  gpu_buf_pair_grad.d_parts_send_g,
-                  gpu_buf_pair_grad.d_parts_recv_g,
-                    stream_pairs,
-                    d_a, d_H,
-                    e,
-                    gpu_buf_pair_grad.fparti_fpartj_lparti_lpartj,
-                    gpu_buf_pair_grad.event_end,
-                    gpu_buf_pair_grad.pv.n_leaves_found,
-                    gpu_buf_pair_grad.ci_d,
-                    gpu_buf_pair_grad.cj_d,
-                    gpu_buf_pair_grad.first_and_last_daughters,
-                    gpu_buf_pair_grad.ci_top,
-                    gpu_buf_pair_grad.cj_top);
-#endif  // GPUOFFLOAD_GRADIENT
+            runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H);
+#endif
           } else if (t->subtype == task_subtype_gpu_pack_f) {
 #ifdef GPUOFFLOAD_FORCE
               runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_forc, ci, cj, t, /*depth=*/0, /*timer=*/1);

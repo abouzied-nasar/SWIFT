@@ -54,34 +54,59 @@ void gpu_pack_part_self_force(
 
 void gpu_unpack_part_self_density(struct cell* restrict c,
     const struct part_aos_f4_recv_d* restrict parts_aos_buffer,
-    const int tid, const size_t pack_position,
+    const size_t pack_position,
     const size_t count, const struct engine *e);
 
 void gpu_unpack_part_self_gradient(struct cell* restrict c,
     const struct part_aos_f4_recv_g* restrict parts_aos_buffer,
-    const int tid, const size_t pack_position,
+    const size_t pack_position,
     const size_t count, const struct engine *e);
 
 void gpu_unpack_part_self_force(struct cell* restrict c,
     const struct part_aos_f4_recv_f* restrict parts_aos_buffer,
-    const int tid, const size_t pack_position,
+    const size_t pack_position,
     const size_t count, const struct engine *e);
 
 void gpu_pack_part_pair_density(
     const struct cell *c, struct part_aos_f4_send_d *parts_aos_buffer,
-    const int tid, const int local_pack_position,
+    const int local_pack_position,
     const int count, const double3 shift, const int2 cstarts);
 
-void gpu_pack_pair_density(struct gpu_offload_data* buf,
-    const struct runner *r, const struct cell *ci, const struct cell *cj,
-    const double3 shift_tmp, const int tid);
+void gpu_pack_part_pair_gradient(
+    const struct cell *c, struct part_aos_f4_send_g *parts_aos_buffer,
+    const int local_pack_position,
+    const int count, const double3 shift, const int2 cstarts);
+
+void gpu_pack_part_pair_force(
+    const struct cell *c, struct part_aos_f4_send_f *parts_aos_buffer,
+    const int local_pack_position,
+    const int count, const double3 shift, const int2 cstarts);
 
 void gpu_unpack_part_pair_density(
-    const struct runner *r,
     struct cell *c,
     const struct part_aos_f4_recv_d *parts_aos_buffer,
     const size_t pack_ind,
     const size_t count);
+
+void gpu_unpack_part_pair_gradient(
+    struct cell *c,
+    const struct part_aos_f4_recv_g *parts_aos_buffer,
+    const size_t pack_ind,
+    const size_t count);
+
+void gpu_unpack_part_pair_force(
+    struct cell *c,
+    const struct part_aos_f4_recv_f *parts_aos_buffer,
+    const size_t pack_ind,
+    const size_t count);
+
+void gpu_pack_pair_density(struct gpu_offload_data* buf,
+    const struct runner *r, const struct cell *ci, const struct cell *cj,
+    const double3 shift_tmp);
+
+void gpu_pack_pair_gradient(struct gpu_offload_data* buf,
+    const struct runner *r, const struct cell *ci, const struct cell *cj,
+    const double3 shift_tmp);
 
 void gpu_unpack_pair_density(
     const struct runner *r,
@@ -91,6 +116,16 @@ void gpu_unpack_pair_density(
     size_t *pack_ind,
     size_t count_max_parts
     );
+
+void gpu_unpack_pair_gradient(
+    const struct runner *r,
+    struct cell *ci,
+    struct cell *cj,
+    const struct part_aos_f4_recv_g *parts_aos_buffer,
+    size_t *pack_ind,
+    size_t count_max_parts
+    );
+
 
 
 
