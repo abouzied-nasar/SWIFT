@@ -819,9 +819,8 @@ void runner_doself_gpu_unpack(
 }
 
 
-/*
- * @brief Run the actual hydro density self tasks on GPU: Transfer memory to
- * GPU, launch kernels and solve, transfer back and unpack
+/**
+ * @brief Run the hydro density self tasks on GPU
  */
 void runner_doself_gpu_density(
     struct runner *r,
@@ -833,19 +832,30 @@ void runner_doself_gpu_density(
     const float d_H
     ) {
 
-  TIMER_TIC;
-  runner_doself_gpu_launch(r, s, buf, t->subtype, stream, d_a, d_H);
-  TIMER_TOC(timer_doself_gpu_launch_d);
+  /* Pack the data. */
+  runner_doself_gpu_pack_density(r, s, buf, t->ci, t);
 
-  TIMER_TIC2;
-  runner_doself_gpu_unpack(r, s, buf, t->subtype, stream);
-  TIMER_TOC2(timer_doself_gpu_unpack_d);
+  /* No pack tasks left in queue, flag that we want to run */
+  char launch_leftovers = buf->pv.launch_leftovers;
+
+  /* Packed enough tasks. Let's go*/
+  char launch = buf->pv.launch;
+
+  /* Do we have enough stuff to run the GPU ? */
+  if (launch || launch_leftovers) {
+    TIMER_TIC;
+    runner_doself_gpu_launch(r, s, buf, t->subtype, stream, d_a, d_H);
+    TIMER_TOC(timer_doself_gpu_launch_d);
+
+    TIMER_TIC2;
+    runner_doself_gpu_unpack(r, s, buf, t->subtype, stream);
+    TIMER_TOC2(timer_doself_gpu_unpack_d);
+  }
 }
 
 
-/*
- * @brief Run the actual hydro gradient self tasks on GPU: Transfer memory to
- * GPU, launch kernels and solve, transfer back and unpack
+/**
+ * @brief Run the hydro gradient self tasks on GPU
  */
 void runner_doself_gpu_gradient(
     struct runner *r,
@@ -857,19 +867,30 @@ void runner_doself_gpu_gradient(
     const float d_H
     ) {
 
-  TIMER_TIC;
-  runner_doself_gpu_launch(r, s, buf, t->subtype, stream, d_a, d_H);
-  TIMER_TOC(timer_doself_gpu_launch_g);
+  /* Pack the data. */
+  runner_doself_gpu_pack_gradient(r, s, buf, t->ci, t);
 
-  TIMER_TIC2;
-  runner_doself_gpu_unpack(r, s, buf, t->subtype, stream);
-  TIMER_TOC2(timer_doself_gpu_unpack_g);
+  /* No pack tasks left in queue, flag that we want to run */
+  char launch_leftovers = buf->pv.launch_leftovers;
+
+  /* Packed enough tasks. Let's go*/
+  char launch = buf->pv.launch;
+
+  /* Do we have enough stuff to run the GPU ? */
+  if (launch || launch_leftovers) {
+    TIMER_TIC;
+    runner_doself_gpu_launch(r, s, buf, t->subtype, stream, d_a, d_H);
+    TIMER_TOC(timer_doself_gpu_launch_g);
+
+    TIMER_TIC2;
+    runner_doself_gpu_unpack(r, s, buf, t->subtype, stream);
+    TIMER_TOC2(timer_doself_gpu_unpack_g);
+  }
 }
 
 
 /*
- * @brief Run the actual hydro force self tasks on GPU: Transfer memory to
- * GPU, launch kernels and solve, transfer back and unpack
+ * @brief Run the hydro force self tasks on GPU
  */
 void runner_doself_gpu_force(
     struct runner *r,
@@ -881,13 +902,26 @@ void runner_doself_gpu_force(
     const float d_H
     ) {
 
-  TIMER_TIC;
-  runner_doself_gpu_launch(r, s, buf, t->subtype, stream, d_a, d_H);
-  TIMER_TOC(timer_doself_gpu_launch_f);
+  /* Pack the particle data */
+  runner_doself_gpu_pack_force(r, s, buf, t->ci, t);
 
-  TIMER_TIC2;
-  runner_doself_gpu_unpack(r, s, buf, t->subtype, stream);
-  TIMER_TOC2(timer_doself_gpu_unpack_f);
+  /* No pack tasks left in queue, flag that we want to run */
+  char launch_leftovers = buf->pv.launch_leftovers;
+
+  /*Packed enough tasks let's go*/
+  char launch = buf->pv.launch;
+
+  /* Do we have enough stuff to run the GPU ? */
+  if (launch || launch_leftovers) {
+    /*Launch GPU tasks*/
+    TIMER_TIC;
+    runner_doself_gpu_launch(r, s, buf, t->subtype, stream, d_a, d_H);
+    TIMER_TOC(timer_doself_gpu_launch_f);
+
+    TIMER_TIC2;
+    runner_doself_gpu_unpack(r, s, buf, t->subtype, stream);
+    TIMER_TOC2(timer_doself_gpu_unpack_f);
+  }
 }
 
 
@@ -1143,10 +1177,15 @@ void runner_dopair_gpu_unpack_density(
 
 
 
-void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *s,
+void runner_gpu_pack_daughters_and_launch_d(
+    const struct runner *r,
+    struct scheduler *s,
     struct cell * ci, struct cell * cj,
     struct gpu_offload_data* restrict buf,
-    struct task *t, cudaStream_t *stream, float d_a, float d_H){
+    struct task *t,
+    cudaStream_t *stream,
+    const float d_a,
+    const float d_H){
 
   int n_leaves_found = buf->pv.n_leaves_found;
   int** f_l_daughters = buf->first_and_last_daughters;
@@ -1302,6 +1341,23 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
 }
 
 
+
+
+
+void runner_dopair_gpu_density(
+    const struct runner *r,
+    struct scheduler *s,
+    struct cell * ci, struct cell * cj,
+    struct gpu_offload_data* restrict buf,
+    struct task *t,
+    cudaStream_t *stream, const float d_a, const float d_H){
+
+    /* Collect cell interaction data recursively*/
+    runner_dopair_gpu_recurse(r, s, buf, ci, cj, t, /*depth=*/0, /*timer=*/1);
+
+    /* pack the data and run, if enough data has been gathered */
+    runner_gpu_pack_daughters_and_launch_d(r, s, ci, cj, buf, t, stream, d_a, d_H);
+}
 
 
 

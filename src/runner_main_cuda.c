@@ -315,38 +315,16 @@ void *runner_main_cuda(void *data) {
 #endif
           } else if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
-            /* GPU Work */
-            runner_doself_gpu_pack_density(r, sched, &gpu_buf_self_dens, ci, t);
-            /* No pack tasks left in queue, flag that we want to run */
-            char launch_leftovers = gpu_buf_self_dens.pv.launch_leftovers;
-            /* Packed enough tasks. Let's go*/
-            char launch = gpu_buf_self_dens.pv.launch;
-            /* Do we have enough stuff to run the GPU ? */
-            if (launch || launch_leftovers) {
-              runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream, d_a, d_H);
-            }
+            runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream, d_a, d_H);
 #endif
           } /* self / pack */
           else if (t->subtype == task_subtype_gpu_pack_g) {
 #ifdef GPUOFFLOAD_GRADIENT
-            runner_doself_gpu_pack_gradient(r, sched, &gpu_buf_self_grad, ci, t);
-            /* Do we have enough stuff to run the GPU ? */
-            if (gpu_buf_self_grad.pv.launch || gpu_buf_self_grad.pv.launch_leftovers) {
-              runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream, d_a, d_H);
-            }
+            runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream, d_a, d_H);
 #endif  // GPUGRADSELF
           } else if (t->subtype == task_subtype_gpu_pack_f) {
 #ifdef GPUOFFLOAD_FORCE
-            runner_doself_gpu_pack_force(r, sched, &gpu_buf_self_forc, ci, t);
-            /* No pack tasks left in queue, flag that we want to run */
-            char launch_leftovers = gpu_buf_self_forc.pv.launch_leftovers;
-            /*Packed enough tasks let's go*/
-            char launch = gpu_buf_self_forc.pv.launch;
-            /* Do we have enough stuff to run the GPU ? */
-            if (launch || launch_leftovers) {
-              /*Launch GPU tasks*/
-              runner_doself_gpu_force(r, sched, &gpu_buf_self_forc, t, stream, d_a, d_H);
-            }
+            runner_doself_gpu_force(r, sched, &gpu_buf_self_forc, t, stream, d_a, d_H);
 #endif
           }
 #ifdef EXTRA_HYDRO_LOOP
@@ -414,8 +392,8 @@ void *runner_main_cuda(void *data) {
           /* GPU WORK */
           else if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
-            runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_dens, ci, cj, t, /*depth=*/0, /*timer=*/1);
-            runner_gpu_pack_daughters_and_launch_d(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H);
+            runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H);
+
 #endif  // GPUOFFLOAD_DENSITY
           }
           else if (t->subtype == task_subtype_gpu_pack_g) {
