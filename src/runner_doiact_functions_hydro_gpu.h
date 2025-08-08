@@ -1266,8 +1266,13 @@ void runner_dopair_gpu_pack_and_launch(
 
       /* Here we only launch the tasks. No unpacking! This is done in next function ;) */
 /* TODO: CALL TOP LEVEL FUNCTIONS HERE BASED ON TASK TYPE*/
-      runner_dopair_gpu_launch_density(r, buf, stream, d_a, d_H);
-      runner_dopair_gpu_unpack_density(r, s, buf, stream, npacked);
+      if (t->subtype == task_subtype_gpu_pack_d){
+        runner_dopair_gpu_launch_density(r, buf, stream, d_a, d_H);
+        runner_dopair_gpu_unpack_density(r, s, buf, stream, npacked);
+      }
+      else {
+        error("Unknown task subtype %s", subtaskID_names[t->subtype]);
+      }
 
       if(npacked == n_leaves_found){
         pack_vars->n_daughters_total = 0;
@@ -1333,7 +1338,9 @@ void runner_dopair_gpu_pack_and_launch(
 
 
 
-
+/**
+ * Top level runner function to solve hydro density pair tasks on GPU.
+ */
 void runner_dopair_gpu_density(
     const struct runner *r,
     struct scheduler *s,
