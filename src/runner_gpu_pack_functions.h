@@ -76,6 +76,25 @@ void gpu_pack_pair_density(struct gpu_offload_data* buf,
     const struct runner *r, const struct cell *ci, const struct cell *cj,
     const double3 shift_tmp, const int tid);
 
+void gpu_unpack_part_pair_density(
+    const struct runner *r,
+    struct cell *c,
+    const struct part_aos_f4_recv_d *parts_aos_buffer,
+    const size_t pack_ind,
+    const size_t count);
+
+void gpu_unpack_pair_density(
+    const struct runner *r,
+    struct cell *ci,
+    struct cell *cj,
+    const struct part_aos_f4_recv_d *parts_aos_buffer,
+    size_t *pack_ind,
+    size_t count_max_parts
+    );
+
+
+
+
 
 
 /* ------------------------------------------ */
@@ -94,11 +113,6 @@ void runner_doself1_gpu_unpack_neat_aos_f4_f(
     const struct runner *r, struct cell *restrict c,
     struct part_aos_f4_recv_f *restrict parts_aos_buffer, int timer,
     size_t *pack_length, int tid, int count_max_parts_tmp, const struct engine *e);
-
-void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
-    struct runner *r, struct cell *ci, struct cell *cj,
-    struct part_aos_f4_recv_d *parts_aos_buffer, int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, const struct engine *e);
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(
     struct runner *r, struct cell *ci, struct cell *cj,

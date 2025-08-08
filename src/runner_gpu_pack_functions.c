@@ -231,40 +231,32 @@ void gpu_unpack_part_self_force(struct cell* restrict c,
   }
 }
 
+/* TODO: IDEALLY, THIS SHOULD BE IDENTICAL FOR THE SELF TASKS.
+ * PASS A CELL, BUFFER, INDEX TO COPY BACK. THIS REPLICATION IS
+ * UNNECESSARY.*/
+void gpu_unpack_part_pair_density(
+    const struct runner *r,
+    struct cell *c,
+    const struct part_aos_f4_recv_d *parts_aos_buffer,
+    const size_t pack_ind,
+    const size_t count) {
 
-void unpack_neat_pair_aos_f4(struct runner *r, struct cell *c,
-                             struct part_aos_f4_recv_d *parts_aos_buffer, int tid,
-                             int local_pack_position, int count,
-                             const struct engine *e) {
+  const struct part_aos_f4_recv_d *parts_tmp = &parts_aos_buffer[pack_ind];
+  const struct engine* e = r->e;
 
-  struct part_aos_f4_recv_d *parts_tmp = &parts_aos_buffer[local_pack_position];
   if (cell_is_active_hydro(c, e)) {
-    for (int i = 0; i < count; i++) {
+    for (size_t i = 0; i < count; i++) {
+      /* TODO: WHY ARE WE NOT CHECKING WHETHER PARTICLE IS ACTIVE HERE???? */
       struct part_aos_f4_recv_d p_tmp = parts_tmp[i];
       struct part *p = &c->hydro.parts[i];
-      //      c->hydro.parts[i].rho += parts_aos_buffer[j].rho_dh_wcount.x;
       part_set_rho(p, part_get_rho(p) + p_tmp.rho_dh_wcount.x);
-      //      c->hydro.parts[i].density.rho_dh +=
-      //      parts_aos_buffer[j].rho_dh_wcount.y;
       part_set_rho_dh(p, part_get_rho_dh(p) + p_tmp.rho_dh_wcount.y);
-      //      c->hydro.parts[i].density.wcount +=
-      //      parts_aos_buffer[j].rho_dh_wcount.z;
       part_set_wcount(p, part_get_wcount(p) + p_tmp.rho_dh_wcount.z);
-      //      c->hydro.parts[i].density.wcount_dh +=
-      //          parts_aos_buffer[j].rho_dh_wcount.w;
       part_set_wcount_dh(p, part_get_wcount_dh(p) + p_tmp.rho_dh_wcount.w);
-      //      c->hydro.parts[i].density.rot_v[0] +=
-      //      parts_aos_buffer[j].rot_ux_div_v.x;
-      //      c->hydro.parts[i].density.rot_v[1] +=
-      //      parts_aos_buffer[j].rot_ux_div_v.y;
-      //      c->hydro.parts[i].density.rot_v[2] +=
-      //      parts_aos_buffer[j].rot_ux_div_v.z;
       const float *rot_v = part_get_rot_v(p);
       part_set_rot_v_ind(p, 0, rot_v[0] + p_tmp.rot_ux_div_v.x);
       part_set_rot_v_ind(p, 1, rot_v[1] + p_tmp.rot_ux_div_v.y);
       part_set_rot_v_ind(p, 2, rot_v[2] + p_tmp.rot_ux_div_v.z);
-      //      c->hydro.parts[i].viscosity.div_v +=
-      //      parts_aos_buffer[j].rot_ux_div_v.w;
       part_set_div_v(p, part_get_div_v(p) + p_tmp.rot_ux_div_v.w);
     }
   }
@@ -448,36 +440,42 @@ void pack_neat_pair_aos_f4_f(
 }
 
 
-void runner_do_ci_cj_gpu_unpack_neat_aos_f4(
-    struct runner *r, struct cell *ci, struct cell *cj,
-    struct part_aos_f4_recv_d *parts_aos_buffer, int timer, size_t *pack_length,
-    int tid, int count_max_parts_tmp, const struct engine *e) {
+void gpu_unpack_pair_density(
+    const struct runner *r,
+    struct cell *ci,
+    struct cell *cj,
+    const struct part_aos_f4_recv_d *parts_aos_buffer,
+    size_t *pack_ind,
+    size_t count_max_parts
+    ) {
+
+  const struct engine* e = r->e;
 
   if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) {
     message("Inactive cell");
     return;
   }
-  int count_ci = ci->hydro.count;
-  int count_cj = cj->hydro.count;
-  int local_pack_position = (*pack_length);
+  size_t count_ci = ci->hydro.count;
+  size_t count_cj = cj->hydro.count;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (local_pack_position + count_ci + count_cj >= count_max_parts_tmp) {
-    error("Exceeded count_max_parts_tmp. Make arrays bigger! pack_length is "
-          "%lu pointer to pack_length is %p, local_pack_position is % i, "
-          "count is %i",
-          (*pack_length), pack_length, local_pack_position, count_ci);
+  if (*pack_ind + count_ci + count_cj >= count_max_parts) {
+    error("Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind is "
+          "%lu, counts are %lu %lu, max is %lu",
+          *pack_ind, count_ci, count_cj, count_max_parts);
   }
 #endif
 
-  unpack_neat_pair_aos_f4(r, ci, parts_aos_buffer, tid, local_pack_position,
-                          count_ci, e);
-  local_pack_position += count_ci;
+  gpu_unpack_part_pair_density(r, ci, parts_aos_buffer, *pack_ind, count_ci);
+
+  /* Increment packed index accordingly */
+  *pack_ind += count_ci;
+
   /* Pack the particle data into CPU-side buffers*/
-  unpack_neat_pair_aos_f4(r, cj, parts_aos_buffer, tid, local_pack_position,
-                          count_cj, e);
-  /* Increment pack length accordingly */
-  (*pack_length) += count_ci + count_cj;
+  gpu_unpack_part_pair_density(r, cj, parts_aos_buffer, *pack_ind, count_cj);
+
+  /* Increment packed index accordingly */
+  *pack_ind += count_cj;
 }
 
 void runner_do_ci_cj_gpu_unpack_neat_aos_f4_g(

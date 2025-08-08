@@ -64,7 +64,7 @@ extern "C" {
  * @param t the associated task to pack
  * @param mode: 0 for density, 1 for gradient, 2 for force
  */
-void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_data *buf, enum task_subtypes task_subtype) {
+void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_data *buf, const enum task_subtypes task_subtype) {
 
   /* Grab a hold of the packing buffers */
   struct gpu_pack_vars* pv = &(buf->pv);
@@ -143,8 +143,8 @@ void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_
 /**
  * @brief packs the data required for the self density tasks.
  */
-void runner_doself_gpu_pack_density(struct runner *r, struct scheduler *s, struct
-    gpu_offload_data *buf, struct cell *ci, struct task *t) {
+void runner_doself_gpu_pack_density(const struct runner *r, struct scheduler *s,
+    struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
 
@@ -166,8 +166,8 @@ void runner_doself_gpu_pack_density(struct runner *r, struct scheduler *s, struc
 /**
  * @brief packs the data required for the self gradient tasks.
  */
-void runner_doself_gpu_pack_gradient(struct runner *r, struct scheduler *s, struct
-    gpu_offload_data *buf, struct cell *ci, struct task *t) {
+void runner_doself_gpu_pack_gradient(const struct runner *r, struct scheduler *s,
+    struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
 
@@ -189,8 +189,8 @@ void runner_doself_gpu_pack_gradient(struct runner *r, struct scheduler *s, stru
 /**
  * @brief packs the data required for the self force tasks.
  */
-void runner_doself_gpu_pack_force(struct runner *r, struct scheduler *s, struct
-    gpu_offload_data *buf, struct cell *ci, struct task *t) {
+void runner_doself_gpu_pack_force(const struct runner *r, struct scheduler *s,
+    struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
 
@@ -217,8 +217,8 @@ void runner_doself_gpu_pack_force(struct runner *r, struct scheduler *s, struct
 void runner_dopair_gpu_recurse(const struct runner *r,
                         const struct scheduler *s,
                         struct gpu_offload_data* restrict buf,
-                        struct cell *ci, struct cell *cj, struct task *t,
-                        int depth, char timer){
+                        struct cell *ci, struct cell *cj, const struct task *t,
+                        const int depth, const char timer){
 
   if (timer) {
     TIMER_TIC;
@@ -283,6 +283,9 @@ void runner_dopair_gpu_recurse(const struct runner *r,
 
 
 
+/**
+ * Generic function to pack GPU pair tasks
+ */
 void runner_dopair_gpu_pack(const struct runner *r, const struct scheduler *s,
                         struct gpu_offload_data *restrict buf,
                         const struct cell *ci, const struct cell *cj,
@@ -358,6 +361,9 @@ void runner_dopair_gpu_pack(const struct runner *r, const struct scheduler *s,
 
 
 
+/**
+ * Wrapper to pack data for density pair tasks on the GPU.
+ */
 void runner_dopair_gpu_pack_density(const struct runner *r, const struct scheduler *s,
                               struct gpu_offload_data *restrict buf,
                               const struct cell *ci, const struct cell *cj, const struct task *t){
@@ -889,7 +895,7 @@ void runner_doself_gpu_force(
  * Generic function to launch GPU pair tasks
  */
 void runner_dopair_gpu_launch(
-    const struct runner *r, const struct scheduler *s,
+    const struct runner *r,
     struct gpu_offload_data* restrict buf,
     cudaStream_t *stream, const float d_a,
     const float d_H,
@@ -897,8 +903,6 @@ void runner_dopair_gpu_launch(
 
   /* Grab handles */
   struct gpu_pack_vars* pack_vars = &buf->pv;
-  struct part_aos_f4_send_d *d_parts_send = buf->d_parts_send_d;
-  struct part_aos_f4_recv_d *d_parts_recv = buf->d_parts_recv_d;
   int4* fparti_fpartj_lparti_lpartj_dens = buf->fparti_fpartj_lparti_lpartj;
   cudaEvent_t *pair_end = buf->event_end;
 
@@ -951,6 +955,7 @@ void runner_dopair_gpu_launch(
     const size_t bundle_n_parts =
         pack_vars->bundle_last_part[bid] - first_part_tmp_i;
 
+    /* Transfer memory to device */
     if (task_subtype == task_subtype_gpu_launch_d){
 
       cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp_i],
@@ -981,7 +986,7 @@ void runner_dopair_gpu_launch(
     /* Launch the kernel for ci using data for ci and cj */
     if (task_subtype == task_subtype_gpu_launch_d){
       gpu_launch_pair_density(
-          d_parts_send, d_parts_recv, d_a, d_H, stream[bid], numBlocks_x,
+          buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H, stream[bid], numBlocks_x,
           numBlocks_y, bundle_part_0, bundle_n_parts);
     }
     else {
@@ -1039,7 +1044,6 @@ void runner_dopair_gpu_launch(
  */
 void runner_dopair_gpu_launch_density(
     const struct runner *r,
-    const struct scheduler *s,
     struct gpu_offload_data* restrict buf,
     cudaStream_t *stream,
     const float d_a,
@@ -1047,7 +1051,7 @@ void runner_dopair_gpu_launch_density(
 
   TIMER_TIC;
 
-  runner_dopair_gpu_launch(r, s, buf, stream, d_a, d_H, task_subtype_gpu_launch_d);
+  runner_dopair_gpu_launch(r, buf, stream, d_a, d_H, task_subtype_gpu_launch_d);
 
   TIMER_TOC(timer_dopair_gpu_launch_d);
 }
@@ -1055,14 +1059,46 @@ void runner_dopair_gpu_launch_density(
 
 
 
-void runner_dopair_unpack_d(
-    struct runner *r, struct scheduler *s, struct gpu_pack_vars *pack_vars,
-    struct task *t, struct part_aos_f4_send_d *parts_send,
-    struct part_aos_f4_recv_d *parts_recv, struct part_aos_f4_send_d *d_parts_send,
-    struct part_aos_f4_recv_d *d_parts_recv, cudaStream_t *stream, float d_a,
-    float d_H, const struct engine *e, int4 *fparti_fpartj_lparti_lpartj_dens,
-    cudaEvent_t *pair_end, int npacked, int n_leaves_found, struct cell ** ci_d, struct cell ** cj_d, int ** f_l_daughters
-    , struct cell ** ci_top, struct cell ** cj_top) {
+/**
+ * TODO: Documentation
+ * WHAT IS NPACKED??
+ */
+void runner_dopair_gpu_unpack_density(
+    const struct runner *r,
+    struct scheduler *s,
+    struct gpu_offload_data* restrict buf,
+    /* struct gpu_pack_vars *pack_vars, */
+    /* struct task *t, */
+    /* struct part_aos_f4_send_d *parts_send, */
+    /* struct part_aos_f4_recv_d *parts_recv, */
+    /* struct part_aos_f4_send_d *d_parts_send, */
+    /* struct part_aos_f4_recv_d *d_parts_recv, */
+    cudaStream_t *stream,
+    /* float d_a, */
+    /* float d_H, */
+    /* const struct engine *e, */
+    /* int4 *fparti_fpartj_lparti_lpartj_dens, */
+    /* cudaEvent_t *pair_end, */
+    const int npacked
+    /* int n_leaves_found, */
+    /* struct cell ** ci_d, */
+    /* struct cell ** cj_d, */
+    /* int ** f_l_daughters, */
+    /* struct cell ** ci_top, */
+    /* struct cell ** cj_top) { */
+    ){
+
+  /* Grab handles */
+
+  struct gpu_pack_vars* pack_vars = &buf->pv;
+  int n_leaves_found = buf->pv.n_leaves_found;
+
+  struct cell ** ci_d = buf->ci_d;
+  struct cell ** cj_d = buf->cj_d;
+  int** f_l_daughters = buf->first_and_last_daughters;
+  struct cell ** ci_top = buf->ci_top;
+  struct cell ** cj_top = buf->cj_top;
+
 
   /////////////////////////////////
   // Should this be reset to zero HERE???
@@ -1083,9 +1119,9 @@ void runner_dopair_unpack_d(
       /*Get pointers to the leaf cells*/
       struct cell *cii_l = ci_d[tid];
       struct cell *cjj_l = cj_d[tid];
-      runner_do_ci_cj_gpu_unpack_neat_aos_f4(r, cii_l, cjj_l, parts_recv, 0,
-                                             &pack_length_unpack, tid,
-                                             2 * pack_vars->count_max_parts, e);
+
+      gpu_unpack_pair_density(r, cii_l, cjj_l, buf->parts_recv_d, &pack_length_unpack, 2 * pack_vars->count_max_parts);
+      /* TODO: WHY IS THERE A FACTOR OF 2 HERE? */
     }
     cell_unlocktree(ci_top[topid]);
     cell_unlocktree(cj_top[topid]);
@@ -1096,6 +1132,7 @@ void runner_dopair_unpack_d(
     if (topid == pack_vars->top_tasks_packed - 1 && npacked != n_leaves_found) {
       continue;
     }
+
     enqueue_dependencies(s, pack_vars->top_task_list[topid]);
     pthread_mutex_lock(&s->sleep_mutex);
     atomic_dec(&s->waiting);
@@ -1111,20 +1148,13 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
     struct gpu_offload_data* restrict buf,
     struct task *t, cudaStream_t *stream, float d_a, float d_H){
 
-  const struct engine* e = r->e;
   int n_leaves_found = buf->pv.n_leaves_found;
-  struct part_aos_f4_send_d *parts_send = buf->parts_send_d;
-  struct part_aos_f4_recv_d *parts_recv = buf->parts_recv_d;
-  struct part_aos_f4_send_d *d_parts_send = buf->d_parts_send_d;
-  struct part_aos_f4_recv_d *d_parts_recv = buf->d_parts_recv_d;
   int** f_l_daughters = buf->first_and_last_daughters;
-  int4* fparti_fpartj_lparti_lpartj_dens = buf->fparti_fpartj_lparti_lpartj;
 
   struct cell ** ci_d = buf->ci_d;
   struct cell ** cj_d = buf->cj_d;
   struct cell ** ci_top = buf->ci_top;
   struct cell ** cj_top = buf->cj_top;
-  cudaEvent_t *pair_end = buf->event_end;
 
   struct gpu_pack_vars* pack_vars = &buf->pv;
 
@@ -1138,6 +1168,8 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
   ci_top[top_tasks_packed] = ci;
   cj_top[top_tasks_packed] = cj;
 
+  /* TODO ABOUZIED: WE HAVE BOTH LEAVES TOTAL AND DAUGHTERS TOTAL. DO WE NEED
+   * BOTH? */
   pack_vars->n_leaves_total += n_leaves_found;
 
   int first_cell_to_move = pack_vars->n_daughters_packed_index;
@@ -1149,12 +1181,14 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
   /* Increment how many top tasks we've packed */
   pack_vars->top_tasks_packed++;
 
-  //A. Nasar: Remove this from struct as not needed. Was only used for de-bugging
+  /* A. Nasar: Remove this from struct as not needed. Was only used for de-bugging */
+  /* TODO: Abouzied, do this please! */
   /* How many daughter tasks do we want to offload at once?*/
   size_t target_n_tasks_tmp = pack_vars->target_n_tasks;
 
-  // A. Nasar: Check to see if this is the last task in the queue.
-  // If so, set launch_leftovers to 1 and recursively pack and launch daughter tasks on GPU
+  /* A. Nasar: Check to see if this is the last task in the queue. If so, set
+   * launch_leftovers to 1 and recursively pack and launch daughter tasks on
+   * GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].n_packs_pair_left_d--;
@@ -1202,14 +1236,10 @@ void runner_gpu_pack_daughters_and_launch_d(struct runner *r, struct scheduler *
       launched = 1;
 
       /* Here we only launch the tasks. No unpacking! This is done in next function ;) */
-      runner_dopair_gpu_launch_density(r, s, buf, stream, d_a, d_H);
+      /* TODO: CALL TOP LEVEL FUNCTIONS HERE */
+      runner_dopair_gpu_launch_density(r, buf, stream, d_a, d_H);
+      runner_dopair_gpu_unpack_density(r, s, buf, stream, npacked);
 
-      runner_dopair_unpack_d(
-            r, s, pack_vars, t, parts_send,
-            parts_recv, d_parts_send,
-            d_parts_recv, stream, d_a, d_H, e,
-            fparti_fpartj_lparti_lpartj_dens,
-            pair_end, npacked, n_leaves_found, ci_d, cj_d, f_l_daughters, ci_top, cj_top);
       if(npacked == n_leaves_found){
         pack_vars->n_daughters_total = 0;
         pack_vars->top_tasks_packed = 0;
