@@ -1176,8 +1176,11 @@ void runner_dopair_gpu_unpack_density(
 }
 
 
-
-void runner_gpu_pack_daughters_and_launch_d(
+/**
+ * Generic function to pack pair tasks and launch them
+ * on the device depending on the task subtype
+ */
+void runner_dopair_gpu_pack_and_launch(
     const struct runner *r,
     struct scheduler *s,
     struct cell * ci, struct cell * cj,
@@ -1187,25 +1190,21 @@ void runner_gpu_pack_daughters_and_launch_d(
     const float d_a,
     const float d_H){
 
+  /* Grab handles */
+  struct gpu_pack_vars* pack_vars = &buf->pv;
   int n_leaves_found = buf->pv.n_leaves_found;
   int** f_l_daughters = buf->first_and_last_daughters;
-
-  struct cell ** ci_d = buf->ci_d;
-  struct cell ** cj_d = buf->cj_d;
-  struct cell ** ci_top = buf->ci_top;
-  struct cell ** cj_top = buf->cj_top;
-
-  struct gpu_pack_vars* pack_vars = &buf->pv;
-
-  pack_vars->n_daughters_total += n_leaves_found;
   int top_tasks_packed = pack_vars->top_tasks_packed;
+
+  /* TODO: WHY IS THIS HERE AND NOT IN RUNNER_GPU_RECURSE??? */
+  pack_vars->n_daughters_total += n_leaves_found;
 
   /* Keep separate */
   f_l_daughters[top_tasks_packed][0] = pack_vars->n_daughters_packed_index;
 
   /* Keep separate */
-  ci_top[top_tasks_packed] = ci;
-  cj_top[top_tasks_packed] = cj;
+  buf->ci_top[top_tasks_packed] = ci;
+  buf->cj_top[top_tasks_packed] = cj;
 
   /* TODO ABOUZIED: WE HAVE BOTH LEAVES TOTAL AND DAUGHTERS TOTAL. DO WE NEED
    * BOTH? */
@@ -1225,15 +1224,6 @@ void runner_gpu_pack_daughters_and_launch_d(
   /* How many daughter tasks do we want to offload at once?*/
   size_t target_n_tasks_tmp = pack_vars->target_n_tasks;
 
-  /* A. Nasar: Check to see if this is the last task in the queue. If so, set
-   * launch_leftovers to 1 and recursively pack and launch daughter tasks on
-   * GPU */
-  unsigned int qid = r->qid;
-  lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_pair_left_d--;
-  if (s->queues[qid].n_packs_pair_left_d < 1) pack_vars->launch_leftovers = 1;
-  (void)lock_unlock(&s->queues[qid].lock);
-
   /* Counter for how many tasks we've packed */
   int npacked = 0;
   int launched = 0;
@@ -1252,8 +1242,8 @@ void runner_gpu_pack_daughters_and_launch_d(
   while(npacked < n_leaves_found){
 
     top_tasks_packed = pack_vars->top_tasks_packed;
-    struct cell * cii = ci_d[copy_index];
-    struct cell * cjj = cj_d[copy_index];
+    struct cell * cii = buf->ci_d[copy_index];
+    struct cell * cjj = buf->cj_d[copy_index];
     runner_dopair_gpu_pack_density(r, s, buf, cii, cjj, t);
 
     /* record number of tasks we've copied from last launch */
@@ -1275,7 +1265,7 @@ void runner_gpu_pack_daughters_and_launch_d(
       launched = 1;
 
       /* Here we only launch the tasks. No unpacking! This is done in next function ;) */
-      /* TODO: CALL TOP LEVEL FUNCTIONS HERE */
+/* TODO: CALL TOP LEVEL FUNCTIONS HERE BASED ON TASK TYPE*/
       runner_dopair_gpu_launch_density(r, buf, stream, d_a, d_H);
       runner_dopair_gpu_unpack_density(r, s, buf, stream, npacked);
 
@@ -1293,15 +1283,15 @@ void runner_gpu_pack_daughters_and_launch_d(
          * starts from zero and ends in n_daughters_left */
         for (int i = first_cell_to_move; i < n_daughters_left; i++) {
           int shuffle = i - first_cell_to_move;
-          ci_d[shuffle] = ci_d[i];
-          cj_d[shuffle] = cj_d[i];
+          buf->ci_d[shuffle] = buf->ci_d[i];
+          buf->cj_d[shuffle] = buf->cj_d[i];
         }
         copy_index = 0;
         f_l_daughters[0][0] = 0;
         f_l_daughters[0][1] = n_daughters_left - first_cell_to_move;
 
-        cj_top[0] = cj;
-        ci_top[0] = ci;
+        buf->cj_top[0] = cj;
+        buf->ci_top[0] = ci;
 
         n_daughters_left -= first_cell_to_move;
         first_cell_to_move = 0;
@@ -1318,8 +1308,8 @@ void runner_gpu_pack_daughters_and_launch_d(
     else if(npacked == n_leaves_found){
       if(launched == 1){
         pack_vars->n_daughters_total = n_daughters_left;
-        cj_top[0] = cj;
-        ci_top[0] = ci;
+        buf->cj_top[0] = cj;
+        buf->ci_top[0] = ci;
         f_l_daughters[0][0] = 0;
         f_l_daughters[0][1] = n_daughters_left;
         pack_vars->top_tasks_packed = 1;
@@ -1355,8 +1345,33 @@ void runner_dopair_gpu_density(
     /* Collect cell interaction data recursively*/
     runner_dopair_gpu_recurse(r, s, buf, ci, cj, t, /*depth=*/0, /*timer=*/1);
 
+    /* A. Nasar: Check to see if this is the last task in the queue. If so, set
+     * launch_leftovers to 1 and recursively pack and launch daughter tasks on
+     * GPU */
+    unsigned int qid = r->qid;
+    lock_lock(&s->queues[qid].lock);
+    s->queues[qid].n_packs_pair_left_d--;
+    if (s->queues[qid].n_packs_pair_left_d < 1) buf->pv.launch_leftovers = 1;
+    (void)lock_unlock(&s->queues[qid].lock);
+
     /* pack the data and run, if enough data has been gathered */
-    runner_gpu_pack_daughters_and_launch_d(r, s, ci, cj, buf, t, stream, d_a, d_H);
+    runner_dopair_gpu_pack_and_launch(r, s, ci, cj, buf, t, stream, d_a, d_H);
+}
+
+
+void runner_dopair_gpu_gradient(
+    const struct runner *r,
+    struct scheduler *s,
+    struct cell * ci, struct cell * cj,
+    struct gpu_offload_data* restrict buf,
+    struct task *t,
+    cudaStream_t *stream, const float d_a, const float d_H){
+
+    /* Collect cell interaction data recursively*/
+    runner_dopair_gpu_recurse(r, s, buf, ci, cj, t, /*depth=*/0, /*timer=*/1);
+
+    /* pack the data and run, if enough data has been gathered */
+    /* runner_gpu_pack_daughters_and_launch_grad(r, s, ci, cj, buf, t, stream, d_a, d_H); */
 }
 
 
