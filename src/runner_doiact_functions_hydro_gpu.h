@@ -1,7 +1,6 @@
 /*******************************************************************************
  * This file is part of SWIFT.
- * Copyright (c)
- *               2025 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
+ * Copyright (c) 2025 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
  *                    Mladen Ivkovic (mladen.ivkovic@durham.ac.uk)
  *
  * This program is free software: you can redistribute it and/or modify
@@ -28,6 +27,7 @@ extern "C" {
 /* #include "atomic.h" */
 #include "active.h"
 #include "error.h"
+#include "inline.h"
 #include "runner.h"
 #include "runner_gpu_pack_functions.h"
 #include "scheduler.h"
@@ -62,7 +62,7 @@ extern "C" {
  * @param t the associated task to pack
  * @param mode: 0 for density, 1 for gradient, 2 for force
  */
-void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_data *buf, const enum task_subtypes task_subtype) {
+__attribute__((always_inline)) INLINE void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_data *buf, const enum task_subtypes task_subtype) {
 
   /* Grab a hold of the packing buffers */
   struct gpu_pack_vars* pv = &(buf->pv);
@@ -119,7 +119,9 @@ void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_
   }
 
   /* Tell the cell it has been packed */
+#ifdef CUDA_DEBUG
   ci->pack_done++;
+#endif
 
   /* Record that we have now done a packing (self) */
   t->done = 1;
@@ -141,7 +143,7 @@ void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_
 /**
  * @brief packs the data required for the self density tasks.
  */
-void runner_doself_gpu_pack_density(const struct runner *r, struct scheduler *s,
+__attribute__((always_inline)) INLINE void runner_doself_gpu_pack_density(const struct runner *r, struct scheduler *s,
     struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -164,7 +166,7 @@ void runner_doself_gpu_pack_density(const struct runner *r, struct scheduler *s,
 /**
  * @brief packs the data required for the self gradient tasks.
  */
-void runner_doself_gpu_pack_gradient(const struct runner *r, struct scheduler *s,
+__attribute__((always_inline)) INLINE void runner_doself_gpu_pack_gradient(const struct runner *r, struct scheduler *s,
     struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -187,7 +189,7 @@ void runner_doself_gpu_pack_gradient(const struct runner *r, struct scheduler *s
 /**
  * @brief packs the data required for the self force tasks.
  */
-void runner_doself_gpu_pack_force(const struct runner *r, struct scheduler *s,
+__attribute__((always_inline)) INLINE void runner_doself_gpu_pack_force(const struct runner *r, struct scheduler *s,
     struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -212,7 +214,7 @@ void runner_doself_gpu_pack_force(const struct runner *r, struct scheduler *s,
 /**
  * @brief recurse into a (sub-)pair task and identify all cell-cell interactions.
  */
-void runner_dopair_gpu_recurse(const struct runner *r,
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_recurse(const struct runner *r,
                         const struct scheduler *s,
                         struct gpu_offload_data* restrict buf,
                         struct cell *ci, struct cell *cj, const struct task *t,
@@ -282,7 +284,7 @@ void runner_dopair_gpu_recurse(const struct runner *r,
 /**
  * Generic function to pack GPU pair tasks
  */
-void runner_dopair_gpu_pack(const struct runner *r, const struct scheduler *s,
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_pack(const struct runner *r,
                         struct gpu_offload_data *restrict buf,
                         const struct cell *ci, const struct cell *cj,
                         const enum task_subtypes task_subtype){
@@ -341,8 +343,11 @@ void runner_dopair_gpu_pack(const struct runner *r, const struct scheduler *s,
   fparti_fpartj_lparti_lpartj[tid].w = pack_vars->count_parts;
 
   /* Tell the cells they have been packed */
-  /* ci->pack_done++; */ /* TODO: REMOVE THIS */
+#ifdef CUDA_DEBUG
+  /* TODO: REMOVE THIS? PREVENTS CELL FROM BEING CONST ARGUMENT*/
+  /* ci->pack_done++; */
   /* cj->pack_done++; */
+#endif
 
   /* Identify first particle for each bundle of tasks */
   const int bundle_size = pack_vars->bundle_size;
@@ -364,36 +369,36 @@ void runner_dopair_gpu_pack(const struct runner *r, const struct scheduler *s,
 /**
  * Wrapper to pack data for density pair tasks on the GPU.
  */
-void runner_dopair_gpu_pack_density(const struct runner *r, const struct scheduler *s,
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_density(const struct runner *r,
                               struct gpu_offload_data *restrict buf,
                               const struct cell *ci, const struct cell *cj, const struct task *t){
 
   TIMER_TIC;
-  runner_dopair_gpu_pack(r, s, buf, ci, cj, t->subtype);
+  runner_dopair_gpu_pack(r, buf, ci, cj, t->subtype);
   TIMER_TOC(timer_dopair_gpu_pack_d);
 }
 
 /**
  * Wrapper to pack data for density pair tasks on the GPU.
  */
-void runner_dopair_gpu_pack_gradient(const struct runner *r, const struct scheduler *s,
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_gradient(const struct runner *r,
                               struct gpu_offload_data *restrict buf,
                               const struct cell *ci, const struct cell *cj, const struct task *t){
 
   TIMER_TIC;
-  runner_dopair_gpu_pack(r, s, buf, ci, cj, t->subtype);
+  runner_dopair_gpu_pack(r, buf, ci, cj, t->subtype);
   TIMER_TOC(timer_dopair_gpu_pack_g);
 }
 
 /**
  * Wrapper to pack data for density pair tasks on the GPU.
  */
-void runner_dopair_gpu_pack_force(const struct runner *r, const struct scheduler *s,
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_force(const struct runner *r,
                               struct gpu_offload_data *restrict buf,
                               const struct cell *ci, const struct cell *cj, const struct task *t){
 
   TIMER_TIC;
-  runner_dopair_gpu_pack(r, s, buf, ci, cj, t->subtype);
+  runner_dopair_gpu_pack(r, buf, ci, cj, t->subtype);
   TIMER_TOC(timer_dopair_gpu_pack_f);
 }
 
@@ -402,9 +407,8 @@ void runner_dopair_gpu_pack_force(const struct runner *r, const struct scheduler
  * @brief Solves self task on GPU: Copies data over to GPU and launches
  * appropriate kernels given the task_subtype.
  */
-void runner_doself_gpu_launch(
+__attribute__((always_inline)) INLINE void runner_doself_gpu_launch(
     const struct runner *r,
-    struct scheduler *s,
     struct gpu_offload_data *buf,
     const enum task_subtypes task_subtype,
     cudaStream_t *stream,
@@ -585,12 +589,11 @@ void runner_doself_gpu_launch(
 /**
  * @ brief Unpacks the completed self tasks for the corresponding task_subtype
  */
-void runner_doself_gpu_unpack(
+__attribute__((always_inline)) INLINE void runner_doself_gpu_unpack(
     const struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data *buf,
-    const enum task_subtypes task_subtype,
-    cudaStream_t *stream
+    const enum task_subtypes task_subtype
     ) {
 
   const struct engine* e = r->e;
@@ -710,11 +713,11 @@ void runner_doself_gpu_density(
   /* Do we have enough stuff to run the GPU ? */
   if (launch || launch_leftovers) {
     TIMER_TIC;
-    runner_doself_gpu_launch(r, s, buf, t->subtype, stream, d_a, d_H);
+    runner_doself_gpu_launch(r, buf, t->subtype, stream, d_a, d_H);
     TIMER_TOC(timer_doself_gpu_launch_d);
 
     TIMER_TIC2;
-    runner_doself_gpu_unpack(r, s, buf, t->subtype, stream);
+    runner_doself_gpu_unpack(r, s, buf, t->subtype);
     TIMER_TOC2(timer_doself_gpu_unpack_d);
   }
 }
@@ -745,11 +748,11 @@ void runner_doself_gpu_gradient(
   /* Do we have enough stuff to run the GPU ? */
   if (launch || launch_leftovers) {
     TIMER_TIC;
-    runner_doself_gpu_launch(r, s, buf, t->subtype, stream, d_a, d_H);
+    runner_doself_gpu_launch(r, buf, t->subtype, stream, d_a, d_H);
     TIMER_TOC(timer_doself_gpu_launch_g);
 
     TIMER_TIC2;
-    runner_doself_gpu_unpack(r, s, buf, t->subtype, stream);
+    runner_doself_gpu_unpack(r, s, buf, t->subtype);
     TIMER_TOC2(timer_doself_gpu_unpack_g);
   }
 }
@@ -781,11 +784,11 @@ void runner_doself_gpu_force(
   if (launch || launch_leftovers) {
     /*Launch GPU tasks*/
     TIMER_TIC;
-    runner_doself_gpu_launch(r, s, buf, t->subtype, stream, d_a, d_H);
+    runner_doself_gpu_launch(r, buf, t->subtype, stream, d_a, d_H);
     TIMER_TOC(timer_doself_gpu_launch_f);
 
     TIMER_TIC2;
-    runner_doself_gpu_unpack(r, s, buf, t->subtype, stream);
+    runner_doself_gpu_unpack(r, s, buf, t->subtype);
     TIMER_TOC2(timer_doself_gpu_unpack_f);
   }
 }
@@ -794,7 +797,7 @@ void runner_doself_gpu_force(
 /**
  * Generic function to launch GPU pair tasks
  */
-void runner_dopair_gpu_launch(
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_launch(
     const struct runner *r,
     struct gpu_offload_data* restrict buf,
     cudaStream_t *stream, const float d_a,
@@ -976,7 +979,7 @@ void runner_dopair_gpu_launch(
 /**
  * Wrapper to launch density pair tasks on the GPU.
  */
-void runner_dopair_gpu_launch_density(
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_launch_density(
     const struct runner *r,
     struct gpu_offload_data* restrict buf,
     cudaStream_t *stream,
@@ -993,7 +996,7 @@ void runner_dopair_gpu_launch_density(
 /**
  * Wrapper to launch density pair tasks on the GPU.
  */
-void runner_dopair_gpu_launch_gradient(
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_launch_gradient(
     const struct runner *r,
     struct gpu_offload_data* restrict buf,
     cudaStream_t *stream,
@@ -1010,7 +1013,7 @@ void runner_dopair_gpu_launch_gradient(
 /**
  * Wrapper to launch density pair tasks on the GPU.
  */
-void runner_dopair_gpu_launch_force(
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_launch_force(
     const struct runner *r,
     struct gpu_offload_data* restrict buf,
     cudaStream_t *stream,
@@ -1029,12 +1032,11 @@ void runner_dopair_gpu_launch_force(
  * Generic function to unpack a GPU pair task depending on the task subtype.
  * TODO: DOCUMENT WHAT IS NPACKED??
  */
-void runner_dopair_gpu_unpack(
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack(
     const struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data* restrict buf,
     const int npacked,
-    cudaStream_t *stream,
     const enum task_subtypes task_subtype
     ){
 
@@ -1114,17 +1116,16 @@ void runner_dopair_gpu_unpack(
  * Provide the correct subtype to use and time the runtime separately
  * TODO: Documentation: WHAT IS NPACKED??
  */
-void runner_dopair_gpu_unpack_density(
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack_density(
     const struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data* restrict buf,
-    const int npacked,
-    cudaStream_t *stream
+    const int npacked
     ){
 
   TIMER_TIC;
 
-  runner_dopair_gpu_unpack(r, s, buf, npacked, stream, task_subtype_gpu_pack_d);
+  runner_dopair_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_pack_d);
 
   TIMER_TOC(timer_dopair_gpu_unpack_d);
 }
@@ -1134,17 +1135,16 @@ void runner_dopair_gpu_unpack_density(
  * Provide the correct subtype to use and time the runtime separately
  * TODO: Documentation: WHAT IS NPACKED??
  */
-void runner_dopair_gpu_unpack_gradient(
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack_gradient(
     const struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data* restrict buf,
-    const int npacked,
-    cudaStream_t *stream
+    const int npacked
     ){
 
   TIMER_TIC;
 
-  runner_dopair_gpu_unpack(r, s, buf, npacked, stream, task_subtype_gpu_pack_g);
+  runner_dopair_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_pack_g);
 
   TIMER_TOC(timer_dopair_gpu_unpack_g);
 }
@@ -1155,17 +1155,16 @@ void runner_dopair_gpu_unpack_gradient(
  * Provide the correct subtype to use and time the runtime separately
  * TODO: Documentation: WHAT IS NPACKED??
  */
-void runner_dopair_gpu_unpack_force(
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack_force(
     const struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data* restrict buf,
-    const int npacked,
-    cudaStream_t *stream
+    const int npacked
     ){
 
   TIMER_TIC;
 
-  runner_dopair_gpu_unpack(r, s, buf, npacked, stream, task_subtype_gpu_pack_f);
+  runner_dopair_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_pack_f);
 
   TIMER_TOC(timer_dopair_gpu_unpack_f);
 }
@@ -1176,7 +1175,7 @@ void runner_dopair_gpu_unpack_force(
  * Generic function to pack pair tasks and launch them
  * on the device depending on the task subtype
  */
-void runner_dopair_gpu_pack_and_launch(
+__attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_and_launch(
     const struct runner *r,
     struct scheduler *s,
     struct cell * ci, struct cell * cj,
@@ -1242,13 +1241,13 @@ void runner_dopair_gpu_pack_and_launch(
     struct cell * cjj = buf->cj_d[copy_index];
 
     if (t->subtype == task_subtype_gpu_pack_d){
-      runner_dopair_gpu_pack_density(r, s, buf, cii, cjj, t);
+      runner_dopair_gpu_pack_density(r, buf, cii, cjj, t);
     }
     else if (t->subtype == task_subtype_gpu_pack_g){
-      runner_dopair_gpu_pack_gradient(r, s, buf, cii, cjj, t);
+      runner_dopair_gpu_pack_gradient(r, buf, cii, cjj, t);
     }
     else if (t->subtype == task_subtype_gpu_pack_f){
-      runner_dopair_gpu_pack_force(r, s, buf, cii, cjj, t);
+      runner_dopair_gpu_pack_force(r, buf, cii, cjj, t);
     } else {
       error("Unknown task subtype %s", subtaskID_names[t->subtype]);
     }
@@ -1275,20 +1274,20 @@ void runner_dopair_gpu_pack_and_launch(
         /* Launch the tasks */
         runner_dopair_gpu_launch_density(r, buf, stream, d_a, d_H);
         /* Unpack the results into CPU memory */
-        runner_dopair_gpu_unpack_density(r, s, buf, npacked, stream);
+        runner_dopair_gpu_unpack_density(r, s, buf, npacked);
       }
       else if (t->subtype == task_subtype_gpu_pack_g){
         /* Launch the tasks */
         runner_dopair_gpu_launch_gradient(r, buf, stream, d_a, d_H);
         /* Unpack the results into CPU memory */
-        runner_dopair_gpu_unpack_gradient(r, s, buf, npacked, stream);
+        runner_dopair_gpu_unpack_gradient(r, s, buf, npacked);
       }
       else if (t->subtype == task_subtype_gpu_pack_f){
         /* Launch the tasks */
         runner_dopair_gpu_launch_force(r, buf, stream, d_a, d_H);
       /* runner_dopair_launch_f( */
         /* Unpack the results into CPU memory */
-        runner_dopair_gpu_unpack_force(r, s, buf, npacked, stream);
+        runner_dopair_gpu_unpack_force(r, s, buf, npacked);
       /* runner_dopair_unpack_f( */
       }
       else {
