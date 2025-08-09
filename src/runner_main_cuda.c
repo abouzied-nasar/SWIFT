@@ -130,6 +130,7 @@ extern "C" {
 #include "runner_doiact_black_holes.h"
 #include "runner_doiact_undef.h"
 
+/* Import the black hole feedback loop functions. */
 #define FUNCTION feedback
 #define FUNCTION_TASK_LOOP TASK_LOOP_FEEDBACK
 #include "runner_doiact_black_holes.h"

@@ -220,7 +220,7 @@ void runner_dopair_gpu_recurse(const struct runner *r,
                         struct cell *ci, struct cell *cj, const struct task *t,
                         const int depth, const char timer){
 
-  if (timer) { TIMER_TIC; }
+  TIMER_TIC;
 
   /* Should we even bother? A. Nasar: For GPU code we need to be clever about
    * this */
