@@ -402,17 +402,8 @@ void *runner_main_cuda(void *data) {
 #endif
           } else if (t->subtype == task_subtype_gpu_pack_f) {
 #ifdef GPUOFFLOAD_FORCE
-            runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H);
-
-            /* runner_dopair_gpu_recurse(r, sched, &gpu_buf_pair_forc, ci, cj, t, [>depth=0, timer=<]1); */
-
-            /* runner_gpu_pack_daughters_and_launch_f(r, sched, ci, cj, &gpu_buf_pair_forc.pv, t, */
-            /*       gpu_buf_pair_forc.parts_send_f, gpu_buf_pair_forc.parts_recv_f, */
-            /*       gpu_buf_pair_forc.d_parts_send_f, gpu_buf_pair_forc.d_parts_recv_f, */
-            /*       stream_pairs, d_a, d_H, e, gpu_buf_pair_forc.fparti_fpartj_lparti_lpartj, */
-            /*       gpu_buf_pair_forc.event_end, gpu_buf_pair_forc.pv.n_leaves_found, gpu_buf_pair_forc.ci_d, gpu_buf_pair_forc.cj_d, */
-            /*       gpu_buf_pair_forc.first_and_last_daughters, gpu_buf_pair_forc.ci_top, gpu_buf_pair_forc.cj_top); */
-#endif  // GPUOFFLOAD_FORCE
+            runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_pair_forc, t, stream_pairs, d_a, d_H);
+#endif
           } else if (t->subtype == task_subtype_gpu_unpack_d) {
           } else if (t->subtype == task_subtype_gpu_unpack_g) {
           } else if (t->subtype == task_subtype_gpu_unpack_f) {
