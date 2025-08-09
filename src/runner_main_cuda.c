@@ -46,16 +46,12 @@ extern "C" {
 #include "runner.h"
 
 /* Local headers. */
-#include "cell.h" // TODO(mivkov): Check if necessary after refactor
-#include "cuda/gpu_offload_data.h"
-/* #include "cuda/gpu_part_structs.h" */
-/* #include "cuda/gpu_launch.h" */
 #include "cuda/cuda_config.h"
+#include "cuda/gpu_offload_data.h"
 #include "cuda/gpu_utils.h"
 #include "engine.h"
 #include "feedback.h"
 #include "runner_doiact_functions_hydro_gpu.h"
-#include "runner_gpu_pack_functions.h"
 #include "scheduler.h"
 #include "space_getsid.h"
 #include "timers.h"
@@ -199,7 +195,9 @@ void *runner_main_cuda(void *data) {
       sizeof(struct gpu_part_send_f), sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
 
 
-  /* TODO: MOVE TO CUDA_INIT_STREAMS ? */
+  /* Create streams so that we can off-load different batches of work in
+   * different streams and get some con-CURRENCY! Events used to maximise
+   * asynchrony further*/
   cudaStream_t stream[gpu_pack_params.n_bundles];
   cudaStream_t stream_pairs[gpu_pack_params.n_bundles_pair];
 
@@ -744,7 +742,13 @@ void *runner_main_cuda(void *data) {
     } /* main loop. */
   }
 
-  /* TODO: clear/free alloc'd stuff here. */
+  /* Release the bytes back into the wilderness */
+  gpu_free_data_buffers(&gpu_buf_self_dens, /*is_pair_task=*/0);
+  gpu_free_data_buffers(&gpu_buf_self_grad, /*is_pair_task=*/0);
+  gpu_free_data_buffers(&gpu_buf_self_forc, /*is_pair_task=*/0);
+  gpu_free_data_buffers(&gpu_buf_pair_dens, /*is_pair_task=*/1);
+  gpu_free_data_buffers(&gpu_buf_pair_grad, /*is_pair_task=*/1);
+  gpu_free_data_buffers(&gpu_buf_pair_forc, /*is_pair_task=*/1);
 
   /* Be kind, rewind. */
   return NULL;

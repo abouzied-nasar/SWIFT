@@ -114,12 +114,12 @@ void gpu_init_data_buffers(
    * Needed for offloading self tasks as we use these to sort through which
    * parts need to interact with which */
   if (is_pair_task){
-    buf->task_first_part_f4 = NULL;
-    buf->d_task_first_part_f4 = NULL;
+    buf->task_first_part = NULL;
+    buf->d_task_first_part = NULL;
   } else {
-    cu_error = cudaMallocHost((void **)&buf->task_first_part_f4, target_n_tasks * sizeof(int2));
+    cu_error = cudaMallocHost((void **)&buf->task_first_part, target_n_tasks * sizeof(int2));
     swift_assert(cu_error == cudaSuccess);
-    cu_error = cudaMalloc((void **)&buf->d_task_first_part_f4, target_n_tasks * sizeof(int2));
+    cu_error = cudaMalloc((void **)&buf->d_task_first_part, target_n_tasks * sizeof(int2));
     swift_assert(cu_error == cudaSuccess);
   }
 
@@ -128,8 +128,7 @@ void gpu_init_data_buffers(
            be useful for recursion on the GPU so keep for now     */
   buf->fparti_fpartj_lparti_lpartj = NULL;
   if (is_pair_task){
-    cu_error = cudaMallocHost((void **)&buf->fparti_fpartj_lparti_lpartj,
-		  target_n_tasks * sizeof(int4));
+    cu_error = cudaMallocHost((void **)&buf->fparti_fpartj_lparti_lpartj, target_n_tasks * sizeof(int4));
     swift_assert(cu_error == cudaSuccess);
   }
 
@@ -140,12 +139,10 @@ void gpu_init_data_buffers(
   cu_error = cudaMalloc((void **)&buf->d_parts_recv_d, self_pair_fact * count_max_parts * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaMallocHost((void **)&buf->parts_send_d,
-                 self_pair_fact * count_max_parts * send_struct_size);
+  cu_error = cudaMallocHost((void **)&buf->parts_send_d, self_pair_fact * count_max_parts * send_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaMallocHost((void **)&buf->parts_recv_d,
-                 self_pair_fact * count_max_parts * recv_struct_size);
+  cu_error = cudaMallocHost((void **)&buf->parts_recv_d, self_pair_fact * count_max_parts * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
 
@@ -176,12 +173,7 @@ void gpu_init_data_buffers(
   }
 
 
-  /* Create streams so that we can off-load different batches of work in
-   * different streams and get some con-CURRENCY! Events used to maximise
-   * asynchrony further*/
-  /* TODO: remove this? */
-  /* buf->stream = (cudaStream_t*)malloc(n_bundles * sizeof(cudaStream_t)); */
-  /* TODO: Don't do this here? */
+  /* Create space for cuda events */
   buf->event_end = (cudaEvent_t*)malloc(n_bundles * sizeof(cudaEvent_t));
 
   for (size_t i = 0; i < n_bundles; i++){
@@ -199,6 +191,66 @@ void gpu_init_data_buffers_step(struct gpu_offload_data *buf){
   struct gpu_pack_vars* pv = &buf->pv;
   gpu_init_pack_vars_step(pv);
 
+}
+
+
+/**
+ * Free everything you allocated.
+ */
+void gpu_free_data_buffers(struct gpu_offload_data *buf, const char is_pair_task){
+
+  struct gpu_pack_vars* pv = &(buf->pv);
+
+  cudaError_t cu_error = cudaErrorMemoryAllocation;
+  cu_error = cudaFreeHost(pv->bundle_first_part);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaFreeHost(pv->bundle_last_part);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaFreeHost(pv->bundle_first_task_list);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaFreeHost(buf->d_parts_send_d);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaFreeHost(buf->d_parts_recv_d);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaFreeHost(buf->parts_send_d);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaFreeHost(buf->parts_recv_d);
+  swift_assert(cu_error == cudaSuccess);
+
+  free((void*)buf->event_end);
+
+  if (is_pair_task){
+    free((void*)pv->top_task_list);
+
+    cu_error = cudaFreeHost(buf->fparti_fpartj_lparti_lpartj);
+    swift_assert(cu_error == cudaSuccess);
+
+    for (size_t i = 0; i < pv->target_n_tasks * 2; i++){
+      free(buf->first_and_last_daughters[i]);
+    }
+    free((void*)buf->first_and_last_daughters);
+    free((void*)buf->ci_d);
+    free((void*)buf->cj_d);
+    free((void*)buf->ci_top);
+    free((void*)buf->cj_top);
+
+  } else {
+
+    free((void*)pv->task_list);
+    free((void*)pv->ci_list);
+
+    cu_error = cudaFreeHost(buf->task_first_part);
+    swift_assert(cu_error == cudaSuccess);
+
+    cu_error = cudaFreeHost(buf->d_task_first_part);
+    swift_assert(cu_error == cudaSuccess);
+  }
 }
 
 #ifdef __cplusplus

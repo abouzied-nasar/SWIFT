@@ -47,8 +47,8 @@ struct gpu_offload_data{
   struct gpu_pack_vars pv;
 
   /*! First and last particles for self interactions */
-  int2 *task_first_part_f4;
-  int2 *d_task_first_part_f4;
+  int2 *task_first_part;
+  int2 *d_task_first_part;
 
   /*! First and last particles of cells i and j for pair interactions */
   int4 *fparti_fpartj_lparti_lpartj;
@@ -113,6 +113,7 @@ void gpu_init_data_buffers(
 
 void gpu_init_data_buffers_step(struct gpu_offload_data *buf);
 
+void gpu_free_data_buffers(struct gpu_offload_data *buf, const char is_pair_task);
 
 #ifdef __cplusplus
 }

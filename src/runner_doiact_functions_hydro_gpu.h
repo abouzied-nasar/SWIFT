@@ -73,7 +73,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(struct 
   pv->ci_list[tasks_packed] = ci;
 
   /* Identify row in particle arrays where this task starts*/
-  buf->task_first_part_f4[tasks_packed].x = pv->count_parts;
+  buf->task_first_part[tasks_packed].x = pv->count_parts;
 
   /* Anything to do here? */
   int count = ci->hydro.count;
@@ -107,13 +107,13 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(struct 
 
   /* Identify the row in the array where this task ends (row id of its
      last particle)*/
-  buf->task_first_part_f4[tasks_packed].y = buf->pv.count_parts;
+  buf->task_first_part[tasks_packed].y = buf->pv.count_parts;
 
   /* Identify first particle for each bundle of tasks */
   const size_t bundle_size = buf->pv.bundle_size;
   if (tasks_packed % bundle_size == 0) {
     size_t bid = tasks_packed / bundle_size;
-    buf->pv.bundle_first_part[bid] = buf->task_first_part_f4[tasks_packed].x;
+    buf->pv.bundle_first_part[bid] = buf->task_first_part[tasks_packed].x;
     buf->pv.bundle_first_task_list[bid] = tasks_packed;
   }
 
@@ -435,7 +435,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     n_bundles = (tasks_packed + bundle_size - 1) / bundle_size;
     if (tasks_packed == 0)
       error("zero tasks packed but somehow got into GPU loop");
-    pack_vars->bundle_first_part[n_bundles] = buf->task_first_part_f4[tasks_packed - 1].x;
+    pack_vars->bundle_first_part[n_bundles] = buf->task_first_part[tasks_packed - 1].x;
   }
   pack_vars->n_bundles_unpack = n_bundles;
 
@@ -463,7 +463,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
       if (tid < tasks_packed) {
         /* Get an estimate for the max number of parts per cell in the bundle.
          * Used for determining the number of GPU CUDA blocks*/
-        size_t count = buf->task_first_part_f4[tid].y - buf->task_first_part_f4[tid].x;
+        size_t count = buf->task_first_part[tid].y - buf->task_first_part[tid].x;
         max_parts = max(max_parts, count);
         last_task = tid;
       }
@@ -482,8 +482,8 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
 
     /* Copy data over to GPU */
     /* First the meta-data */
-    cudaMemcpyAsync(&buf->d_task_first_part_f4[first_task],
-                    &buf->task_first_part_f4[first_task],
+    cudaMemcpyAsync(&buf->d_task_first_part[first_task],
+                    &buf->task_first_part[first_task],
                     (last_task + 1 - first_task) * sizeof(int2),
                     cudaMemcpyHostToDevice, stream[bid]);
 
@@ -522,19 +522,19 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     if (task_subtype == task_subtype_gpu_pack_d){
       gpu_launch_self_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H, stream[bid],
                             numBlocks_x, numBlocks_y, bundle_first_task,
-                            buf->d_task_first_part_f4);
+                            buf->d_task_first_part);
 
     } else if (task_subtype == task_subtype_gpu_pack_g){
 
       gpu_launch_self_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H, stream[bid],
                              numBlocks_x, numBlocks_y, bundle_first_task,
-                             buf->d_task_first_part_f4);
+                             buf->d_task_first_part);
 
     } else if (task_subtype == task_subtype_gpu_pack_f){
 
       gpu_launch_self_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H, stream[bid],
                         numBlocks_x, numBlocks_y, bundle_first_task,
-                        buf->d_task_first_part_f4);
+                        buf->d_task_first_part);
     } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
