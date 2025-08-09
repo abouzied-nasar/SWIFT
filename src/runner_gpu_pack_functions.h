@@ -52,7 +52,7 @@
  * to distinguish between SPH flavours in the future here by including the
  * correct corresponding header file.
  */
-__attribute__((always_inline)) INLINE void gpu_pack_self_density(
+__attribute__((always_inline)) INLINE static void gpu_pack_self_density(
     const struct cell* restrict c, struct gpu_offload_data* restrict buf) {
 
   gpu_pack_part_self_density(c, buf);
@@ -65,7 +65,7 @@ __attribute__((always_inline)) INLINE void gpu_pack_self_density(
  * to distinguish between SPH flavours in the future here by including the
  * correct corresponding header file.
  */
-__attribute__((always_inline)) INLINE void gpu_pack_self_gradient(
+__attribute__((always_inline)) INLINE static void gpu_pack_self_gradient(
     const struct cell* restrict c, struct gpu_offload_data* restrict buf) {
 
   gpu_pack_part_self_gradient(c, buf);
@@ -78,7 +78,7 @@ __attribute__((always_inline)) INLINE void gpu_pack_self_gradient(
  * to distinguish between SPH flavours in the future here by including the
  * correct corresponding header file.
  */
-__attribute__((always_inline)) INLINE void gpu_pack_self_force(
+__attribute__((always_inline)) INLINE static void gpu_pack_self_force(
     const struct cell* restrict c,
     struct gpu_offload_data *restrict buf) {
 
@@ -91,7 +91,7 @@ __attribute__((always_inline)) INLINE void gpu_pack_self_force(
  * to distinguish between SPH flavours in the future here by including the
  * correct corresponding header file.
  */
-__attribute__((always_inline)) INLINE void gpu_unpack_self_density(
+__attribute__((always_inline)) INLINE static void gpu_unpack_self_density(
     struct cell* restrict c,
     const struct gpu_part_recv_d* restrict parts_buffer,
     const size_t pack_position,
@@ -106,7 +106,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_self_density(
  * to distinguish between SPH flavours in the future here by including the
  * correct corresponding header file.
  */
-__attribute__((always_inline)) INLINE void gpu_unpack_self_gradient(
+__attribute__((always_inline)) INLINE static void gpu_unpack_self_gradient(
     struct cell* restrict c,
     const struct gpu_part_recv_g* restrict parts_buffer,
     const size_t pack_position,
@@ -121,7 +121,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_self_gradient(
  * to distinguish between SPH flavours in the future here by including the
  * correct corresponding header file.
  */
-__attribute__((always_inline)) INLINE void gpu_unpack_self_force(
+__attribute__((always_inline)) INLINE static void gpu_unpack_self_force(
     struct cell* restrict c,
     const struct gpu_part_recv_f* restrict parts_buffer,
     const size_t pack_position,
@@ -137,7 +137,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_self_force(
 /**
  * @brief unpacks particle data of two cells for the pair density GPU task from the buffers
  */
-__attribute__((always_inline)) INLINE void gpu_unpack_pair_density(
+__attribute__((always_inline)) INLINE static void gpu_unpack_pair_density(
     const struct runner *r,
     struct cell *ci,
     struct cell *cj,
@@ -185,7 +185,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_pair_density(
 /**
  * @brief unpacks particle data of two cells for the pair gradient GPU task from the buffers
  */
-__attribute__((always_inline)) INLINE void gpu_unpack_pair_gradient(
+__attribute__((always_inline)) INLINE static void gpu_unpack_pair_gradient(
     const struct runner *r,
     struct cell *ci,
     struct cell *cj,
@@ -231,7 +231,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_pair_gradient(
 /**
  * @brief unpacks particle data of two cells for the pair force GPU task from the buffers
  */
-__attribute__((always_inline)) INLINE void gpu_unpack_pair_force(
+__attribute__((always_inline)) INLINE static void gpu_unpack_pair_force(
     const struct runner *r,
     struct cell *ci,
     struct cell *cj,
@@ -277,7 +277,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_pair_force(
  * @brief packs up particle data of two cells for the pair density GPU task into the buffers
  * @TODO: WHAT IS SHIFT_TMP?
  */
-__attribute__((always_inline)) INLINE void gpu_pack_pair_density(struct gpu_offload_data* buf,
+__attribute__((always_inline)) INLINE static void gpu_pack_pair_density(struct gpu_offload_data* buf,
     const struct cell *ci, const struct cell *cj,
     const double3 shift_tmp) {
 
@@ -337,7 +337,7 @@ __attribute__((always_inline)) INLINE void gpu_pack_pair_density(struct gpu_offl
  * @brief packs up particle data of two cells for the pair gradient GPU task into the buffers
  * @TODO: WHAT IS SHIFT_TMP?
  */
-__attribute__((always_inline)) INLINE void gpu_pack_pair_gradient(struct gpu_offload_data* buf,
+__attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(struct gpu_offload_data* buf,
     const struct cell *ci, const struct cell *cj,
     const double3 shift_tmp) {
 
@@ -396,7 +396,7 @@ __attribute__((always_inline)) INLINE void gpu_pack_pair_gradient(struct gpu_off
  * @brief packs up particle data of two cells for the pair force GPU task into the buffers
  * @TODO: WHAT IS SHIFT_TMP?
  */
-__attribute__((always_inline)) INLINE void gpu_pack_pair_force(struct gpu_offload_data* buf,
+__attribute__((always_inline)) INLINE static void gpu_pack_pair_force(struct gpu_offload_data* buf,
     const struct cell *ci, const struct cell *cj,
     const double3 shift_tmp) {
 

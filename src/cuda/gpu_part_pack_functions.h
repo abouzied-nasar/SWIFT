@@ -35,7 +35,7 @@
  * @brief packs particle data for density tasks into CPU-side buffers for self
  * tasks
  */
-__attribute__((always_inline)) INLINE void gpu_pack_part_self_density(
+__attribute__((always_inline)) INLINE static void gpu_pack_part_self_density(
     const struct cell* restrict c, struct gpu_offload_data* restrict buf) {
 
   const int count = c->hydro.count;
@@ -71,7 +71,7 @@ __attribute__((always_inline)) INLINE void gpu_pack_part_self_density(
  * @brief packs particle data for gradient tasks into CPU-side buffers for self
  * tasks
  */
-__attribute__((always_inline)) INLINE void gpu_pack_part_self_gradient(
+__attribute__((always_inline)) INLINE static void gpu_pack_part_self_gradient(
     const struct cell* restrict c, struct gpu_offload_data* restrict buf) {
 
   const int count = c->hydro.count;
@@ -109,7 +109,7 @@ __attribute__((always_inline)) INLINE void gpu_pack_part_self_gradient(
  * @brief packs particle data for force tasks into CPU-side buffers for self
  * tasks
  */
-__attribute__((always_inline)) INLINE void gpu_pack_part_self_force(
+__attribute__((always_inline)) INLINE static void gpu_pack_part_self_force(
     const struct cell* restrict c,
     struct gpu_offload_data *restrict buf) {
 
@@ -157,7 +157,7 @@ __attribute__((always_inline)) INLINE void gpu_pack_part_self_force(
 /**
  * @brief Unpacks the density data from GPU buffers of self tasks into particles
  */
-__attribute__((always_inline)) INLINE void gpu_unpack_part_self_density(
+__attribute__((always_inline)) INLINE static void gpu_unpack_part_self_density(
     struct cell* restrict c,
     const struct gpu_part_recv_d* restrict parts_buffer,
     const size_t pack_position,
@@ -194,7 +194,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_part_self_density(
 /**
  * @brief Unpacks the gradient data from GPU buffers of self tasks into particles
  */
-__attribute__((always_inline)) INLINE void gpu_unpack_part_self_gradient(
+__attribute__((always_inline)) INLINE static void gpu_unpack_part_self_gradient(
     struct cell* restrict c,
     const struct gpu_part_recv_g* restrict parts_buffer,
     const size_t pack_position,
@@ -219,7 +219,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_part_self_gradient(
 /**
  * @brief Unpacks the force data from GPU buffers of self tasks into particles
  */
-__attribute__((always_inline)) INLINE void gpu_unpack_part_self_force(
+__attribute__((always_inline)) INLINE static void gpu_unpack_part_self_force(
     struct cell* restrict c,
     const struct gpu_part_recv_f* restrict parts_buffer,
     const size_t pack_position,
@@ -254,7 +254,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_part_self_force(
 /* TODO: IDEALLY, THIS SHOULD BE IDENTICAL FOR THE SELF TASKS.
  * PASS A CELL, BUFFER, INDEX TO COPY BACK. THIS REPLICATION IS
  * UNNECESSARY.*/
-__attribute__((always_inline)) INLINE void gpu_unpack_part_pair_density(
+__attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_density(
     struct cell* restrict c,
     const struct gpu_part_recv_d* restrict parts_buffer,
     const size_t pack_ind,
@@ -281,7 +281,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_part_pair_density(
 /* TODO: IDEALLY, THIS SHOULD BE IDENTICAL FOR THE SELF TASKS.
  * PASS A CELL, BUFFER, INDEX TO COPY BACK. THIS REPLICATION IS
  * UNNECESSARY.*/
-__attribute__((always_inline)) INLINE void gpu_unpack_part_pair_gradient(
+__attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_gradient(
     struct cell* restrict c,
     const struct gpu_part_recv_g* restrict parts_buffer,
     const size_t pack_ind,
@@ -303,7 +303,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_part_pair_gradient(
 /* TODO: IDEALLY, THIS SHOULD BE IDENTICAL FOR THE SELF TASKS.
  * PASS A CELL, BUFFER, INDEX TO COPY BACK. THIS REPLICATION IS
  * UNNECESSARY.*/
-__attribute__((always_inline)) INLINE void gpu_unpack_part_pair_force(
+__attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_force(
     struct cell * restrict c,
     const struct gpu_part_recv_f *restrict parts_buffer,
     const size_t pack_ind,
@@ -331,7 +331,7 @@ __attribute__((always_inline)) INLINE void gpu_unpack_part_pair_force(
 }
 
 
-__attribute__((always_inline)) INLINE void gpu_pack_part_pair_density(
+__attribute__((always_inline)) INLINE static void gpu_pack_part_pair_density(
     const struct cell *restrict c, struct gpu_part_send_d *restrict parts_buffer,
     const int local_pack_position,
     const int count, const double3 shift, const int2 cstarts) {
@@ -356,7 +356,7 @@ __attribute__((always_inline)) INLINE void gpu_pack_part_pair_density(
 }
 
 
-__attribute__((always_inline)) INLINE void gpu_pack_part_pair_gradient(
+__attribute__((always_inline)) INLINE static void gpu_pack_part_pair_gradient(
     const struct cell* restrict c,
     struct gpu_part_send_g* restrict parts_buffer,
     const int local_pack_position, const int count, const double3 shift,
@@ -389,7 +389,7 @@ __attribute__((always_inline)) INLINE void gpu_pack_part_pair_gradient(
 }
 
 
-__attribute__((always_inline)) INLINE void gpu_pack_part_pair_force(
+__attribute__((always_inline)) INLINE static void gpu_pack_part_pair_force(
     const struct cell* restrict c,
     struct gpu_part_send_f* restrict parts_buffer,
     const int local_pack_position, const int count, const double3 shift,

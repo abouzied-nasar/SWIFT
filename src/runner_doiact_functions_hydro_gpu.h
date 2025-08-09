@@ -61,7 +61,7 @@ extern "C" {
  * @param t the associated task to pack
  * @param mode: 0 for density, 1 for gradient, 2 for force
  */
-__attribute__((always_inline)) INLINE void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_data *buf, const enum task_subtypes task_subtype) {
+__attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_data *buf, const enum task_subtypes task_subtype) {
 
   /* Grab a hold of the packing buffers */
   struct gpu_pack_vars* pv = &(buf->pv);
@@ -142,7 +142,7 @@ __attribute__((always_inline)) INLINE void runner_doself_gpu_pack(struct cell *c
 /**
  * @brief packs the data required for the self density tasks.
  */
-__attribute__((always_inline)) INLINE void runner_doself_gpu_pack_density(const struct runner *r, struct scheduler *s,
+__attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_density(const struct runner *r, struct scheduler *s,
     struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -165,7 +165,7 @@ __attribute__((always_inline)) INLINE void runner_doself_gpu_pack_density(const 
 /**
  * @brief packs the data required for the self gradient tasks.
  */
-__attribute__((always_inline)) INLINE void runner_doself_gpu_pack_gradient(const struct runner *r, struct scheduler *s,
+__attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_gradient(const struct runner *r, struct scheduler *s,
     struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -188,7 +188,7 @@ __attribute__((always_inline)) INLINE void runner_doself_gpu_pack_gradient(const
 /**
  * @brief packs the data required for the self force tasks.
  */
-__attribute__((always_inline)) INLINE void runner_doself_gpu_pack_force(const struct runner *r, struct scheduler *s,
+__attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_force(const struct runner *r, struct scheduler *s,
     struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
 
   TIMER_TIC;
@@ -213,11 +213,13 @@ __attribute__((always_inline)) INLINE void runner_doself_gpu_pack_force(const st
 /**
  * @brief recurse into a (sub-)pair task and identify all cell-cell interactions.
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_recurse(const struct runner *r,
+static void runner_dopair_gpu_recurse(const struct runner *r,
                         const struct scheduler *s,
                         struct gpu_offload_data* restrict buf,
                         struct cell *ci, struct cell *cj, const struct task *t,
                         const int depth, const char timer){
+
+  /* Note: Can't inline a recursive function... */
 
   TIMER_TIC;
 
@@ -283,7 +285,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_recurse(const struc
 /**
  * Generic function to pack GPU pair tasks
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_pack(const struct runner *r,
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(const struct runner *r,
                         struct gpu_offload_data *restrict buf,
                         const struct cell *ci, const struct cell *cj,
                         const enum task_subtypes task_subtype){
@@ -368,7 +370,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_pack(const struct r
 /**
  * Wrapper to pack data for density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_density(const struct runner *r,
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_density(const struct runner *r,
                               struct gpu_offload_data *restrict buf,
                               const struct cell *ci, const struct cell *cj, const struct task *t){
 
@@ -380,7 +382,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_density(const 
 /**
  * Wrapper to pack data for density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_gradient(const struct runner *r,
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_gradient(const struct runner *r,
                               struct gpu_offload_data *restrict buf,
                               const struct cell *ci, const struct cell *cj, const struct task *t){
 
@@ -392,7 +394,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_gradient(const
 /**
  * Wrapper to pack data for density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_force(const struct runner *r,
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_force(const struct runner *r,
                               struct gpu_offload_data *restrict buf,
                               const struct cell *ci, const struct cell *cj, const struct task *t){
 
@@ -406,7 +408,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_force(const st
  * @brief Solves self task on GPU: Copies data over to GPU and launches
  * appropriate kernels given the task_subtype.
  */
-__attribute__((always_inline)) INLINE void runner_doself_gpu_launch(
+__attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     const struct runner *r,
     struct gpu_offload_data *buf,
     const enum task_subtypes task_subtype,
@@ -588,7 +590,7 @@ __attribute__((always_inline)) INLINE void runner_doself_gpu_launch(
 /**
  * @ brief Unpacks the completed self tasks for the corresponding task_subtype
  */
-__attribute__((always_inline)) INLINE void runner_doself_gpu_unpack(
+__attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
     const struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data *buf,
@@ -696,7 +698,7 @@ __attribute__((always_inline)) INLINE void runner_doself_gpu_unpack(
 /**
  * @brief Run the hydro density self tasks on GPU
  */
-void runner_doself_gpu_density(
+static void runner_doself_gpu_density(
     struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data *buf,
@@ -731,7 +733,7 @@ void runner_doself_gpu_density(
 /**
  * @brief Run the hydro gradient self tasks on GPU
  */
-void runner_doself_gpu_gradient(
+static void runner_doself_gpu_gradient(
     struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data *buf,
@@ -766,7 +768,7 @@ void runner_doself_gpu_gradient(
 /*
  * @brief Run the hydro force self tasks on GPU
  */
-void runner_doself_gpu_force(
+static void runner_doself_gpu_force(
     struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data *buf,
@@ -802,7 +804,7 @@ void runner_doself_gpu_force(
 /**
  * Generic function to launch GPU pair tasks
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_launch(
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
     const struct runner *r,
     struct gpu_offload_data* restrict buf,
     cudaStream_t *stream, const float d_a,
@@ -984,7 +986,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_launch(
 /**
  * Wrapper to launch density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_launch_density(
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch_density(
     const struct runner *r,
     struct gpu_offload_data* restrict buf,
     cudaStream_t *stream,
@@ -1001,7 +1003,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_launch_density(
 /**
  * Wrapper to launch density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_launch_gradient(
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch_gradient(
     const struct runner *r,
     struct gpu_offload_data* restrict buf,
     cudaStream_t *stream,
@@ -1018,7 +1020,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_launch_gradient(
 /**
  * Wrapper to launch density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_launch_force(
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch_force(
     const struct runner *r,
     struct gpu_offload_data* restrict buf,
     cudaStream_t *stream,
@@ -1037,7 +1039,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_launch_force(
  * Generic function to unpack a GPU pair task depending on the task subtype.
  * TODO: DOCUMENT WHAT IS NPACKED??
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack(
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     const struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data* restrict buf,
@@ -1121,7 +1123,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack(
  * Provide the correct subtype to use and time the runtime separately
  * TODO: Documentation: WHAT IS NPACKED??
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack_density(
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack_density(
     const struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data* restrict buf,
@@ -1140,7 +1142,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack_density(
  * Provide the correct subtype to use and time the runtime separately
  * TODO: Documentation: WHAT IS NPACKED??
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack_gradient(
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack_gradient(
     const struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data* restrict buf,
@@ -1160,7 +1162,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack_gradient(
  * Provide the correct subtype to use and time the runtime separately
  * TODO: Documentation: WHAT IS NPACKED??
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack_force(
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack_force(
     const struct runner *r,
     struct scheduler *s,
     struct gpu_offload_data* restrict buf,
@@ -1180,7 +1182,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_unpack_force(
  * Generic function to pack pair tasks and launch them
  * on the device depending on the task subtype
  */
-__attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_and_launch(
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_and_launch(
     const struct runner *r,
     struct scheduler *s,
     struct cell * ci, struct cell * cj,
@@ -1366,7 +1368,7 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_pack_and_launch(
 /**
  * Top level runner function to solve hydro density pair tasks on GPU.
  */
-void runner_dopair_gpu_density(
+static void runner_dopair_gpu_density(
     const struct runner *r,
     struct scheduler *s,
     struct cell * ci, struct cell * cj,
@@ -1394,7 +1396,7 @@ void runner_dopair_gpu_density(
 /**
  * Top level runner function to solve hydro gradient pair tasks on GPU.
  */
-void runner_dopair_gpu_gradient(
+static void runner_dopair_gpu_gradient(
     const struct runner *r,
     struct scheduler *s,
     struct cell * ci, struct cell * cj,
@@ -1421,7 +1423,7 @@ void runner_dopair_gpu_gradient(
 /**
  * Top level runner function to solve hydro force pair tasks on GPU.
  */
-void runner_dopair_gpu_force(
+static void runner_dopair_gpu_force(
     const struct runner *r,
     struct scheduler *s,
     struct cell * ci, struct cell * cj,
