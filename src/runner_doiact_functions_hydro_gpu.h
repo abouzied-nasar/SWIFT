@@ -28,9 +28,7 @@ extern "C" {
 /* #include "atomic.h" */
 #include "active.h"
 #include "error.h"
-/* #include "GPU_pack_vars.h" */
 #include "runner.h"
-/* #include "runner_doiact_hydro.h" */
 #include "runner_gpu_pack_functions.h"
 #include "scheduler.h"
 #include "space_getsid.h"

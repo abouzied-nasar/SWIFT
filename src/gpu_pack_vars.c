@@ -84,18 +84,11 @@ void gpu_init_pack_vars(struct gpu_pack_vars* pv){
   pv->cellx = NULL;
   pv->celly = NULL;
   pv->cellz = NULL;
-  pv->d_cellx = NULL;
-  pv->d_celly = NULL;
-  pv->d_cellz = NULL;
 
   pv->bundle_size = 0;
   pv->count_parts = 0;
   pv->tasks_packed = 0;
 
-  pv->task_first_part = NULL;
-  pv->task_last_part = NULL;
-  pv->d_task_first_part = NULL;
-  pv->d_task_last_part = NULL;
   pv->bundle_first_part = NULL;
   pv->bundle_last_part = NULL;
   pv->bundle_first_task_list = NULL;
@@ -119,7 +112,7 @@ void gpu_init_pack_vars(struct gpu_pack_vars* pv){
  */
 void gpu_init_pack_vars_step(struct gpu_pack_vars* pv){
 
-  // Initialise packing counters
+  /* Initialise packing counters */
   pv->tasks_packed = 0;
   pv->count_parts = 0;
   pv->top_tasks_packed = 0;

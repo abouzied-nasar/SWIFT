@@ -80,43 +80,18 @@ struct gpu_pack_vars {
     double *cellz;
     double *shiftz;
   };
-  /* List of cell shifts and positions ON DEVICE. Shifts are used for
-   * pair tasks, while cell positions are used for self tasks.*/
-  union {
-    double *d_cellx;
-    double *d_shiftx;
-  };
-  union {
-    double *d_celly;
-    double *d_shifty;
-  };
-  union {
-    double *d_cellz;
-    double *d_shiftz;
-  };
 
   /*! TODO: documentation */
   size_t bundle_size;
 
   /*! How many particles in a bundle*/
   size_t count_parts;
-  /**/
+
+  /*! TODO: DOCUMENTATION */
   size_t tasks_packed;
 
   /*! TODO: documentation */
   size_t top_tasks_packed;
-
-  /*! TODO: documentation */
-  int *task_first_part;
-
-  /*! TODO: documentation */
-  int *task_last_part;
-
-  /*! TODO: documentation */
-  int *d_task_first_part;
-
-  /*! TODO: documentation */
-  int *d_task_last_part;
 
   /*! TODO: documentation */
   int *bundle_first_part;

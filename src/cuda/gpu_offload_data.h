@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef CUDA_gpu_offload_data_H
-#define CUDA_gpu_offload_data_H
+#ifndef CUDA_GPU_OFFLOAD_DATA_H
+#define CUDA_GPU_OFFLOAD_DATA_H
 
 
 /**
@@ -46,6 +46,7 @@ extern "C" {
 
 /*! Struct to hold all data for the transfer of a single task (sub)type */
 struct gpu_offload_data{
+#ifdef WITH_CUDA
 
   /*! data required for self and pair packing tasks destined for the GPU*/
   struct gpu_pack_vars pv;
@@ -98,7 +99,10 @@ struct gpu_offload_data{
 
   /* cudaStream_t *stream; */
   cudaEvent_t* event_end;
+
+#endif /* WITH_CUDA */
 };
+
 
 
 void gpu_init_data_buffers(
@@ -116,4 +120,4 @@ void gpu_init_data_buffers_step(struct gpu_offload_data *buf);
 }
 #endif
 
-#endif
+#endif /* CUDA_GPU_OFFLOAD_DATA_H */
