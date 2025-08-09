@@ -255,10 +255,6 @@ void *runner_main_cuda(void *data) {
         if (t == NULL) break;
       }
 
-/* TODO MLADEN: REMOVE */
-/* message("RUNNING TASK %s/%s", taskID_names[t->type], subtaskID_names[t->subtype]); */
-/* fflush(stdout); */
-
       /* Get the cells. */
       struct cell *ci = t->ci;
       struct cell *cj = t->cj;
