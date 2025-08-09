@@ -180,7 +180,7 @@ extern int engine_rank;
  *
  */
 #ifdef WITH_MPI
-#define swift_assert(expr)                                                          \
+#define swift_assert(expr)                                                    \
   ({                                                                          \
     if (!(expr)) {                                                            \
       fflush(stdout);                                                         \
@@ -192,7 +192,7 @@ extern int engine_rank;
     }                                                                         \
   })
 #else
-#define swift_assert(expr)                                                          \
+#define swift_assert(expr)                                                    \
   ({                                                                          \
     if (!(expr)) {                                                            \
       fflush(stdout);                                                         \

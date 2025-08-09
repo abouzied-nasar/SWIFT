@@ -162,12 +162,15 @@ enum task_subtypes {
   task_subtype_sink_do_gas_swallow,
   task_subtype_rt_gradient,
   task_subtype_rt_transport,
-  task_subtype_gpu_pack_d,  // A. Nasar
+  task_subtype_gpu_pack_d,
   task_subtype_gpu_pack_g,
   task_subtype_gpu_pack_f,
   task_subtype_gpu_unpack_d,
   task_subtype_gpu_unpack_g,
   task_subtype_gpu_unpack_f,
+  task_subtype_gpu_launch_d,
+  task_subtype_gpu_launch_g,
+  task_subtype_gpu_launch_f,
   task_subtype_count
 } __attribute__((packed));
 
@@ -248,10 +251,6 @@ struct task {
 
   int done;  // A. Nasar
 
-  int gpu_done;
-
-  int corner_pair;
-
   /*! Pointers to the cells this task acts upon */
   struct cell **ci_unpack;  //, **cj;
 
@@ -305,9 +304,6 @@ struct task {
 
   /*! Start and end time of this task */
   ticks tic, toc;
-
-  ticks total_cpu_pack_ticks;
-  ticks total_cpu_unpack_ticks;
 
   /* Total time spent running this task */
   ticks total_ticks;

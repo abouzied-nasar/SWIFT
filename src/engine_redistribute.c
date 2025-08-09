@@ -447,7 +447,7 @@ struct savelink_mapper_data {
       for (int i = 0; i < node; i++) offset += counts[nodeID * nr_nodes + i];  \
                                                                                \
       for (int k = 0; k < counts[nodeID * nr_nodes + node]; k++) {             \
-        struct gpart *gp = parts[k + offset].gpart;                           \
+        struct gpart *gp = parts[k + offset].gpart;                            \
         if (gp != NULL) {                                                      \
           if (CHECKS)                                                          \
             if (gp->id_or_neg_offset > 0)                                      \

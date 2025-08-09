@@ -2245,12 +2245,8 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
 #endif
       if (t_subtype == task_subtype_density) {
         engine_addlink(e, &ci->hydro.density, t);
-      } else if (t_subtype == task_subtype_gpu_pack_d) {  // A. Nasar
+      } else if (t_subtype == task_subtype_gpu_pack_d) {
         engine_addlink(e, &ci->hydro.density_pack, t);
-        //      } else if (t_subtype == task_subtype_gpu_pack_f) {
-        //        engine_addlink(e, &ci->hydro.force_pack, t);
-        //      } else if (t_subtype == task_subtype_gpu_pack_g) {
-        //        engine_addlink(e, &ci->hydro.gradient_pack, t);
       } else if (t_subtype == task_subtype_grav) {
         engine_addlink(e, &ci->grav.grav, t);
       } else if (t_subtype == task_subtype_external_grav) {
@@ -2270,12 +2266,6 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
       } else if (t_subtype == task_subtype_gpu_pack_d) {  // A. Nasar
         engine_addlink(e, &ci->hydro.density_pack, t);
         engine_addlink(e, &cj->hydro.density_pack, t);
-        //      } else if (t_subtype == task_subtype_gpu_pack_f) {
-        //        engine_addlink(e, &ci->hydro.force_pack, t);
-        //        engine_addlink(e, &cj->hydro.force_pack, t);
-        //      } else if (t_subtype == task_subtype_gpu_pack_g) {
-        //        engine_addlink(e, &ci->hydro.gradient_pack, t);
-        //        engine_addlink(e, &cj->hydro.gradient_pack, t);
       } else if (t_subtype == task_subtype_grav) {
         engine_addlink(e, &ci->grav.grav, t);
         engine_addlink(e, &cj->grav.grav, t);
@@ -4194,7 +4184,6 @@ void engine_maketasks(struct engine *e) {
       if (count_current_self % pack_size == 0) {
         last_created_self_unpack = scheduler_addtask(
             sched, task_type_self, task_subtype_gpu_unpack_d, 0, 0, NULL, NULL);
-        last_created_self_unpack->gpu_done = 0;
       }
 
       /* pack -> unpack -> ghost_in */
@@ -4257,7 +4246,6 @@ void engine_maketasks(struct engine *e) {
       if (count_current_self % pack_size == 0) {
         last_created_self_unpack = scheduler_addtask(
             sched, task_type_self, task_subtype_gpu_unpack_g, 0, 0, NULL, NULL);
-        last_created_self_unpack->gpu_done = 0;
       }
 
       /* pack -> unpack -> ghost_in */
@@ -4372,19 +4360,6 @@ void engine_maketasks(struct engine *e) {
   if (count_current_pair != sched->nr_pair_pack_tasks_f)
     error("We did not find the correct number of F pair pack tasks!!");
 #endif
-  /*Debug code to check if some tasks are not split to desired level in tree for
-   * GPU*/
-  //  for (int i = 0; i < sched->nr_tasks; i++) {
-  //    struct task *t = &sched->tasks[i];
-  //    if(t->ci != NULL){
-  ////      if(t->type == task_type_pair && ((t->ci->split && !t->cj->split) ||
-  ///(!t->ci->split && t->cj->split))) /    	  error("one is split the other
-  /// isn't");
-  //      if(t->ci->hydro.count > 80 && t->type == task_type_self)
-  //    	  error("Count is %i task subtype (%s)",
-  //                  t->ci->hydro.count, subtaskID_names[t->subtype]);
-  //    }
-  //  }
   if (e->verbose)
     message("Making extra hydroloop tasks took %.3f %s.",
             clocks_from_ticks(getticks() - tic2), clocks_getunit());
@@ -4550,30 +4525,5 @@ void engine_maketasks(struct engine *e) {
         t->subtype == task_subtype_force) {
       t->implicit = 1;
     }
-//        if (t->subtype == task_subtype_density) {
-//          t->implicit = 1;
-//        }
-//        if (t->subtype == task_subtype_gpu_pack_d ||
-//          t->subtype == task_subtype_gpu_pack_g ||
-//    	  t->subtype == task_subtype_gpu_pack_f ||
-//    	  t->subtype == task_subtype_gpu_unpack_d ||
-//    	  t->subtype == task_subtype_gpu_unpack_g ||
-//    	  t->subtype == task_subtype_gpu_unpack_f){
-//        	t->implicit = 1;
-//        }
-//        if (t->subtype == task_subtype_gpu_pack_g ||
-//    	  t->subtype == task_subtype_gpu_pack_f ||
-//    	  t->subtype == task_subtype_gpu_unpack_g ||
-//    	  t->subtype == task_subtype_gpu_unpack_f){// ||
-//    //	  (t->type == task_type_pair &&
-//    //	   t->subtype == task_subtype_gpu_pack_d)){
-//        	t->implicit = 1;
-//        }
-//        if ((t->subtype == task_subtype_gpu_pack_d ||
-//          t->subtype == task_subtype_gpu_pack_g  ||
-//    	  t->subtype == task_subtype_gpu_pack_f)
-//        	t->implicit = 1;
-//    //    	error("STill have subs");
-//        }
   }
 }

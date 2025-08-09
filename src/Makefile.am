@@ -105,7 +105,9 @@ include_HEADERS += forcing.h
 include_HEADERS += power_spectrum.h
 include_HEADERS += ghost_stats.h
 include_HEADERS += swift_lustre_api.h
-include_HEADERS += runner_gpu_pack_functions.h cuda/GPU_data_buffers.h cuda/GPU_utils.h cuda/cuda_config.h
+include_HEADERS += runner_gpu_pack_functions.h
+include_HEADERS += cuda/gpu_offload_data.h cuda/gpu_utils.h
+include_HEADERS += cuda/cuda_config.h cuda/gpu_part_pack_functions.h
 
 # source files for EAGLE extra I/O
 EAGLE_EXTRA_IO_SOURCES=
@@ -187,15 +189,16 @@ endif
 GPU_SOURCES = 
 if HAVECUDA
 # list here files to be compiled without nvcc, but needed for execution with GPU
-GPU_CUDA_SOURCES = runner_gpu_pack_functions.c runner_main_cuda.c
-GPU_CUDA_SOURCES += cuda/GPU_data_buffers.c cuda/GPU_utils.c
+GPU_CUDA_SOURCES = runner_main_cuda.c gpu_pack_vars.c engine_maketasks_gpu.c
+GPU_CUDA_SOURCES += cuda/gpu_offload_data.c cuda/gpu_utils.c
 # TODO????
 GPU_SOURCES+=$(GPU_CUDA_SOURCES)
 endif
 
 if HAVEHIP 
-GPU_HIP_SOURCES =
-GPU_HIP_SOURCES += runner_gpu_pack_functions.c
+# TODO: This is not up to date. Look at what we did for CUDA.
+# GPU_HIP_SOURCES = runner_main_hip.c
+GPU_CUDA_SOURCES = gpu_pack_vars.c engine_maketasks_gpu.c
 # TODO: Fix this. Do the same as cuda.
 GPU_SOURCES+=$(GPU_HIP_SOURCES)
 endif
@@ -557,10 +560,10 @@ nobase_noinst_HEADERS += fvpm_geometry.h fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/None/fvpm_geometry.h fvpm_geometry/None/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/fvpm_geometry.h fvpm_geometry/Gizmo/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/MFM/fvpm_geometry.h fvpm_geometry/Gizmo/MFV/fvpm_geometry.h
-nobase_noinst_HEADERS += GPU_pack_vars.h 
-nobase_noinst_HEADERS += cuda/GPU_part_structs.h
-nobase_noinst_HEADERS += runner_doiact_functions_hydro_gpu.h
-nobase_noinst_HEADERS += cuda/device_functions.h cuda/GPU_runner_functions.h
+nobase_noinst_HEADERS += gpu_pack_vars.h 
+nobase_noinst_HEADERS += cuda/gpu_part_structs.h
+nobase_noinst_HEADERS += runner_doiact_functions_hydro_gpu.h cuda/gpu_launch.h
+nobase_noinst_HEADERS += cuda/device_functions.cuh cuda/cuda_particle_kernels.cuh
 
 # TODO: Add HIP C-headers without base files here
 
@@ -619,9 +622,9 @@ libswiftsim_mpihip_la_SHORTNAME = mpihip
 libswiftsim_mpihip_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) libgrav_mpi.la
 
 if HAVECUDA
-AM_CUDA_DEVICE_SOURCES = cuda/GPU_runner_functions.cu cuda/device_functions.h
-AM_CUDA_DEVICE_OBJECTS = cuda/GPU_runner_functions.o
-AM_CUDA_DEVICE_DLINK_OBJECTS = cuda/GPU_runner_functions.dlink_o
+AM_CUDA_DEVICE_SOURCES = cuda/gpu_launch.cu cuda/device_functions.h
+AM_CUDA_DEVICE_OBJECTS = cuda/gpu_launch.o
+AM_CUDA_DEVICE_DLINK_OBJECTS = cuda/gpu_launch.dlink_o
 
 libswift_cuda_device_a_SOURCES = $(AM_CUDA_DEVICE_SOURCES)
 libswift_cuda_device_a_LIBADD = $(AM_CUDA_DEVICE_OBJECTS) $(AM_CUDA_DEVICE_DLINK_OBJECTS)

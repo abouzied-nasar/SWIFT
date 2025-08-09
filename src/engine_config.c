@@ -38,6 +38,7 @@
 
 #ifdef WITH_HIP
 #include "runner_main_clean.hip"
+
 #include <hip/hip_runtime.h>
 #endif
 

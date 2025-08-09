@@ -112,13 +112,13 @@ struct pack_vars_pair_f4 {
 } pack_vars_pair_f4;
 
 #ifdef WITH_CUDA
-#include "cuda/cuda_config.h"
 #include "cuda/GPU_runner_functions.h"
+#include "cuda/cuda_config.h"
 #endif
 
 #ifdef WITH_HIP
-#include "hip/hip_config.h"
 #include "hip/GPU_runner_functions.h"
+#include "hip/hip_config.h"
 #endif
 
 #include "runner_gpu_pack_functions.h"

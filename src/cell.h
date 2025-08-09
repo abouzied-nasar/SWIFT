@@ -371,6 +371,7 @@ struct cell {
 
   int unpacker_cell;
 
+  /* TODO: REMOVE ALL THIS */
   /*Marks a cell as having done its pack task 0->not 1-> yes*/
   int pack_done;
   /*Marks a cell as having done its pack task 0->not 1-> yes*/
