@@ -21,6 +21,7 @@
 #ifndef DEVICE_FUNCTIONS_H
 #define DEVICE_FUNCTIONS_H
 #include "../../config.h"
+
 #include <math.h>
 
 #ifdef __cplusplus
@@ -59,7 +60,6 @@ extern "C" {
  * Alpha can be set in the parameter file.
  * Beta is defined as in e.g. Price (2010) Eqn (103) */
 #define const_viscosity_beta 3.0f
-
 
 /**
  * @brief Returns the argument to the power given by the dimension plus one
@@ -169,7 +169,5 @@ __device__ void d_kernel_deval(float u, float *__restrict__ W,
 #ifdef __cplusplus
 }
 #endif
-
-
 
 #endif  // DEVICE_FUNCTIONS_H

@@ -35,12 +35,11 @@
 #define N_TASKS_PER_PACK_PAIR 8
 #define N_TASKS_BUNDLE_PAIR 2
 
-
 #define CUDA_DEBUG
 
 /* Config parameters. */
-#define GPUOFFLOAD_DENSITY 1   /* off-load hydro density to GPU */
-#define GPUOFFLOAD_GRADIENT 1  /* off-load hydro gradient to GPU */
-#define GPUOFFLOAD_FORCE 1     /* off-load hydro force to GPU */
+#define GPUOFFLOAD_DENSITY 1  /* off-load hydro density to GPU */
+#define GPUOFFLOAD_GRADIENT 1 /* off-load hydro gradient to GPU */
+#define GPUOFFLOAD_FORCE 1    /* off-load hydro force to GPU */
 
 #endif

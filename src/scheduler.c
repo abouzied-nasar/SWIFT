@@ -2271,7 +2271,7 @@ void scheduler_reset(struct scheduler *s, int size) {
   s->completed_unlock_writes = 0;
   s->active_count = 0;
   s->total_ticks = 0;
-#if defined(WITH_CUDA) || defined (WITH_HIP)
+#if defined(WITH_CUDA) || defined(WITH_HIP)
   s->pack_size = N_TASKS_PER_PACK_SELF;
   s->pack_size_pair = N_TASKS_PER_PACK_PAIR;
 #else

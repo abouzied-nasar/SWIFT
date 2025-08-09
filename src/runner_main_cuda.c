@@ -56,7 +56,6 @@ extern "C" {
 #include "space_getsid.h"
 #include "timers.h"
 
-
 /* Import the gravity loop functions. */
 #include "runner_doiact_grav.h"
 
@@ -173,7 +172,8 @@ void *runner_main_cuda(void *data) {
   struct gpu_global_pack_params gpu_pack_params;
   gpu_get_pack_params(&gpu_pack_params, sched, e->s->eta_neighbours);
 
-  /* Declare and allocate GPU launch control data structures which need to be in scope */
+  /* Declare and allocate GPU launch control data structures which need to be in
+   * scope */
   struct gpu_offload_data gpu_buf_self_dens;
   struct gpu_offload_data gpu_buf_self_grad;
   struct gpu_offload_data gpu_buf_self_forc;
@@ -182,18 +182,23 @@ void *runner_main_cuda(void *data) {
   struct gpu_offload_data gpu_buf_pair_forc;
 
   gpu_init_data_buffers(&gpu_buf_self_dens, &gpu_pack_params,
-      sizeof(struct gpu_part_send_d), sizeof(struct gpu_part_recv_d), /*is_pair_task=*/0);
+                        sizeof(struct gpu_part_send_d),
+                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/0);
   gpu_init_data_buffers(&gpu_buf_self_grad, &gpu_pack_params,
-      sizeof(struct gpu_part_send_g), sizeof(struct gpu_part_recv_g), /*is_pair_task=*/0);
+                        sizeof(struct gpu_part_send_g),
+                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/0);
   gpu_init_data_buffers(&gpu_buf_self_forc, &gpu_pack_params,
-      sizeof(struct gpu_part_send_f), sizeof(struct gpu_part_recv_f), /*is_pair_task=*/0);
+                        sizeof(struct gpu_part_send_f),
+                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/0);
   gpu_init_data_buffers(&gpu_buf_pair_dens, &gpu_pack_params,
-      sizeof(struct gpu_part_send_d), sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
+                        sizeof(struct gpu_part_send_d),
+                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
   gpu_init_data_buffers(&gpu_buf_pair_grad, &gpu_pack_params,
-      sizeof(struct gpu_part_send_g), sizeof(struct gpu_part_recv_g), /*is_pair_task=*/1);
+                        sizeof(struct gpu_part_send_g),
+                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/1);
   gpu_init_data_buffers(&gpu_buf_pair_forc, &gpu_pack_params,
-      sizeof(struct gpu_part_send_f), sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
-
+                        sizeof(struct gpu_part_send_f),
+                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
 
   /* Create streams so that we can off-load different batches of work in
    * different streams and get some con-CURRENCY! Events used to maximise
@@ -257,10 +262,9 @@ void *runner_main_cuda(void *data) {
       struct cell *ci = t->ci;
       struct cell *cj = t->cj;
 
-      if (ci == NULL &&
-          (t->subtype != task_subtype_gpu_unpack_d &&
-           t->subtype != task_subtype_gpu_unpack_g &&
-           t->subtype != task_subtype_gpu_unpack_f))
+      if (ci == NULL && (t->subtype != task_subtype_gpu_unpack_d &&
+                         t->subtype != task_subtype_gpu_unpack_g &&
+                         t->subtype != task_subtype_gpu_unpack_f))
         error("This cannot be");
 
 #ifdef SWIFT_DEBUG_TASKS
@@ -299,27 +303,27 @@ void *runner_main_cuda(void *data) {
             runner_do_grav_external(r, ci, 1);
           else if (t->subtype == task_subtype_gpu_unpack_d) {
             /* TODO: WHY ARE THESE EMPTY? WHY DO WE HAVE THEM HERE THEN? */
-          }
-          else if (t->subtype == task_subtype_gpu_unpack_g) {
-          }
-          else if (t->subtype == task_subtype_gpu_unpack_f) {
-          }
-          else if (t->subtype == task_subtype_density) {
+          } else if (t->subtype == task_subtype_gpu_unpack_g) {
+          } else if (t->subtype == task_subtype_gpu_unpack_f) {
+          } else if (t->subtype == task_subtype_density) {
 #ifndef GPUOFFLOAD_DENSITY
             runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
 #endif
           } else if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
-            runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream, d_a, d_H);
+            runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream,
+                                      d_a, d_H);
 #endif
           } /* self / pack */
           else if (t->subtype == task_subtype_gpu_pack_g) {
 #ifdef GPUOFFLOAD_GRADIENT
-            runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream, d_a, d_H);
+            runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream,
+                                       d_a, d_H);
 #endif  // GPUGRADSELF
           } else if (t->subtype == task_subtype_gpu_pack_f) {
 #ifdef GPUOFFLOAD_FORCE
-            runner_doself_gpu_force(r, sched, &gpu_buf_self_forc, t, stream, d_a, d_H);
+            runner_doself_gpu_force(r, sched, &gpu_buf_self_forc, t, stream,
+                                    d_a, d_H);
 #endif
           }
 #ifdef EXTRA_HYDRO_LOOP
@@ -387,16 +391,18 @@ void *runner_main_cuda(void *data) {
           /* GPU WORK */
           else if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
-            runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H);
+            runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_pair_dens, t,
+                                      stream_pairs, d_a, d_H);
 #endif
-          }
-          else if (t->subtype == task_subtype_gpu_pack_g) {
+          } else if (t->subtype == task_subtype_gpu_pack_g) {
 #ifdef GPUOFFLOAD_GRADIENT
-            runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_pair_dens, t, stream_pairs, d_a, d_H);
+            runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_pair_dens, t,
+                                       stream_pairs, d_a, d_H);
 #endif
           } else if (t->subtype == task_subtype_gpu_pack_f) {
 #ifdef GPUOFFLOAD_FORCE
-            runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_pair_forc, t, stream_pairs, d_a, d_H);
+            runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_pair_forc, t,
+                                    stream_pairs, d_a, d_H);
 #endif
           } else if (t->subtype == task_subtype_gpu_unpack_d) {
           } else if (t->subtype == task_subtype_gpu_unpack_g) {
@@ -410,8 +416,8 @@ void *runner_main_cuda(void *data) {
             runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 1);
 #else
             runner_dosub_pair1_gradient(r, ci, cj, /*below_h_max=*/0, 1);
-#endif // EXTRA_HYDRO_LOOP_TYPE2
-#endif // GPUOFFLOAD_GRADIENT
+#endif  // EXTRA_HYDRO_LOOP_TYPE2
+#endif  // GPUOFFLOAD_GRADIENT
           }
 #endif  // EXTRA_HYDRO_LOOP
           else if (t->subtype == task_subtype_force) {
@@ -759,4 +765,3 @@ void *runner_main_cuda(void *data) {
 #endif
 
 #endif  // WITH_CUDA
-

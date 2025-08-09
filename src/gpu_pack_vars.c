@@ -22,13 +22,13 @@ extern "C" {
 #endif
 
 #include "gpu_pack_vars.h"
+
 #include "cuda/cuda_config.h"
 
 /**
  * @file gpu_pack_vars.c
  * @brief functions related to GPU packing data and meta-data
  */
-
 
 /**
  * Get global packing parameters from the scheduler and fill out the
@@ -38,18 +38,25 @@ extern "C" {
  * @params sched: the @scheduler
  * @params eta_neighours: Neighbour resolution eta.
  */
-void gpu_get_pack_params(struct gpu_global_pack_params* pars, const struct scheduler* sched, const float eta_neighbours){
+void gpu_get_pack_params(struct gpu_global_pack_params* pars,
+                         const struct scheduler* sched,
+                         const float eta_neighbours) {
 
   pars->target_n_tasks = sched->pack_size;
   pars->target_n_tasks_pair = sched->pack_size_pair;
   pars->bundle_size = N_TASKS_BUNDLE_SELF;
   pars->bundle_size_pair = N_TASKS_BUNDLE_PAIR;
 
-  /* A. Nasar: n_bundles is the number of task bundles each thread has. Used to loop through bundles */
-  pars->n_bundles = (pars->target_n_tasks + pars->bundle_size - 1) / pars->bundle_size;
-  pars->n_bundles_pair = (pars->target_n_tasks_pair + pars->bundle_size_pair - 1) / pars->bundle_size_pair;
+  /* A. Nasar: n_bundles is the number of task bundles each thread has. Used to
+   * loop through bundles */
+  pars->n_bundles =
+      (pars->target_n_tasks + pars->bundle_size - 1) / pars->bundle_size;
+  pars->n_bundles_pair =
+      (pars->target_n_tasks_pair + pars->bundle_size_pair - 1) /
+      pars->bundle_size_pair;
 
-  /* A. Nasar: Try to estimate average number of particles per leaf-level cell */
+  /* A. Nasar: Try to estimate average number of particles per leaf-level cell
+   */
   /* Get smoothing length/particle spacing */
   int np_per_cell = ceil(2.0 * eta_neighbours);
 
@@ -64,18 +71,16 @@ void gpu_get_pack_params(struct gpu_global_pack_params* pars, const struct sched
    *  the allocated memory on buffers and GPU. This can happen if calculated h
    * is larger than cell width and splitting makes bigger than target cells */
 
-  /* Leave this until we implement recursive self tasks -> Exaggerated as we will
-   * off-load really big cells since we don't recurse */
-  pars->count_max_parts = 64ul * 8ul * pars->target_n_tasks * (np_per_cell + buff);
-
+  /* Leave this until we implement recursive self tasks -> Exaggerated as we
+   * will off-load really big cells since we don't recurse */
+  pars->count_max_parts =
+      64ul * 8ul * pars->target_n_tasks * (np_per_cell + buff);
 }
-
-
 
 /**
  * Initialise empty gpu_pack_vars struct
  */
-void gpu_init_pack_vars(struct gpu_pack_vars* pv){
+void gpu_init_pack_vars(struct gpu_pack_vars* pv) {
 
   pv->task_list = NULL;
   pv->top_task_list = NULL;
@@ -106,11 +111,10 @@ void gpu_init_pack_vars(struct gpu_pack_vars* pv){
   pv->n_leaves_total = 0;
 }
 
-
 /**
  * @brief perform the initialisations required at the start of each step
  */
-void gpu_init_pack_vars_step(struct gpu_pack_vars* pv){
+void gpu_init_pack_vars_step(struct gpu_pack_vars* pv) {
 
   /* Initialise packing counters */
   pv->tasks_packed = 0;
@@ -121,9 +125,6 @@ void gpu_init_pack_vars_step(struct gpu_pack_vars* pv){
   pv->n_leaves_total = 0;
 }
 
-
 #ifdef __cplusplus
 }
 #endif
-
-

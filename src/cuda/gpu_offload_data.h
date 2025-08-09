@@ -20,7 +20,6 @@
 #ifndef CUDA_GPU_OFFLOAD_DATA_H
 #define CUDA_GPU_OFFLOAD_DATA_H
 
-
 /**
  * @file cuda/gpu_offload_data.h
  * @brief contains the gpu_offload_data struct, which holds data required for
@@ -37,10 +36,8 @@ extern "C" {
 
 #include <cuda_runtime.h>
 
-
-
 /*! Struct to hold all data for the transfer of a single task (sub)type */
-struct gpu_offload_data{
+struct gpu_offload_data {
 #ifdef WITH_CUDA
 
   /*! data required for self and pair packing tasks destined for the GPU*/
@@ -57,7 +54,7 @@ struct gpu_offload_data{
    * gpu_offload_data will only hold data for either density, gradient, or
    * force task, so we hide them behind a union. */
   union {
-    void* d_parts_send;
+    void *d_parts_send;
     struct gpu_part_send_d *d_parts_send_d;
     struct gpu_part_send_g *d_parts_send_g;
     struct gpu_part_send_f *d_parts_send_f;
@@ -96,24 +93,21 @@ struct gpu_offload_data{
   struct cell **cj_top;
 
   /*! TODO: Documentation */
-  cudaEvent_t* event_end;
+  cudaEvent_t *event_end;
 
 #endif /* WITH_CUDA */
 };
 
-
-
-void gpu_init_data_buffers(
-    struct gpu_offload_data *buf,
-    const struct gpu_global_pack_params* params,
-    const size_t send_struct_size,
-    const size_t recv_struct_size,
-    const char is_pair_task);
-
+void gpu_init_data_buffers(struct gpu_offload_data *buf,
+                           const struct gpu_global_pack_params *params,
+                           const size_t send_struct_size,
+                           const size_t recv_struct_size,
+                           const char is_pair_task);
 
 void gpu_init_data_buffers_step(struct gpu_offload_data *buf);
 
-void gpu_free_data_buffers(struct gpu_offload_data *buf, const char is_pair_task);
+void gpu_free_data_buffers(struct gpu_offload_data *buf,
+                           const char is_pair_task);
 
 #ifdef __cplusplus
 }

@@ -43,7 +43,8 @@ struct gpu_part_send_d {
   /*! Particle predicted velocity and mass -> ux, uy, uz, m */
   float4 ux_m;
 
-  /*! Markers for where neighbour cell j starts and stops in array indices for pair tasks*/
+  /*! Markers for where neighbour cell j starts and stops in array indices for
+   * pair tasks*/
   int2 cjs_cje;
 
 #endif
@@ -59,7 +60,7 @@ struct gpu_part_recv_d {
   float4 rot_ux_div_v;
 
 #endif
-} ;
+};
 
 /*Container for particle data requierd for force calcs*/
 struct gpu_part_send_f {

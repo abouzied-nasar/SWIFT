@@ -3,8 +3,9 @@
 
 #include "hip/hip_runtime.h"
 /* Config parameters. */
-#include "<config.h>"
 #include "align.h"
+
+#include "<config.h>"
 typedef int8_t timebin_t;
 
 #ifdef __WITH_HIP

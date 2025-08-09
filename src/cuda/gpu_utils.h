@@ -27,5 +27,4 @@
 void gpu_init_thread(const struct engine* e, const int cpuid);
 void gpu_print_free_mem(const struct engine* e, const int cpuid);
 
-
 #endif

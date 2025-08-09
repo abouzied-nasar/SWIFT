@@ -34,22 +34,20 @@ extern "C" {
 #include "task.h"
 #include "timers.h"
 
-
 #ifdef WITH_CUDA
-#include <cuda.h>
-#include <cuda_runtime.h>
-
 #include "cuda/cuda_config.h"
 #include "cuda/gpu_launch.h"
 #include "cuda/gpu_offload_data.h"
+
+#include <cuda.h>
+#include <cuda_runtime.h>
 #else
 #endif
 
 #ifdef WITH_HIP
-#include "hip/hip_config.h"
 #include "hip/gpu_runner_functions.h"
+#include "hip/hip_config.h"
 #endif
-
 
 /**
  * @brief Packing procedure for the self density tasks
@@ -61,10 +59,12 @@ extern "C" {
  * @param t the associated task to pack
  * @param mode: 0 for density, 1 for gradient, 2 for force
  */
-__attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(struct cell *ci, struct task *t, struct gpu_offload_data *buf, const enum task_subtypes task_subtype) {
+__attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
+    struct cell *ci, struct task *t, struct gpu_offload_data *buf,
+    const enum task_subtypes task_subtype) {
 
   /* Grab a hold of the packing buffers */
-  struct gpu_pack_vars* pv = &(buf->pv);
+  struct gpu_pack_vars *pv = &(buf->pv);
 
   /* Place pointers to the task and cells packed in an array for use later
    * when unpacking after the GPU offload */
@@ -83,7 +83,8 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(struct 
     const size_t local_pack_position = buf->pv.count_parts;
     const size_t count_max_parts_tmp = buf->pv.count_max_parts;
     if (local_pack_position + count >= count_max_parts_tmp) {
-      error("Exceeded count_max_parts_tmp. Make arrays bigger! "
+      error(
+          "Exceeded count_max_parts_tmp. Make arrays bigger! "
           "count_max %lu count %lu",
           count_max_parts_tmp, local_pack_position + count);
     }
@@ -95,7 +96,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(struct 
       gpu_pack_self_density(ci, buf);
     } else if (task_subtype == task_subtype_gpu_pack_g) {
       gpu_pack_self_gradient(ci, buf);
-    } else if (task_subtype == task_subtype_gpu_pack_f){
+    } else if (task_subtype == task_subtype_gpu_pack_f) {
       gpu_pack_self_force(ci, buf);
     } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
@@ -129,7 +130,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(struct 
   buf->pv.launch_leftovers = 0;
 
   /* Have we packed enough tasks to offload to GPU? */
-  if (buf->pv.tasks_packed == buf->pv.target_n_tasks){
+  if (buf->pv.tasks_packed == buf->pv.target_n_tasks) {
     buf->pv.launch = 1;
   }
 
@@ -138,12 +139,13 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(struct 
   cell_unlocktree(ci);
 }
 
-
 /**
  * @brief packs the data required for the self density tasks.
  */
-__attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_density(const struct runner *r, struct scheduler *s,
-    struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
+__attribute__((always_inline)) INLINE static void
+runner_doself_gpu_pack_density(const struct runner *r, struct scheduler *s,
+                               struct gpu_offload_data *buf, struct cell *ci,
+                               struct task *t) {
 
   TIMER_TIC;
 
@@ -165,8 +167,10 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_density
 /**
  * @brief packs the data required for the self gradient tasks.
  */
-__attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_gradient(const struct runner *r, struct scheduler *s,
-    struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
+__attribute__((always_inline)) INLINE static void
+runner_doself_gpu_pack_gradient(const struct runner *r, struct scheduler *s,
+                                struct gpu_offload_data *buf, struct cell *ci,
+                                struct task *t) {
 
   TIMER_TIC;
 
@@ -188,8 +192,9 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_gradien
 /**
  * @brief packs the data required for the self force tasks.
  */
-__attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_force(const struct runner *r, struct scheduler *s,
-    struct gpu_offload_data *buf, struct cell *ci, struct task *t) {
+__attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_force(
+    const struct runner *r, struct scheduler *s, struct gpu_offload_data *buf,
+    struct cell *ci, struct task *t) {
 
   TIMER_TIC;
 
@@ -208,16 +213,16 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_force(c
   TIMER_TOC(timer_doself_gpu_pack_f);
 }
 
-
-
 /**
- * @brief recurse into a (sub-)pair task and identify all cell-cell interactions.
+ * @brief recurse into a (sub-)pair task and identify all cell-cell
+ * interactions.
  */
 static void runner_dopair_gpu_recurse(const struct runner *r,
-                        const struct scheduler *s,
-                        struct gpu_offload_data* restrict buf,
-                        struct cell *ci, struct cell *cj, const struct task *t,
-                        const int depth, const char timer){
+                                      const struct scheduler *s,
+                                      struct gpu_offload_data *restrict buf,
+                                      struct cell *ci, struct cell *cj,
+                                      const struct task *t, const int depth,
+                                      const char timer) {
 
   /* Note: Can't inline a recursive function... */
 
@@ -234,10 +239,10 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
   struct gpu_pack_vars *pack_vars = &buf->pv;
 
   /* Arrays for daughter cells */
-  struct cell ** ci_d = buf->ci_d;
-  struct cell ** cj_d = buf->cj_d;
+  struct cell **ci_d = buf->ci_d;
+  struct cell **cj_d = buf->cj_d;
 
-  if (depth==0){
+  if (depth == 0) {
     /* while at the top level, reset counters. */
     pack_vars->n_daughters_packed_index = pack_vars->n_daughters_total;
     pack_vars->n_leaves_found = 0;
@@ -250,7 +255,8 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
   const int sid = space_getsid_and_swap_cells(e->s, &ci, &cj, shift);
 
   /* Recurse? */
-  if (cell_can_recurse_in_pair_hydro_task(ci) && cell_can_recurse_in_pair_hydro_task(cj)) {
+  if (cell_can_recurse_in_pair_hydro_task(ci) &&
+      cell_can_recurse_in_pair_hydro_task(cj)) {
 
     struct cell_split_pair *csp = &cell_split_pairs[sid];
 
@@ -259,7 +265,7 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
       const int pjd = csp->pairs[k].pjd;
       if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL) {
         runner_dopair_gpu_recurse(r, s, buf, ci->progeny[pid], cj->progeny[pjd],
-                           t, depth + 1, /*timer=*/0);
+                                  t, depth + 1, /*timer=*/0);
       }
     }
   } else if (cell_is_active_hydro(ci, e) || cell_is_active_hydro(cj, e)) {
@@ -274,26 +280,25 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
 
     pack_vars->n_leaves_found++;
     if (pack_vars->n_leaves_found >= pack_vars->n_expected_pair_tasks)
-      error("Created %i more than expected leaf cells. depth %i", pack_vars->n_leaves_found, depth);
+      error("Created %i more than expected leaf cells. depth %i",
+            pack_vars->n_leaves_found, depth);
   }
 
   if (timer) TIMER_TOC(timer_dopair_gpu_recurse);
 }
 
-
-
 /**
  * Generic function to pack GPU pair tasks
  */
-__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(const struct runner *r,
-                        struct gpu_offload_data *restrict buf,
-                        const struct cell *ci, const struct cell *cj,
-                        const enum task_subtypes task_subtype){
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(
+    const struct runner *r, struct gpu_offload_data *restrict buf,
+    const struct cell *ci, const struct cell *cj,
+    const enum task_subtypes task_subtype) {
 
   /* Grab handles */
-  const struct engine* e = r->e;
-  int4* fparti_fpartj_lparti_lpartj = buf->fparti_fpartj_lparti_lpartj;
-  struct gpu_pack_vars* pack_vars = &buf->pv;
+  const struct engine *e = r->e;
+  int4 *fparti_fpartj_lparti_lpartj = buf->fparti_fpartj_lparti_lpartj;
+  struct gpu_pack_vars *pack_vars = &buf->pv;
 
   const size_t count_ci = ci->hydro.count;
   const size_t count_cj = cj->hydro.count;
@@ -323,14 +328,13 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(const s
   fparti_fpartj_lparti_lpartj[tid].x = pack_vars->count_parts;
   fparti_fpartj_lparti_lpartj[tid].y = pack_vars->count_parts + count_ci;
 
-
   /* This re-arranges the particle data from cell->hydro->parts into a
   long array of part structs*/
-  if (task_subtype == task_subtype_gpu_pack_d){
+  if (task_subtype == task_subtype_gpu_pack_d) {
     gpu_pack_pair_density(buf, ci, cj, shift_tmp);
-  } else if (task_subtype == task_subtype_gpu_pack_g){
+  } else if (task_subtype == task_subtype_gpu_pack_g) {
     gpu_pack_pair_gradient(buf, ci, cj, shift_tmp);
-  } else if (task_subtype == task_subtype_gpu_pack_f){
+  } else if (task_subtype == task_subtype_gpu_pack_f) {
     gpu_pack_pair_force(buf, ci, cj, shift_tmp);
   } else {
     error("Unknown task subtype %s", subtaskID_names[task_subtype]);
@@ -365,14 +369,14 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(const s
   pack_vars->tasks_packed++;
 };
 
-
-
 /**
  * Wrapper to pack data for density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_density(const struct runner *r,
-                              struct gpu_offload_data *restrict buf,
-                              const struct cell *ci, const struct cell *cj, const struct task *t){
+__attribute__((always_inline)) INLINE static void
+runner_dopair_gpu_pack_density(const struct runner *r,
+                               struct gpu_offload_data *restrict buf,
+                               const struct cell *ci, const struct cell *cj,
+                               const struct task *t) {
 
   TIMER_TIC;
   runner_dopair_gpu_pack(r, buf, ci, cj, t->subtype);
@@ -382,9 +386,11 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_density
 /**
  * Wrapper to pack data for density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_gradient(const struct runner *r,
-                              struct gpu_offload_data *restrict buf,
-                              const struct cell *ci, const struct cell *cj, const struct task *t){
+__attribute__((always_inline)) INLINE static void
+runner_dopair_gpu_pack_gradient(const struct runner *r,
+                                struct gpu_offload_data *restrict buf,
+                                const struct cell *ci, const struct cell *cj,
+                                const struct task *t) {
 
   TIMER_TIC;
   runner_dopair_gpu_pack(r, buf, ci, cj, t->subtype);
@@ -394,28 +400,23 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_gradien
 /**
  * Wrapper to pack data for density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_force(const struct runner *r,
-                              struct gpu_offload_data *restrict buf,
-                              const struct cell *ci, const struct cell *cj, const struct task *t){
+__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_force(
+    const struct runner *r, struct gpu_offload_data *restrict buf,
+    const struct cell *ci, const struct cell *cj, const struct task *t) {
 
   TIMER_TIC;
   runner_dopair_gpu_pack(r, buf, ci, cj, t->subtype);
   TIMER_TOC(timer_dopair_gpu_pack_f);
 }
 
-
 /**
  * @brief Solves self task on GPU: Copies data over to GPU and launches
  * appropriate kernels given the task_subtype.
  */
 __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
-    const struct runner *r,
-    struct gpu_offload_data *buf,
-    const enum task_subtypes task_subtype,
-    cudaStream_t *stream,
-    const float d_a,
-    const float d_H
-    ) {
+    const struct runner *r, struct gpu_offload_data *buf,
+    const enum task_subtypes task_subtype, cudaStream_t *stream,
+    const float d_a, const float d_H) {
 
   /* Grab pack_vars */
   struct gpu_pack_vars *pack_vars = &buf->pv;
@@ -435,7 +436,8 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     n_bundles = (tasks_packed + bundle_size - 1) / bundle_size;
     if (tasks_packed == 0)
       error("zero tasks packed but somehow got into GPU loop");
-    pack_vars->bundle_first_part[n_bundles] = buf->task_first_part[tasks_packed - 1].x;
+    pack_vars->bundle_first_part[n_bundles] =
+        buf->task_first_part[tasks_packed - 1].x;
   }
   pack_vars->n_bundles_unpack = n_bundles;
 
@@ -463,16 +465,20 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
       if (tid < tasks_packed) {
         /* Get an estimate for the max number of parts per cell in the bundle.
          * Used for determining the number of GPU CUDA blocks*/
-        size_t count = buf->task_first_part[tid].y - buf->task_first_part[tid].x;
+        size_t count =
+            buf->task_first_part[tid].y - buf->task_first_part[tid].x;
         max_parts = max(max_parts, count);
         last_task = tid;
       }
     }
 
     const size_t first_part_tmp = pack_vars->bundle_first_part[bid];
-    const size_t bundle_n_parts = pack_vars->bundle_last_part[bid] - first_part_tmp;
+    const size_t bundle_n_parts =
+        pack_vars->bundle_last_part[bid] - first_part_tmp;
     const size_t tasksperbundle = pack_vars->tasksperbundle;
-    const size_t tasks_left = (bid == n_bundles - 1) ? tasks_packed - (n_bundles - 1) * tasksperbundle : tasksperbundle;
+    const size_t tasks_left =
+        (bid == n_bundles - 1) ? tasks_packed - (n_bundles - 1) * tasksperbundle
+                               : tasksperbundle;
 
     /* Will launch a 2d grid of GPU thread blocks (number of tasks is
        the y dimension and max_parts is the x dimension */
@@ -488,21 +494,24 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
                     cudaMemcpyHostToDevice, stream[bid]);
 
     /* Now the actual particle data */
-    if (task_subtype == task_subtype_gpu_pack_d){
+    if (task_subtype == task_subtype_gpu_pack_d) {
 
-      cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp], &buf->parts_send_d[first_part_tmp],
+      cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp],
+                      &buf->parts_send_d[first_part_tmp],
                       bundle_n_parts * sizeof(struct gpu_part_send_d),
                       cudaMemcpyHostToDevice, stream[bid]);
 
-    } else if (task_subtype == task_subtype_gpu_pack_g){
+    } else if (task_subtype == task_subtype_gpu_pack_g) {
 
-      cudaMemcpyAsync(&buf->d_parts_send_g[first_part_tmp], &buf->parts_send_g[first_part_tmp],
-                    bundle_n_parts * sizeof(struct gpu_part_send_g),
-                    cudaMemcpyHostToDevice, stream[bid]);
+      cudaMemcpyAsync(&buf->d_parts_send_g[first_part_tmp],
+                      &buf->parts_send_g[first_part_tmp],
+                      bundle_n_parts * sizeof(struct gpu_part_send_g),
+                      cudaMemcpyHostToDevice, stream[bid]);
 
-    } else if (task_subtype == task_subtype_gpu_pack_f){
+    } else if (task_subtype == task_subtype_gpu_pack_f) {
 
-      cudaMemcpyAsync(&buf->d_parts_send_f[first_part_tmp], &buf->parts_send_f[first_part_tmp],
+      cudaMemcpyAsync(&buf->d_parts_send_f[first_part_tmp],
+                      &buf->parts_send_f[first_part_tmp],
                       bundle_n_parts * sizeof(struct gpu_part_send_f),
                       cudaMemcpyHostToDevice, stream[bid]);
 
@@ -514,57 +523,62 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     cudaError_t cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error("CUDA error in task subtype %s H2D memcpy: '%s' cpuid id is: %i",
-          subtaskID_names[task_subtype], cudaGetErrorString(cu_error), r->cpuid);
+            subtaskID_names[task_subtype], cudaGetErrorString(cu_error),
+            r->cpuid);
     }
 #endif
 
     /* Launch the kernel */
-    if (task_subtype == task_subtype_gpu_pack_d){
-      gpu_launch_self_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H, stream[bid],
-                            numBlocks_x, numBlocks_y, bundle_first_task,
-                            buf->d_task_first_part);
+    if (task_subtype == task_subtype_gpu_pack_d) {
+      gpu_launch_self_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a,
+                              d_H, stream[bid], numBlocks_x, numBlocks_y,
+                              bundle_first_task, buf->d_task_first_part);
 
-    } else if (task_subtype == task_subtype_gpu_pack_g){
+    } else if (task_subtype == task_subtype_gpu_pack_g) {
 
-      gpu_launch_self_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H, stream[bid],
-                             numBlocks_x, numBlocks_y, bundle_first_task,
-                             buf->d_task_first_part);
+      gpu_launch_self_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a,
+                               d_H, stream[bid], numBlocks_x, numBlocks_y,
+                               bundle_first_task, buf->d_task_first_part);
 
-    } else if (task_subtype == task_subtype_gpu_pack_f){
+    } else if (task_subtype == task_subtype_gpu_pack_f) {
 
-      gpu_launch_self_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H, stream[bid],
-                        numBlocks_x, numBlocks_y, bundle_first_task,
-                        buf->d_task_first_part);
+      gpu_launch_self_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
+                            stream[bid], numBlocks_x, numBlocks_y,
+                            bundle_first_task, buf->d_task_first_part);
     } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
 #ifdef CUDA_DEBUG
-      cu_error = cudaPeekAtLastError();
-      if (cu_error != cudaSuccess) {
-        error("CUDA error in task subtype %s kernel launch: '%s' cpuid id is: %i",
-            subtaskID_names[task_subtype], cudaGetErrorString(cu_error), r->cpuid);
-      }
+    cu_error = cudaPeekAtLastError();
+    if (cu_error != cudaSuccess) {
+      error("CUDA error in task subtype %s kernel launch: '%s' cpuid id is: %i",
+            subtaskID_names[task_subtype], cudaGetErrorString(cu_error),
+            r->cpuid);
+    }
 #endif
 
     /* Copy back */
-    if (task_subtype == task_subtype_gpu_pack_d){
+    if (task_subtype == task_subtype_gpu_pack_d) {
 
-      cudaMemcpyAsync(&buf->parts_recv_d[first_part_tmp], &buf->d_parts_recv_d[first_part_tmp],
+      cudaMemcpyAsync(&buf->parts_recv_d[first_part_tmp],
+                      &buf->d_parts_recv_d[first_part_tmp],
                       bundle_n_parts * sizeof(struct gpu_part_recv_d),
                       cudaMemcpyDeviceToHost, stream[bid]);
 
-    } else if (task_subtype == task_subtype_gpu_pack_g){
+    } else if (task_subtype == task_subtype_gpu_pack_g) {
 
-      cudaMemcpyAsync(&buf->parts_recv_g[first_part_tmp], &buf->d_parts_recv_g[first_part_tmp],
+      cudaMemcpyAsync(&buf->parts_recv_g[first_part_tmp],
+                      &buf->d_parts_recv_g[first_part_tmp],
                       bundle_n_parts * sizeof(struct gpu_part_recv_g),
                       cudaMemcpyDeviceToHost, stream[bid]);
 
-    } else if (task_subtype == task_subtype_gpu_pack_f){
+    } else if (task_subtype == task_subtype_gpu_pack_f) {
 
-      cudaMemcpyAsync(&buf->parts_recv_f[first_part_tmp], &buf->d_parts_recv_f[first_part_tmp],
-                    bundle_n_parts * sizeof(struct gpu_part_recv_f),
-                    cudaMemcpyDeviceToHost, stream[bid]);
+      cudaMemcpyAsync(&buf->parts_recv_f[first_part_tmp],
+                      &buf->d_parts_recv_f[first_part_tmp],
+                      bundle_n_parts * sizeof(struct gpu_part_recv_f),
+                      cudaMemcpyDeviceToHost, stream[bid]);
     } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
@@ -576,7 +590,8 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error("CUDA error in task subtype %s D2H memcpy: %s cpuid id is: %i",
-            subtaskID_names[task_subtype], cudaGetErrorString(cu_error), r->cpuid);
+            subtaskID_names[task_subtype], cudaGetErrorString(cu_error),
+            r->cpuid);
     }
 #endif
 
@@ -586,18 +601,14 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
   /* cudaDeviceSynchronize(); */
 }
 
-
 /**
  * @ brief Unpacks the completed self tasks for the corresponding task_subtype
  */
 __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
-    const struct runner *r,
-    struct scheduler *s,
-    struct gpu_offload_data *buf,
-    const enum task_subtypes task_subtype
-    ) {
+    const struct runner *r, struct scheduler *s, struct gpu_offload_data *buf,
+    const enum task_subtypes task_subtype) {
 
-  const struct engine* e = r->e;
+  const struct engine *e = r->e;
 
   /* Grab pack_vars */
   struct gpu_pack_vars *pack_vars = &buf->pv;
@@ -619,7 +630,8 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
     /* cudaStreamSynchronize(stream[bid]); */
     cudaEventSynchronize(buf->event_end[bid]);
 
-    for (size_t tid = bid * bundle_size; tid < (bid + 1) * bundle_size && tid < tasks_packed; tid++) {
+    for (size_t tid = bid * bundle_size;
+         tid < (bid + 1) * bundle_size && tid < tasks_packed; tid++) {
 
       struct cell *c = pack_vars->ci_list[tid];
       struct task *t = pack_vars->task_list[tid];
@@ -636,14 +648,15 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
 
 #ifdef SWIFT_DEBUG_CHECKS
       if (pack_length + count >= pack_vars->count_max_parts) {
-        error("Exceeded count_max_parts. Make arrays bigger! pack_length is "
-              "%lu, count is %lu, max_parts is %lu",
-              pack_length, count, pack_vars->count_max_parts);
+        error(
+            "Exceeded count_max_parts. Make arrays bigger! pack_length is "
+            "%lu, count is %lu, max_parts is %lu",
+            pack_length, count, pack_vars->count_max_parts);
       }
 #endif
 
       /* Do the copy */
-      if (task_subtype == task_subtype_gpu_pack_d){
+      if (task_subtype == task_subtype_gpu_pack_d) {
 
         gpu_unpack_self_density(c, buf->parts_recv_d, pack_length, count, e);
         /* Record things for debugging */
@@ -651,7 +664,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
         c->gpu_done++;
 #endif
 
-      } else if (task_subtype == task_subtype_gpu_pack_g){
+      } else if (task_subtype == task_subtype_gpu_pack_g) {
 
         gpu_unpack_self_gradient(c, buf->parts_recv_g, pack_length, count, e);
         /* Record things for debugging */
@@ -659,7 +672,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
         c->gpu_done_g++;
 #endif
 
-      } else if (task_subtype == task_subtype_gpu_pack_f){
+      } else if (task_subtype == task_subtype_gpu_pack_f) {
 
         gpu_unpack_self_force(c, buf->parts_recv_f, pack_length, count, e);
         /* Record things for debugging */
@@ -694,19 +707,13 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
   pack_vars->n_bundles_unpack = 0;
 }
 
-
 /**
  * @brief Run the hydro density self tasks on GPU
  */
-static void runner_doself_gpu_density(
-    struct runner *r,
-    struct scheduler *s,
-    struct gpu_offload_data *buf,
-    struct task *t,
-    cudaStream_t *stream,
-    const float d_a,
-    const float d_H
-    ) {
+static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
+                                      struct gpu_offload_data *buf,
+                                      struct task *t, cudaStream_t *stream,
+                                      const float d_a, const float d_H) {
 
   /* Pack the data. */
   runner_doself_gpu_pack_density(r, s, buf, t->ci, t);
@@ -729,19 +736,13 @@ static void runner_doself_gpu_density(
   }
 }
 
-
 /**
  * @brief Run the hydro gradient self tasks on GPU
  */
-static void runner_doself_gpu_gradient(
-    struct runner *r,
-    struct scheduler *s,
-    struct gpu_offload_data *buf,
-    struct task *t,
-    cudaStream_t *stream,
-    const float d_a,
-    const float d_H
-    ) {
+static void runner_doself_gpu_gradient(struct runner *r, struct scheduler *s,
+                                       struct gpu_offload_data *buf,
+                                       struct task *t, cudaStream_t *stream,
+                                       const float d_a, const float d_H) {
 
   /* Pack the data. */
   runner_doself_gpu_pack_gradient(r, s, buf, t->ci, t);
@@ -764,19 +765,13 @@ static void runner_doself_gpu_gradient(
   }
 }
 
-
 /*
  * @brief Run the hydro force self tasks on GPU
  */
-static void runner_doself_gpu_force(
-    struct runner *r,
-    struct scheduler *s,
-    struct gpu_offload_data *buf,
-    struct task *t,
-    cudaStream_t *stream,
-    const float d_a,
-    const float d_H
-    ) {
+static void runner_doself_gpu_force(struct runner *r, struct scheduler *s,
+                                    struct gpu_offload_data *buf,
+                                    struct task *t, cudaStream_t *stream,
+                                    const float d_a, const float d_H) {
 
   /* Pack the particle data */
   runner_doself_gpu_pack_force(r, s, buf, t->ci, t);
@@ -800,20 +795,17 @@ static void runner_doself_gpu_force(
   }
 }
 
-
 /**
  * Generic function to launch GPU pair tasks
  */
 __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
-    const struct runner *r,
-    struct gpu_offload_data* restrict buf,
-    cudaStream_t *stream, const float d_a,
-    const float d_H,
+    const struct runner *r, struct gpu_offload_data *restrict buf,
+    cudaStream_t *stream, const float d_a, const float d_H,
     const enum task_subtypes task_subtype) {
 
   /* Grab handles */
-  struct gpu_pack_vars* pack_vars = &buf->pv;
-  int4* fparti_fpartj_lparti_lpartj_dens = buf->fparti_fpartj_lparti_lpartj;
+  struct gpu_pack_vars *pack_vars = &buf->pv;
+  int4 *fparti_fpartj_lparti_lpartj_dens = buf->fparti_fpartj_lparti_lpartj;
   cudaEvent_t *pair_end = buf->event_end;
 
   /* Identify the number of GPU bundles to run in ideal case*/
@@ -866,96 +858,92 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
         pack_vars->bundle_last_part[bid] - first_part_tmp_i;
 
     /* Transfer memory to device */
-    if (task_subtype == task_subtype_gpu_launch_d){
+    if (task_subtype == task_subtype_gpu_launch_d) {
 
       cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp_i],
-                    &buf->parts_send_d[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct gpu_part_send_d),
-                    cudaMemcpyHostToDevice, stream[bid]);
-    }
-    else if (task_subtype == task_subtype_gpu_launch_g){
+                      &buf->parts_send_d[first_part_tmp_i],
+                      bundle_n_parts * sizeof(struct gpu_part_send_d),
+                      cudaMemcpyHostToDevice, stream[bid]);
+    } else if (task_subtype == task_subtype_gpu_launch_g) {
       cudaMemcpyAsync(&buf->d_parts_send_g[first_part_tmp_i],
-                    &buf->parts_send_g[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct gpu_part_send_g),
-                    cudaMemcpyHostToDevice, stream[bid]);
-    }
-    else if (task_subtype == task_subtype_gpu_launch_f){
+                      &buf->parts_send_g[first_part_tmp_i],
+                      bundle_n_parts * sizeof(struct gpu_part_send_g),
+                      cudaMemcpyHostToDevice, stream[bid]);
+    } else if (task_subtype == task_subtype_gpu_launch_f) {
       cudaMemcpyAsync(&buf->d_parts_send_f[first_part_tmp_i],
-                    &buf->parts_send_f[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct gpu_part_send_f),
-                    cudaMemcpyHostToDevice, stream[bid]);
-    }
-    else {
+                      &buf->parts_send_f[first_part_tmp_i],
+                      bundle_n_parts * sizeof(struct gpu_part_send_f),
+                      cudaMemcpyHostToDevice, stream[bid]);
+    } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
 #ifdef CUDA_DEBUG
     cudaError_t cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
-      error("CUDA error with task subtype %s H2D async memcpy ci: %s cpuid id is: %i"
-            "Something's up with your cuda code first_part %lu bundle size %lu",
-            subtaskID_names[task_subtype], cudaGetErrorString(cu_error), r->cpuid, first_part_tmp_i, bundle_n_parts);
+      error(
+          "CUDA error with task subtype %s H2D async memcpy ci: %s cpuid id "
+          "is: %i"
+          "Something's up with your cuda code first_part %lu bundle size %lu",
+          subtaskID_names[task_subtype], cudaGetErrorString(cu_error), r->cpuid,
+          first_part_tmp_i, bundle_n_parts);
     }
 #endif
 
     /* LAUNCH THE GPU KERNELS for ci & cj */
     /* Setup 2d grid of GPU thread blocks for ci (number of tasks is
      * the y dimension and max_parts is the x dimension */
-    int numBlocks_y = 0;  /* tasks_left; //Changed this to 1D grid of blocks so this is no longer necessary */
+    int numBlocks_y = 0; /* tasks_left; //Changed this to 1D grid of blocks so
+                            this is no longer necessary */
     int numBlocks_x = (bundle_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int bundle_part_0 = pack_vars->bundle_first_part[bid];
 
     /* Launch the kernel for ci using data for ci and cj */
-    if (task_subtype == task_subtype_gpu_launch_d){
-      gpu_launch_pair_density(
-          buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H, stream[bid], numBlocks_x,
-          numBlocks_y, bundle_part_0, bundle_n_parts);
-    }
-    else if (task_subtype == task_subtype_gpu_launch_g) {
-      gpu_launch_pair_gradient(
-          buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H, stream[bid], numBlocks_x,
-          numBlocks_y, bundle_part_0, bundle_n_parts);
-    }
-    else if (task_subtype == task_subtype_gpu_launch_f) {
-      gpu_launch_pair_force(
-        buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H, stream[bid], numBlocks_x,
-        numBlocks_y, bundle_part_0, bundle_n_parts);
-    }
-    else {
+    if (task_subtype == task_subtype_gpu_launch_d) {
+      gpu_launch_pair_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a,
+                              d_H, stream[bid], numBlocks_x, numBlocks_y,
+                              bundle_part_0, bundle_n_parts);
+    } else if (task_subtype == task_subtype_gpu_launch_g) {
+      gpu_launch_pair_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a,
+                               d_H, stream[bid], numBlocks_x, numBlocks_y,
+                               bundle_part_0, bundle_n_parts);
+    } else if (task_subtype == task_subtype_gpu_launch_f) {
+      gpu_launch_pair_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
+                            stream[bid], numBlocks_x, numBlocks_y,
+                            bundle_part_0, bundle_n_parts);
+    } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
 #ifdef CUDA_DEBUG
     cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
-      error("CUDA error with task subtype %s kernel launch: %s cpuid id is: %i\n "
-            "nbx %i nby %i max_parts_i %i max_parts_j %i\n"
-            "Something's up with kernel launch.",
-            subtaskID_names[task_subtype], cudaGetErrorString(cu_error), r->cpuid, numBlocks_x, numBlocks_y,
-            max_parts_i, max_parts_j);
+      error(
+          "CUDA error with task subtype %s kernel launch: %s cpuid id is: %i\n "
+          "nbx %i nby %i max_parts_i %i max_parts_j %i\n"
+          "Something's up with kernel launch.",
+          subtaskID_names[task_subtype], cudaGetErrorString(cu_error), r->cpuid,
+          numBlocks_x, numBlocks_y, max_parts_i, max_parts_j);
     }
 #endif
 
     /* Copy results back to CPU BUFFERS */
-    if (task_subtype == task_subtype_gpu_launch_d){
+    if (task_subtype == task_subtype_gpu_launch_d) {
       cudaMemcpyAsync(&buf->parts_recv_d[first_part_tmp_i],
                       &buf->d_parts_recv_d[first_part_tmp_i],
                       bundle_n_parts * sizeof(struct gpu_part_recv_d),
                       cudaMemcpyDeviceToHost, stream[bid]);
-    }
-    else if (task_subtype == task_subtype_gpu_launch_g) {
+    } else if (task_subtype == task_subtype_gpu_launch_g) {
       cudaMemcpyAsync(&buf->parts_recv_g[first_part_tmp_i],
-                    &buf->d_parts_recv_g[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct gpu_part_recv_g),
-                    cudaMemcpyDeviceToHost, stream[bid]);
-    }
-    else if (task_subtype == task_subtype_gpu_launch_f) {
+                      &buf->d_parts_recv_g[first_part_tmp_i],
+                      bundle_n_parts * sizeof(struct gpu_part_recv_g),
+                      cudaMemcpyDeviceToHost, stream[bid]);
+    } else if (task_subtype == task_subtype_gpu_launch_f) {
       cudaMemcpyAsync(&buf->parts_recv_f[first_part_tmp_i],
-                    &buf->d_parts_recv_f[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct gpu_part_recv_f),
-                    cudaMemcpyDeviceToHost, stream[bid]);
-    }
-    else {
+                      &buf->d_parts_recv_f[first_part_tmp_i],
+                      bundle_n_parts * sizeof(struct gpu_part_recv_f),
+                      cudaMemcpyDeviceToHost, stream[bid]);
+    } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
@@ -965,9 +953,11 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
 #ifdef CUDA_DEBUG
     cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
-      error("CUDA error with task subtype %s D2H memcpy: %s cpuid id is: %i\n"
-            "Something's up with your cuda code", subtaskID_names[task_subtype],
-            cudaGetErrorString(cu_error), r->cpuid);
+      error(
+          "CUDA error with task subtype %s D2H memcpy: %s cpuid id is: %i\n"
+          "Something's up with your cuda code",
+          subtaskID_names[task_subtype], cudaGetErrorString(cu_error),
+          r->cpuid);
     }
 #endif
 
@@ -981,17 +971,14 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
   }
 }
 
-
-
 /**
  * Wrapper to launch density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch_density(
-    const struct runner *r,
-    struct gpu_offload_data* restrict buf,
-    cudaStream_t *stream,
-    const float d_a,
-    const float d_H) {
+__attribute__((always_inline)) INLINE static void
+runner_dopair_gpu_launch_density(const struct runner *r,
+                                 struct gpu_offload_data *restrict buf,
+                                 cudaStream_t *stream, const float d_a,
+                                 const float d_H) {
 
   TIMER_TIC;
 
@@ -1003,12 +990,11 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch_densi
 /**
  * Wrapper to launch density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch_gradient(
-    const struct runner *r,
-    struct gpu_offload_data* restrict buf,
-    cudaStream_t *stream,
-    const float d_a,
-    const float d_H) {
+__attribute__((always_inline)) INLINE static void
+runner_dopair_gpu_launch_gradient(const struct runner *r,
+                                  struct gpu_offload_data *restrict buf,
+                                  cudaStream_t *stream, const float d_a,
+                                  const float d_H) {
 
   TIMER_TIC;
 
@@ -1020,12 +1006,11 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch_gradi
 /**
  * Wrapper to launch density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch_force(
-    const struct runner *r,
-    struct gpu_offload_data* restrict buf,
-    cudaStream_t *stream,
-    const float d_a,
-    const float d_H) {
+__attribute__((always_inline)) INLINE static void
+runner_dopair_gpu_launch_force(const struct runner *r,
+                               struct gpu_offload_data *restrict buf,
+                               cudaStream_t *stream, const float d_a,
+                               const float d_H) {
 
   TIMER_TIC;
 
@@ -1034,29 +1019,24 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch_force
   TIMER_TOC(timer_dopair_gpu_launch_f);
 }
 
-
 /**
  * Generic function to unpack a GPU pair task depending on the task subtype.
  * TODO: DOCUMENT WHAT IS NPACKED??
  */
 __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
-    const struct runner *r,
-    struct scheduler *s,
-    struct gpu_offload_data* restrict buf,
-    const int npacked,
-    const enum task_subtypes task_subtype
-    ){
+    const struct runner *r, struct scheduler *s,
+    struct gpu_offload_data *restrict buf, const int npacked,
+    const enum task_subtypes task_subtype) {
 
   /* Grab handles */
-  struct gpu_pack_vars* pack_vars = &buf->pv;
+  struct gpu_pack_vars *pack_vars = &buf->pv;
   int n_leaves_found = buf->pv.n_leaves_found;
 
-  struct cell ** ci_d = buf->ci_d;
-  struct cell ** cj_d = buf->cj_d;
-  struct cell ** ci_top = buf->ci_top;
-  struct cell ** cj_top = buf->cj_top;
-  int** f_l_daughters = buf->first_and_last_daughters;
-
+  struct cell **ci_d = buf->ci_d;
+  struct cell **cj_d = buf->cj_d;
+  struct cell **ci_top = buf->ci_top;
+  struct cell **cj_top = buf->cj_top;
+  int **f_l_daughters = buf->first_and_last_daughters;
 
   /////////////////////////////////
   // Should this be reset to zero HERE???
@@ -1073,7 +1053,8 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     }
 
     /* Loop through each daughter task */
-    for (int tid = f_l_daughters[topid][0]; tid < f_l_daughters[topid][1]; tid++){
+    for (int tid = f_l_daughters[topid][0]; tid < f_l_daughters[topid][1];
+         tid++) {
 
       /*Get pointers to the leaf cells*/
       struct cell *cii_l = ci_d[tid];
@@ -1081,13 +1062,19 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
 
       /* Not a typo: task subtype is task_subtype_pack_*. The unpacking gets
        * called at the end of packing, running, and possibly launching */
-      if (task_subtype == task_subtype_gpu_pack_d){
+      if (task_subtype == task_subtype_gpu_pack_d) {
         /* TODO: WHY IS THERE A FACTOR OF 2 HERE? LEAVE A COMMENT. */
-        gpu_unpack_pair_density(r, cii_l, cjj_l, buf->parts_recv_d, &pack_length_unpack, 2 * pack_vars->count_max_parts);
+        gpu_unpack_pair_density(r, cii_l, cjj_l, buf->parts_recv_d,
+                                &pack_length_unpack,
+                                2 * pack_vars->count_max_parts);
       } else if (task_subtype == task_subtype_gpu_pack_g) {
-        gpu_unpack_pair_gradient(r, cii_l, cjj_l, buf->parts_recv_g, &pack_length_unpack, 2 * pack_vars->count_max_parts);
+        gpu_unpack_pair_gradient(r, cii_l, cjj_l, buf->parts_recv_g,
+                                 &pack_length_unpack,
+                                 2 * pack_vars->count_max_parts);
       } else if (task_subtype == task_subtype_gpu_pack_f) {
-        gpu_unpack_pair_force(r, cii_l, cjj_l, buf->parts_recv_f, &pack_length_unpack, 2 * pack_vars->count_max_parts);
+        gpu_unpack_pair_force(r, cii_l, cjj_l, buf->parts_recv_f,
+                              &pack_length_unpack,
+                              2 * pack_vars->count_max_parts);
       } else {
         error("Unknown task subtype %s", subtaskID_names[task_subtype]);
       }
@@ -1114,21 +1101,15 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
   }
 }
 
-
-
-
-
 /**
  * Wrapper for the density unpacking of pair tasks:
  * Provide the correct subtype to use and time the runtime separately
  * TODO: Documentation: WHAT IS NPACKED??
  */
-__attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack_density(
-    const struct runner *r,
-    struct scheduler *s,
-    struct gpu_offload_data* restrict buf,
-    const int npacked
-    ){
+__attribute__((always_inline)) INLINE static void
+runner_dopair_gpu_unpack_density(const struct runner *r, struct scheduler *s,
+                                 struct gpu_offload_data *restrict buf,
+                                 const int npacked) {
 
   TIMER_TIC;
 
@@ -1142,12 +1123,10 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack_densi
  * Provide the correct subtype to use and time the runtime separately
  * TODO: Documentation: WHAT IS NPACKED??
  */
-__attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack_gradient(
-    const struct runner *r,
-    struct scheduler *s,
-    struct gpu_offload_data* restrict buf,
-    const int npacked
-    ){
+__attribute__((always_inline)) INLINE static void
+runner_dopair_gpu_unpack_gradient(const struct runner *r, struct scheduler *s,
+                                  struct gpu_offload_data *restrict buf,
+                                  const int npacked) {
 
   TIMER_TIC;
 
@@ -1156,18 +1135,15 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack_gradi
   TIMER_TOC(timer_dopair_gpu_unpack_g);
 }
 
-
 /**
  * Wrapper for the force unpacking of pair tasks:
  * Provide the correct subtype to use and time the runtime separately
  * TODO: Documentation: WHAT IS NPACKED??
  */
-__attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack_force(
-    const struct runner *r,
-    struct scheduler *s,
-    struct gpu_offload_data* restrict buf,
-    const int npacked
-    ){
+__attribute__((always_inline)) INLINE static void
+runner_dopair_gpu_unpack_force(const struct runner *r, struct scheduler *s,
+                               struct gpu_offload_data *restrict buf,
+                               const int npacked) {
 
   TIMER_TIC;
 
@@ -1176,26 +1152,21 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack_force
   TIMER_TOC(timer_dopair_gpu_unpack_f);
 }
 
-
-
 /**
  * Generic function to pack pair tasks and launch them
  * on the device depending on the task subtype
  */
-__attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_and_launch(
-    const struct runner *r,
-    struct scheduler *s,
-    struct cell * ci, struct cell * cj,
-    struct gpu_offload_data* restrict buf,
-    struct task *t,
-    cudaStream_t *stream,
-    const float d_a,
-    const float d_H){
+__attribute__((always_inline)) INLINE static void
+runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
+                                  struct cell *ci, struct cell *cj,
+                                  struct gpu_offload_data *restrict buf,
+                                  struct task *t, cudaStream_t *stream,
+                                  const float d_a, const float d_H) {
 
   /* Grab handles */
-  struct gpu_pack_vars* pack_vars = &buf->pv;
+  struct gpu_pack_vars *pack_vars = &buf->pv;
   int n_leaves_found = buf->pv.n_leaves_found;
-  int** f_l_daughters = buf->first_and_last_daughters;
+  int **f_l_daughters = buf->first_and_last_daughters;
   int top_tasks_packed = pack_vars->top_tasks_packed;
 
   /* TODO: WHY IS THIS HERE AND NOT IN RUNNER_GPU_RECURSE??? */
@@ -1221,7 +1192,8 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_and_lau
   /* Increment how many top tasks we've packed */
   pack_vars->top_tasks_packed++;
 
-  /* A. Nasar: Remove this from struct as not needed. Was only used for de-bugging */
+  /* A. Nasar: Remove this from struct as not needed. Was only used for
+   * de-bugging */
   /* TODO: Abouzied, do this please! */
   /* How many daughter tasks do we want to offload at once?*/
   size_t target_n_tasks_tmp = pack_vars->target_n_tasks;
@@ -1233,27 +1205,25 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_and_lau
   /* A. Nasar: Loop through the daughter tasks we found */
   int copy_index = pack_vars->n_daughters_packed_index;
 
-  /* not strictly true!!! Could be that we packed and moved on without launching */
+  /* not strictly true!!! Could be that we packed and moved on without launching
+   */
   int had_prev_task = 0;
-  if(pack_vars->n_daughters_packed_index > 0)
-    had_prev_task = 1;
+  if (pack_vars->n_daughters_packed_index > 0) had_prev_task = 1;
 
   cell_unlocktree(ci);
   cell_unlocktree(cj);
 
-  while(npacked < n_leaves_found){
+  while (npacked < n_leaves_found) {
 
     top_tasks_packed = pack_vars->top_tasks_packed;
-    struct cell * cii = buf->ci_d[copy_index];
-    struct cell * cjj = buf->cj_d[copy_index];
+    struct cell *cii = buf->ci_d[copy_index];
+    struct cell *cjj = buf->cj_d[copy_index];
 
-    if (t->subtype == task_subtype_gpu_pack_d){
+    if (t->subtype == task_subtype_gpu_pack_d) {
       runner_dopair_gpu_pack_density(r, buf, cii, cjj, t);
-    }
-    else if (t->subtype == task_subtype_gpu_pack_g){
+    } else if (t->subtype == task_subtype_gpu_pack_g) {
       runner_dopair_gpu_pack_gradient(r, buf, cii, cjj, t);
-    }
-    else if (t->subtype == task_subtype_gpu_pack_f){
+    } else if (t->subtype == task_subtype_gpu_pack_f) {
       runner_dopair_gpu_pack_force(r, buf, cii, cjj, t);
     } else {
       error("Unknown task subtype %s", subtaskID_names[t->subtype]);
@@ -1266,46 +1236,47 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_and_lau
     npacked++;
     first_cell_to_move++;
 
-    f_l_daughters[top_tasks_packed - 1][1] = f_l_daughters[top_tasks_packed - 1][0] + copy_index;
+    f_l_daughters[top_tasks_packed - 1][1] =
+        f_l_daughters[top_tasks_packed - 1][0] + copy_index;
     if (had_prev_task)
-      f_l_daughters[top_tasks_packed - 1][1] = f_l_daughters[top_tasks_packed - 1][0] + copy_index - pack_vars->n_daughters_packed_index;
+      f_l_daughters[top_tasks_packed - 1][1] =
+          f_l_daughters[top_tasks_packed - 1][0] + copy_index -
+          pack_vars->n_daughters_packed_index;
 
-    if(pack_vars->tasks_packed == target_n_tasks_tmp)
-        pack_vars->launch = 1;
+    if (pack_vars->tasks_packed == target_n_tasks_tmp) pack_vars->launch = 1;
 
-    if(pack_vars->launch || (pack_vars->launch_leftovers && npacked == n_leaves_found)){
+    if (pack_vars->launch ||
+        (pack_vars->launch_leftovers && npacked == n_leaves_found)) {
 
       launched = 1;
 
-      if (t->subtype == task_subtype_gpu_pack_d){
+      if (t->subtype == task_subtype_gpu_pack_d) {
         /* Launch the tasks */
         runner_dopair_gpu_launch_density(r, buf, stream, d_a, d_H);
         /* Unpack the results into CPU memory */
         runner_dopair_gpu_unpack_density(r, s, buf, npacked);
-      }
-      else if (t->subtype == task_subtype_gpu_pack_g){
+      } else if (t->subtype == task_subtype_gpu_pack_g) {
         /* Launch the tasks */
         runner_dopair_gpu_launch_gradient(r, buf, stream, d_a, d_H);
         /* Unpack the results into CPU memory */
         runner_dopair_gpu_unpack_gradient(r, s, buf, npacked);
-      }
-      else if (t->subtype == task_subtype_gpu_pack_f){
+      } else if (t->subtype == task_subtype_gpu_pack_f) {
         /* Launch the tasks */
         runner_dopair_gpu_launch_force(r, buf, stream, d_a, d_H);
-      /* runner_dopair_launch_f( */
+        /* runner_dopair_launch_f( */
         /* Unpack the results into CPU memory */
         runner_dopair_gpu_unpack_force(r, s, buf, npacked);
-      /* runner_dopair_unpack_f( */
-      }
-      else {
+        /* runner_dopair_unpack_f( */
+      } else {
         error("Unknown task subtype %s", subtaskID_names[t->subtype]);
       }
 
-      if(npacked == n_leaves_found){
+      if (npacked == n_leaves_found) {
         pack_vars->n_daughters_total = 0;
         pack_vars->top_tasks_packed = 0;
       }
-      /* Special treatment required here. Launched but have not packed all tasks */
+      /* Special treatment required here. Launched but have not packed all tasks
+       */
       else {
         /* If we launch but still have daughters left re-set this task to be
          * the first in the list so that we can continue packing correctly */
@@ -1337,8 +1308,8 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_and_lau
     }
     /* case when we have launched then gone back to pack but did not pack
      * enough to launch again */
-    else if(npacked == n_leaves_found){
-      if(launched == 1){
+    else if (npacked == n_leaves_found) {
+      if (launched == 1) {
         pack_vars->n_daughters_total = n_daughters_left;
         buf->cj_top[0] = cj;
         buf->ci_top[0] = ci;
@@ -1347,9 +1318,9 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_and_lau
         pack_vars->top_tasks_packed = 1;
         pack_vars->top_task_list[0] = t;
         launched = 0;
-      }
-      else {
-        f_l_daughters[top_tasks_packed - 1][0] = pack_vars->n_daughters_packed_index;
+      } else {
+        f_l_daughters[top_tasks_packed - 1][0] =
+            pack_vars->n_daughters_packed_index;
         f_l_daughters[top_tasks_packed - 1][1] = pack_vars->n_daughters_total;
       }
       pack_vars->launch = 0;
@@ -1362,47 +1333,41 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack_and_lau
   pack_vars->launch = 0;
 }
 
-
-
-
 /**
  * Top level runner function to solve hydro density pair tasks on GPU.
  */
-static void runner_dopair_gpu_density(
-    const struct runner *r,
-    struct scheduler *s,
-    struct cell * ci, struct cell * cj,
-    struct gpu_offload_data* restrict buf,
-    struct task *t,
-    cudaStream_t *stream, const float d_a, const float d_H){
+static void runner_dopair_gpu_density(const struct runner *r,
+                                      struct scheduler *s, struct cell *ci,
+                                      struct cell *cj,
+                                      struct gpu_offload_data *restrict buf,
+                                      struct task *t, cudaStream_t *stream,
+                                      const float d_a, const float d_H) {
 
-    /* Collect cell interaction data recursively*/
-    runner_dopair_gpu_recurse(r, s, buf, ci, cj, t, /*depth=*/0, /*timer=*/1);
+  /* Collect cell interaction data recursively*/
+  runner_dopair_gpu_recurse(r, s, buf, ci, cj, t, /*depth=*/0, /*timer=*/1);
 
-    /* A. Nasar: Check to see if this is the last task in the queue. If so, set
-     * launch_leftovers to 1 and recursively pack and launch daughter tasks on
-     * GPU */
-    unsigned int qid = r->qid;
-    lock_lock(&s->queues[qid].lock);
-    s->queues[qid].n_packs_pair_left_d--;
-    if (s->queues[qid].n_packs_pair_left_d < 1) buf->pv.launch_leftovers = 1;
-    (void)lock_unlock(&s->queues[qid].lock);
+  /* A. Nasar: Check to see if this is the last task in the queue. If so, set
+   * launch_leftovers to 1 and recursively pack and launch daughter tasks on
+   * GPU */
+  unsigned int qid = r->qid;
+  lock_lock(&s->queues[qid].lock);
+  s->queues[qid].n_packs_pair_left_d--;
+  if (s->queues[qid].n_packs_pair_left_d < 1) buf->pv.launch_leftovers = 1;
+  (void)lock_unlock(&s->queues[qid].lock);
 
-    /* pack the data and run, if enough data has been gathered */
-    runner_dopair_gpu_pack_and_launch(r, s, ci, cj, buf, t, stream, d_a, d_H);
+  /* pack the data and run, if enough data has been gathered */
+  runner_dopair_gpu_pack_and_launch(r, s, ci, cj, buf, t, stream, d_a, d_H);
 }
-
 
 /**
  * Top level runner function to solve hydro gradient pair tasks on GPU.
  */
-static void runner_dopair_gpu_gradient(
-    const struct runner *r,
-    struct scheduler *s,
-    struct cell * ci, struct cell * cj,
-    struct gpu_offload_data* restrict buf,
-    struct task *t,
-    cudaStream_t *stream, const float d_a, const float d_H){
+static void runner_dopair_gpu_gradient(const struct runner *r,
+                                       struct scheduler *s, struct cell *ci,
+                                       struct cell *cj,
+                                       struct gpu_offload_data *restrict buf,
+                                       struct task *t, cudaStream_t *stream,
+                                       const float d_a, const float d_H) {
 
   /* Collect cell interaction data recursively*/
   runner_dopair_gpu_recurse(r, s, buf, ci, cj, t, /*depth=*/0, /*timer=*/1);
@@ -1423,13 +1388,11 @@ static void runner_dopair_gpu_gradient(
 /**
  * Top level runner function to solve hydro force pair tasks on GPU.
  */
-static void runner_dopair_gpu_force(
-    const struct runner *r,
-    struct scheduler *s,
-    struct cell * ci, struct cell * cj,
-    struct gpu_offload_data* restrict buf,
-    struct task *t,
-    cudaStream_t *stream, const float d_a, const float d_H){
+static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
+                                    struct cell *ci, struct cell *cj,
+                                    struct gpu_offload_data *restrict buf,
+                                    struct task *t, cudaStream_t *stream,
+                                    const float d_a, const float d_H) {
 
   /* Collect cell interaction data recursively*/
   runner_dopair_gpu_recurse(r, s, buf, ci, cj, t, /*depth=*/0, /*timer=*/1);
@@ -1447,7 +1410,6 @@ static void runner_dopair_gpu_force(
   /* pack the data and run, if enough data has been gathered */
   runner_dopair_gpu_pack_and_launch(r, s, ci, cj, buf, t, stream, d_a, d_H);
 }
-
 
 #ifdef __cplusplus
 }
