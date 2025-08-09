@@ -35,12 +35,7 @@ extern "C" {
 #include "gpu_pack_vars.h"
 #include "gpu_part_structs.h"
 
-#include <cuda.h>
 #include <cuda_runtime.h>
-#include <stddef.h>
-
-
-
 
 
 
@@ -113,6 +108,7 @@ struct gpu_offload_data{
 
   /*! Size of the struct used to send data to/from device. */
   size_t size_of_recv_struct;
+
 #endif /* WITH_CUDA */
 };
 

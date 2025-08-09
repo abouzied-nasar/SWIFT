@@ -24,7 +24,6 @@
 extern "C" {
 #endif
 
-/* #include "atomic.h" */
 #include "active.h"
 #include "error.h"
 #include "inline.h"
@@ -93,11 +92,11 @@ __attribute__((always_inline)) INLINE void runner_doself_gpu_pack(struct cell *c
     /* This re-arranges the particle data from cell->hydro->parts into a
        long array of part structs */
     if (task_subtype == task_subtype_gpu_pack_d) {
-      gpu_pack_part_self_density(ci, buf);
+      gpu_pack_self_density(ci, buf);
     } else if (task_subtype == task_subtype_gpu_pack_g) {
-      gpu_pack_part_self_gradient(ci, buf);
+      gpu_pack_self_gradient(ci, buf);
     } else if (task_subtype == task_subtype_gpu_pack_f){
-      gpu_pack_part_self_force(ci, buf);
+      gpu_pack_self_force(ci, buf);
     } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
@@ -326,11 +325,11 @@ __attribute__((always_inline)) INLINE void runner_dopair_gpu_pack(const struct r
   /* This re-arranges the particle data from cell->hydro->parts into a
   long array of part structs*/
   if (task_subtype == task_subtype_gpu_pack_d){
-    gpu_pack_pair_density(buf, r, ci, cj, shift_tmp);
+    gpu_pack_pair_density(buf, ci, cj, shift_tmp);
   } else if (task_subtype == task_subtype_gpu_pack_g){
-    gpu_pack_pair_gradient(buf, r, ci, cj, shift_tmp);
+    gpu_pack_pair_gradient(buf, ci, cj, shift_tmp);
   } else if (task_subtype == task_subtype_gpu_pack_f){
-    gpu_pack_pair_force(buf, r, ci, cj, shift_tmp);
+    gpu_pack_pair_force(buf, ci, cj, shift_tmp);
   } else {
     error("Unknown task subtype %s", subtaskID_names[task_subtype]);
   }
@@ -644,21 +643,27 @@ __attribute__((always_inline)) INLINE void runner_doself_gpu_unpack(
       /* Do the copy */
       if (task_subtype == task_subtype_gpu_pack_d){
 
-        gpu_unpack_part_self_density(c, buf->parts_recv_d, pack_length, count, e);
+        gpu_unpack_self_density(c, buf->parts_recv_d, pack_length, count, e);
         /* Record things for debugging */
+#ifdef CUDA_DEBUG
         c->gpu_done++;
+#endif
 
       } else if (task_subtype == task_subtype_gpu_pack_g){
 
-        gpu_unpack_part_self_gradient(c, buf->parts_recv_g, pack_length, count, e);
+        gpu_unpack_self_gradient(c, buf->parts_recv_g, pack_length, count, e);
         /* Record things for debugging */
+#ifdef CUDA_DEBUG
         c->gpu_done_g++;
+#endif
 
       } else if (task_subtype == task_subtype_gpu_pack_f){
 
-        gpu_unpack_part_self_force(c, buf->parts_recv_f, pack_length, count, e);
+        gpu_unpack_self_force(c, buf->parts_recv_f, pack_length, count, e);
         /* Record things for debugging */
+#ifdef CUDA_DEBUG
         c->gpu_done_f++;
+#endif
 
       } else {
         error("Unknown task subtype %s", subtaskID_names[task_subtype]);
