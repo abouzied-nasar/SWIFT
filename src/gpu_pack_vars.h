@@ -20,6 +20,11 @@
 #ifndef GPU_PACK_VARS_H
 #define GPU_PACK_VARS_H
 
+/**
+ * @file gpu_pack_vars.h
+ * @brief struct and corresponding functions related to GPU packing data and
+ * meta-data
+ */
 
 #ifdef __cplusplus
 extern "C" {

@@ -21,8 +21,13 @@
 extern "C" {
 #endif
 
-#include "GPU_pack_vars.h"
+#include "gpu_pack_vars.h"
 #include "cuda/cuda_config.h"
+
+/**
+ * @file gpu_pack_vars.c
+ * @brief functions related to GPU packing data and meta-data
+ */
 
 
 /**

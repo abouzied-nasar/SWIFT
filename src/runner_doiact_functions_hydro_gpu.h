@@ -42,15 +42,15 @@ extern "C" {
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#include "cuda/GPU_offload_data.h"
-#include "cuda/GPU_runner_functions.h"
 #include "cuda/cuda_config.h"
+#include "cuda/gpu_launch.h"
+#include "cuda/gpu_offload_data.h"
 #else
 #endif
 
 #ifdef WITH_HIP
 #include "hip/hip_config.h"
-#include "hip/GPU_runner_functions.h"
+#include "hip/gpu_runner_functions.h"
 #endif
 
 

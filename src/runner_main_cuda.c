@@ -47,11 +47,11 @@ extern "C" {
 
 /* Local headers. */
 #include "cell.h" // TODO(mivkov): Check if necessary after refactor
-#include "cuda/GPU_offload_data.h"
-#include "cuda/GPU_part_structs.h"
-#include "cuda/GPU_runner_functions.h"
-#include "cuda/GPU_utils.h"
+#include "cuda/gpu_offload_data.h"
+/* #include "cuda/gpu_part_structs.h" */
+/* #include "cuda/gpu_launch.h" */
 #include "cuda/cuda_config.h"
+#include "cuda/gpu_utils.h"
 #include "engine.h"
 #include "feedback.h"
 #include "runner_doiact_functions_hydro_gpu.h"

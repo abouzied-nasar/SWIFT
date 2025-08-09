@@ -3,7 +3,7 @@
  * @brief misc GPU utilities
  */
 
-#include "GPU_utils.h"
+#include "gpu_utils.h"
 #include "cuda_config.h"
 #include "runner.h"
 

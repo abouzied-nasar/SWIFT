@@ -17,11 +17,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
+
+/**
+ * @file cuda/gpu_offload_data.c
+ * @brief functions related to the gpu_offload_data struct, containing data
+ * required for offloading
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "GPU_offload_data.h"
+#include "gpu_offload_data.h"
 #include "task.h"
 
 #include <cuda.h>

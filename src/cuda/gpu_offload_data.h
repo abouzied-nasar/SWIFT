@@ -1,19 +1,46 @@
+/*******************************************************************************
+ * This file is part of SWIFT.
+ * Copyright (c) 2025 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
+ *                    Mladen Ivkovic (mladen.ivkovic@durham.ac.uk)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ ******************************************************************************/
 #ifndef CUDA_gpu_offload_data_H
 #define CUDA_gpu_offload_data_H
+
+
+/**
+ * @file cuda/gpu_offload_data.h
+ * @brief contains the gpu_offload_data struct, which holds data required for
+ * offloading, and associated functions
+ */
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include "GPU_pack_vars.h"
-#include "GPU_part_structs.h"
 #include "cell.h"
+#include "gpu_pack_vars.h"
+#include "gpu_part_structs.h"
 
-#include <stddef.h>
-
-/* TODO: remove again? */
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <stddef.h>
+
+
+
 
 
 

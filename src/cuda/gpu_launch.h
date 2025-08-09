@@ -1,3 +1,23 @@
+/*******************************************************************************
+ * This file is part of SWIFT.
+ * Copyright (c) 2025 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
+ *                    Mladen Ivkovic (mladen.ivkovic@durham.ac.uk)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ ******************************************************************************/
+
 #ifndef CUDA_GPU_RUNNER_FUNCTIONS_H
 #define CUDA_GPU_RUNNER_FUNCTIONS_H
 #define n_streams 1024
@@ -7,7 +27,7 @@ extern "C" {
 #endif
 #include <cuda_runtime.h>
 
-#include "GPU_part_structs.h"
+#include "gpu_part_structs.h"
 
 void gpu_launch_self_density(struct part_aos_f4_send_d *parts_send,
                            struct part_aos_f4_recv_d *parts_recv, float d_a,

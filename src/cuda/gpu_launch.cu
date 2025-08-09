@@ -4,17 +4,6 @@
  * called from within runner_main.c
  ******************************************************************************/
 
-/* Hacky method to make c++ compilers not die. */
-/* TODO: do we still need this..? */
-/* #ifdef WITH_CUDA */
-/* #ifndef static */
-/* #define static */
-/* #endif */
-/* #ifndef restrict */
-/* #define restrict __restrict__ */
-/* #endif */
-/* #endif */
-
 /* ifdef __cplusplus prevents name mangling. C code sees exact names
  of functions rather than mangled template names produced by C++ */
 #ifdef __cplusplus
@@ -31,10 +20,10 @@ extern "C" {
 #include <cuda_runtime.h>
 #include <stdio.h>
 
-#include "GPU_part_structs.h"
-#include "GPU_runner_functions.h"
 #include "cuda_config.h"
 #include "device_functions.h"
+#include "gpu_launch.h"
+#include "gpu_part_structs.h"
 
 
 /**
