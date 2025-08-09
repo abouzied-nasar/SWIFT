@@ -188,6 +188,9 @@ void gpu_init_data_buffers(
     cudaEventCreate(&(buf->event_end[i]));
   }
 
+  /* Store the size of structs for anonymous use in cudaMemcpy calls */
+  buf->size_of_send_struct = send_struct_size;
+  buf->size_of_recv_struct = recv_struct_size;
 }
 
 
