@@ -562,8 +562,8 @@ nobase_noinst_HEADERS += fvpm_geometry/Gizmo/fvpm_geometry.h fvpm_geometry/Gizmo
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/MFM/fvpm_geometry.h fvpm_geometry/Gizmo/MFV/fvpm_geometry.h
 nobase_noinst_HEADERS += gpu_pack_vars.h 
 nobase_noinst_HEADERS += cuda/gpu_part_structs.h
-nobase_noinst_HEADERS += runner_doiact_functions_hydro_gpu.h
-nobase_noinst_HEADERS += cuda/device_functions.h cuda/gpu_launch.h
+nobase_noinst_HEADERS += runner_doiact_functions_hydro_gpu.h cuda/gpu_launch.h
+nobase_noinst_HEADERS += cuda/device_functions.cuh cuda/cuda_particle_kernels.cuh
 
 # TODO: Add HIP C-headers without base files here
 
