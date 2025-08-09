@@ -108,6 +108,10 @@ void gpu_pack_pair_gradient(struct gpu_offload_data* buf,
     const struct runner *r, const struct cell *ci, const struct cell *cj,
     const double3 shift_tmp);
 
+void gpu_pack_pair_force(struct gpu_offload_data* buf,
+    const struct runner *r, const struct cell *ci, const struct cell *cj,
+    const double3 shift_tmp);
+
 void gpu_unpack_pair_density(
     const struct runner *r,
     struct cell *ci,
@@ -122,6 +126,15 @@ void gpu_unpack_pair_gradient(
     struct cell *ci,
     struct cell *cj,
     const struct part_aos_f4_recv_g *parts_aos_buffer,
+    size_t *pack_ind,
+    size_t count_max_parts
+    );
+
+void gpu_unpack_pair_force(
+    const struct runner *r,
+    struct cell *ci,
+    struct cell *cj,
+    const struct part_aos_f4_recv_f *parts_aos_buffer,
     size_t *pack_ind,
     size_t count_max_parts
     );
