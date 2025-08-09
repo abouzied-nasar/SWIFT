@@ -55,7 +55,7 @@
 __attribute__((always_inline)) INLINE static void gpu_pack_self_density(
     const struct cell* restrict c, struct gpu_offload_data* restrict buf) {
 
-  gpu_pack_part_self_density(c, buf);
+  gpu_pack_part_self_density(c, buf->parts_send_d, buf->pv.count_parts);
 }
 
 /**
@@ -68,7 +68,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_self_density(
 __attribute__((always_inline)) INLINE static void gpu_pack_self_gradient(
     const struct cell* restrict c, struct gpu_offload_data* restrict buf) {
 
-  gpu_pack_part_self_gradient(c, buf);
+  gpu_pack_part_self_gradient(c, buf->parts_send_g, buf->pv.count_parts);
 }
 
 /**
@@ -82,7 +82,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_self_force(
     const struct cell* restrict c,
     struct gpu_offload_data *restrict buf) {
 
-  gpu_pack_part_self_force(c, buf);
+  gpu_pack_part_self_force(c, buf->parts_send_f, buf->pv.count_parts);
 }
 
 /**
@@ -313,7 +313,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(struct g
   const int2 cjs_cje = {pack_ind + count_ci, pack_ind + count_ci + count_cj};
 
   /* Pack cell i */
-  gpu_pack_part_pair_density(ci, buf->parts_send_d, pack_ind, count_ci, shift_i, cjs_cje);
+  gpu_pack_part_pair_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs_cje);
 
   /* Update the particles packed counter */
   pack_ind += count_ci;
@@ -321,7 +321,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(struct g
   /* Do the same for cj */
   const double3 shift_j = {cj->loc[0], cj->loc[1], cj->loc[2]};
 
-  gpu_pack_part_pair_density(cj, buf->parts_send_d, pack_ind, count_cj, shift_j, cis_cie);
+  gpu_pack_part_pair_density(cj, buf->parts_send_d, pack_ind, shift_j, cis_cie);
 
   pack_ind += count_cj;
 
@@ -372,7 +372,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(struct 
   const int2 cjs_cje = {pack_ind + count_ci, pack_ind + count_ci + count_cj};
 
   /* Pack cell i */
-  gpu_pack_part_pair_gradient(ci, buf->parts_send_g, pack_ind, count_ci, shift_i, cjs_cje);
+  gpu_pack_part_pair_gradient(ci, buf->parts_send_g, pack_ind, shift_i, cjs_cje);
 
   /* Update the particles packed counter */
   pack_ind += count_ci;
@@ -380,7 +380,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(struct 
   /* Do the same for cj */
   const double3 shift_j = {cj->loc[0], cj->loc[1], cj->loc[2]};
 
-  gpu_pack_part_pair_gradient(cj, buf->parts_send_g, pack_ind, count_cj, shift_j, cis_cie);
+  gpu_pack_part_pair_gradient(cj, buf->parts_send_g, pack_ind, shift_j, cis_cie);
 
   /* Update the particles packed counter */
   pack_ind += count_cj;
@@ -432,7 +432,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(struct gpu
   /* Get first and last particles of cell j */
   const int2 cjs_cje = {pack_ind + count_ci, pack_ind + count_ci + count_cj};
 
-  gpu_pack_part_pair_force(ci, buf->parts_send_f, pack_ind, count_ci, shift_i, cjs_cje);
+  gpu_pack_part_pair_force(ci, buf->parts_send_f, pack_ind, shift_i, cjs_cje);
 
   /* Update the particles packed counter */
   pack_ind += count_ci;
@@ -440,7 +440,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(struct gpu
   /* Pack the particle data into CPU-side buffers*/
   const double3 shift_j = {cj->loc[0], cj->loc[1], cj->loc[2]};
 
-  gpu_pack_part_pair_force(cj, buf->parts_send_f, pack_ind, count_cj, shift_j, cis_cie);
+  gpu_pack_part_pair_force(cj, buf->parts_send_f, pack_ind, shift_j, cis_cie);
 
   /* Update the particles packed counter */
   pack_ind += count_cj;
