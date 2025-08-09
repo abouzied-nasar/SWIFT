@@ -17,10 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
-#ifndef CUDA_GPU_RUNNER_FUNCTIONS_H
-#define CUDA_GPU_RUNNER_FUNCTIONS_H
-#define n_streams 1024
+#ifndef CUDA_GPU_LAUNCH_H
+#define CUDA_GPU_LAUNCH_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -63,4 +61,4 @@ void gpu_launch_pair_force(struct gpu_part_send_f *parts_send,
 }
 #endif
 
-#endif  // GPU_RUNNER_FUNCTIONS_H
+#endif  // CUDA_GPU_LAUNCH_H

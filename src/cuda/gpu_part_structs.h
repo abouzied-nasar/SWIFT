@@ -17,7 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
 #ifndef CUDA_GPU_PART_STRUCTS_H
 #define CUDA_GPU_PART_STRUCTS_H
 

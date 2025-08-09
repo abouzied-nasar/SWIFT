@@ -1,7 +1,6 @@
 /*******************************************************************************
  * This file is part of SWIFT.
  * Copyright (c) 2025 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
- *                    Mladen Ivkovic (mladen.ivkovic@durham.ac.uk)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -170,4 +169,4 @@ __device__ void d_kernel_deval(float u, float *__restrict__ W,
 }
 #endif
 
-#endif  // DEVICE_FUNCTIONS_H
+#endif  // DEVICE_FUNCTIONS_CUH
