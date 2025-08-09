@@ -65,33 +65,33 @@ struct gpu_offload_data{
    * without discriminating which type of struct it is. */
   union {
     void* d_parts_send;
-    struct part_aos_f4_send_d *d_parts_send_d;
-    struct part_aos_f4_send_g *d_parts_send_g;
-    struct part_aos_f4_send_f *d_parts_send_f;
+    struct gpu_part_send_d *d_parts_send_d;
+    struct gpu_part_send_g *d_parts_send_g;
+    struct gpu_part_send_f *d_parts_send_f;
   };
 
   /*! TODO: Documentation?? */
   union {
     void* d_parts_recv;
-    struct part_aos_f4_recv_d *d_parts_recv_d;
-    struct part_aos_f4_recv_g *d_parts_recv_g;
-    struct part_aos_f4_recv_f *d_parts_recv_f;
+    struct gpu_part_recv_d *d_parts_recv_d;
+    struct gpu_part_recv_g *d_parts_recv_g;
+    struct gpu_part_recv_f *d_parts_recv_f;
   };
 
   /*! TODO: Documentation?? */
   union {
     void *parts_send;
-    struct part_aos_f4_send_d *parts_send_d;
-    struct part_aos_f4_send_g *parts_send_g;
-    struct part_aos_f4_send_f *parts_send_f;
+    struct gpu_part_send_d *parts_send_d;
+    struct gpu_part_send_g *parts_send_g;
+    struct gpu_part_send_f *parts_send_f;
   };
 
   /*! TODO: Documentation?? */
   union {
     void *parts_recv;
-    struct part_aos_f4_recv_d *parts_recv_d;
-    struct part_aos_f4_recv_g *parts_recv_g;
-    struct part_aos_f4_recv_f *parts_recv_f;
+    struct gpu_part_recv_d *parts_recv_d;
+    struct gpu_part_recv_g *parts_recv_g;
+    struct gpu_part_recv_f *parts_recv_f;
   };
 
   /*! TODO: Documentation */

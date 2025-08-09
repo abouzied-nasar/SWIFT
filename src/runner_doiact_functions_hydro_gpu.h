@@ -486,19 +486,19 @@ void runner_doself_gpu_launch(
     if (task_subtype == task_subtype_gpu_pack_d){
 
       cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp], &buf->parts_send_d[first_part_tmp],
-                      bundle_n_parts * sizeof(struct part_aos_f4_send_d),
+                      bundle_n_parts * sizeof(struct gpu_part_send_d),
                       cudaMemcpyHostToDevice, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_pack_g){
 
       cudaMemcpyAsync(&buf->d_parts_send_g[first_part_tmp], &buf->parts_send_g[first_part_tmp],
-                    bundle_n_parts * sizeof(struct part_aos_f4_send_g),
+                    bundle_n_parts * sizeof(struct gpu_part_send_g),
                     cudaMemcpyHostToDevice, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_pack_f){
 
       cudaMemcpyAsync(&buf->d_parts_send_f[first_part_tmp], &buf->parts_send_f[first_part_tmp],
-                      bundle_n_parts * sizeof(struct part_aos_f4_send_f),
+                      bundle_n_parts * sizeof(struct gpu_part_send_f),
                       cudaMemcpyHostToDevice, stream[bid]);
 
     } else {
@@ -546,19 +546,19 @@ void runner_doself_gpu_launch(
     if (task_subtype == task_subtype_gpu_pack_d){
 
       cudaMemcpyAsync(&buf->parts_recv_d[first_part_tmp], &buf->d_parts_recv_d[first_part_tmp],
-                      bundle_n_parts * sizeof(struct part_aos_f4_recv_d),
+                      bundle_n_parts * sizeof(struct gpu_part_recv_d),
                       cudaMemcpyDeviceToHost, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_pack_g){
 
       cudaMemcpyAsync(&buf->parts_recv_g[first_part_tmp], &buf->d_parts_recv_g[first_part_tmp],
-                      bundle_n_parts * sizeof(struct part_aos_f4_recv_g),
+                      bundle_n_parts * sizeof(struct gpu_part_recv_g),
                       cudaMemcpyDeviceToHost, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_pack_f){
 
       cudaMemcpyAsync(&buf->parts_recv_f[first_part_tmp], &buf->d_parts_recv_f[first_part_tmp],
-                    bundle_n_parts * sizeof(struct part_aos_f4_recv_f),
+                    bundle_n_parts * sizeof(struct gpu_part_recv_f),
                     cudaMemcpyDeviceToHost, stream[bid]);
     } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
@@ -860,19 +860,19 @@ void runner_dopair_gpu_launch(
 
       cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp_i],
                     &buf->parts_send_d[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_send_d),
+                    bundle_n_parts * sizeof(struct gpu_part_send_d),
                     cudaMemcpyHostToDevice, stream[bid]);
     }
     else if (task_subtype == task_subtype_gpu_launch_g){
       cudaMemcpyAsync(&buf->d_parts_send_g[first_part_tmp_i],
                     &buf->parts_send_g[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_send_g),
+                    bundle_n_parts * sizeof(struct gpu_part_send_g),
                     cudaMemcpyHostToDevice, stream[bid]);
     }
     else if (task_subtype == task_subtype_gpu_launch_f){
       cudaMemcpyAsync(&buf->d_parts_send_f[first_part_tmp_i],
                     &buf->parts_send_f[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_send_f),
+                    bundle_n_parts * sizeof(struct gpu_part_send_f),
                     cudaMemcpyHostToDevice, stream[bid]);
     }
     else {
@@ -930,19 +930,19 @@ void runner_dopair_gpu_launch(
     if (task_subtype == task_subtype_gpu_launch_d){
       cudaMemcpyAsync(&buf->parts_recv_d[first_part_tmp_i],
                       &buf->d_parts_recv_d[first_part_tmp_i],
-                      bundle_n_parts * sizeof(struct part_aos_f4_recv_d),
+                      bundle_n_parts * sizeof(struct gpu_part_recv_d),
                       cudaMemcpyDeviceToHost, stream[bid]);
     }
     else if (task_subtype == task_subtype_gpu_launch_g) {
       cudaMemcpyAsync(&buf->parts_recv_g[first_part_tmp_i],
                     &buf->d_parts_recv_g[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_recv_g),
+                    bundle_n_parts * sizeof(struct gpu_part_recv_g),
                     cudaMemcpyDeviceToHost, stream[bid]);
     }
     else if (task_subtype == task_subtype_gpu_launch_f) {
       cudaMemcpyAsync(&buf->parts_recv_f[first_part_tmp_i],
                     &buf->d_parts_recv_f[first_part_tmp_i],
-                    bundle_n_parts * sizeof(struct part_aos_f4_recv_f),
+                    bundle_n_parts * sizeof(struct gpu_part_recv_f),
                     cudaMemcpyDeviceToHost, stream[bid]);
     }
     else {

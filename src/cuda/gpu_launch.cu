@@ -30,8 +30,8 @@ extern "C" {
  * Does the self density computation on device
  */
 __global__ void cuda_launch_self_density(
-    struct part_aos_f4_send_d* __restrict__ parts_send,
-    struct part_aos_f4_recv_d* __restrict__ parts_recv, const float d_a,
+    struct gpu_part_send_d* __restrict__ parts_send,
+    struct gpu_part_recv_d* __restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
     const int2 *__restrict__ d_task_first_part_f4) {
 
@@ -48,7 +48,7 @@ __global__ void cuda_launch_self_density(
 
   float4 res_rho = {0.0, 0.0, 0.0, 0.0};
   float4 res_rot = {0.0, 0.0, 0.0, 0.0};
-  const struct part_aos_f4_send_d pi = parts_send[pid];
+  const struct gpu_part_send_d pi = parts_send[pid];
   const float4 x_pi = pi.x_p_h;
   const float4 ux_pi = pi.ux_m;
   const float hi = x_pi.w;
@@ -62,7 +62,7 @@ __global__ void cuda_launch_self_density(
   for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks; b += BLOCK_SIZE) {
 
     int j = b + threadIdx.x;
-    struct part_aos_f4_send_d pj = parts_send[j];
+    struct gpu_part_send_d pj = parts_send[j];
     x_p_h_tmp[threadIdx.x] = pj.x_p_h;
     ux_m_tmp[threadIdx.x] = pj.ux_m;
     __syncthreads();
@@ -125,8 +125,8 @@ __global__ void cuda_launch_self_density(
  * Does the self density computation on device
  */
 __global__ void cuda_launch_self_gradient(
-    struct part_aos_f4_send_g *__restrict__ parts_send,
-    struct part_aos_f4_recv_g *__restrict__ parts_recv, const float d_a,
+    struct gpu_part_send_g *__restrict__ parts_send,
+    struct gpu_part_recv_g *__restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
     const int2 *__restrict__ d_task_first_part_f4) {
 
@@ -140,7 +140,7 @@ __global__ void cuda_launch_self_gradient(
   int last_part_in_task_blocks = first_last_parts.y;
   const int pid = threadid + first_part_in_task_blocks;
 
-  struct part_aos_f4_send_g pi = parts_send[pid];
+  struct gpu_part_send_g pi = parts_send[pid];
   float4 x_h_i = pi.x_h;
   float4 ux_m_i = pi.ux_m;
   float4 rho_avisc_u_c_i = pi.rho_avisc_u_c;
@@ -162,7 +162,7 @@ __global__ void cuda_launch_self_gradient(
 
     int j = b + threadIdx.x;
 
-    struct part_aos_f4_send_g pj = parts_send[j];
+    struct gpu_part_send_g pj = parts_send[j];
     x_h_tmp[threadIdx.x] = pj.x_h;
     ux_m_tmp[threadIdx.x] = pj.ux_m;
     rho_avisc_u_c_tmp[threadIdx.x] = pj.rho_avisc_u_c;
@@ -236,8 +236,8 @@ __global__ void cuda_launch_self_gradient(
  * Does the self force computation on device
  */
 __global__ void cuda_launch_self_force(
-    struct part_aos_f4_send_f*__restrict__ parts_send,
-    struct part_aos_f4_recv_f *__restrict__ parts_recv, const float d_a,
+    struct gpu_part_send_f*__restrict__ parts_send,
+    struct gpu_part_recv_f *__restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
     const int2 *__restrict__ d_task_first_part_f4) {
 
@@ -252,7 +252,7 @@ __global__ void cuda_launch_self_force(
 
   const int pid = threadid + first_part_in_task_blocks;
 
-  const part_aos_f4_send_f pi = parts_send[pid];
+  const gpu_part_send_f pi = parts_send[pid];
   float4 x_h_i = pi.x_h;
   float4 ux_m_i = pi.ux_m;
   float4 f_b_t_mintbinngb_i = pi.f_bals_timebin_mintimebin_ngb;
@@ -283,7 +283,7 @@ __global__ void cuda_launch_self_force(
   for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks;
        b += BLOCK_SIZE) {
     int j = b + threadIdx.x;
-    struct part_aos_f4_send_f pj = parts_send[j];
+    struct gpu_part_send_f pj = parts_send[j];
     x_h_tmp[threadIdx.x] = pj.x_h;
     ux_m_tmp[threadIdx.x] = pj.ux_m;
     f_b_t_mintbinngb_tmp[threadIdx.x] = pj.f_bals_timebin_mintimebin_ngb;
@@ -434,9 +434,9 @@ __global__ void cuda_launch_self_force(
  * Naive kernel computing density interaction for pair task
  */
 __device__ void cuda_kernel_pair_density(
-    const struct part_aos_f4_send_d pi,
-    struct part_aos_f4_send_d *__restrict__ parts_send,
-    struct part_aos_f4_recv_d *__restrict__ parts_recv, int pid,
+    const struct gpu_part_send_d pi,
+    struct gpu_part_send_d *__restrict__ parts_send,
+    struct gpu_part_recv_d *__restrict__ parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
   float hi = 0.0;
@@ -450,7 +450,7 @@ __device__ void cuda_kernel_pair_density(
 
   /* Particles copied in blocks to shared memory */
   for (int j = cj_start; j < cj_end; j++) {
-    struct part_aos_f4_send_d pj = parts_send[j];
+    struct gpu_part_send_d pj = parts_send[j];
 
     const float4 x_p_h_j = pj.x_p_h;
     const float4 ux_m_j = pj.ux_m;
@@ -503,9 +503,9 @@ __device__ void cuda_kernel_pair_density(
  * Naive kernel computing gradient interaction for pair task
  */
 __device__ void cuda_kernel_pair_gradient(
-    const struct part_aos_f4_send_g pi,
-    struct part_aos_f4_send_g *__restrict__ parts_send,
-    struct part_aos_f4_recv_g *__restrict__ parts_recv, int pid,
+    const struct gpu_part_send_g pi,
+    struct gpu_part_send_g *__restrict__ parts_send,
+    struct gpu_part_recv_g *__restrict__ parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
   float hi = 0.0;
@@ -520,7 +520,7 @@ __device__ void cuda_kernel_pair_gradient(
 
   /* Particles copied in blocks to shared memory */
   for (int j = cj_start; j < cj_end; j++) {
-    struct part_aos_f4_send_g pj = parts_send[j];
+    struct gpu_part_send_g pj = parts_send[j];
 
     const float4 x_h_j = pj.x_h;
     const float4 ux_m_j = pj.ux_m;
@@ -580,9 +580,9 @@ __device__ void cuda_kernel_pair_gradient(
  * Naive kernel computing force interaction for pair task
  */
 __device__ void cuda_kernel_pair_force(
-    const struct part_aos_f4_send_f pi,
-    struct part_aos_f4_send_f *__restrict__ parts_send,
-    struct part_aos_f4_recv_f *__restrict__ parts_recv, int pid,
+    const struct gpu_part_send_f pi,
+    struct gpu_part_send_f *__restrict__ parts_send,
+    struct gpu_part_recv_f *__restrict__ parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
   const float4 x_h_i = pi.x_h;
@@ -605,7 +605,7 @@ __device__ void cuda_kernel_pair_force(
 
   /* Particles copied in blocks to shared memory */
   for (int j = cj_start; j < cj_end; j++) {
-    struct part_aos_f4_send_f pj = parts_send[j];
+    struct gpu_part_send_f pj = parts_send[j];
     const float4 x_h_j = pj.x_h;
     const float4 ux_m_j = pj.ux_m;
     const float4 f_b_t_mintbinngb_j = pj.f_bals_timebin_mintimebin_ngb;
@@ -735,14 +735,14 @@ __device__ void cuda_kernel_pair_force(
  * Launch the pair density computations on the GPU
  */
 __global__ void cuda_launch_pair_density(
-    struct part_aos_f4_send_d *parts_send, struct part_aos_f4_recv_d *parts_recv,
+    struct gpu_part_send_d *parts_send, struct gpu_part_recv_d *parts_recv,
     float d_a, float d_H, int bundle_first_part, int bundle_n_parts) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int pid = bundle_first_part + threadid;
 
   if (pid < bundle_first_part + bundle_n_parts) {
-    const struct part_aos_f4_send_d pi = parts_send[pid];
+    const struct gpu_part_send_d pi = parts_send[pid];
     const int cj_start = pi.cjs_cje.x;
     const int cj_end = pi.cjs_cje.y;
 
@@ -755,15 +755,15 @@ __global__ void cuda_launch_pair_density(
  * Launch the pair gradient computations on the GPU
  */
 __global__ void cuda_launch_pair_gradient(
-    struct part_aos_f4_send_g *parts_send,
-    struct part_aos_f4_recv_g *parts_recv, float d_a, float d_H,
+    struct gpu_part_send_g *parts_send,
+    struct gpu_part_recv_g *parts_recv, float d_a, float d_H,
     int bundle_first_part, int bundle_n_parts) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int pid = bundle_first_part + threadid;
 
   if (pid < bundle_first_part + bundle_n_parts) {
-    const struct part_aos_f4_send_g pi = parts_send[pid];
+    const struct gpu_part_send_g pi = parts_send[pid];
     const int cj_start = pi.cjs_cje.x;
     const int cj_end = pi.cjs_cje.y;
 
@@ -777,15 +777,15 @@ __global__ void cuda_launch_pair_gradient(
  * Launch the pair force computations on the GPU
  */
 __global__ void cuda_launch_pair_force(
-    struct part_aos_f4_send_f *parts_send,
-    struct part_aos_f4_recv_f *parts_recv, float d_a, float d_H,
+    struct gpu_part_send_f *parts_send,
+    struct gpu_part_recv_f *parts_recv, float d_a, float d_H,
     int bundle_first_part, int bundle_n_parts) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int pid = bundle_first_part + threadid;
 
   if (pid < bundle_first_part + bundle_n_parts) {
-    const struct part_aos_f4_send_f pi = parts_send[pid];
+    const struct gpu_part_send_f pi = parts_send[pid];
     const int cj_start = pi.cjs_cje.x;
     const int cj_end = pi.cjs_cje.y;
 
@@ -799,7 +799,7 @@ __global__ void cuda_launch_pair_force(
  * Launch the pair density computation on the GPU.
  */
 void gpu_launch_pair_density(
-    struct part_aos_f4_send_d *parts_send, struct part_aos_f4_recv_d *parts_recv,
+    struct gpu_part_send_d *parts_send, struct gpu_part_recv_d *parts_recv,
     float d_a, float d_H, cudaStream_t stream, int numBlocks_x, int numBlocks_y,
     int bundle_first_part, int bundle_n_parts) {
 
@@ -813,8 +813,8 @@ void gpu_launch_pair_density(
  * Launch the pair gradient computation on the GPU.
  */
 void gpu_launch_pair_gradient(
-    struct part_aos_f4_send_g *parts_send,
-    struct part_aos_f4_recv_g *parts_recv, float d_a, float d_H,
+    struct gpu_part_send_g *parts_send,
+    struct gpu_part_recv_g *parts_recv, float d_a, float d_H,
     cudaStream_t stream, int numBlocks_x, int numBlocks_y,
     int bundle_first_part, int bundle_n_parts) {
 
@@ -828,8 +828,8 @@ void gpu_launch_pair_gradient(
  * Launch the pair force computation on the GPU.
  */
 void gpu_launch_pair_force(
-    struct part_aos_f4_send_f *parts_send,
-    struct part_aos_f4_recv_f *parts_recv, float d_a, float d_H,
+    struct gpu_part_send_f *parts_send,
+    struct gpu_part_recv_f *parts_recv, float d_a, float d_H,
     cudaStream_t stream, int numBlocks_x, int numBlocks_y,
     int bundle_first_part, int bundle_n_parts) {
 
@@ -842,8 +842,8 @@ void gpu_launch_pair_force(
 /**
  * Launch the self density computation on the GPU.
  */
-void gpu_launch_self_density(struct part_aos_f4_send_d *parts_send,
-                           struct part_aos_f4_recv_d *parts_recv, float d_a,
+void gpu_launch_self_density(struct gpu_part_send_d *parts_send,
+                           struct gpu_part_recv_d *parts_recv, float d_a,
                            float d_H, cudaStream_t stream, int numBlocks_x,
                            int numBlocks_y, int bundle_first_task,
                            int2 *d_task_first_part_f4) {
@@ -858,8 +858,8 @@ void gpu_launch_self_density(struct part_aos_f4_send_d *parts_send,
 /**
  * Launch the self gradient computation on the GPU.
  */
-void gpu_launch_self_gradient(struct part_aos_f4_send_g *parts_send,
-                            struct part_aos_f4_recv_g *parts_recv, float d_a,
+void gpu_launch_self_gradient(struct gpu_part_send_g *parts_send,
+                            struct gpu_part_recv_g *parts_recv, float d_a,
                             float d_H, cudaStream_t stream, int numBlocks_x,
                             int numBlocks_y, int bundle_first_task,
                             int2 *d_task_first_part_f4) {
@@ -871,8 +871,8 @@ void gpu_launch_self_gradient(struct part_aos_f4_send_g *parts_send,
 /**
  * Launch the self force computation on the GPU.
  */
-void gpu_launch_self_force(struct part_aos_f4_send_f *d_parts_send,
-                         struct part_aos_f4_recv_f *d_parts_recv, float d_a,
+void gpu_launch_self_force(struct gpu_part_send_f *d_parts_send,
+                         struct gpu_part_recv_f *d_parts_recv, float d_a,
                          float d_H, cudaStream_t stream, int numBlocks_x,
                          int numBlocks_y, int bundle_first_task,
                          int2 *d_task_first_part_f4) {

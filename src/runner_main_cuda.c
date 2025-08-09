@@ -186,17 +186,17 @@ void *runner_main_cuda(void *data) {
   struct gpu_offload_data gpu_buf_pair_forc;
 
   gpu_init_data_buffers(&gpu_buf_self_dens, &gpu_pack_params,
-      sizeof(struct part_aos_f4_send_d), sizeof(struct part_aos_f4_recv_d), /*is_pair_task=*/0);
+      sizeof(struct gpu_part_send_d), sizeof(struct gpu_part_recv_d), /*is_pair_task=*/0);
   gpu_init_data_buffers(&gpu_buf_self_grad, &gpu_pack_params,
-      sizeof(struct part_aos_f4_send_g), sizeof(struct part_aos_f4_recv_g), /*is_pair_task=*/0);
+      sizeof(struct gpu_part_send_g), sizeof(struct gpu_part_recv_g), /*is_pair_task=*/0);
   gpu_init_data_buffers(&gpu_buf_self_forc, &gpu_pack_params,
-      sizeof(struct part_aos_f4_send_f), sizeof(struct part_aos_f4_recv_f), /*is_pair_task=*/0);
+      sizeof(struct gpu_part_send_f), sizeof(struct gpu_part_recv_f), /*is_pair_task=*/0);
   gpu_init_data_buffers(&gpu_buf_pair_dens, &gpu_pack_params,
-      sizeof(struct part_aos_f4_send_d), sizeof(struct part_aos_f4_recv_d), /*is_pair_task=*/1);
+      sizeof(struct gpu_part_send_d), sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
   gpu_init_data_buffers(&gpu_buf_pair_grad, &gpu_pack_params,
-      sizeof(struct part_aos_f4_send_g), sizeof(struct part_aos_f4_recv_g), /*is_pair_task=*/1);
+      sizeof(struct gpu_part_send_g), sizeof(struct gpu_part_recv_g), /*is_pair_task=*/1);
   gpu_init_data_buffers(&gpu_buf_pair_forc, &gpu_pack_params,
-      sizeof(struct part_aos_f4_send_f), sizeof(struct part_aos_f4_recv_f), /*is_pair_task=*/1);
+      sizeof(struct gpu_part_send_f), sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
 
 
   /* TODO: MOVE TO CUDA_INIT_STREAMS ? */

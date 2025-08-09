@@ -161,18 +161,18 @@ void gpu_pack_part_self_force(const struct cell* restrict c, struct gpu_offload_
  * @brief Unpacks the density data from GPU buffers of self tasks into particles
  */
 void gpu_unpack_part_self_density(struct cell* restrict c,
-    const struct part_aos_f4_recv_d* restrict parts_aos_buffer,
+    const struct gpu_part_recv_d* restrict parts_aos_buffer,
     const size_t pack_position,
     const size_t count, const struct engine *e){
 
-  const struct part_aos_f4_recv_d *parts_tmp = &parts_aos_buffer[pack_position];
+  const struct gpu_part_recv_d *parts_tmp = &parts_aos_buffer[pack_position];
 
   for (size_t i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
     if (!part_is_active(p, e)) continue;
 
-    struct part_aos_f4_recv_d p_tmp = parts_tmp[i];
+    struct gpu_part_recv_d p_tmp = parts_tmp[i];
     float4 rho_dh_wcount = p_tmp.rho_dh_wcount;
     float4 rot_ux_div_v = p_tmp.rot_ux_div_v;
 
@@ -197,18 +197,18 @@ void gpu_unpack_part_self_density(struct cell* restrict c,
  * @brief Unpacks the gradient data from GPU buffers of self tasks into particles
  */
 void gpu_unpack_part_self_gradient(struct cell* restrict c,
-    const struct part_aos_f4_recv_g* restrict parts_aos_buffer,
+    const struct gpu_part_recv_g* restrict parts_aos_buffer,
     const size_t pack_position,
     const size_t count, const struct engine *e){
 
-  const struct part_aos_f4_recv_g *parts_tmp = &parts_aos_buffer[pack_position];
+  const struct gpu_part_recv_g *parts_tmp = &parts_aos_buffer[pack_position];
 
   for (size_t i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
     if (!part_is_active(p, e)) continue;
 
-    struct part_aos_f4_recv_g p_tmp = parts_tmp[i];
+    struct gpu_part_recv_g p_tmp = parts_tmp[i];
 
     part_set_v_sig(p, fmaxf(p_tmp.vsig_lapu_aviscmax.x, part_get_v_sig(p)));
     part_set_laplace_u(p, part_get_laplace_u(p) + p_tmp.vsig_lapu_aviscmax.y);
@@ -221,18 +221,18 @@ void gpu_unpack_part_self_gradient(struct cell* restrict c,
  * @brief Unpacks the force data from GPU buffers of self tasks into particles
  */
 void gpu_unpack_part_self_force(struct cell* restrict c,
-    const struct part_aos_f4_recv_f* restrict parts_aos_buffer,
+    const struct gpu_part_recv_f* restrict parts_aos_buffer,
     const size_t pack_position,
     const size_t count, const struct engine *e){
 
-  const struct part_aos_f4_recv_f *parts_tmp = &parts_aos_buffer[pack_position];
+  const struct gpu_part_recv_f *parts_tmp = &parts_aos_buffer[pack_position];
 
   for (size_t i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
     if (!part_is_active(p, e)) continue;
 
-    struct part_aos_f4_recv_f p_tmp = parts_tmp[i];
+    struct gpu_part_recv_f p_tmp = parts_tmp[i];
 
     float *a = part_get_a_hydro(p);
     part_set_a_hydro_ind(p, 0, a[0] + p_tmp.a_hydro.x);
@@ -256,15 +256,15 @@ void gpu_unpack_part_self_force(struct cell* restrict c,
  * UNNECESSARY.*/
 void gpu_unpack_part_pair_density(
     struct cell *c,
-    const struct part_aos_f4_recv_d *parts_aos_buffer,
+    const struct gpu_part_recv_d *parts_aos_buffer,
     const size_t pack_ind,
     const size_t count) {
 
-  const struct part_aos_f4_recv_d *parts_tmp = &parts_aos_buffer[pack_ind];
+  const struct gpu_part_recv_d *parts_tmp = &parts_aos_buffer[pack_ind];
 
   for (size_t i = 0; i < count; i++) {
     /* TODO: WHY ARE WE NOT CHECKING WHETHER PARTICLE IS ACTIVE HERE???? */
-    struct part_aos_f4_recv_d p_tmp = parts_tmp[i];
+    struct gpu_part_recv_d p_tmp = parts_tmp[i];
     struct part *p = &c->hydro.parts[i];
     part_set_rho(p, part_get_rho(p) + p_tmp.rho_dh_wcount.x);
     part_set_rho_dh(p, part_get_rho_dh(p) + p_tmp.rho_dh_wcount.y);
@@ -283,14 +283,14 @@ void gpu_unpack_part_pair_density(
  * UNNECESSARY.*/
 void gpu_unpack_part_pair_gradient(
     struct cell *c,
-    const struct part_aos_f4_recv_g *parts_aos_buffer,
+    const struct gpu_part_recv_g *parts_aos_buffer,
     const size_t pack_ind,
     const size_t count) {
 
-  const struct part_aos_f4_recv_g *parts_tmp = &parts_aos_buffer[pack_ind];
+  const struct gpu_part_recv_g *parts_tmp = &parts_aos_buffer[pack_ind];
 
   for (size_t i = 0; i < count; i++) {
-    struct part_aos_f4_recv_g p_tmp = parts_tmp[i];
+    struct gpu_part_recv_g p_tmp = parts_tmp[i];
     struct part *p = &c->hydro.parts[i];
 
     part_set_v_sig(p, fmaxf(p_tmp.vsig_lapu_aviscmax.x, part_get_v_sig(p)));
@@ -305,15 +305,15 @@ void gpu_unpack_part_pair_gradient(
  * UNNECESSARY.*/
 void gpu_unpack_part_pair_force(
     struct cell *c,
-    const struct part_aos_f4_recv_f *parts_aos_buffer,
+    const struct gpu_part_recv_f *parts_aos_buffer,
     const size_t pack_ind,
     const size_t count) {
 
-  const struct part_aos_f4_recv_f *restrict parts_tmp = &parts_aos_buffer[pack_ind];
+  const struct gpu_part_recv_f *restrict parts_tmp = &parts_aos_buffer[pack_ind];
 
   /* int pp = local_pack_position; */
   for (size_t i = 0; i < count; i++) {
-    struct part_aos_f4_recv_f p_tmp = parts_tmp[i];
+    struct gpu_part_recv_f p_tmp = parts_tmp[i];
     struct part *restrict p = &c->hydro.parts[i];
 
     float *a = part_get_a_hydro(p);
@@ -333,7 +333,7 @@ void gpu_unpack_part_pair_force(
 
 
 void gpu_pack_part_pair_density(
-    const struct cell *c, struct part_aos_f4_send_d *parts_aos_buffer,
+    const struct cell *c, struct gpu_part_send_d *parts_aos_buffer,
     const int local_pack_position,
     const int count, const double3 shift, const int2 cstarts) {
 
@@ -359,7 +359,7 @@ void gpu_pack_part_pair_density(
 
 void gpu_pack_part_pair_gradient(
     const struct cell* restrict c,
-    struct part_aos_f4_send_g* parts_aos_buffer,
+    struct gpu_part_send_g* parts_aos_buffer,
     const int local_pack_position, const int count, const double3 shift,
     const int2 cstarts) {
 
@@ -391,7 +391,7 @@ void gpu_pack_part_pair_gradient(
 
 void gpu_pack_part_pair_force(
     const struct cell* restrict c,
-    struct part_aos_f4_send_f* parts_aos_buffer,
+    struct gpu_part_send_f* parts_aos_buffer,
     const int local_pack_position, const int count, const double3 shift,
     const int2 cstarts) {
 
@@ -437,7 +437,7 @@ void gpu_unpack_pair_density(
     const struct runner *r,
     struct cell *ci,
     struct cell *cj,
-    const struct part_aos_f4_recv_d *parts_aos_buffer,
+    const struct gpu_part_recv_d *parts_aos_buffer,
     size_t *pack_ind,
     size_t count_max_parts
     ) {
@@ -482,7 +482,7 @@ void gpu_unpack_pair_gradient(
     const struct runner *r,
     struct cell *ci,
     struct cell *cj,
-    const struct part_aos_f4_recv_g *parts_aos_buffer,
+    const struct gpu_part_recv_g *parts_aos_buffer,
     size_t *pack_ind,
     size_t count_max_parts){
 
@@ -526,7 +526,7 @@ void gpu_unpack_pair_force(
     const struct runner *r,
     struct cell *ci,
     struct cell *cj,
-    const struct part_aos_f4_recv_f *parts_aos_buffer,
+    const struct gpu_part_recv_f *parts_aos_buffer,
     size_t *pack_ind,
     size_t count_max_parts){
 
