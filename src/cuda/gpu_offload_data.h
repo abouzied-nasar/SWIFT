@@ -53,11 +53,9 @@ struct gpu_offload_data{
   /*! First and last particles of cells i and j for pair interactions */
   int4 *fparti_fpartj_lparti_lpartj;
 
-  /*! Arrays used to send particle data on device. A single struct
+  /*! Arrays used to send particle data from device to host. A single struct
    * gpu_offload_data will only hold data for either density, gradient, or
-   * force task, so we hide them behind a union. We add another one, a pointer
-   * to void, which can be used to pass the correct address to cudaMemcpy* functions
-   * without discriminating which type of struct it is. */
+   * force task, so we hide them behind a union. */
   union {
     void* d_parts_send;
     struct gpu_part_send_d *d_parts_send_d;
@@ -65,25 +63,22 @@ struct gpu_offload_data{
     struct gpu_part_send_f *d_parts_send_f;
   };
 
-  /*! TODO: Documentation?? */
+  /*! Array used to receive particle data on device from host */
   union {
-    void* d_parts_recv;
     struct gpu_part_recv_d *d_parts_recv_d;
     struct gpu_part_recv_g *d_parts_recv_g;
     struct gpu_part_recv_f *d_parts_recv_f;
   };
 
-  /*! TODO: Documentation?? */
+  /*! Array used to send particle data from host to device */
   union {
-    void *parts_send;
     struct gpu_part_send_d *parts_send_d;
     struct gpu_part_send_g *parts_send_g;
     struct gpu_part_send_f *parts_send_f;
   };
 
-  /*! TODO: Documentation?? */
+  /*! Array used to receive particle data from device on host */
   union {
-    void *parts_recv;
     struct gpu_part_recv_d *parts_recv_d;
     struct gpu_part_recv_g *parts_recv_g;
     struct gpu_part_recv_f *parts_recv_f;
@@ -102,12 +97,6 @@ struct gpu_offload_data{
 
   /*! TODO: Documentation */
   cudaEvent_t* event_end;
-
-  /*! Size of the struct used to send data to/from device. */
-  size_t size_of_send_struct;
-
-  /*! Size of the struct used to send data to/from device. */
-  size_t size_of_recv_struct;
 
 #endif /* WITH_CUDA */
 };
