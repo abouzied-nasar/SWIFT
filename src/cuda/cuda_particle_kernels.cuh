@@ -40,7 +40,7 @@ extern "C" {
 /**
  * Does the self density computation on device
  */
-__device__ __attribute__((always_inline)) INLINE void cuda_kernel_self_density(
+__global__ void cuda_kernel_self_density(
     struct gpu_part_send_d* __restrict__ parts_send,
     struct gpu_part_recv_d* __restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
@@ -135,7 +135,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_self_density(
 /**
  * Does the self gradient computation on device
  */
-__device__ __attribute__((always_inline)) INLINE  void cuda_kernel_self_gradient(
+__global__ void cuda_kernel_self_gradient(
     struct gpu_part_send_g *__restrict__ parts_send,
     struct gpu_part_recv_g *__restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
@@ -246,7 +246,7 @@ __device__ __attribute__((always_inline)) INLINE  void cuda_kernel_self_gradient
 /**
  * Does the self force computation on device
  */
-__device__  __attribute__((always_inline)) INLINE void cuda_kernel_self_force(
+__global__ void cuda_kernel_self_force(
     struct gpu_part_send_f*__restrict__ parts_send,
     struct gpu_part_recv_f *__restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
