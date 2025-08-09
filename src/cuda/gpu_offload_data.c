@@ -221,10 +221,10 @@ void gpu_free_data_buffers(struct gpu_offload_data *buf,
   cu_error = cudaFreeHost(pv->bundle_first_task_list);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaFreeHost(buf->d_parts_send_d);
+  cu_error = cudaFree(buf->d_parts_send_d);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaFreeHost(buf->d_parts_recv_d);
+  cu_error = cudaFree(buf->d_parts_recv_d);
   swift_assert(cu_error == cudaSuccess);
 
   cu_error = cudaFreeHost(buf->parts_send_d);
@@ -258,7 +258,7 @@ void gpu_free_data_buffers(struct gpu_offload_data *buf,
     cu_error = cudaFreeHost(buf->task_first_part);
     swift_assert(cu_error == cudaSuccess);
 
-    cu_error = cudaFreeHost(buf->d_task_first_part);
+    cu_error = cudaFree(buf->d_task_first_part);
     swift_assert(cu_error == cudaSuccess);
   }
 }
