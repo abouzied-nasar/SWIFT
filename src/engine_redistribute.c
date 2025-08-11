@@ -447,11 +447,12 @@ struct savelink_mapper_data {
       for (int i = 0; i < node; i++) offset += counts[nodeID * nr_nodes + i];  \
                                                                                \
       for (int k = 0; k < counts[nodeID * nr_nodes + node]; k++) {             \
-        if (parts[k + offset].gpart != NULL) {                                 \
+        struct gpart *gp = parts[k + offset].gpart;                           \
+        if (gp != NULL) {                                                      \
           if (CHECKS)                                                          \
-            if (parts[k + offset].gpart->id_or_neg_offset > 0)                 \
+            if (gp->id_or_neg_offset > 0)                                      \
               error("Trying to link a partnerless " #TYPE "!");                \
-          parts[k + offset].gpart->id_or_neg_offset = -count;                  \
+          gp->id_or_neg_offset = -count;                                       \
           count++;                                                             \
         }                                                                      \
       }                                                                        \
@@ -465,7 +466,7 @@ struct savelink_mapper_data {
 #ifdef SWIFT_DEBUG_CHECKS
 void ENGINE_REDISTRIBUTE_SAVELINK_GETTERS_MAPPER(part, 1);
 #else
-void ENGINE_REDISTRIBUTE_SAVELINK_MAPPER(part, 0);
+void ENGINE_REDISTRIBUTE_SAVELINK_GETTERS_MAPPER(part, 0);
 #endif
 
 /**
