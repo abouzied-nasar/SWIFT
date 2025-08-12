@@ -232,6 +232,7 @@ void *runner_main2(void *data) {
   else {
     cudaSetDevice(mpi_rank);
     devId = mpi_rank;
+    message("my rank %i my devID %i", mpi_rank, devId);
   }
 #endif
   //Now tell me some info about my device
