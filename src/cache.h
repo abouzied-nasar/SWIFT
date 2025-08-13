@@ -119,12 +119,13 @@ struct c2_cache {
  * @param c The cache.
  * @param count Number of particles to allocate space for.
  */
-__attribute__((always_inline)) INLINE void cache_init(struct cache *c,
-                                                      size_t count) {
+static __attribute__((always_inline)) INLINE void cache_init(struct cache *c,
+                                                             size_t count) {
 
   /* Align cache on correct byte boundary and pad cache size to be a multiple of
    * the vector size and include 2 vector lengths for remainder operations. */
-  size_t pad = 2 * VEC_SIZE, rem = count % VEC_SIZE;
+  size_t pad = 2 * VEC_SIZE;
+  size_t rem = count % VEC_SIZE;
   if (rem > 0) pad += VEC_SIZE - rem;
   size_t sizeBytes = (count + pad) * sizeof(float);
   size_t sizeIntBytes = (count + pad) * sizeof(int);
@@ -180,7 +181,7 @@ __attribute__((always_inline)) INLINE void cache_init(struct cache *c,
  * @param ci_cache The cache.
  * @return uninhibited_count The no. of uninhibited particles.
  */
-__attribute__((always_inline)) INLINE int cache_read_particles(
+static __attribute__((always_inline)) INLINE int cache_read_particles(
     const struct cell *restrict const ci,
     struct cache *restrict const ci_cache) {
 
@@ -261,9 +262,9 @@ __attribute__((always_inline)) INLINE int cache_read_particles(
  * @param ci_cache The cache.
  * @return uninhibited_count The no. of uninhibited particles.
  */
-__attribute__((always_inline)) INLINE int cache_read_particles_subset_self(
-    const struct cell *restrict const ci,
-    struct cache *restrict const ci_cache) {
+static __attribute__((always_inline)) INLINE int
+cache_read_particles_subset_self(const struct cell *restrict const ci,
+                                 struct cache *restrict const ci_cache) {
 
 #if defined(GADGET2_SPH)
 
@@ -343,10 +344,12 @@ __attribute__((always_inline)) INLINE int cache_read_particles_subset_self(
  * @param loc The cell location to remove from the particle positions.
  * @param flipped Flag to check whether the cells have been flipped or not.
  */
-__attribute__((always_inline)) INLINE void cache_read_particles_subset_pair(
-    const struct cell *restrict const ci, struct cache *restrict const ci_cache,
-    const struct sort_entry *restrict sort_i, int *first_pi, int *last_pi,
-    const double *loc, const int flipped) {
+static __attribute__((always_inline)) INLINE void
+cache_read_particles_subset_pair(const struct cell *restrict const ci,
+                                 struct cache *restrict const ci_cache,
+                                 const struct sort_entry *restrict sort_i,
+                                 int *first_pi, int *last_pi, const double *loc,
+                                 const int flipped) {
 
 #if defined(GADGET2_SPH)
 
@@ -491,7 +494,7 @@ __attribute__((always_inline)) INLINE void cache_read_particles_subset_pair(
  * @param ci_cache The cache.
  * @return uninhibited_count The no. of uninhibited particles.
  */
-__attribute__((always_inline)) INLINE int cache_read_force_particles(
+static __attribute__((always_inline)) INLINE int cache_read_force_particles(
     const struct cell *restrict const ci,
     struct cache *restrict const ci_cache) {
 
@@ -604,13 +607,15 @@ __attribute__((always_inline)) INLINE int cache_read_force_particles(
  * @param first_pi The first particle in cell ci that is in range.
  * @param last_pj The last particle in cell cj that is in range.
  */
-__attribute__((always_inline)) INLINE void cache_read_two_partial_cells_sorted(
-    const struct cell *restrict const ci, const struct cell *restrict const cj,
-    struct cache *restrict const ci_cache,
-    struct cache *restrict const cj_cache,
-    const struct sort_entry *restrict sort_i,
-    const struct sort_entry *restrict sort_j,
-    const double *restrict const shift, int *first_pi, int *last_pj) {
+static __attribute__((always_inline)) INLINE void
+cache_read_two_partial_cells_sorted(const struct cell *restrict const ci,
+                                    const struct cell *restrict const cj,
+                                    struct cache *restrict const ci_cache,
+                                    struct cache *restrict const cj_cache,
+                                    const struct sort_entry *restrict sort_i,
+                                    const struct sort_entry *restrict sort_j,
+                                    const double *restrict const shift,
+                                    int *first_pi, int *last_pj) {
 
   /* Make the number of particles to be read a multiple of the vector size.
    * This eliminates serial remainder loops where possible when populating the
@@ -668,7 +673,7 @@ __attribute__((always_inline)) INLINE void cache_read_two_partial_cells_sorted(
     const int idx = sort_i[i + first_pi_align].i;
 
     /* Put inhibited particles out of range. */
-    if (parts_i[idx].time_bin >= time_bin_inhibited) {
+    if (part_get_time_bin(&parts_i[idx]) >= time_bin_inhibited) {
       x[i] = pos_padded_i[0];
       y[i] = pos_padded_i[1];
       z[i] = pos_padded_i[2];
@@ -682,15 +687,15 @@ __attribute__((always_inline)) INLINE void cache_read_two_partial_cells_sorted(
       continue;
     }
 
-    x[i] = (float)(parts_i[idx].x[0] - total_ci_shift[0]);
-    y[i] = (float)(parts_i[idx].x[1] - total_ci_shift[1]);
-    z[i] = (float)(parts_i[idx].x[2] - total_ci_shift[2]);
-    h[i] = parts_i[idx].h;
-    vx[i] = parts_i[idx].v[0];
-    vy[i] = parts_i[idx].v[1];
-    vz[i] = parts_i[idx].v[2];
+    x[i] = (float)(part_get_x_ind(&parts_i[idx], 0) - total_ci_shift[0]);
+    y[i] = (float)(part_get_x_ind(&parts_i[idx], 1) - total_ci_shift[1]);
+    z[i] = (float)(part_get_x_ind(&parts_i[idx], 2) - total_ci_shift[2]);
+    h[i] = part_get_h(&parts_i[idx]);
+    vx[i] = part_get_v_ind(&parts_i[idx], 0);
+    vy[i] = part_get_v_ind(&parts_i[idx], 1);
+    vz[i] = part_get_v_ind(&parts_i[idx], 2);
 #ifdef GADGET2_SPH
-    m[i] = parts_i[idx].mass;
+    m[i] = part_get_mass(&parts_i[idx]);
 #endif
   }
 
@@ -770,7 +775,7 @@ __attribute__((always_inline)) INLINE void cache_read_two_partial_cells_sorted(
     const int idx = sort_j[i].i;
 
     /* Put inhibited particles out of range. */
-    if (parts_j[idx].time_bin >= time_bin_inhibited) {
+    if (part_get_time_bin(&parts_j[idx]) >= time_bin_inhibited) {
       xj[i] = pos_padded_j[0];
       yj[i] = pos_padded_j[1];
       zj[i] = pos_padded_j[2];
@@ -784,15 +789,15 @@ __attribute__((always_inline)) INLINE void cache_read_two_partial_cells_sorted(
       continue;
     }
 
-    xj[i] = (float)(parts_j[idx].x[0] - total_cj_shift[0]);
-    yj[i] = (float)(parts_j[idx].x[1] - total_cj_shift[1]);
-    zj[i] = (float)(parts_j[idx].x[2] - total_cj_shift[2]);
-    hj[i] = parts_j[idx].h;
-    vxj[i] = parts_j[idx].v[0];
-    vyj[i] = parts_j[idx].v[1];
-    vzj[i] = parts_j[idx].v[2];
+    xj[i] = (float)(part_get_x_ind(&parts_j[idx], 0) - total_cj_shift[0]);
+    yj[i] = (float)(part_get_x_ind(&parts_j[idx], 1) - total_cj_shift[1]);
+    zj[i] = (float)(part_get_x_ind(&parts_j[idx], 2) - total_cj_shift[2]);
+    hj[i] = part_get_h(&parts_j[idx]);
+    vxj[i] = part_get_v_ind(&parts_j[idx], 0);
+    vyj[i] = part_get_v_ind(&parts_j[idx], 1);
+    vzj[i] = part_get_v_ind(&parts_j[idx], 2);
 #ifdef GADGET2_SPH
-    mj[i] = parts_j[idx].mass;
+    mj[i] = part_get_mass(&parts_j[idx]);
 #endif
   }
 
@@ -856,7 +861,7 @@ __attribute__((always_inline)) INLINE void cache_read_two_partial_cells_sorted(
  * @param first_pi The first particle in cell ci that is in range.
  * @param last_pj The last particle in cell cj that is in range.
  */
-__attribute__((always_inline)) INLINE void
+static __attribute__((always_inline)) INLINE void
 cache_read_two_partial_cells_sorted_force(
     const struct cell *const ci, const struct cell *const cj,
     struct cache *const ci_cache, struct cache *const cj_cache,
@@ -930,7 +935,7 @@ cache_read_two_partial_cells_sorted_force(
     const int idx = sort_i[i + first_pi_align].i;
 
     /* Put inhibited particles out of range. */
-    if (parts_i[idx].time_bin >= time_bin_inhibited) {
+    if (part_get_time_bin(&parts_i[idx]) >= time_bin_inhibited) {
       x[i] = pos_padded_i[0];
       y[i] = pos_padded_i[1];
       z[i] = pos_padded_i[2];
@@ -948,20 +953,23 @@ cache_read_two_partial_cells_sorted_force(
       continue;
     }
 
-    x[i] = (float)(parts_i[idx].x[0] - total_ci_shift[0]);
-    y[i] = (float)(parts_i[idx].x[1] - total_ci_shift[1]);
-    z[i] = (float)(parts_i[idx].x[2] - total_ci_shift[2]);
-    h[i] = parts_i[idx].h;
-    vx[i] = parts_i[idx].v[0];
-    vy[i] = parts_i[idx].v[1];
-    vz[i] = parts_i[idx].v[2];
+    x[i] = (float)(part_get_x_ind(&parts_i[idx], 0) - total_ci_shift[0]);
+    y[i] = (float)(part_get_x_ind(&parts_i[idx], 1) - total_ci_shift[1]);
+    z[i] = (float)(part_get_x_ind(&parts_i[idx], 2) - total_ci_shift[2]);
+    h[i] = part_get_h(&parts_i[idx]);
+    vx[i] = part_get_v_ind(&parts_i[idx], 0);
+    vy[i] = part_get_v_ind(&parts_i[idx], 1);
+    vz[i] = part_get_v_ind(&parts_i[idx], 2);
 #ifdef GADGET2_SPH
-    m[i] = parts_i[idx].mass;
-    rho[i] = parts_i[idx].rho;
-    grad_h[i] = parts_i[idx].force.f;
-    pOrho2[i] = parts_i[idx].force.P_over_rho2;
-    balsara[i] = parts_i[idx].force.balsara;
-    soundspeed[i] = parts_i[idx].force.soundspeed;
+    error(
+        "Double-check this once getters/setters are implemented for gadget2 "
+        "SPH.");
+    m[i] = part_get_mass(&parts_i[idx]);
+    rho[i] = part_get_rho(&parts_i[idx]);
+    grad_h[i] = part_get_force_f(&parts_i[idx]);
+    pOrho2[i] = part_get_P_over_rho2(&parts_i[idx]);
+    balsara[i] = part_get_balsara(&parts_i[idx]);
+    soundspeed[i] = part_get_soundspeed(&parts_i[idx]);
 #endif
   }
 
@@ -1014,7 +1022,7 @@ cache_read_two_partial_cells_sorted_force(
     const int idx = sort_j[i].i;
 
     /* Put inhibited particles out of range. */
-    if (parts_j[idx].time_bin == time_bin_inhibited) {
+    if (part_get_time_bin(&parts_j[idx]) == time_bin_inhibited) {
       xj[i] = pos_padded_j[0];
       yj[i] = pos_padded_j[1];
       zj[i] = pos_padded_j[2];
@@ -1032,13 +1040,13 @@ cache_read_two_partial_cells_sorted_force(
       continue;
     }
 
-    xj[i] = (float)(parts_j[idx].x[0] - total_cj_shift[0]);
-    yj[i] = (float)(parts_j[idx].x[1] - total_cj_shift[1]);
-    zj[i] = (float)(parts_j[idx].x[2] - total_cj_shift[2]);
-    hj[i] = parts_j[idx].h;
-    vxj[i] = parts_j[idx].v[0];
-    vyj[i] = parts_j[idx].v[1];
-    vzj[i] = parts_j[idx].v[2];
+    xj[i] = (float)(part_get_x_ind(&parts_j[idx], 0) - total_cj_shift[0]);
+    yj[i] = (float)(part_get_x_ind(&parts_j[idx], 1) - total_cj_shift[1]);
+    zj[i] = (float)(part_get_x_ind(&parts_j[idx], 2) - total_cj_shift[2]);
+    hj[i] = part_get_h(&parts_j[idx]);
+    vxj[i] = part_get_v_ind(&parts_j[idx], 0);
+    vyj[i] = part_get_v_ind(&parts_j[idx], 1);
+    vzj[i] = part_get_v_ind(&parts_j[idx], 2);
 #ifdef GADGET2_SPH
     mj[i] = parts_j[idx].mass;
     rhoj[i] = parts_j[idx].rho;
