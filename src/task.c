@@ -165,10 +165,10 @@ const char *subtaskID_names[task_subtype_count] = {
     "sink_do_gas_swallow",
     "rt_gradient",
     "rt_transport",
-    "gpu_pack",  // A. Nasar
+    "gpu_pack_d",  // A. Nasar
     "gpu_pack_g",
     "gpu_pack_f",
-    "gpu_unpack",
+    "gpu_unpack_d",
     "gpu_unpack_g",
     "gpu_unpack_f",
 };

@@ -6,7 +6,7 @@ if HAVECUDA
 
 AM_CFLAGS = -I.. $(HDF5_CPPFLAGS)
 CUDA_MYFLAGS = -D_FORCE_INLINES -O4 -lineinfo -src-in-ptx --maxrregcount=64 -ftz=true -DWITH_CUDA --default-stream per-thread --use_fast_math -lcudadevrt #-dlink -ccbin=gcc 
-CUDA_MYFLAGS += -arch=sm_70
+CUDA_MYFLAGS += -gencode=arch=compute_70,code=compute_70
 CUDA_MYFLAGS += --extra-device-vectorization
 
 #CUDA_MYFLAGS = -D_FORCE_INLINES -O3 -lineinfo -src-in-ptx --maxrregcount=32 -ftz=true -DWITH_CUDA -ccbin=gcc -m64 --default-stream per-thread #-dlink
