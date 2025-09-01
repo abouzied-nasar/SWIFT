@@ -118,11 +118,6 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
     buf->pv.bundle_first_task_list[bid] = tasks_packed;
   }
 
-  /* Tell the cell it has been packed */
-#ifdef CUDA_DEBUG
-  ci->pack_done++;
-#endif
-
   /* Record that we have now done a packing (self) */
   t->done = 1;
   buf->pv.tasks_packed++;
@@ -346,13 +341,6 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(
   ////////////////////////
   fparti_fpartj_lparti_lpartj[tid].z = pack_vars->count_parts - count_cj;
   fparti_fpartj_lparti_lpartj[tid].w = pack_vars->count_parts;
-
-  /* Tell the cells they have been packed */
-#ifdef CUDA_DEBUG
-  /* TODO: REMOVE THIS? PREVENTS CELL FROM BEING CONST ARGUMENT*/
-  /* ci->pack_done++; */
-  /* cj->pack_done++; */
-#endif
 
   /* Identify first particle for each bundle of tasks */
   const int bundle_size = pack_vars->bundle_size;
@@ -657,29 +645,12 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
 
       /* Do the copy */
       if (task_subtype == task_subtype_gpu_pack_d) {
-
         gpu_unpack_self_density(c, buf->parts_recv_d, pack_length, count, e);
-        /* Record things for debugging */
-#ifdef CUDA_DEBUG
-        c->gpu_done++;
-#endif
-
       } else if (task_subtype == task_subtype_gpu_pack_g) {
-
         gpu_unpack_self_gradient(c, buf->parts_recv_g, pack_length, count, e);
-        /* Record things for debugging */
-#ifdef CUDA_DEBUG
-        c->gpu_done_g++;
-#endif
-
       } else if (task_subtype == task_subtype_gpu_pack_f) {
-
         gpu_unpack_self_force(c, buf->parts_recv_f, pack_length, count, e);
         /* Record things for debugging */
-#ifdef CUDA_DEBUG
-        c->gpu_done_f++;
-#endif
-
       } else {
         error("Unknown task subtype %s", subtaskID_names[task_subtype]);
       }

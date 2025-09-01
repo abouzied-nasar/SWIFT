@@ -54,7 +54,6 @@ struct gpu_offload_data {
    * gpu_offload_data will only hold data for either density, gradient, or
    * force task, so we hide them behind a union. */
   union {
-    void *d_parts_send;
     struct gpu_part_send_d *d_parts_send_d;
     struct gpu_part_send_g *d_parts_send_g;
     struct gpu_part_send_f *d_parts_send_f;
