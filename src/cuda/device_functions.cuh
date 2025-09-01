@@ -1,6 +1,26 @@
+/*******************************************************************************
+ * This file is part of SWIFT.
+ * Copyright (c) 2025 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ ******************************************************************************/
+
 #ifndef DEVICE_FUNCTIONS_H
 #define DEVICE_FUNCTIONS_H
 #include "../../config.h"
+
 #include <math.h>
 
 #ifdef __cplusplus
@@ -39,7 +59,6 @@ extern "C" {
  * Alpha can be set in the parameter file.
  * Beta is defined as in e.g. Price (2010) Eqn (103) */
 #define const_viscosity_beta 3.0f
-
 
 /**
  * @brief Returns the argument to the power given by the dimension plus one
@@ -150,6 +169,4 @@ __device__ void d_kernel_deval(float u, float *__restrict__ W,
 }
 #endif
 
-
-
-#endif  // DEVICE_FUNCTIONS_H
+#endif  // DEVICE_FUNCTIONS_CUH

@@ -166,12 +166,15 @@ const char *subtaskID_names[task_subtype_count] = {
     "sink_do_gas_swallow",
     "rt_gradient",
     "rt_transport",
-    "gpu_pack",  // A. Nasar
+    "gpu_pack_d",
     "gpu_pack_g",
     "gpu_pack_f",
-    "gpu_unpack",
+    "gpu_unpack_d",
     "gpu_unpack_g",
     "gpu_unpack_f",
+    "gpu_launch_d",
+    "gpu_launch_g",
+    "gpu_launch_f",
 };
 
 const char *task_category_names[task_category_count] = {
@@ -1885,12 +1888,17 @@ enum task_categories task_get_category(const struct task *t) {
         case task_subtype_force:
           return task_category_hydro;
 
-        case task_subtype_gpu_pack_d:  // A. Nasar
-        case task_subtype_gpu_unpack_d:
-        case task_subtype_gpu_pack_f:
-        case task_subtype_gpu_unpack_f:
+        case task_subtype_gpu_pack_d:
         case task_subtype_gpu_pack_g:
+        case task_subtype_gpu_pack_f:
+          return task_category_gpu_pack;
+        case task_subtype_gpu_unpack_d:
+        case task_subtype_gpu_unpack_f:
         case task_subtype_gpu_unpack_g:
+          return task_category_gpu_unpack;
+        case task_subtype_gpu_launch_d:
+        case task_subtype_gpu_launch_g:
+        case task_subtype_gpu_launch_f:
           return task_category_gpu;
 
         case task_subtype_limiter:

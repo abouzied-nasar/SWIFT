@@ -1,20 +1,21 @@
-#ifndef CUDA_GPU_PART_STRUCTS_H
-#define CUDA_GPU_PART_STRUCTS_H
+#ifndef HIP_GPU_PART_STRUCTS_H
+#define HIP_GPU_PART_STRUCTS_H
 
-#ifdef __cplusplus
+#include "hip/hip_runtime.h"
+/* Config parameters. */
+#include "align.h"
+
+#include "<config.h>"
+typedef int8_t timebin_t;
+
+#ifdef __WITH_HIP
 extern "C" {
 #endif
 
-#ifdef HAVE_CUDA
-#include <vector_types.h>
-#endif
+// #include
+// </usr/local/cuda-12.2/targets/x86_64-linux/include/hip/hip_vector_types.h>
 
-/* Config parameters. */
-#include "../../config.h"
-#include "../align.h"
-#include "../timeline.h"
-/* typedef int8_t timebin_t; */
-
+#include <hip/hip_vector_types.h>
 
 typedef struct part_soa {
   /*Task ID*/
@@ -187,14 +188,9 @@ typedef struct part_aos_f4_send {
 
   /*! Particle predicted velocity and mass -> ux, uy, uz, m */
   float4 ux_m;
-
-  //  /*Temporary trial to see if doing shifts on GPU works*/
-  //  float3 shift;
-
   /*Markers for where neighbour cell j starts and stops in array indices for
    * pair tasks*/
   int2 cjs_cje;
-
 } part_aos_f4_send __attribute__((aligned(SWIFT_STRUCT_ALIGNMENT)));
 
 typedef struct part_aos_f4_recv {
@@ -414,8 +410,8 @@ typedef struct part_aos_f4_g_recv {
 
 } part_aos_f4_g_recv;
 
-#ifdef __cplusplus
+#ifdef __WITH_HIP
 }
 #endif
 
-#endif  // CUDA_GPU_PART_STRUCTS_H
+#endif  // HIP_GPU_PART_STRUCTS_H

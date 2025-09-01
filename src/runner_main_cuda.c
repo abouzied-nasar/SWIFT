@@ -4,6 +4,7 @@
  *                    Matthieu Schaller (schaller@strw.leidenuniv.nl)
  *               2015 Peter W. Draper (p.w.draper@durham.ac.uk)
  *               2022 Abouzied M. A. Nasar (abouzied.nasar@manchester.ac.uk)
+ *               2025 Mladen Ivkovic (mladen.ivkovic@durham.ac.uk)
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Lesser General Public License as published
@@ -21,14 +22,6 @@
  ******************************************************************************/
 
 #ifdef WITH_CUDA
-
-/* Config parameters. */
-#define GPUOFFLOAD_DENSITY 1   // off-load hydro density to GPU
-#define GPUOFFLOAD_GRADIENT 1  // off-load hydro gradient to GPU
-#define GPUOFFLOAD_FORCE 1     // off-load hydro force to GPU
-
-//A. Nasar: Remove as will no longer be necessary. Leaving for now during dev
-#define RECURSE 1 //Allow recursion through sub-tasks before offloading
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,20 +46,15 @@ extern "C" {
 #include "runner.h"
 
 /* Local headers. */
-#include "cell.h" // TODO: Check if necessary after refactor
-#include "cuda/GPU_data_buffers.h"
-#include "cuda/GPU_part_structs.h"
-#include "cuda/GPU_runner_functions.h"
-#include "cuda/GPU_utils.h"
+#include "cuda/cuda_config.h"
+#include "cuda/gpu_offload_data.h"
+#include "cuda/gpu_utils.h"
 #include "engine.h"
 #include "feedback.h"
 #include "runner_doiact_functions_hydro_gpu.h"
-#include "runner_gpu_pack_functions.h"
 #include "scheduler.h"
 #include "space_getsid.h"
 #include "timers.h"
-
-
 
 /* Import the gravity loop functions. */
 #include "runner_doiact_grav.h"
@@ -137,6 +125,7 @@ extern "C" {
 #include "runner_doiact_black_holes.h"
 #include "runner_doiact_undef.h"
 
+/* Import the black hole feedback loop functions. */
 #define FUNCTION feedback
 #define FUNCTION_TASK_LOOP TASK_LOOP_FEEDBACK
 #include "runner_doiact_black_holes.h"
@@ -179,297 +168,73 @@ void *runner_main_cuda(void *data) {
   /* Initialise cuda context for this thread. */
   gpu_init_thread(e, r->cpuid);
 
-  //////////Declare and allocate GPU launch control data structures/////////
-  /*pack_vars contain data required for self and pair packing tasks destined
-   *  for the GPU*/
-  //A. N: Needed
+  /* Get estimates for array sizes et al. */
+  struct gpu_global_pack_params gpu_pack_params;
+  gpu_get_pack_params(&gpu_pack_params, sched, e->s->eta_neighbours);
 
-  const int cuda_dev_id = engine_rank;
-  const int target_n_tasks = sched->pack_size;
-  const int target_n_tasks_pair = sched->pack_size_pair;
-  const int bundle_size = N_TASKS_BUNDLE_SELF;
-  const int bundle_size_pair = N_TASKS_BUNDLE_PAIR;
-  const int n_bundles = (target_n_tasks + bundle_size - 1) / bundle_size;
-  const int n_bundles_pair = (target_n_tasks_pair + bundle_size_pair - 1) / bundle_size_pair;
-  /* A. Nasar: Try to estimate average number of particles per leaf-level cell */
-  /* Get smoothing length/particle spacing */
-  const float eta_neighbours = e->s->eta_neighbours;
-  int np_per_cell = ceil(2.0 * eta_neighbours);
-  //Cube to find average number of particles in 3D
-  np_per_cell *= np_per_cell * np_per_cell;
-  /*A. Nasar: Increase parts per recursed task-level cell by buffer to
-    ensure we allocate enough memory*/
-  const int buff = ceil(0.5 * np_per_cell);
-  /*A. Nasar: Multiplication by 2 is also to ensure we do not over-run
-   *  the allocated memory on buffers and GPU. This can happen if calculated h
-   * is larger than cell width and splitting makes bigger than target cells*/
-  //Leave this until we implement recursive self tasks -> Exaggerated as we will
-  //off-load really big cells since we don't recurse
-  const int count_max_parts_tmp = 64 * 8 * target_n_tasks * (np_per_cell + buff);
+  /* Declare and allocate GPU launch control data structures which need to be in
+   * scope */
+  struct gpu_offload_data gpu_buf_self_dens;
+  struct gpu_offload_data gpu_buf_self_grad;
+  struct gpu_offload_data gpu_buf_self_forc;
+  struct gpu_offload_data gpu_buf_pair_dens;
+  struct gpu_offload_data gpu_buf_pair_grad;
+  struct gpu_offload_data gpu_buf_pair_forc;
 
+  gpu_init_data_buffers(&gpu_buf_self_dens, &gpu_pack_params,
+                        sizeof(struct gpu_part_send_d),
+                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/0);
+  gpu_init_data_buffers(&gpu_buf_self_grad, &gpu_pack_params,
+                        sizeof(struct gpu_part_send_g),
+                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/0);
+  gpu_init_data_buffers(&gpu_buf_self_forc, &gpu_pack_params,
+                        sizeof(struct gpu_part_send_f),
+                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/0);
+  gpu_init_data_buffers(&gpu_buf_pair_dens, &gpu_pack_params,
+                        sizeof(struct gpu_part_send_d),
+                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
+  gpu_init_data_buffers(&gpu_buf_pair_grad, &gpu_pack_params,
+                        sizeof(struct gpu_part_send_g),
+                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/1);
+  gpu_init_data_buffers(&gpu_buf_pair_forc, &gpu_pack_params,
+                        sizeof(struct gpu_part_send_f),
+                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
 
-  struct pack_vars_self *pack_vars_self_dens = NULL;
-  struct pack_vars_self *pack_vars_self_grad = NULL;
-  struct pack_vars_self *pack_vars_self_forc = NULL;
-  struct pack_vars_pair *pack_vars_pair_dens = NULL;
-  struct pack_vars_pair *pack_vars_pair_grad = NULL;
-  struct pack_vars_pair *pack_vars_pair_forc = NULL;
-
-  gpu_init_pack_vars_self(&pack_vars_self_dens, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp);
-  gpu_init_pack_vars_self(&pack_vars_self_grad, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp);
-  gpu_init_pack_vars_self(&pack_vars_self_forc, target_n_tasks, bundle_size, n_bundles, count_max_parts_tmp);
-  gpu_init_pack_vars_pair(&pack_vars_pair_dens, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp);
-  gpu_init_pack_vars_pair(&pack_vars_pair_grad, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp);
-  gpu_init_pack_vars_pair(&pack_vars_pair_forc, target_n_tasks_pair, bundle_size_pair, n_bundles_pair, count_max_parts_tmp);
-
-
-  // A. Nasar: Keep track of first and last particles for each self task (particle data is
-  // arranged in long arrays containing particles from all the tasks we will
-  // work with)
-  /* A. N.: Needed for offloading self tasks as we use these to sort through
-   *        which parts need to interact with which */
-  int2 *task_first_part_f4;
-  int2 *task_first_part_f4_f;
-  int2 *task_first_part_f4_g;
-  int2 *d_task_first_part_f4;
-  int2 *d_task_first_part_f4_f;
-  int2 *d_task_first_part_f4_g;
-  cudaMallocHost((void **)&task_first_part_f4, target_n_tasks * sizeof(int2));
-  cudaMalloc((void **)&d_task_first_part_f4, target_n_tasks * sizeof(int2));
-  cudaMallocHost((void **)&task_first_part_f4_f, target_n_tasks * sizeof(int2));
-  cudaMalloc((void **)&d_task_first_part_f4_f, target_n_tasks * sizeof(int2));
-  cudaMallocHost((void **)&task_first_part_f4_g, target_n_tasks * sizeof(int2));
-  cudaMalloc((void **)&d_task_first_part_f4_g, target_n_tasks * sizeof(int2));
-
-  /*A. N.: Needed but only for small part in launch functions. Might
-           be useful for recursion on the GPU so keep for now     */
-  int4 *fparti_fpartj_lparti_lpartj_dens;
-  int4 *fparti_fpartj_lparti_lpartj_forc;
-  int4 *fparti_fpartj_lparti_lpartj_grad;
-  cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_dens,
-		  target_n_tasks_pair * sizeof(int4));
-  cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_forc,
-          target_n_tasks_pair * sizeof(int4));
-  cudaMallocHost((void **)&fparti_fpartj_lparti_lpartj_grad,
-          target_n_tasks_pair * sizeof(int4));
-
-  /*Create streams so that we can off-load different batches of work in
+  /* Create streams so that we can off-load different batches of work in
    * different streams and get some con-CURRENCY! Events used to maximise
    * asynchrony further*/
+  cudaStream_t stream[gpu_pack_params.n_bundles];
+  cudaStream_t stream_pairs[gpu_pack_params.n_bundles_pair];
 
-  cudaStream_t stream[n_bundles];
-  cudaStream_t stream_pairs[n_bundles_pair];
-
-  cudaEvent_t self_end[n_bundles];
-  for (int i = 0; i < n_bundles; i++) cudaEventCreate(&self_end[i]);
-  cudaEvent_t self_end_g[n_bundles];
-  for (int i = 0; i < n_bundles; i++) cudaEventCreate(&self_end_g[i]);
-  cudaEvent_t self_end_f[n_bundles];
-  for (int i = 0; i < n_bundles; i++) cudaEventCreate(&self_end_f[i]);
-
-  cudaEvent_t pair_end[n_bundles_pair];
-  for (int i = 0; i < n_bundles_pair; i++) cudaEventCreate(&pair_end[i]);
-  cudaEvent_t pair_end_g[n_bundles_pair];
-  for (int i = 0; i < n_bundles_pair; i++) cudaEventCreate(&pair_end_g[i]);
-  cudaEvent_t pair_end_f[n_bundles_pair];
-  for (int i = 0; i < n_bundles_pair; i++) cudaEventCreate(&pair_end_f[i]);
-
-  for (int i = 0; i < n_bundles; ++i)
+  for (size_t i = 0; i < gpu_pack_params.n_bundles; ++i)
     cudaStreamCreateWithFlags(&stream[i], cudaStreamNonBlocking);
-  for (int i = 0; i < n_bundles_pair; ++i)
+  for (size_t i = 0; i < gpu_pack_params.n_bundles_pair; ++i)
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
-  /*Estimate how many particles to pack for GPU for each GPU launch
-   * instruction*/
-#ifdef WITH_MPI
-  int nr_nodes = 1;
-  int res = 0;
-  if ((res = MPI_Comm_size(MPI_COMM_WORLD, &nr_nodes)) != MPI_SUCCESS)
-    error("MPI_Comm_size failed with error %i.", res);
-#endif
-
-  /*Declare Buffer and GPU particle arrays*/
-  struct part_aos_f4_send *parts_aos_f4_send;
-  struct part_aos_f4_recv *parts_aos_f4_recv;
-
-  struct part_aos_f4_f_send *parts_aos_forc_f4_send;
-  struct part_aos_f4_f_recv *parts_aos_forc_f4_recv;
-
-  struct part_aos_f4_g_send *parts_aos_grad_f4_send;
-  struct part_aos_f4_g_recv *parts_aos_grad_f4_recv;
-
-  struct part_aos_f4_send *d_parts_aos_f4_send;
-  struct part_aos_f4_recv *d_parts_aos_f4_recv;
-
-  struct part_aos_f4_f_send *d_parts_aos_forc_f4_send;
-  struct part_aos_f4_f_recv *d_parts_aos_forc_f4_recv;
-
-  struct part_aos_f4_g_send *d_parts_aos_grad_f4_send;
-  struct part_aos_f4_g_recv *d_parts_aos_grad_f4_recv;
-
-  struct part_aos_f4_send *parts_aos_pair_f4_send;
-  struct part_aos_f4_recv *parts_aos_pair_f4_recv;
-
-  struct part_aos_f4_send *d_parts_aos_pair_f4_send;
-  struct part_aos_f4_recv *d_parts_aos_pair_f4_recv;
-
-  struct part_aos_f4_f_send *parts_aos_pair_f4_f_send;
-  struct part_aos_f4_f_recv *parts_aos_pair_f4_f_recv;
-
-  struct part_aos_f4_f_send *d_parts_aos_pair_f4_f_send;
-  struct part_aos_f4_f_recv *d_parts_aos_pair_f4_f_recv;
-
-  struct part_aos_f4_g_send *parts_aos_pair_f4_g_send;
-  struct part_aos_f4_g_recv *parts_aos_pair_f4_g_recv;
-
-  struct part_aos_f4_g_send *d_parts_aos_pair_f4_g_send;
-  struct part_aos_f4_g_recv *d_parts_aos_pair_f4_g_recv;
-
-  /*Now allocate memory for Buffer and GPU particle arrays*/
-  cudaMalloc((void **)&d_parts_aos_f4_send,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_send));
-  cudaMalloc((void **)&d_parts_aos_f4_recv,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_recv));
-
-  cudaMalloc((void **)&d_parts_aos_forc_f4_send,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_f_send));
-  cudaMalloc((void **)&d_parts_aos_forc_f4_recv,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_f_recv));
-
-  cudaMalloc((void **)&d_parts_aos_grad_f4_send,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_g_send));
-  cudaMalloc((void **)&d_parts_aos_grad_f4_recv,
-             count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
-
-  cudaMallocHost((void **)&parts_aos_f4_send,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_send));
-  cudaMallocHost((void **)&parts_aos_f4_recv,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_recv));
-
-  cudaMallocHost((void **)&parts_aos_forc_f4_send,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_f_send));
-  cudaMallocHost((void **)&parts_aos_forc_f4_recv,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_f_recv));
-
-  cudaMallocHost((void **)&parts_aos_grad_f4_send,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_g_send));
-  cudaMallocHost((void **)&parts_aos_grad_f4_recv,
-                 count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
-
-  cudaMalloc((void **)&d_parts_aos_pair_f4_send,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_send));
-  cudaMalloc((void **)&d_parts_aos_pair_f4_recv,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_recv));
-
-  cudaMalloc((void **)&d_parts_aos_pair_f4_f_send,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_f_send));
-  cudaMalloc((void **)&d_parts_aos_pair_f4_f_recv,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_f_recv));
-
-  cudaMalloc((void **)&d_parts_aos_pair_f4_g_send,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_g_send));
-  cudaMalloc((void **)&d_parts_aos_pair_f4_g_recv,
-             2 * count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
-
-  cudaMallocHost((void **)&parts_aos_pair_f4_send,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_send));
-  cudaMallocHost((void **)&parts_aos_pair_f4_recv,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_recv));
-
-  cudaMallocHost((void **)&parts_aos_pair_f4_g_send,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_g_send));
-  cudaMallocHost((void **)&parts_aos_pair_f4_g_recv,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_g_recv));
-
-  cudaMallocHost((void **)&parts_aos_pair_f4_f_send,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_f_send));
-  cudaMallocHost((void **)&parts_aos_pair_f4_f_recv,
-                 2 * count_max_parts_tmp * sizeof(struct part_aos_f4_f_recv));
-
-  /*Declare some global variables*/
-  float d_a = e->cosmology->a;
-  float d_H = e->cosmology->H;
+  /* Declare some global variables */
   int step = 0;
-
-  // a list of the cells and tasks the GPU will work on
-
-  /* A. Nasar: Over-setimate better than under-estimate
-   * Over-allocated for now but a good guess is multiply by 2 to ensure we
-   * always have room for recursing through more tasks than we plan to
-   * offload. */
-  int max_length = 2 * target_n_tasks_pair * 2;
-  struct cell **ci_dd = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_dd = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **ci_dg = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_dg = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **ci_df = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  struct cell **cj_df = (struct cell**)malloc(max_length * sizeof(struct cell *));
-  int **first_and_last_daughters_d;
-  int **first_and_last_daughters_g;
-  int **first_and_last_daughters_f;
-
-  //A. Nasar: This is over-kill but it's necessary in case we start of with top level cells that are all leaf cells
-  struct cell **ci_top_d = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_d = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **ci_top_g = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_g = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **ci_top_f = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  struct cell **cj_top_f = (struct cell**)malloc(2ul * target_n_tasks_pair * sizeof(struct cell *));
-  first_and_last_daughters_d = (int**)malloc(target_n_tasks_pair * 2ul * sizeof(int *));
-  first_and_last_daughters_g = (int**)malloc(target_n_tasks_pair * 2ul * sizeof(int *));
-  first_and_last_daughters_f = (int**)malloc(target_n_tasks_pair * 2ul * sizeof(int *));
-  for (int i = 0; i < target_n_tasks_pair * 2; i++){
-	  first_and_last_daughters_d[i] = (int*)malloc(2 * sizeof(int));
-	  first_and_last_daughters_g[i] = (int*)malloc(2 * sizeof(int));
-	  first_and_last_daughters_f[i] = (int*)malloc(2 * sizeof(int));
-  }
 
   /* Tell me how much memory we're using. */
   gpu_print_free_mem(e, r->cpuid);
 
   /* Main loop. */
   while (1) {
-    /*Stuff for debugging*/
-    //	Initialise timers to zero
-    double time_for_density_gpu = 0.0;
-    double time_for_gpu_f = 0.0;
-    double time_for_gpu_pair_f = 0.0;
-    double time_for_gpu_g = 0.0;
-    double time_for_gpu_pair_g = 0.0;
-    double unpack_time_self_g = 0.0;
-    double unpack_time_self_f = 0.0;
-    double unpack_time_self = 0.0;
-    double time_for_gpu_pair = 0.0;
     /* Wait at the barrier. */
     engine_barrier(e);
-    // Initialise packing counters
-    pack_vars_self_dens->tasks_packed = 0;
-    pack_vars_pair_dens->tasks_packed = 0;
-    pack_vars_self_dens->count_parts = 0;
-    pack_vars_pair_dens->count_parts = 0;
-    pack_vars_pair_dens->top_tasks_packed = 0;
-    // Initialise packing counters
-    pack_vars_self_forc->tasks_packed = 0;
-    pack_vars_pair_forc->tasks_packed = 0;
-    pack_vars_self_forc->count_parts = 0;
-    pack_vars_pair_forc->count_parts = 0;
-    // Initialise packing counters
-    pack_vars_self_grad->tasks_packed = 0;
-    pack_vars_pair_grad->tasks_packed = 0;
-    pack_vars_self_grad->count_parts = 0;
-    pack_vars_pair_grad->count_parts = 0;
 
-    double packing_time = 0.0;
-    double packing_time_f = 0.0;
-    double packing_time_g = 0.0;
-    double packing_time_pair = 0.0;
-    double packing_time_pair_f = 0.0;
-    double packing_time_pair_g = 0.0;
-    double unpacking_time_pair = 0.0;
-    double unpacking_time_pair_f = 0.0;
-    double unpacking_time_pair_g = 0.0;
     /* Can we go home yet? */
     if (e->step_props & engine_step_prop_done) break;
+
+    gpu_init_data_buffers_step(&gpu_buf_self_dens);
+    gpu_init_data_buffers_step(&gpu_buf_self_grad);
+    gpu_init_data_buffers_step(&gpu_buf_self_forc);
+    gpu_init_data_buffers_step(&gpu_buf_pair_dens);
+    gpu_init_data_buffers_step(&gpu_buf_pair_grad);
+    gpu_init_data_buffers_step(&gpu_buf_pair_forc);
+
+    /* Get some global variables' values for this step */
+    const float d_a = e->cosmology->a;
+    const float d_H = e->cosmology->H;
 
     /* Re-set the pointer to the previous task, as there is none. */
     struct task *t = NULL;
@@ -478,10 +243,6 @@ void *runner_main_cuda(void *data) {
 
     if (step == 0) cudaProfilerStart();
     step++;
-
-    pack_vars_pair_dens->n_daughters_total = 0;
-    pack_vars_pair_grad->n_daughters_total = 0;
-    pack_vars_pair_forc->n_daughters_total = 0;
 
     /* Loop while there are tasks... */
     while (1) {
@@ -496,13 +257,15 @@ void *runner_main_cuda(void *data) {
         /* Did I get anything? */
         if (t == NULL) break;
       }
+
       /* Get the cells. */
       struct cell *ci = t->ci;
       struct cell *cj = t->cj;
 
-      if (ci == NULL && (t->subtype != task_subtype_gpu_unpack_d
-    		  && t->subtype != task_subtype_gpu_unpack_g
-			  && t->subtype != task_subtype_gpu_unpack_f)) error("This cannot be");
+      if (ci == NULL && (t->subtype != task_subtype_gpu_unpack_d &&
+                         t->subtype != task_subtype_gpu_unpack_g &&
+                         t->subtype != task_subtype_gpu_unpack_f))
+        error("This cannot be");
 
 #ifdef SWIFT_DEBUG_TASKS
       /* Mark the thread we run on */
@@ -539,72 +302,28 @@ void *runner_main_cuda(void *data) {
           else if (t->subtype == task_subtype_external_grav)
             runner_do_grav_external(r, ci, 1);
           else if (t->subtype == task_subtype_gpu_unpack_d) {
+            /* TODO: WHY ARE THESE EMPTY? WHY DO WE HAVE THEM HERE THEN? */
           } else if (t->subtype == task_subtype_gpu_unpack_g) {
           } else if (t->subtype == task_subtype_gpu_unpack_f) {
           } else if (t->subtype == task_subtype_density) {
 #ifndef GPUOFFLOAD_DENSITY
             runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
 #endif
-            /* GPU WORK */
           } else if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
-            runner_doself1_pack_f4(r, sched, pack_vars_self_dens, ci, t,
-                                       parts_aos_f4_send, task_first_part_f4);
-            /* No pack tasks left in queue, flag that we want to run */
-            int launch_leftovers = pack_vars_self_dens->launch_leftovers;
-            /*Packed enough tasks. Let's go*/
-            int launch = pack_vars_self_dens->launch;
-            /* Do we have enough stuff to run the GPU ? */
-            if (launch || launch_leftovers) {
-              /*Launch GPU tasks*/
-              runner_doself1_launch_f4(
-                  r, sched, pack_vars_self_dens, ci, t, parts_aos_f4_send,
-                  parts_aos_f4_recv, d_parts_aos_f4_send, d_parts_aos_f4_recv,
-                  stream, d_a, d_H, e, &packing_time, &time_for_density_gpu,
-                  &unpack_time_self, cuda_dev_id,
-                  task_first_part_f4, d_task_first_part_f4, self_end);
-            } /*End of GPU work Self*/
+            runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream,
+                                      d_a, d_H);
 #endif
           } /* self / pack */
           else if (t->subtype == task_subtype_gpu_pack_g) {
 #ifdef GPUOFFLOAD_GRADIENT
-            packing_time_g += runner_doself1_pack_f4_g(
-                r, sched, pack_vars_self_grad, ci, t, parts_aos_grad_f4_send,
-                task_first_part_f4_g);
-            /* No pack tasks left in queue, flag that we want to run */
-            int launch_leftovers = pack_vars_self_grad->launch_leftovers;
-            /*Packed enough tasks let's go*/
-            int launch = pack_vars_self_grad->launch;
-            /* Do we have enough stuff to run the GPU ? */
-            if (launch || launch_leftovers) {
-              /*Launch GPU tasks*/
-              runner_doself1_launch_f4_g(
-                  r, sched, pack_vars_self_grad, ci, t, parts_aos_grad_f4_send,
-                  parts_aos_grad_f4_recv, d_parts_aos_grad_f4_send,
-                  d_parts_aos_grad_f4_recv, stream, d_a, d_H, e,
-                  &packing_time_g, &time_for_gpu_g, task_first_part_f4_g,
-                  d_task_first_part_f4_g, self_end_g, &unpack_time_self_g);
-            } /*End of GPU work Self*/
+            runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream,
+                                       d_a, d_H);
 #endif  // GPUGRADSELF
           } else if (t->subtype == task_subtype_gpu_pack_f) {
 #ifdef GPUOFFLOAD_FORCE
-            packing_time_f += runner_doself1_pack_f4_f(
-                r, sched, pack_vars_self_forc, ci, t, parts_aos_forc_f4_send,
-                task_first_part_f4_f);
-            /* No pack tasks left in queue, flag that we want to run */
-            int launch_leftovers = pack_vars_self_forc->launch_leftovers;
-            /*Packed enough tasks let's go*/
-            int launch = pack_vars_self_forc->launch;
-            /* Do we have enough stuff to run the GPU ? */
-            if (launch || launch_leftovers) {
-              /*Launch GPU tasks*/
-              runner_doself1_launch_f4_f(
-                  r, sched, pack_vars_self_forc, ci, t, parts_aos_forc_f4_send,
-                  parts_aos_forc_f4_recv, d_parts_aos_forc_f4_send,
-                  d_parts_aos_forc_f4_recv, stream, d_a, d_H, e,
-                  &packing_time_f, &time_for_gpu_f, task_first_part_f4_f,
-                  d_task_first_part_f4_f, self_end_f, &unpack_time_self_f);
-            } /*End of GPU work Self*/
+            runner_doself_gpu_force(r, sched, &gpu_buf_self_forc, t, stream,
+                                    d_a, d_H);
 #endif
           }
 #ifdef EXTRA_HYDRO_LOOP
@@ -672,143 +391,19 @@ void *runner_main_cuda(void *data) {
           /* GPU WORK */
           else if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
-#ifndef RECURSE
-            ticks tic_cpu_pack = getticks();
-            /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
-            packing_time_pair +=
-                runner_dopair1_pack_f4_d(r, sched, pack_vars_pair_dens, ci,
-                                         cj, t, parts_aos_pair_f4_send, e,
-                                         fparti_fpartj_lparti_lpartj_dens);
-            /* No pack tasks left in queue, flag that we want to run */
-            int launch_leftovers = pack_vars_pair_dens->launch_leftovers;
-            /*Packed enough tasks let's go*/
-            int launch = pack_vars_pair_dens->launch;
-            /* Do we have enough stuff to run the GPU ? */
-            if (launch || launch_leftovers) {
-              /*Launch GPU tasks*/
-              runner_dopair1_launch_f4_one_memcpy(
-                  r, sched, pack_vars_pair_dens, t, parts_aos_pair_f4_send,
-                  parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
-                  d_parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e,
-                  &packing_time_pair, &time_for_gpu_pair,
-                  &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-                  pair_end);
-              pack_vars_pair_dens->launch_leftovers = 0;
-            } /* End of GPU work Pairs */
-
-#else //RECURSE
-            /////////////////////W.I.P!!!////////////////////////////////////////////////////////
-            /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
-            * We are recursing separately to find out how much work we have before offloading*/
-            //We need to allocate a list to put cell pointers into for each new task
-            int n_expected_tasks = 4096; //A. Nasar: Need to come up with a good estimate for this
-            int depth = 0;
-            pack_vars_pair_dens->n_daughters_packed_index = pack_vars_pair_dens->n_daughters_total;
-            int n_leaves_found = 0;
-            runner_recurse_gpu(r, sched, pack_vars_pair_dens, ci, cj, t,
-                      e, fparti_fpartj_lparti_lpartj_dens, &n_leaves_found, depth, n_expected_tasks, ci_dd, cj_dd, pack_vars_pair_dens->n_daughters_total);
-
-            runner_pack_daughters_and_launch(r, sched, ci, cj, pack_vars_pair_dens,
-            	    t, parts_aos_pair_f4_send , parts_aos_pair_f4_recv, d_parts_aos_pair_f4_send,
-            	    parts_aos_pair_f4_recv, stream_pairs, d_a, d_H, e, &packing_time_pair, &time_for_gpu_pair,
-            	    &unpacking_time_pair, fparti_fpartj_lparti_lpartj_dens,
-            	    pair_end, n_leaves_found, ci_dd, cj_dd, first_and_last_daughters_d, ci_top_d, cj_top_d);
-#endif  //RECURSE
-#endif  // GPUOFFLOAD_DENSITY
-          } /* pair / pack */
-          else if (t->subtype == task_subtype_gpu_pack_g) {
-#ifdef GPUOFFLOAD_GRADIENT
-#ifndef RECURSE
-              ticks tic_cpu_pack = getticks();
-              packing_time_pair_g +=
-                  runner_dopair1_pack_f4_g(r, sched, pack_vars_pair_grad, ci,
-                                           cj, t, parts_aos_pair_f4_g_send, e,
-                                           fparti_fpartj_lparti_lpartj_grad);
-              t->total_cpu_pack_ticks += getticks() - tic_cpu_pack;
-              /* No pack tasks left in queue, flag that we want to run */
-              int launch_leftovers = pack_vars_pair_grad->launch_leftovers;
-              /*Packed enough tasks, let's go*/
-              int launch = pack_vars_pair_grad->launch;
-              /* Do we have enough stuff to run the GPU ? */
-              if (launch || launch_leftovers) {
-                /*Launch GPU tasks*/
-                int t_packed = pack_vars_pair_grad->tasks_packed;
-                //                signal_sleeping_runners(sched, t, t_packed);
-                runner_dopair1_launch_f4_g_one_memcpy(
-                    r, sched, pack_vars_pair_grad, t, parts_aos_pair_f4_g_send,
-                    parts_aos_pair_f4_g_recv, d_parts_aos_pair_f4_g_send,
-                    d_parts_aos_pair_f4_g_recv, stream_pairs, d_a, d_H, e,
-                    &packing_time_pair_g, &time_for_gpu_pair_g,
-                    &unpacking_time_pair_g, fparti_fpartj_lparti_lpartj_grad,
-                    pair_end_g);
-              }
-              pack_vars_pair_grad->launch_leftovers = 0;
-#else
-              /////////////////////W.I.P!!!////////////////////////////////////////////////////////
-              /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
-              * We are recursing separately to find out how much work we have before offloading*/
-              //We need to allocate a list to put cell pointers into for each new task
-              int n_expected_tasks = 4096; //A. Nasar: Need to come up with a good estimate for this
-              int depth = 0;
-              pack_vars_pair_grad->n_daughters_packed_index = pack_vars_pair_grad->n_daughters_total;
-              int n_leaves_found = 0;
-              runner_recurse_gpu(r, sched, pack_vars_pair_grad, ci, cj, t,
-                        e, fparti_fpartj_lparti_lpartj_grad, &n_leaves_found, depth, n_expected_tasks, ci_dg, cj_dg, pack_vars_pair_grad->n_daughters_total);
-
-              runner_pack_daughters_and_launch_g(r, sched, ci, cj, pack_vars_pair_grad,
-              	    t, parts_aos_pair_f4_g_send, parts_aos_pair_f4_g_recv, d_parts_aos_pair_f4_g_send,
-              	    parts_aos_pair_f4_g_recv, stream_pairs, d_a, d_H, e, &packing_time_pair_g, &time_for_gpu_pair_g,
-              	    &unpacking_time_pair_g, fparti_fpartj_lparti_lpartj_grad,
-              	    pair_end_g, n_leaves_found, ci_dg, cj_dg, first_and_last_daughters_g, ci_top_g, cj_top_g);
+            runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_pair_dens, t,
+                                      stream_pairs, d_a, d_H);
 #endif
-#endif  // GPUOFFLOAD_GRADIENT
+          } else if (t->subtype == task_subtype_gpu_pack_g) {
+#ifdef GPUOFFLOAD_GRADIENT
+            runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_pair_dens, t,
+                                       stream_pairs, d_a, d_H);
+#endif
           } else if (t->subtype == task_subtype_gpu_pack_f) {
 #ifdef GPUOFFLOAD_FORCE
-#ifndef RECURSE
-              ticks tic_cpu_pack = getticks();
-              /*Pack data and increment counters checking if we should run on the GPU after packing this task*/
-              packing_time_pair_f +=
-                  runner_dopair1_pack_f4_f(r, sched, pack_vars_pair_forc, ci,
-                                           cj, t, parts_aos_pair_f4_f_send, e,
-                                           fparti_fpartj_lparti_lpartj_forc);
-              /* No pack tasks left in queue, flag that we want to run */
-              int launch_leftovers = pack_vars_pair_forc->launch_leftovers;
-              /*Packed enough tasks let's go*/
-              int launch = pack_vars_pair_forc->launch;
-              /* Do we have enough stuff to run the GPU ? */
-              if (launch || launch_leftovers) {
-                /*Launch GPU tasks*/
-                int t_packed = pack_vars_pair_forc->tasks_packed;
-                //                signal_sleeping_runners(sched, t, t_packed);
-                runner_dopair1_launch_f4_f_one_memcpy(
-                    r, sched, pack_vars_pair_forc, t, parts_aos_pair_f4_f_send,
-                    parts_aos_pair_f4_f_recv, d_parts_aos_pair_f4_f_send,
-                    d_parts_aos_pair_f4_f_recv, stream_pairs, d_a, d_H, e,
-                    &packing_time_pair_f, &time_for_gpu_pair_f,
-                    &unpacking_time_pair_f, fparti_fpartj_lparti_lpartj_forc,
-                    pair_end_f);
-
-                pack_vars_pair_forc->launch_leftovers = 0;
-              } /* End of GPU work Pairs */
-#else
-              /////////////////////W.I.P!!!////////////////////////////////////////////////////////
-              /*Call recursion here. This will be a function in runner_doiact_functions_hydro_gpu.h.
-              * We are recursing separately to find out how much work we have before offloading*/
-              //We need to allocate a list to put cell pointers into for each new task
-              int n_expected_tasks = 4096; //A. Nasar: Need to come up with a good estimate for this
-              int depth = 0;
-              pack_vars_pair_forc->n_daughters_packed_index = pack_vars_pair_forc->n_daughters_total;
-              int n_leaves_found = 0;
-              runner_recurse_gpu(r, sched, pack_vars_pair_forc, ci, cj, t,
-                        e, fparti_fpartj_lparti_lpartj_forc, &n_leaves_found, depth, n_expected_tasks, ci_df, cj_df, pack_vars_pair_forc->n_daughters_total);
-
-              runner_pack_daughters_and_launch_f(r, sched, ci, cj, pack_vars_pair_forc,
-                    t, parts_aos_pair_f4_f_send, parts_aos_pair_f4_f_recv, d_parts_aos_pair_f4_f_send,
-                    parts_aos_pair_f4_f_recv, stream_pairs, d_a, d_H, e, &packing_time_pair_f, &time_for_gpu_pair_f,
-                    &unpacking_time_pair_f, fparti_fpartj_lparti_lpartj_forc,
-                    pair_end_f, n_leaves_found, ci_df, cj_df, first_and_last_daughters_f, ci_top_f, cj_top_f);
+            runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_pair_forc, t,
+                                    stream_pairs, d_a, d_H);
 #endif
-#endif  // GPUOFFLOAD_FORCE
           } else if (t->subtype == task_subtype_gpu_unpack_d) {
           } else if (t->subtype == task_subtype_gpu_unpack_g) {
           } else if (t->subtype == task_subtype_gpu_unpack_f) {
@@ -821,8 +416,8 @@ void *runner_main_cuda(void *data) {
             runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 1);
 #else
             runner_dosub_pair1_gradient(r, ci, cj, /*below_h_max=*/0, 1);
-#endif
-#endif
+#endif  // EXTRA_HYDRO_LOOP_TYPE2
+#endif  // GPUOFFLOAD_GRADIENT
           }
 #endif  // EXTRA_HYDRO_LOOP
           else if (t->subtype == task_subtype_force) {
@@ -886,7 +481,7 @@ void *runner_main_cuda(void *data) {
           runner_do_hydro_sort(
               r, ci, t->flags,
               ci->hydro.dx_max_sort_old > space_maxreldx * ci->dmin,
-              /*lock=*/0, /*rt_requests_sorts=*/1, /*clock=*/1);
+              /*lock=*/0, /*rt_requests_sort=*/1, /*clock=*/1);
           /* Reset the sort flags as our work here is done. */
           t->flags = 0;
           break;
@@ -1151,134 +746,15 @@ void *runner_main_cuda(void *data) {
         t = scheduler_done(sched, t);
       }
     } /* main loop. */
-
-    time_for_density_gpu = 0.0;
-    if(step == 4)cudaProfilerStop();
-    //	if(step == 2)exit(0);
-    //	  size_t free_byte ;
-    //	  size_t total_byte ;
-    //	  cudaError_t cuda_status = cudaMemGetInfo( &free_byte,
-    //&total_byte ) ; 	  double free = (double)free_byte; 	  double
-    // available = (double)total_byte; 	  double used = (available - free);
-    // fprintf(stderr, "Used %f GB GPU memory\n", used/1e9);
-    /* Wait at the wait barrier. */
-    //    swift_barrier_wait(&e->wait_barrier);
   }
-  // Free all data
-  //  cudaFree(d_tid_p);
-  //  cudaFree(d_id);
-  //  cudaFree(d_x_p);
-  //  cudaFree(d_y_p);
-  //  cudaFree(d_z_p);
-  //  cudaFree(d_ux);
-  //  cudaFree(d_uy);
-  //  cudaFree(d_uz);
-  //  cudaFree(d_a_hydrox);
-  //  cudaFree(d_a_hydroy);
-  //  cudaFree(d_a_hydroz);
-  //  cudaFree(d_mass);
-  //  cudaFree(d_h);
-  //  cudaFree(d_u);
-  //  cudaFree(d_u_dt);
-  //  cudaFree(d_rho);
-  //  cudaFree(d_SPH_sum);
-  //  cudaFree(d_locx);
-  //  cudaFree(d_locy);
-  //  cudaFree(d_locz);
-  //  cudaFree(d_widthx);
-  //  cudaFree(d_widthy);
-  //  cudaFree(d_widthz);
-  //  cudaFree(d_h_max);
-  //  cudaFree(d_count_p);
-  //  cudaFree(d_wcount);
-  //  cudaFree(d_wcount_dh);
-  //  cudaFree(d_rho_dh);
-  //  cudaFree(d_rot_ux);
-  //  cudaFree(d_rot_uy);
-  //  cudaFree(d_rot_uz);
-  //  cudaFree(d_div_v);
-  //  cudaFree(d_div_v_previous_step);
-  //  cudaFree(d_alpha_visc);
-  //  cudaFree(d_v_sig);
-  //  cudaFree(d_laplace_u);
-  //  cudaFree(d_alpha_diff);
-  //  cudaFree(d_f);
-  //  cudaFree(d_soundspeed);
-  //  cudaFree(d_h_dt);
-  //  cudaFree(d_balsara);
-  //  cudaFree(d_pressure);
-  //  cudaFree(d_alpha_visc_max_ngb);
-  //  cudaFree(d_time_bin);
-  //  cudaFree(d_wakeup);
-  //  cudaFree(d_min_ngb_time_bin);
-  //  cudaFree(d_to_be_synchronized);
-  //  cudaFree(tid_p);
-  //  cudaFree(id);
-  //  cudaFree(mass);
-  //  cudaFree(h);
-  //  cudaFree(u);
-  //  cudaFree(u_dt);
-  //  cudaFree(rho);
-  //  cudaFree(SPH_sum);
-  //  cudaFree(x_p);
-  //  cudaFree(y_p);
-  //  cudaFree(z_p);
-  //  cudaFree(ux);
-  //  cudaFree(uy);
-  //  cudaFree(uz);
-  //  cudaFree(a_hydrox);
-  //  cudaFree(a_hydroy);
-  //  cudaFree(a_hydroz);
-  //  cudaFree(locx);
-  //  cudaFree(locy);
-  //  cudaFree(locz);
-  //  cudaFree(widthx);
-  //  cudaFree(widthy);
-  //  cudaFree(widthz);
-  //  cudaFree(h_max);
-  //  cudaFree(count_p);
-  //  cudaFree(wcount);
-  //  cudaFree(wcount_dh);
-  //  cudaFree(rho_dh);
-  //  cudaFree(rot_ux);
-  //  cudaFree(rot_uy);
-  //  cudaFree(rot_uz);
-  //  cudaFree(div_v);
-  //  cudaFree(div_v_previous_step);
-  //  cudaFree(alpha_visc);
-  //  cudaFree(v_sig);
-  //  cudaFree(laplace_u);
-  //  cudaFree(alpha_diff);
-  //  cudaFree(f);
-  //  cudaFree(soundspeed);
-  //  cudaFree(h_dt);
-  //  cudaFree(balsara);
-  //  cudaFree(pressure);
-  //  cudaFree(alpha_visc_max_ngb);
-  //  cudaFree(time_bin);
-  //  cudaFree(wakeup);
-  //  cudaFree(min_ngb_time_bin);
-  //  cudaFree(to_be_synchronized);
-  //  cudaFree(partid_p);
-  //  cudaFree(d_task_first_part);
-  //  cudaFree(d_task_last_part);
-  //  cudaFree(task_first_part_self_dens);
-  //  cudaFree(task_last_part_self_dens);
-  //  cudaFree(task_first_part_pair_ci);
-  //  cudaFree(task_last_part_pair_ci);
-  //  cudaFree(task_first_part_pair_cj);
-  //  cudaFree(task_last_part_pair_cj);
-  //  cudaFree(d_bundle_first_part_self_dens);
-  //  cudaFree(d_bundle_last_part_self_dens);
-  //  cudaFree(bundle_first_part_self_dens);
-  //  cudaFree(bundle_last_part_self_dens);
-  //  cudaFree(bundle_first_part_pair_ci);
-  //  cudaFree(bundle_last_part_pair_ci);
-  //  cudaFree(bundle_first_part_pair_cj);
-  //  cudaFree(bundle_last_part_pair_cj);
-  //  free(ci_list_self_dens);
-  //  free(ci_list_pair);
-  //  free(cj_list_pair);
+
+  /* Release the bytes back into the wilderness */
+  gpu_free_data_buffers(&gpu_buf_self_dens, /*is_pair_task=*/0);
+  gpu_free_data_buffers(&gpu_buf_self_grad, /*is_pair_task=*/0);
+  gpu_free_data_buffers(&gpu_buf_self_forc, /*is_pair_task=*/0);
+  gpu_free_data_buffers(&gpu_buf_pair_dens, /*is_pair_task=*/1);
+  gpu_free_data_buffers(&gpu_buf_pair_grad, /*is_pair_task=*/1);
+  gpu_free_data_buffers(&gpu_buf_pair_forc, /*is_pair_task=*/1);
 
   /* Be kind, rewind. */
   return NULL;
@@ -1289,4 +765,3 @@ void *runner_main_cuda(void *data) {
 #endif
 
 #endif  // WITH_CUDA
-
