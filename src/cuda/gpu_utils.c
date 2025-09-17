@@ -59,43 +59,43 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
 
   cudaFree(0);
   /* Now tell me some info about my device */
-//  cudaGetDeviceProperties(&prop, dev_id);
-//  cudaDeviceGetAttribute(&max_blocks_SM, cudaDevAttrMaxBlocksPerMultiprocessor,
-//                         dev_id);
-//  cudaDeviceGetAttribute(&n_SMs, cudaDevAttrMultiProcessorCount, dev_id);
-//  char uuid_str[40];
-//  cudaUUID_t uuid = prop.uuid;
-//
-//
-//  snprintf(uuid_str, sizeof(uuid_str),
-//		  "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-//		  uuid.bytes[0], uuid.bytes[1], uuid.bytes[2], uuid.bytes[3],
-//		  uuid.bytes[4], uuid.bytes[5], uuid.bytes[6], uuid.bytes[7],
-//		  uuid.bytes[8], uuid.bytes[9], uuid.bytes[10], uuid.bytes[11],
-//		  uuid.bytes[12], uuid.bytes[13], uuid.bytes[14], uuid.bytes[15]);
-//
-//  size_t free_mem;
-//  size_t total_mem;
-//  const struct space* space = e->s;
-//  cudaMemGetInfo(&free_mem, &total_mem);
-//  int nPartsPerCell = space->nr_parts / space->tot_cells;
-//  if (cpuid == 0 && engine_rank == 0) {
-//    message("Devices available:          %i", n_devices);
-//    message("Device id:                  %i", dev_id);
-//    message("Device UUID:                %s", uuid_str);
-//    message("Device name:                %s", prop.name);
-//    message("n_SMs:                      %i", n_SMs);
-//    message("max blocks per SM:          %i", max_blocks_SM);
-//    message("max blocks per stream:      %i", n_SMs * max_blocks_SM);
-//    message("Target n_blocks per kernel: %i",
-//            N_TASKS_BUNDLE_SELF * nPartsPerCell / BLOCK_SIZE);
-//    message("Target n_blocks per stream: %i",
-//            N_TASKS_PER_PACK_SELF * nPartsPerCell / BLOCK_SIZE);
-//    message("free mem:                   %.3g GB",
-//            ((double)free_mem) / (1024. * 1024. * 1024.));
-//    message("total mem:                  %.3g GB",
-//            ((double)total_mem) / (1024. * 1024. * 1024.));
-//  }
+  cudaGetDeviceProperties(&prop, dev_id);
+  cudaDeviceGetAttribute(&max_blocks_SM, cudaDevAttrMaxBlocksPerMultiprocessor,
+                         dev_id);
+  cudaDeviceGetAttribute(&n_SMs, cudaDevAttrMultiProcessorCount, dev_id);
+  char uuid_str[40];
+  cudaUUID_t uuid = prop.uuid;
+
+
+  snprintf(uuid_str, sizeof(uuid_str),
+		  "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+		  uuid.bytes[0], uuid.bytes[1], uuid.bytes[2], uuid.bytes[3],
+		  uuid.bytes[4], uuid.bytes[5], uuid.bytes[6], uuid.bytes[7],
+		  uuid.bytes[8], uuid.bytes[9], uuid.bytes[10], uuid.bytes[11],
+		  uuid.bytes[12], uuid.bytes[13], uuid.bytes[14], uuid.bytes[15]);
+
+  size_t free_mem;
+  size_t total_mem;
+  const struct space* space = e->s;
+  cudaMemGetInfo(&free_mem, &total_mem);
+  int nPartsPerCell = space->nr_parts / space->tot_cells;
+  if (cpuid == 0 && engine_rank == 0) {
+    message("Devices available:          %i", n_devices);
+    message("Device id:                  %i", dev_id);
+    message("Device UUID:                %s", uuid_str);
+    message("Device name:                %s", prop.name);
+    message("n_SMs:                      %i", n_SMs);
+    message("max blocks per SM:          %i", max_blocks_SM);
+    message("max blocks per stream:      %i", n_SMs * max_blocks_SM);
+    message("Target n_blocks per kernel: %i",
+            N_TASKS_BUNDLE_SELF * nPartsPerCell / BLOCK_SIZE);
+    message("Target n_blocks per stream: %i",
+            N_TASKS_PER_PACK_SELF * nPartsPerCell / BLOCK_SIZE);
+    message("free mem:                   %.3g GB",
+            ((double)free_mem) / (1024. * 1024. * 1024.));
+    message("total mem:                  %.3g GB",
+            ((double)total_mem) / (1024. * 1024. * 1024.));
+  }
 }
 
 /**
