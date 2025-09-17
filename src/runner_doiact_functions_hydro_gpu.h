@@ -510,9 +510,9 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
 #ifdef CUDA_DEBUG
     cudaError_t cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
-      error("CUDA error in task subtype %s H2D memcpy: '%s' rank is: %i",
+      error("CUDA error in task subtype %s H2D memcpy: '%s' cpuid id is: %i",
             subtaskID_names[task_subtype], cudaGetErrorString(cu_error),
-            engine_rank);
+            r->cpuid);
     }
 #endif
 

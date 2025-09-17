@@ -215,7 +215,7 @@ void *runner_main_cuda(void *data) {
   int step = 0;
 
   /* Tell me how much memory we're using. */
-//  gpu_print_free_mem(e, r->cpuid);
+  gpu_print_free_mem(e, r->cpuid);
 
   /* Main loop. */
   while (1) {
