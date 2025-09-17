@@ -62,6 +62,16 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
   cudaDeviceGetAttribute(&max_blocks_SM, cudaDevAttrMaxBlocksPerMultiprocessor,
                          dev_id);
   cudaDeviceGetAttribute(&n_SMs, cudaDevAttrMultiProcessorCount, dev_id);
+  char uuid_str[40];
+  cudaUUID_t uuid = prop.uuid;
+
+
+  snprintf(uuid_str, sizeof(uuid_str),
+		  "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x",
+		  uuid.bytes[0], uuid.bytes[1], uuid.bytes[2], uuid.bytes[3],
+		  uuid.bytes[4], uuid.bytes[5], uuid.bytes[6], uuid.bytes[7],
+		  uuid.bytes[8], uuid.bytes[9], uuid.bytes[10], uuid.bytes[11],
+		  uuid.bytes[12], uuid.bytes[13], uuid.bytes[14], uuid.bytes[15]);
 
   size_t free_mem;
   size_t total_mem;
@@ -71,6 +81,7 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
   if (cpuid == 0 && engine_rank == 0) {
     message("Devices available:          %i", n_devices);
     message("Device id:                  %i", dev_id);
+    message("Device UUID:                %s", uuid_str);
     message("Device name:                %s", prop.name);
     message("n_SMs:                      %i", n_SMs);
     message("max blocks per SM:          %i", max_blocks_SM);

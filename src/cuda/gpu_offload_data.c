@@ -139,6 +139,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   }
 
   /* Now allocate memory for Buffer and GPU particle arrays */
+  if (sizeof(struct gpu_part_send_d) == send_struct_size){
   cu_error = cudaMalloc((void **)&buf->d_parts_send_d,
                         self_pair_fact * count_max_parts * send_struct_size);
   swift_assert(cu_error == cudaSuccess);
@@ -156,6 +157,45 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
       cudaMallocHost((void **)&buf->parts_recv_d,
                      self_pair_fact * count_max_parts * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
+  }
+  else if (sizeof(struct gpu_part_send_g) == send_struct_size){
+    cu_error = cudaMalloc((void **)&buf->d_parts_send_g,
+    		self_pair_fact * count_max_parts * send_struct_size);
+    swift_assert(cu_error == cudaSuccess);
+
+    cu_error = cudaMalloc((void **)&buf->d_parts_recv_g,
+    		self_pair_fact * count_max_parts * recv_struct_size);
+    swift_assert(cu_error == cudaSuccess);
+
+    cu_error =
+    		cudaMallocHost((void **)&buf->parts_send_g,
+    				self_pair_fact * count_max_parts * send_struct_size);
+    swift_assert(cu_error == cudaSuccess);
+
+    cu_error =
+    		cudaMallocHost((void **)&buf->parts_recv_g,
+    				self_pair_fact * count_max_parts * recv_struct_size);
+    swift_assert(cu_error == cudaSuccess);
+  }
+  else{
+    cu_error = cudaMalloc((void **)&buf->d_parts_send_f,
+    		self_pair_fact * count_max_parts * send_struct_size);
+    swift_assert(cu_error == cudaSuccess);
+
+    cu_error = cudaMalloc((void **)&buf->d_parts_recv_f,
+    		self_pair_fact * count_max_parts * recv_struct_size);
+    swift_assert(cu_error == cudaSuccess);
+
+    cu_error =
+    		cudaMallocHost((void **)&buf->parts_send_f,
+    				self_pair_fact * count_max_parts * send_struct_size);
+    swift_assert(cu_error == cudaSuccess);
+
+    cu_error =
+    		cudaMallocHost((void **)&buf->parts_recv_f,
+    				self_pair_fact * count_max_parts * recv_struct_size);
+    swift_assert(cu_error == cudaSuccess);
+  }
 
   if (is_pair_task) {
 
