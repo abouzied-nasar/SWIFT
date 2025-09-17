@@ -57,6 +57,7 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
   }
 #endif
 
+  cudaFree(0);
   /* Now tell me some info about my device */
   cudaGetDeviceProperties(&prop, dev_id);
   cudaDeviceGetAttribute(&max_blocks_SM, cudaDevAttrMaxBlocksPerMultiprocessor,
