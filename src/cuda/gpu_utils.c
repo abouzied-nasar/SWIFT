@@ -41,8 +41,8 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
   int dev_id = 0; /* gpu device name */
   struct cudaDeviceProp prop;
   int n_devices;
-//  int max_blocks_SM;
-//  int n_SMs;
+  int max_blocks_SM;
+  int n_SMs;
 
   cudaGetDeviceCount(&n_devices);
   /* A. Nasar: If running on MPI we set code to use one MPI rank per GPU
