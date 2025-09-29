@@ -113,10 +113,11 @@ void gpu_print_free_mem(const struct engine* e, const int cpuid) {
   cudaMemGetInfo(&free_mem, &total_mem);
   if (cpuid == 0) {
 #ifdef SWIFT_DEBUG_CHECKS
-    message("pciBusID %4d, After allocation: free mem: %8.3g GB, total mem: %8.3g GB",
-            prop.pciBusID,
-            ((double)free_mem) / (1024. * 1024. * 1024.),
-            ((double)total_mem) / (1024. * 1024. * 1024.));
+    message(
+        "pciBusID %4d, After allocation: free mem: %8.3g GB, total mem: %8.3g "
+        "GB",
+        prop.pciBusID, ((double)free_mem) / (1024. * 1024. * 1024.),
+        ((double)total_mem) / (1024. * 1024. * 1024.));
 #else
     message("After allocation: free mem: %8.3g GB, total mem: %8.3g GB",
             ((double)free_mem) / (1024. * 1024. * 1024.),
