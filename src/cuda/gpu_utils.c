@@ -93,7 +93,16 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
 void gpu_print_free_mem(const struct engine* e, const int cpuid) {
 
   /* Find and print GPU name(s) */
-  int dev_id = engine_rank; /* gpu device name */
+  int dev_id = 0;
+  int n_devices;
+  cudaGetDeviceCount(&n_devices);
+
+#ifdef WITH_MPI
+  if (n_devices != 1) {
+    dev_id = engine_rank;
+  }
+#endif
+
   struct cudaDeviceProp prop;
 
   /* Now tell me some info about my device */
@@ -103,8 +112,15 @@ void gpu_print_free_mem(const struct engine* e, const int cpuid) {
   size_t total_mem;
   cudaMemGetInfo(&free_mem, &total_mem);
   if (cpuid == 0) {
-    message("After allocation: free mem: %.3g GB, total mem: %.3g GB",
+#ifdef SWIFT_DEBUG_CHECKS
+    message("pciBusID %4d, After allocation: free mem: %8.3g GB, total mem: %8.3g GB",
+            prop.pciBusID,
             ((double)free_mem) / (1024. * 1024. * 1024.),
             ((double)total_mem) / (1024. * 1024. * 1024.));
+#else
+    message("After allocation: free mem: %8.3g GB, total mem: %8.3g GB",
+            ((double)free_mem) / (1024. * 1024. * 1024.),
+            ((double)total_mem) / (1024. * 1024. * 1024.));
+#endif
   }
 }
