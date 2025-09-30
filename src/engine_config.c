@@ -939,10 +939,10 @@ void engine_config(int restart, int fof, struct engine *e,
   /* TODO (Mladen): READ PARAMETERS FROM YAML FILE HERE and remove inclusion of
    * cuda_config.h. */
 #if defined(WITH_CUDA) || defined(WITH_HIP)
-  size_t pack_size = N_TASKS_PER_PACK_SELF;
-  size_t pack_size_pair = N_TASKS_PER_PACK_PAIR;
-  size_t bundle_size = N_TASKS_BUNDLE_SELF;
-  size_t bundle_size_pair = N_TASKS_BUNDLE_PAIR;
+  size_t pack_size = _N_TASKS_PER_PACK_SELF;
+  size_t pack_size_pair = _N_TASKS_PER_PACK_PAIR;
+  size_t bundle_size = _N_TASKS_BUNDLE_SELF;
+  size_t bundle_size_pair = _N_TASKS_BUNDLE_PAIR;
 #else
   size_t pack_size = 1;
   size_t pack_size_pair = 1;
