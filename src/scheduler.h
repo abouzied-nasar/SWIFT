@@ -315,7 +315,9 @@ void scheduler_enqueue(struct scheduler *s, struct task *t);
 void scheduler_start(struct scheduler *s);
 void scheduler_reset(struct scheduler *s, int nr_tasks);
 void scheduler_ranktasks(struct scheduler *s);
-void scheduler_reweight(struct scheduler *s, const struct gpu_global_pack_params* gpu_pack_params, int verbose);
+void scheduler_reweight(struct scheduler *s,
+                        const struct gpu_global_pack_params *gpu_pack_params,
+                        int verbose);
 struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
                                enum task_subtypes subtype, long long flags,
                                int implicit, struct cell *ci, struct cell *cj);

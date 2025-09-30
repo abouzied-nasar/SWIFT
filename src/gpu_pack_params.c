@@ -19,16 +19,14 @@
 
 #include "gpu_pack_params.h"
 
-#include <math.h>
-
 #include "error.h"
+
+#include <math.h>
 
 /**
  * @file gpu_pack_params.c
  * @brief functions related to global GPU packing parameters struct
  */
-
-
 
 /**
  * Get global packing parameters from the scheduler and fill out the
@@ -39,8 +37,7 @@
  * @params eta_neighours: Neighbour resolution eta.
  */
 void gpu_set_pack_params(struct gpu_global_pack_params* pars,
-                         const size_t pack_size,
-                         const size_t pack_size_pair,
+                         const size_t pack_size, const size_t pack_size_pair,
                          const size_t bundle_size,
                          const size_t bundle_size_pair,
                          const float eta_neighbours) {
@@ -54,9 +51,8 @@ void gpu_set_pack_params(struct gpu_global_pack_params* pars,
    * loop through bundles */
   pars->n_bundles =
       (pars->pack_size + pars->bundle_size - 1) / pars->bundle_size;
-  pars->n_bundles_pair =
-      (pars->pack_size_pair + pars->bundle_size_pair - 1) /
-      pars->bundle_size_pair;
+  pars->n_bundles_pair = (pars->pack_size_pair + pars->bundle_size_pair - 1) /
+                         pars->bundle_size_pair;
 
   swift_assert(pars->pack_size != 0);
   swift_assert(pars->pack_size_pair != 0);
@@ -89,5 +85,3 @@ void gpu_set_pack_params(struct gpu_global_pack_params* pars,
    * will off-load really big cells since we don't recurse */
   pars->count_max_parts = 64ul * 8ul * pars->pack_size * (np_per_cell + buff);
 }
-
-

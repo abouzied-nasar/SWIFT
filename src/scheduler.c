@@ -2282,7 +2282,9 @@ void scheduler_reset(struct scheduler *s, int size) {
  * @param s The #scheduler.
  * @param verbose Are we talkative?
  */
-void scheduler_reweight(struct scheduler *s, const struct gpu_global_pack_params* gpu_pack_params, int verbose) {
+void scheduler_reweight(struct scheduler *s,
+                        const struct gpu_global_pack_params *gpu_pack_params,
+                        int verbose) {
   const int nr_tasks = s->nr_tasks;
   int *tid = s->tasks_ind;
   struct task *tasks = s->tasks;

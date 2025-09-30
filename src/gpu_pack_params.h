@@ -44,10 +44,8 @@ struct gpu_global_pack_params {
   int count_max_parts;
 };
 
-
 void gpu_set_pack_params(struct gpu_global_pack_params *pars,
-                         const size_t pack_size,
-                         const size_t pack_size_pair,
+                         const size_t pack_size, const size_t pack_size_pair,
                          const size_t bundle_size,
                          const size_t bundle_size_pair,
                          const float eta_neighbours);
