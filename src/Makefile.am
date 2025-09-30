@@ -190,7 +190,7 @@ endif
 GPU_SOURCES = 
 if HAVECUDA
 # list here files to be compiled without nvcc, but needed for execution with GPU
-GPU_CUDA_SOURCES = runner_main_cuda.c gpu_pack_vars.c gpu_pack_params.c engine_maketasks_gpu.c
+GPU_CUDA_SOURCES = runner_main_cuda.c gpu_pack_vars.c engine_maketasks_gpu.c
 GPU_CUDA_SOURCES += cuda/gpu_offload_data.c cuda/gpu_utils.c
 # TODO????
 GPU_SOURCES+=$(GPU_CUDA_SOURCES)
@@ -199,7 +199,7 @@ endif
 if HAVEHIP 
 # TODO: This is not up to date. Look at what we did for CUDA.
 # GPU_HIP_SOURCES = runner_main_hip.c
-GPU_HIP_SOURCES = runner_main_cuda.c gpu_pack_vars.c gpu_pack_params.c engine_maketasks_gpu.c
+GPU_HIP_SOURCES = runner_main_cuda.c gpu_pack_vars.c engine_maketasks_gpu.c
 # TODO: Fix this. Do the same as cuda.
 GPU_SOURCES+=$(GPU_HIP_SOURCES)
 endif
@@ -260,6 +260,7 @@ AM_SOURCES += $(PS2020_COOLING_SOURCES)
 AM_SOURCES += $(SPHM1RT_RT_SOURCES)
 AM_SOURCES += $(GEAR_RT_SOURCES)
 AM_SOURCES += swift_lustre_api.c
+AM_SOURCES += gpu_pack_params.c # we need this here so we can still compile without GPU support enabled.
 
 # Include files for distribution, not installation.
 nobase_noinst_HEADERS = align.h approx_math.h atomic.h barrier.h cycle.h error.h inline.h kernel_hydro.h kernel_gravity.h
