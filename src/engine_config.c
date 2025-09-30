@@ -46,6 +46,7 @@
 #include "engine.h"
 
 /* Local headers. */
+#include "cuda/cuda_config.h"
 #include "fof.h"
 #include "line_of_sight.h"
 #include "mpiuse.h"
@@ -926,9 +927,6 @@ void engine_config(int restart, int fof, struct engine *e,
   /* Init the scheduler. Allow stealing*/
   scheduler_init(&e->sched, e->s, maxtasks, nr_queues,
                  (e->policy & scheduler_flag_steal), e->nodeID, &e->threadpool);
-  /* Init the scheduler. NO stealing  A. Nasar */
-  //  scheduler_init(&e->sched, e->s, maxtasks, nr_queues, 0, e->nodeID,
-  //                 &e->threadpool);
 
   /* Maximum size of MPI task messages, in KB, that should not be buffered,
    * that is sent using MPI_Issend, not MPI_Isend. 4Mb by default. Can be
@@ -936,6 +934,27 @@ void engine_config(int restart, int fof, struct engine *e,
    */
   e->sched.mpi_message_limit =
       parser_get_opt_param_int(params, "Scheduler:mpi_message_limit", 4) * 1024;
+
+  /* Setup GPU packing parameters. */
+  /* TODO (Mladen): READ PARAMETERS FROM YAML FILE HERE and remove inclusion of
+   * cuda_config.h. */
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+  size_t pack_size = N_TASKS_PER_PACK_SELF;
+  size_t pack_size_pair = N_TASKS_PER_PACK_PAIR;
+  size_t bundle_size = N_TASKS_BUNDLE_SELF;
+  size_t bundle_size_pair = N_TASKS_BUNDLE_PAIR;
+#else
+  size_t pack_size = 1;
+  size_t pack_size_pair = 1;
+  size_t bundle_size = 1;
+  size_t bundle_size_pair = 1;
+#endif
+
+  gpu_set_pack_params(&e->gpu_pack_params,
+      pack_size, pack_size_pair,
+      bundle_size, bundle_size_pair,
+      e->s->eta_neighbours
+      );
 
   if (restart) {
 

@@ -2271,13 +2271,7 @@ void scheduler_reset(struct scheduler *s, int size) {
   s->completed_unlock_writes = 0;
   s->active_count = 0;
   s->total_ticks = 0;
-#if defined(WITH_CUDA) || defined(WITH_HIP)
-  s->pack_size = N_TASKS_PER_PACK_SELF;
-  s->pack_size_pair = N_TASKS_PER_PACK_PAIR;
-#else
-  s->pack_size = 0;
-  s->pack_size_pair = 0;
-#endif
+
   /* Set the task pointers in the queues. */
   for (int k = 0; k < s->nr_queues; k++) s->queues[k].tasks = s->tasks;
 }
@@ -2288,13 +2282,15 @@ void scheduler_reset(struct scheduler *s, int size) {
  * @param s The #scheduler.
  * @param verbose Are we talkative?
  */
-void scheduler_reweight(struct scheduler *s, int verbose) {
+void scheduler_reweight(struct scheduler *s, const struct gpu_global_pack_params* gpu_pack_params, int verbose) {
   const int nr_tasks = s->nr_tasks;
   int *tid = s->tasks_ind;
   struct task *tasks = s->tasks;
   const int nodeID = s->nodeID;
   const float wscale = 0.001f;
   const ticks tic = getticks();
+
+  const size_t pack_size = gpu_pack_params->pack_size;
 
   /* Run through the tasks backwards and set their weights. */
   for (int k = nr_tasks - 1; k >= 0; k--) {
@@ -2363,14 +2359,14 @@ void scheduler_reweight(struct scheduler *s, int verbose) {
           cost = 1.f * (wscale * count_i * count_i);  // * s->pack_size;
         } else if (t->subtype == task_subtype_gpu_unpack_d) {
           // cost = wscale * s->pack_size;
-          cost = 1.f * wscale * s->pack_size;
+          cost = 1.f * wscale * pack_size;
           //          cost = 1.f * wscale * s->pack_size;
         } else if (t->subtype == task_subtype_gpu_unpack_f) {
-          cost = 1.f * wscale * s->pack_size;
+          cost = 1.f * wscale * pack_size;
           //	  cost = wscale * s->pack_size;
           //          cost = 1.f * wscale * s->pack_size;
         } else if (t->subtype == task_subtype_gpu_unpack_g) {
-          cost = 1.f * wscale * s->pack_size;
+          cost = 1.f * wscale * pack_size;
           //	  cost = wscale * s->pack_size;
           //          cost = 1.f * wscale * s->pack_size;
         } else if (t->subtype == task_subtype_do_bh_swallow) {
@@ -2421,13 +2417,13 @@ void scheduler_reweight(struct scheduler *s, int verbose) {
 
           //          cost = 2.f * (wscale * count_i) * count_i;
         } else if (t->subtype == task_subtype_gpu_unpack_d) {
-          cost = (wscale * count_i) * count_i * s->pack_size;
+          cost = (wscale * count_i) * count_i * pack_size;
           // cost = 1.f * wscale;
         } else if (t->subtype == task_subtype_gpu_unpack_f) {
-          cost = (wscale * count_i) * count_i * s->pack_size;
+          cost = (wscale * count_i) * count_i * pack_size;
           // cost = 1.f * wscale;
         } else if (t->subtype == task_subtype_gpu_unpack_g) {
-          cost = (wscale * count_i) * count_i * s->pack_size;
+          cost = (wscale * count_i) * count_i * pack_size;
           // cost = 1.f * wscale;
         } else if (t->subtype == task_subtype_stars_density ||
                    t->subtype == task_subtype_stars_prep1 ||
@@ -2493,13 +2489,13 @@ void scheduler_reweight(struct scheduler *s, int verbose) {
         } else if (t->subtype == task_subtype_gpu_pack_g) {
           cost = 2.f * (wscale * count_i) * count_i;
         } else if (t->subtype == task_subtype_gpu_unpack_d) {
-          cost = (wscale * count_i) * count_i * s->pack_size;
+          cost = (wscale * count_i) * count_i * pack_size;
           // cost = 1.f * wscale;
         } else if (t->subtype == task_subtype_gpu_unpack_f) {
-          cost = (wscale * count_i) * count_i * s->pack_size;
+          cost = (wscale * count_i) * count_i * pack_size;
           // cost = 1.f * wscale;
         } else if (t->subtype == task_subtype_gpu_unpack_g) {
-          cost = (wscale * count_i) * count_i * s->pack_size;
+          cost = (wscale * count_i) * count_i * pack_size;
           // cost = 1.f * wscale;
         } else if (t->subtype == task_subtype_density ||
                    t->subtype == task_subtype_gradient ||
@@ -3583,12 +3579,12 @@ void scheduler_init(struct scheduler *s, struct space *space, int nr_tasks,
 
   /* Initialize each queue. */
   for (int k = 0; k < nr_queues; k++) {
-    s->s_d_left = (volatile int *)malloc(sizeof(volatile int) * nr_queues);
-    s->s_g_left = (volatile int *)malloc(sizeof(volatile int) * nr_queues);
-    s->s_f_left = (volatile int *)malloc(sizeof(volatile int) * nr_queues);
-    s->p_d_left = (volatile int *)malloc(sizeof(volatile int) * nr_queues);
-    s->p_g_left = (volatile int *)malloc(sizeof(volatile int) * nr_queues);
-    s->p_f_left = (volatile int *)malloc(sizeof(volatile int) * nr_queues);
+    s->s_d_left = (int *)malloc(sizeof(int) * nr_queues);
+    s->s_g_left = (int *)malloc(sizeof(int) * nr_queues);
+    s->s_f_left = (int *)malloc(sizeof(int) * nr_queues);
+    s->p_d_left = (int *)malloc(sizeof(int) * nr_queues);
+    s->p_g_left = (int *)malloc(sizeof(int) * nr_queues);
+    s->p_f_left = (int *)malloc(sizeof(int) * nr_queues);
   }
 
   /* Init the sleep mutex and cond. */

@@ -33,6 +33,7 @@
 
 /* Includes. */
 #include "cell.h"
+#include "gpu_pack_params.h"
 #include "inline.h"
 #include "lock.h"
 #include "queue.h"
@@ -57,33 +58,26 @@
 /* Data of a scheduler. */
 struct scheduler {
 
-  int nr_packs_self_dens_done;  // A. Nasar
-  int nr_packs_pair_dens_done;
-  int nr_packs_self_forc_done;
-  int nr_packs_pair_forc_done;
-  int nr_packs_self_grad_done;
-  int nr_packs_pair_grad_done;
-
+  /* TODO: DOCUMENT THIS. */
   volatile int *s_d_left;
   volatile int *s_g_left;
   volatile int *s_f_left;
   volatile int *p_d_left;
   volatile int *p_g_left;
   volatile int *p_f_left;
-  /* Actual number of GPU tasks. */
-  int nr_gpu_tasks;
-  /* Number of tasks we want*/
-  int target_gpu_tasks;
+
+  /* TODO: (@Abouzied) please be more specific with documentation here.
+   * Is this total number of tasks of that type? Or active ones during a
+   * step? */
+  /* TODO: (@Abouzied) Do we still need this? I only see it being reset,
+   * incremented, and used for a debug check. If this is intended to stay,
+   * it should be within a DEBUG_CHECK + WITH_GPU macro guard. */
   /* Actual number of density pack tasks. */
   int nr_self_pack_tasks_d, nr_pair_pack_tasks_d;
   /* Actual number of force pack tasks. */
   int nr_self_pack_tasks_f, nr_pair_pack_tasks_f;
   /* Actual number of gradient pack tasks. */
   int nr_self_pack_tasks_g, nr_pair_pack_tasks_g;
-
-  /*how many tasks we want to try and work on at once on the GPU*/
-  int pack_size;
-  int pack_size_pair;
 
   /* Scheduler flags. */
   unsigned int flags;
@@ -321,7 +315,7 @@ void scheduler_enqueue(struct scheduler *s, struct task *t);
 void scheduler_start(struct scheduler *s);
 void scheduler_reset(struct scheduler *s, int nr_tasks);
 void scheduler_ranktasks(struct scheduler *s);
-void scheduler_reweight(struct scheduler *s, int verbose);
+void scheduler_reweight(struct scheduler *s, const struct gpu_global_pack_params* gpu_pack_params, int verbose);
 struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
                                enum task_subtypes subtype, long long flags,
                                int implicit, struct cell *ci, struct cell *cj);

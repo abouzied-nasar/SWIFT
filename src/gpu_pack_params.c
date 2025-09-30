@@ -19,6 +19,10 @@
 
 #include "gpu_pack_params.h"
 
+#include <math.h>
+
+#include "error.h"
+
 /**
  * @file gpu_pack_params.c
  * @brief functions related to global GPU packing parameters struct
@@ -34,25 +38,33 @@
  * @params sched: the @scheduler
  * @params eta_neighours: Neighbour resolution eta.
  */
-void gpu_get_pack_params(struct gpu_global_pack_params* pars,
+void gpu_set_pack_params(struct gpu_global_pack_params* pars,
+                         const size_t pack_size,
+                         const size_t pack_size_pair,
+                         const size_t bundle_size,
+                         const size_t bundle_size_pair,
                          const float eta_neighbours) {
 
-  pars->target_n_tasks = sched->pack_size;
-  pars->target_n_tasks_pair = sched->pack_size_pair;
-  pars->bundle_size = N_TASKS_BUNDLE_SELF;
-  pars->bundle_size_pair = N_TASKS_BUNDLE_PAIR;
+  pars->pack_size = pack_size;
+  pars->pack_size_pair = pack_size_pair;
+  pars->bundle_size = bundle_size;
+  pars->bundle_size_pair = bundle_size_pair;
 
   /* A. Nasar: n_bundles is the number of task bundles each thread has. Used to
    * loop through bundles */
   pars->n_bundles =
-      (pars->target_n_tasks + pars->bundle_size - 1) / pars->bundle_size;
+      (pars->pack_size + pars->bundle_size - 1) / pars->bundle_size;
   pars->n_bundles_pair =
-      (pars->target_n_tasks_pair + pars->bundle_size_pair - 1) /
+      (pars->pack_size_pair + pars->bundle_size_pair - 1) /
       pars->bundle_size_pair;
 
-  /* A. Nasar: Try to estimate average number of particles per leaf-cell */
+  swift_assert(pars->pack_size != 0);
+  swift_assert(pars->pack_size_pair != 0);
+  swift_assert(pars->bundle_size != 0);
+  swift_assert(pars->bundle_size_pair != 0);
 
-  /* Get smoothing length/particle spacing */
+  /* Now try to estimate average number of particles per leaf-cell. */
+  /* First get smoothing length/particle spacing */
   int np_per_cell = ceil(2.0 * eta_neighbours);
 
   /* Apply appropriate dimensional multiplication */
@@ -62,12 +74,11 @@ void gpu_get_pack_params(struct gpu_global_pack_params* pars,
   np_per_cell *= np_per_cell * np_per_cell;
 #elif defined(HYDRO_DIMENSION_1D)
 #else
-  /* TODO mladen: temporary debug check, remove before MR */
-#pragma error("THIS IS NOT SUPPOSED TO HAPPEN.")
+#pragma error("We shouldn't be here.")
 #endif
 
-  /* A. Nasar: Increase parts per recursed task-level cell by buffer to
-    ensure we allocate enough memory */
+  /* Increase parts per recursed task-level cell by buffer to
+     ensure we allocate enough memory */
   const int buff = ceil(0.5 * np_per_cell);
 
   /* A. Nasar: Multiplication by 2 is also to ensure we do not over-run
@@ -76,8 +87,7 @@ void gpu_get_pack_params(struct gpu_global_pack_params* pars,
 
   /* Leave this until we implement recursive self tasks -> Exaggerated as we
    * will off-load really big cells since we don't recurse */
-  pars->count_max_parts =
-      64ul * 8ul * pars->target_n_tasks * (np_per_cell + buff);
+  pars->count_max_parts = 64ul * 8ul * pars->pack_size * (np_per_cell + buff);
 }
 
 

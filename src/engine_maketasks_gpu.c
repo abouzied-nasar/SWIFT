@@ -4162,8 +4162,8 @@ void engine_maketasks(struct engine *e) {
 
   /* Now, create unpack tasks based on the existing packs and create
    * the dependencies pack->unpack->ghost_in A. Nasar */
-  const int pack_size = sched->pack_size;
-  const int pack_size_pair = sched->pack_size_pair;
+  const int pack_size = e->gpu_pack_params.pack_size;
+  const int pack_size_pair = e->gpu_pack_params.pack_size_pair;
 
   int count_current_self = 0;
   int count_current_pair = 0;
@@ -4507,7 +4507,7 @@ void engine_maketasks(struct engine *e) {
             clocks_from_ticks(getticks() - tic2), clocks_getunit());
 
   /* Weight the tasks. */
-  scheduler_reweight(sched, e->verbose);
+  scheduler_reweight(sched, &e->gpu_pack_params, e->verbose);
 
   /* Set the tasks age. */
   e->tasks_age = 0;

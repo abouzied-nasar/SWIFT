@@ -1689,7 +1689,7 @@ int engine_prepare(struct engine *e) {
 
   /* Re-rank the tasks every now and then. XXX this never executes. */
   if (e->tasks_age % engine_tasksreweight == 1) {
-    scheduler_reweight(&e->sched, e->verbose);
+    scheduler_reweight(&e->sched, &e->gpu_pack_params, e->verbose);
   }
   e->tasks_age += 1;
 

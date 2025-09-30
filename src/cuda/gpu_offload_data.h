@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 #include "cell.h"
+#include "gpu_pack_params.h"
 #include "gpu_pack_vars.h"
 #include "gpu_part_structs.h"
 

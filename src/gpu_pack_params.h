@@ -30,17 +30,26 @@
 /*! Struct holding global packing parameters. */
 struct gpu_global_pack_params {
 
-  size_t target_n_tasks;
-  size_t target_n_tasks_pair;
+  /*! How many tasks we target to offload in total, per offload cycle */
+  size_t pack_size;
+  size_t pack_size_pair;
+
+  /*! An offload cycle offloads `pack_size` tasks in total over several bundles
+   * of `bundle_size` tasks per bundle. */
   size_t bundle_size;
   size_t bundle_size_pair;
+
   size_t n_bundles;
   size_t n_bundles_pair;
   int count_max_parts;
 };
 
 
-void gpu_get_pack_params(struct gpu_global_pack_params *pars,
+void gpu_set_pack_params(struct gpu_global_pack_params *pars,
+                         const size_t pack_size,
+                         const size_t pack_size_pair,
+                         const size_t bundle_size,
+                         const size_t bundle_size_pair,
                          const float eta_neighbours);
 
 #endif

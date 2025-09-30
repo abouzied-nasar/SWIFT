@@ -169,8 +169,7 @@ void *runner_main_cuda(void *data) {
   gpu_init_thread(e, r->cpuid);
 
   /* Get estimates for array sizes et al. */
-  struct gpu_global_pack_params gpu_pack_params;
-  gpu_get_pack_params(&gpu_pack_params, sched, e->s->eta_neighbours);
+  const struct gpu_global_pack_params gpu_pack_params = e->gpu_pack_params;
 
   /* Declare and allocate GPU launch control data structures which need to be in
    * scope */
