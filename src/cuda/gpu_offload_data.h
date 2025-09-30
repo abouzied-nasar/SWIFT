@@ -48,6 +48,14 @@ struct gpu_offload_data {
   int2 *task_first_part;
   int2 *d_task_first_part;
 
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t task_first_part_size;
+  size_t d_task_first_part_size;
+#endif
+
+
+
   /*! First and last particles of cells i and j for pair interactions */
   int4 *fparti_fpartj_lparti_lpartj;
 
@@ -60,12 +68,22 @@ struct gpu_offload_data {
     struct gpu_part_send_f *d_parts_send_f;
   };
 
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t d_parts_send_size;
+#endif
+
   /*! Array used to receive particle data on device from host */
   union {
     struct gpu_part_recv_d *d_parts_recv_d;
     struct gpu_part_recv_g *d_parts_recv_g;
     struct gpu_part_recv_f *d_parts_recv_f;
   };
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t d_parts_recv_size;
+#endif
 
   /*! Array used to send particle data from host to device */
   union {
@@ -74,12 +92,22 @@ struct gpu_offload_data {
     struct gpu_part_send_f *parts_send_f;
   };
 
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t parts_send_size;
+#endif
+
   /*! Array used to receive particle data from device on host */
   union {
     struct gpu_part_recv_d *parts_recv_d;
     struct gpu_part_recv_g *parts_recv_g;
     struct gpu_part_recv_f *parts_recv_f;
   };
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t parts_recv_size;
+#endif
 
   /*! TODO: Documentation */
   struct cell **ci_d;

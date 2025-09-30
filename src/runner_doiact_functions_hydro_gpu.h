@@ -477,29 +477,45 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
 
     /* Copy data over to GPU */
     /* First the meta-data */
-    cudaMemcpyAsync(&buf->d_task_first_part[first_task],
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (last_task > buf->d_task_first_part_size)
+      error("Trying to access out-of-boundary in d_task_first_part");
+    if (last_task > buf->task_first_part_size)
+      error("Trying to access out-of-boundary in d_task_first_part");
+#endif
+
+    cudaError_t cu_error = cudaMemcpyAsync(&buf->d_task_first_part[first_task],
                     &buf->task_first_part[first_task],
                     (last_task + 1 - first_task) * sizeof(int2),
                     cudaMemcpyHostToDevice, stream[bid]);
 
+    if (cu_error != cudaSuccess) {
+      error("H2D memcpy metadata self: CUDA error '%s' for task_sybtype %s: "
+          "cpuid=%i, first_task=%ld, size=%ld",
+            cudaGetErrorString(cu_error), subtaskID_names[task_subtype],
+            r->cpuid, first_task, (last_task + 1 - first_task) * sizeof(int2)
+            );
+    }
+
     /* Now the actual particle data */
     if (task_subtype == task_subtype_gpu_pack_d) {
 
-      cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp],
+      cu_error = cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp],
                       &buf->parts_send_d[first_part_tmp],
                       bundle_n_parts * sizeof(struct gpu_part_send_d),
                       cudaMemcpyHostToDevice, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_pack_g) {
 
-      cudaMemcpyAsync(&buf->d_parts_send_g[first_part_tmp],
+      cu_error = cudaMemcpyAsync(&buf->d_parts_send_g[first_part_tmp],
                       &buf->parts_send_g[first_part_tmp],
                       bundle_n_parts * sizeof(struct gpu_part_send_g),
                       cudaMemcpyHostToDevice, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_pack_f) {
 
-      cudaMemcpyAsync(&buf->d_parts_send_f[first_part_tmp],
+      cu_error = cudaMemcpyAsync(&buf->d_parts_send_f[first_part_tmp],
                       &buf->parts_send_f[first_part_tmp],
                       bundle_n_parts * sizeof(struct gpu_part_send_f),
                       cudaMemcpyHostToDevice, stream[bid]);
@@ -508,14 +524,10 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
-#ifdef SWIFT_DEBUG_CHECKS
-    cudaError_t cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
-      error("CUDA error in task subtype %s H2D memcpy: '%s' cpuid id is: %i",
-            subtaskID_names[task_subtype], cudaGetErrorString(cu_error),
-            r->cpuid);
+      error("H2D memcpy self: CUDA error '%s' for task_subtype %s: cpuid=%i",
+            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
     }
-#endif
 
     /* Launch the kernel */
     if (task_subtype == task_subtype_gpu_pack_d) {
@@ -538,33 +550,30 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
-#ifdef SWIFT_DEBUG_CHECKS
     cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
-      error("CUDA error in task subtype %s kernel launch: '%s' cpuid id is: %i",
-            subtaskID_names[task_subtype], cudaGetErrorString(cu_error),
-            r->cpuid);
+      error( "kernel launch self: CUDA error '%s' for task_subtype %s: cpuid=%i",
+            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
     }
-#endif
 
     /* Copy back */
     if (task_subtype == task_subtype_gpu_pack_d) {
 
-      cudaMemcpyAsync(&buf->parts_recv_d[first_part_tmp],
+      cu_error = cudaMemcpyAsync(&buf->parts_recv_d[first_part_tmp],
                       &buf->d_parts_recv_d[first_part_tmp],
                       bundle_n_parts * sizeof(struct gpu_part_recv_d),
                       cudaMemcpyDeviceToHost, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_pack_g) {
 
-      cudaMemcpyAsync(&buf->parts_recv_g[first_part_tmp],
+      cu_error = cudaMemcpyAsync(&buf->parts_recv_g[first_part_tmp],
                       &buf->d_parts_recv_g[first_part_tmp],
                       bundle_n_parts * sizeof(struct gpu_part_recv_g),
                       cudaMemcpyDeviceToHost, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_pack_f) {
 
-      cudaMemcpyAsync(&buf->parts_recv_f[first_part_tmp],
+      cu_error = cudaMemcpyAsync(&buf->parts_recv_f[first_part_tmp],
                       &buf->d_parts_recv_f[first_part_tmp],
                       bundle_n_parts * sizeof(struct gpu_part_recv_f),
                       cudaMemcpyDeviceToHost, stream[bid]);
@@ -572,17 +581,14 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
+    if (cu_error != cudaSuccess) {
+      error("D2H memcpy self: CUDA error '%s' in task_subtype %s: cpuid=%i",
+            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
+    }
+
     /* Record this event */
     cudaEventRecord(buf->event_end[bid], stream[bid]);
 
-#ifdef SWIFT_DEBUG_CHECKS
-    cu_error = cudaPeekAtLastError();
-    if (cu_error != cudaSuccess) {
-      error("CUDA error in task subtype %s D2H memcpy: %s cpuid id is: %i",
-            subtaskID_names[task_subtype], cudaGetErrorString(cu_error),
-            r->cpuid);
-    }
-#endif
 
   } /*End of looping over bundles to launch in streams*/
 
@@ -828,21 +834,21 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
     const size_t first_part_tmp_i = pack_vars->bundle_first_part[bid];
     const size_t bundle_n_parts =
         pack_vars->bundle_last_part[bid] - first_part_tmp_i;
+    cudaError_t cu_error;
 
     /* Transfer memory to device */
     if (task_subtype == task_subtype_gpu_launch_d) {
-
-      cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp_i],
+      cu_error = cudaMemcpyAsync(&buf->d_parts_send_d[first_part_tmp_i],
                       &buf->parts_send_d[first_part_tmp_i],
                       bundle_n_parts * sizeof(struct gpu_part_send_d),
                       cudaMemcpyHostToDevice, stream[bid]);
     } else if (task_subtype == task_subtype_gpu_launch_g) {
-      cudaMemcpyAsync(&buf->d_parts_send_g[first_part_tmp_i],
+      cu_error = cudaMemcpyAsync(&buf->d_parts_send_g[first_part_tmp_i],
                       &buf->parts_send_g[first_part_tmp_i],
                       bundle_n_parts * sizeof(struct gpu_part_send_g),
                       cudaMemcpyHostToDevice, stream[bid]);
     } else if (task_subtype == task_subtype_gpu_launch_f) {
-      cudaMemcpyAsync(&buf->d_parts_send_f[first_part_tmp_i],
+      cu_error = cudaMemcpyAsync(&buf->d_parts_send_f[first_part_tmp_i],
                       &buf->parts_send_f[first_part_tmp_i],
                       bundle_n_parts * sizeof(struct gpu_part_send_f),
                       cudaMemcpyHostToDevice, stream[bid]);
@@ -850,17 +856,15 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
-#ifdef SWIFT_DEBUG_CHECKS
-    cudaError_t cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
+      /* If we're here, assume something's messed up with our code, not with CUDA. */
       error(
-          "CUDA error with task subtype %s H2D async memcpy ci: %s cpuid id "
-          "is: %i"
-          "Something's up with your cuda code first_part %lu bundle size %lu",
-          subtaskID_names[task_subtype], cudaGetErrorString(cu_error), r->cpuid,
+          "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i "
+          "first_part=%lu bundle_n_parts=%lu",
+          cudaGetErrorString(cu_error),
+          subtaskID_names[task_subtype], r->cpuid,
           first_part_tmp_i, bundle_n_parts);
     }
-#endif
 
     /* LAUNCH THE GPU KERNELS for ci & cj */
     /* Setup 2d grid of GPU thread blocks for ci (number of tasks is
@@ -888,31 +892,32 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
-#ifdef SWIFT_DEBUG_CHECKS
+    /* Kernel launches don't return cuda errors, so check here manually.
+     * Use PeekAtLastError so we can error-handle manually (GetLastError
+     * crashes if not cudaSuccess) */
     cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
+      /* If we're here, assume something's messed up with our code, not with CUDA. */
       error(
-          "CUDA error with task subtype %s kernel launch: %s cpuid id is: %i\n "
-          "nbx %i nby %i max_parts_i %i max_parts_j %i\n"
-          "Something's up with kernel launch.",
-          subtaskID_names[task_subtype], cudaGetErrorString(cu_error), r->cpuid,
+          "kernel launch pair: CUDA error '%s' for task_subtype %s: cpuid=%i"
+          "nbx=%i nby=%i max_parts_i=%i max_parts_j=%i",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
           numBlocks_x, numBlocks_y, max_parts_i, max_parts_j);
     }
-#endif
 
     /* Copy results back to CPU BUFFERS */
     if (task_subtype == task_subtype_gpu_launch_d) {
-      cudaMemcpyAsync(&buf->parts_recv_d[first_part_tmp_i],
+      cu_error = cudaMemcpyAsync(&buf->parts_recv_d[first_part_tmp_i],
                       &buf->d_parts_recv_d[first_part_tmp_i],
                       bundle_n_parts * sizeof(struct gpu_part_recv_d),
                       cudaMemcpyDeviceToHost, stream[bid]);
     } else if (task_subtype == task_subtype_gpu_launch_g) {
-      cudaMemcpyAsync(&buf->parts_recv_g[first_part_tmp_i],
+      cu_error = cudaMemcpyAsync(&buf->parts_recv_g[first_part_tmp_i],
                       &buf->d_parts_recv_g[first_part_tmp_i],
                       bundle_n_parts * sizeof(struct gpu_part_recv_g),
                       cudaMemcpyDeviceToHost, stream[bid]);
     } else if (task_subtype == task_subtype_gpu_launch_f) {
-      cudaMemcpyAsync(&buf->parts_recv_f[first_part_tmp_i],
+      cu_error = cudaMemcpyAsync(&buf->parts_recv_f[first_part_tmp_i],
                       &buf->d_parts_recv_f[first_part_tmp_i],
                       bundle_n_parts * sizeof(struct gpu_part_recv_f),
                       cudaMemcpyDeviceToHost, stream[bid]);
@@ -920,19 +925,17 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
-    /* Issue event to be recorded by GPU after copy back to CPU */
-    cudaEventRecord(pair_end[bid], stream[bid]);
-
-#ifdef SWIFT_DEBUG_CHECKS
-    cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
+      /* If we're here, something's messed up with our code, not with CUDA. */
       error(
-          "CUDA error with task subtype %s D2H memcpy: %s cpuid id is: %i\n"
-          "Something's up with your cuda code",
-          subtaskID_names[task_subtype], cudaGetErrorString(cu_error),
+          "D2H async memcpy: CUDA error '%s' for task_subtype %s: cpuid=%i",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype],
           r->cpuid);
     }
-#endif
+
+    /* Issue event to be recorded by GPU after copy back to CPU */
+    cu_error = cudaEventRecord(pair_end[bid], stream[bid]);
+    swift_assert(cu_error == cudaSuccess);
 
   } /*End of looping over bundles to launch in streams*/
 
@@ -940,7 +943,12 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
    * Should swap with one cuda Device Synchronise really if we decide to go this
    * way with unpacking done separately */
   for (size_t bid = 0; bid < n_bundles; bid++) {
-    cudaEventSynchronize(pair_end[bid]);
+    cudaError_t cu_error = cudaEventSynchronize(pair_end[bid]);
+    if (cu_error != cudaSuccess){
+      error("cudaEventSynchronize failed: '%s' for task subtype %s, cpuid=%d, bundle=%ld"
+          " pair_end=%p, [0]=%p",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid, bid, pair_end, pair_end[0]);
+    }
   }
 }
 

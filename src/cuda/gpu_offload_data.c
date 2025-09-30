@@ -119,6 +119,10 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   if (is_pair_task) {
     buf->task_first_part = NULL;
     buf->d_task_first_part = NULL;
+#ifdef SWIFT_DEBUG_CHECKS
+    buf->task_first_part_size = 0;
+    buf->d_task_first_part_size = 0;
+#endif
   } else {
     cu_error = cudaMallocHost((void **)&buf->task_first_part,
                               target_n_tasks * sizeof(int2));
@@ -126,6 +130,10 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
     cu_error = cudaMalloc((void **)&buf->d_task_first_part,
                           target_n_tasks * sizeof(int2));
     swift_assert(cu_error == cudaSuccess);
+#ifdef SWIFT_DEBUG_CHECKS
+    buf->task_first_part_size = target_n_tasks;
+    buf->d_task_first_part_size = target_n_tasks;
+#endif
   }
 
   /* Get array of first and last particles for pair interactions. */
@@ -142,20 +150,32 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   cu_error = cudaMalloc((void **)&buf->d_parts_send_d,
                         self_pair_fact * count_max_parts * send_struct_size);
   swift_assert(cu_error == cudaSuccess);
+#ifdef SWIFT_DEBUG_CHECKS
+  buf->d_parts_send_size = self_pair_fact * count_max_parts;
+#endif
 
   cu_error = cudaMalloc((void **)&buf->d_parts_recv_d,
                         self_pair_fact * count_max_parts * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
+#ifdef SWIFT_DEBUG_CHECKS
+  buf->d_parts_recv_size = self_pair_fact * count_max_parts;
+#endif
 
   cu_error =
       cudaMallocHost((void **)&buf->parts_send_d,
                      self_pair_fact * count_max_parts * send_struct_size);
   swift_assert(cu_error == cudaSuccess);
+#ifdef SWIFT_DEBUG_CHECKS
+  buf->parts_send_size = self_pair_fact * count_max_parts;
+#endif
 
   cu_error =
       cudaMallocHost((void **)&buf->parts_recv_d,
                      self_pair_fact * count_max_parts * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
+#ifdef SWIFT_DEBUG_CHECKS
+  buf->parts_recv_size = self_pair_fact * count_max_parts;
+#endif
 
   if (is_pair_task) {
 
@@ -190,7 +210,8 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   buf->event_end = (cudaEvent_t *)malloc(n_bundles * sizeof(cudaEvent_t));
 
   for (size_t i = 0; i < n_bundles; i++) {
-    cudaEventCreate(&(buf->event_end[i]));
+    cu_error = cudaEventCreate(&(buf->event_end[i]));
+    swift_assert(cu_error == cudaSuccess);
   }
 }
 
