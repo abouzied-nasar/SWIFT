@@ -21,6 +21,7 @@
 extern "C" {
 #endif
 
+#include "config.h"
 #include "gpu_pack_vars.h"
 
 #include "cuda/cuda_config.h"
@@ -30,52 +31,6 @@ extern "C" {
  * @brief functions related to GPU packing data and meta-data
  */
 
-/**
- * Get global packing parameters from the scheduler and fill out the
- * gpu_pack_params struct
- *
- * @params pars (return): the gpu global pack parameter struct to be filled out
- * @params sched: the @scheduler
- * @params eta_neighours: Neighbour resolution eta.
- */
-void gpu_get_pack_params(struct gpu_global_pack_params* pars,
-                         const struct scheduler* sched,
-                         const float eta_neighbours) {
-
-  pars->target_n_tasks = sched->pack_size;
-  pars->target_n_tasks_pair = sched->pack_size_pair;
-  pars->bundle_size = N_TASKS_BUNDLE_SELF;
-  pars->bundle_size_pair = N_TASKS_BUNDLE_PAIR;
-
-  /* A. Nasar: n_bundles is the number of task bundles each thread has. Used to
-   * loop through bundles */
-  pars->n_bundles =
-      (pars->target_n_tasks + pars->bundle_size - 1) / pars->bundle_size;
-  pars->n_bundles_pair =
-      (pars->target_n_tasks_pair + pars->bundle_size_pair - 1) /
-      pars->bundle_size_pair;
-
-  /* A. Nasar: Try to estimate average number of particles per leaf-level cell
-   */
-  /* Get smoothing length/particle spacing */
-  int np_per_cell = ceil(2.0 * eta_neighbours);
-
-  /* Cube to find average number of particles in 3D */
-  np_per_cell *= np_per_cell * np_per_cell;
-
-  /* A. Nasar: Increase parts per recursed task-level cell by buffer to
-    ensure we allocate enough memory */
-  const int buff = ceil(0.5 * np_per_cell);
-
-  /*A. Nasar: Multiplication by 2 is also to ensure we do not over-run
-   *  the allocated memory on buffers and GPU. This can happen if calculated h
-   * is larger than cell width and splitting makes bigger than target cells */
-
-  /* Leave this until we implement recursive self tasks -> Exaggerated as we
-   * will off-load really big cells since we don't recurse */
-  pars->count_max_parts =
-      64ul * 8ul * pars->target_n_tasks * (np_per_cell + buff);
-}
 
 /**
  * Initialise empty gpu_pack_vars struct
