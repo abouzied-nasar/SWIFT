@@ -62,7 +62,6 @@ void gpu_init_pack_vars(struct gpu_pack_vars* pv) {
   pv->n_daughters_total = 0;
   pv->n_daughters_packed_index = 0;
   pv->n_leaves_found = 0;
-  pv->n_leaves_total = 0;
 }
 
 /**
@@ -76,7 +75,6 @@ void gpu_init_pack_vars_step(struct gpu_pack_vars* pv) {
   pv->top_tasks_packed = 0;
   pv->n_daughters_total = 0;
   pv->n_leaves_found = 0;
-  pv->n_leaves_total = 0;
 }
 
 #ifdef __cplusplus

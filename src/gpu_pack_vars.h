@@ -116,13 +116,7 @@ struct gpu_pack_vars {
 
   /*! Number of leaf cells which require interactions found during a recursive
    * search */
-  int n_leaves_found;
-
-  /*! TODO: documentation */
-  int n_leaves_total;
-
-  /*! Number of expected pair tasks. TODO: Needs to be done better. */
-  int n_expected_pair_tasks;
+  size_t n_leaves_found;
 };
 
 void gpu_init_pack_vars(struct gpu_pack_vars *pv);

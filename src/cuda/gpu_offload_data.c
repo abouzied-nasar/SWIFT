@@ -80,11 +80,6 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   pv->bundle_size = bundle_size;
   pv->n_bundles = n_bundles;
 
-  /* TODO: Need to come up with a good estimate for this */
-  /* TODO: Currently, we only use this in a single place to check whether we
-   * exceeded the limit. Might need removal. */
-  pv->n_expected_pair_tasks = 4096;
-
   cudaError_t cu_error = cudaErrorMemoryAllocation;
   cu_error = cudaMallocHost((void **)&pv->bundle_first_part,
                             self_pair_fact * n_bundles * sizeof(int));
@@ -200,12 +195,28 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
     buf->cj_top =
         (struct cell **)malloc(2ul * target_n_tasks * sizeof(struct cell *));
 
+#ifdef SWIFT_DEBUG_CHECKS
+    buf->ci_d_size = target_n_tasks * 2;
+    buf->cj_d_size = target_n_tasks * 2;
+    buf->first_and_last_daughters_size = target_n_tasks * 2;
+    buf->ci_top_size = 2ul * target_n_tasks;
+    buf->cj_top_size = 2ul * target_n_tasks;
+#endif
+
   } else {
     buf->ci_d = NULL;
     buf->cj_d = NULL;
     buf->first_and_last_daughters = NULL;
     buf->ci_top = NULL;
     buf->cj_top = NULL;
+
+#ifdef SWIFT_DEBUG_CHECKS
+    buf->ci_d_size = 0;
+    buf->cj_d_size = 0;
+    buf->first_and_last_daughters_size = 0;
+    buf->ci_top_size = 0;
+    buf->cj_top_size = 0;
+#endif
   }
 
   /* Create space for cuda events */

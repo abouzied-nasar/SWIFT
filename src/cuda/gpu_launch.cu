@@ -30,6 +30,8 @@
 extern "C" {
 #endif
 
+#include <stdio.h>
+
 /* Required header files */
 #include "cuda_config.h"
 #include "cuda_particle_kernels.cuh"
@@ -121,6 +123,7 @@ void gpu_launch_pair_density(struct gpu_part_send_d *parts_send,
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
 
+  /* printf("bundle_first=%d, bundle_n=%d\n", bundle_first_part, bundle_n_parts); */
   cuda_launch_pair_density<<<numBlocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }

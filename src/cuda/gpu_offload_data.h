@@ -54,8 +54,6 @@ struct gpu_offload_data {
   size_t d_task_first_part_size;
 #endif
 
-
-
   /*! First and last particles of cells i and j for pair interactions */
   int4 *fparti_fpartj_lparti_lpartj;
 
@@ -113,12 +111,29 @@ struct gpu_offload_data {
   struct cell **ci_d;
   struct cell **cj_d;
 
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t ci_d_size;
+  size_t cj_d_size;
+#endif
+
   /*! TODO: Documentation */
   int **first_and_last_daughters;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t first_and_last_daughters_size;
+#endif
 
   /*! TODO: Documentation */
   struct cell **ci_top;
   struct cell **cj_top;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t ci_top_size;
+  size_t cj_top_size;
+#endif
 
   /*! TODO: Documentation */
   cudaEvent_t *event_end;
