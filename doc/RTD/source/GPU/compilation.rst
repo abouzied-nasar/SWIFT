@@ -19,7 +19,6 @@ CUDA
 Configuration
 ----------------
 
-
 To enable GPU acceleration via the ``cuda`` implementation, configure with the
 ``--with-cuda`` flag:
 
@@ -42,11 +41,12 @@ If you want to pass on flags to the compilers, you can do so by setting variable
   (``CUDA_CFLAGS=-I/path/to/cuda/include``)
 - Similarly, ``$CUDA_LDFLAGS`` and ``$CUDA_LIBS`` can be used to pass library
   flags related to the linking with cuda to the host compiler and linker.
-- ``$NVCC_FLAGS``: Flags to be passed on to the ``nvcc`` compiler.
+- ``$NVCC_FLAGS``: Flags to be passed on to the ``nvcc`` compiler for compiling
+  device code.
 - Similarly, ``$NVCC_LDFLAGS`` and ``$NVCC_LIBS`` can be used to pass library
   flags to the device linker.
 
-Example usage (note the line break escape characters '\'):
+Example usage (note the line break escape characters ``\\``):
 
 .. code-block:: bash
 
@@ -115,7 +115,7 @@ A note on macros
 For cuda, we mainly use two vaguely related macros:
 
 - ``HAVE_CUDA``:
-   This is set by the autoconf configuration and signifies whether cuda was
+   This is set by the ``autoconf`` configuration and signifies whether cuda was
    found on your system. If available, it will be defined in ``config.h``.
 
 - ``WITH_CUDA``:
@@ -125,6 +125,7 @@ For cuda, we mainly use two vaguely related macros:
   CUDA is available or not. So hide code behind this macro which should only be
   compiled if we're compiling to create the cuda convenience libraries and
   executables.
+
 
 
 
@@ -173,20 +174,10 @@ N.B CUDA and ASAN don't like each other so WHEN RUNNING CODE COMPILED WITH SANIT
 
 
 
-
-
-
-
-
 HIP
 ~~~~~~~
 
 TODO.
-
-.. warning::
-
-   The new built system is not set up to run with HIP yet. It needs adaptation
-   first.
 
 
 If you want to pass on flags to the compilers, you can do so by setting variables:
