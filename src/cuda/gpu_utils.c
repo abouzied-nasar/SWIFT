@@ -47,29 +47,40 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
   int max_blocks_SM;
   int n_SMs;
 
-  cudaGetDeviceCount(&n_devices);
+  cudaError_t cu_error = cudaGetDeviceCount(&n_devices);
+  swift_assert(cu_error == cudaSuccess);
+
   /* A. Nasar: If running on MPI we set code to use one MPI rank per GPU
    * This was found to work very well and simplifies writing slurm scipts */
   if (n_devices == 1) {
-    cudaSetDevice(dev_id);
+    cu_error = cudaSetDevice(dev_id);
+    swift_assert(cu_error == cudaSuccess);
   }
 #ifdef WITH_MPI
   else {
-    cudaSetDevice(engine_rank);
+    cu_error = cudaSetDevice(engine_rank);
+    swift_assert(cu_error == cudaSuccess);
+
     dev_id = engine_rank;
   }
 #endif
 
   /* Now tell me some info about my device */
-  cudaGetDeviceProperties(&prop, dev_id);
-  cudaDeviceGetAttribute(&max_blocks_SM, cudaDevAttrMaxBlocksPerMultiprocessor,
-                         dev_id);
-  cudaDeviceGetAttribute(&n_SMs, cudaDevAttrMultiProcessorCount, dev_id);
+  cu_error = cudaGetDeviceProperties(&prop, dev_id);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaDeviceGetAttribute(&max_blocks_SM, cudaDevAttrMaxBlocksPerMultiprocessor, dev_id);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaDeviceGetAttribute(&n_SMs, cudaDevAttrMultiProcessorCount, dev_id);
+  swift_assert(cu_error == cudaSuccess);
 
   size_t free_mem;
   size_t total_mem;
   const struct space* space = e->s;
-  cudaMemGetInfo(&free_mem, &total_mem);
+  cu_error = cudaMemGetInfo(&free_mem, &total_mem);
+  swift_assert(cu_error == cudaSuccess);
+
   int nPartsPerCell = space->nr_parts / space->tot_cells;
   if (cpuid == 0 && engine_rank == 0) {
     message("Devices available:          %i", n_devices);
@@ -99,7 +110,8 @@ void gpu_print_free_mem(const struct engine* e, const int cpuid) {
   /* Find and print GPU name(s) */
   int dev_id = 0;
   int n_devices;
-  cudaGetDeviceCount(&n_devices);
+  cudaError_t cu_error = cudaGetDeviceCount(&n_devices);
+  swift_assert(cu_error == cudaSuccess);
 
 #ifdef WITH_MPI
   if (n_devices != 1) {
@@ -110,11 +122,14 @@ void gpu_print_free_mem(const struct engine* e, const int cpuid) {
   struct cudaDeviceProp prop;
 
   /* Now tell me some info about my device */
-  cudaGetDeviceProperties(&prop, dev_id);
+  cu_error = cudaGetDeviceProperties(&prop, dev_id);
+  swift_assert(cu_error == cudaSuccess);
 
   size_t free_mem;
   size_t total_mem;
-  cudaMemGetInfo(&free_mem, &total_mem);
+  cu_error = cudaMemGetInfo(&free_mem, &total_mem);
+  swift_assert(cu_error == cudaSuccess);
+
   if (cpuid == 0) {
 #ifdef SWIFT_DEBUG_CHECKS
     message(
