@@ -106,8 +106,7 @@ __global__ void cuda_launch_pair_force(struct gpu_part_send_f *parts_send,
     const int cj_end = pi.cjs_cje.y;
 
     /* Start calculations for particles in cell i */
-    cuda_kernel_pair_force(pi, parts_send, parts_recv, pid, cj_start, cj_end,
-                           d_a, d_H);
+    cuda_kernel_pair_force(pi, parts_send, parts_recv, pid, cj_start, cj_end, d_a, d_H);
   }
 }
 
@@ -129,11 +128,7 @@ void gpu_launch_pair_density(struct gpu_part_send_d *parts_send,
 /**
  * Launch the pair gradient computation on the GPU.
  */
-void gpu_launch_pair_gradient(struct gpu_part_send_g *parts_send,
-                              struct gpu_part_recv_g *parts_recv, float d_a,
-                              float d_H, cudaStream_t stream, int numBlocks_x,
-                              int numBlocks_y, int bundle_first_part,
-                              int bundle_n_parts) {
+void gpu_launch_pair_gradient(struct gpu_part_send_g *parts_send, struct gpu_part_recv_g *parts_recv, float d_a, float d_H, cudaStream_t stream, int numBlocks_x, int numBlocks_y, int bundle_first_part, int bundle_n_parts) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
 
@@ -166,10 +161,8 @@ void gpu_launch_self_density(struct gpu_part_send_d *parts_send,
                              int2 *d_task_first_part_f4) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  cuda_kernel_self_density<<<gridShape, GPU_THREAD_BLOCK_SIZE,
-                             2ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4),
-                             stream>>>(parts_send, parts_recv, d_a, d_H,
-                                       bundle_first_task, d_task_first_part_f4);
+  size_t shmem_size = 2ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4);
+  cuda_kernel_self_density<<<gridShape, GPU_THREAD_BLOCK_SIZE, shmem_size, stream>>>(parts_send, parts_recv, d_a, d_H, bundle_first_task, d_task_first_part_f4);
 }
 
 /**
@@ -182,11 +175,8 @@ void gpu_launch_self_gradient(struct gpu_part_send_g *parts_send,
                               int2 *d_task_first_part_f4) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  cuda_kernel_self_gradient<<<gridShape, GPU_THREAD_BLOCK_SIZE,
-                              3ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4),
-                              stream>>>(parts_send, parts_recv, d_a, d_H,
-                                        bundle_first_task,
-                                        d_task_first_part_f4);
+  size_t shmem_size = 3ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4);
+  cuda_kernel_self_gradient<<<gridShape, GPU_THREAD_BLOCK_SIZE, shmem_size, stream>>>(parts_send, parts_recv, d_a, d_H, bundle_first_task, d_task_first_part_f4);
 }
 
 /**
@@ -199,11 +189,8 @@ void gpu_launch_self_force(struct gpu_part_send_f *d_parts_send,
                            int2 *d_task_first_part_f4) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  cuda_kernel_self_force<<<gridShape, GPU_THREAD_BLOCK_SIZE,
-                           4ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4) +
-                               GPU_THREAD_BLOCK_SIZE * sizeof(float3),
-                           stream>>>(d_parts_send, d_parts_recv, d_a, d_H,
-                                     bundle_first_task, d_task_first_part_f4);
+  size_t shmem_size = 4ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4) + GPU_THREAD_BLOCK_SIZE * sizeof(float3);
+  cuda_kernel_self_force<<<gridShape, GPU_THREAD_BLOCK_SIZE, shmem_size, stream>>>(d_parts_send, d_parts_recv, d_a, d_H, bundle_first_task, d_task_first_part_f4);
 }
 
 #ifdef __cplusplus

@@ -81,6 +81,8 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   pv->n_bundles = n_bundles;
 
   /* TODO: Need to come up with a good estimate for this */
+  /* TODO: Currently, we only use this in a single place to check whether we
+   * exceeded the limit. Might need removal. */
   pv->n_expected_pair_tasks = 4096;
 
   cudaError_t cu_error = cudaErrorMemoryAllocation;
