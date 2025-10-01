@@ -30,6 +30,8 @@
 extern "C" {
 #endif
 
+#include "config.h"
+
 #include <stddef.h>
 #include <vector_types.h>
 
@@ -38,17 +40,33 @@ extern "C" {
  */
 struct gpu_pack_vars {
 
-  /*! List of tasks and respective cells to be packed */
-  struct task **task_list;
+  /* TODO: We only need 1 of these. task_list is used in self tasks,
+   * top_task_list is used in pair tasks. They never interact. Keeping
+   * this until we've figured out current bugs so as to not modify the
+   * codebase beyond recognition yet. */
+  union {
+    /*! List of tasks and respective cells to be packed */
+    struct task **task_list;
 
-  /*! TODO: documentation */
-  struct task **top_task_list;
+    /*! List of "top" tasks (tasks at the super level) we've packed */
+    struct task **top_task_list;
+  };
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  union {
+    size_t task_list_size;
+    size_t top_task_list_size;
+  };
+#endif
 
   /*! TODO: documentation */
   struct cell **ci_list;
 
-  /*! TODO: documentation */
-  struct cell **cj_list;
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t ci_list_size;
+#endif
 
   /* List of cell shifts and positions. Shifts are used for pair tasks,
    * while cell positions are used for self tasks.*/
@@ -80,11 +98,26 @@ struct gpu_pack_vars {
   /*! TODO: documentation */
   int *bundle_first_part;
 
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t bundle_first_part_size;
+#endif
+
   /*! TODO: documentation */
   int *bundle_last_part;
 
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t bundle_last_part_size;
+#endif
+
   /*! TODO: documentation */
   int *bundle_first_task_list;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t bundle_first_task_list_size;
+#endif
 
   /*! TODO: documentation */
   size_t count_max_parts;

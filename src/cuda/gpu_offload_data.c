@@ -84,29 +84,44 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   cu_error = cudaMallocHost((void **)&pv->bundle_first_part,
                             self_pair_fact * n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
+#ifdef SWIFT_DEBUG_CHECKS
+  pv->bundle_first_part_size = self_pair_fact * n_bundles;
+#endif
 
   cu_error = cudaMallocHost((void **)&pv->bundle_last_part,
                             self_pair_fact * n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
+#ifdef SWIFT_DEBUG_CHECKS
+  pv->bundle_last_part_size = self_pair_fact * n_bundles;
+#endif
 
   cu_error = cudaMallocHost((void **)&pv->bundle_first_task_list,
                             self_pair_fact * n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
+#ifdef SWIFT_DEBUG_CHECKS
+  pv->bundle_first_task_list_size = self_pair_fact * n_bundles;
+#endif
 
   pv->tasksperbundle = tasksperbundle;
   pv->count_parts = 0;
   pv->count_max_parts = count_max_parts;
 
+  /* Watch out, task_list and top_tasks_lists are temporarily a union until we
+   * purge one of them. */
   if (is_pair_task) {
-    pv->task_list = NULL;
     pv->ci_list = NULL;
-    pv->top_task_list =
-        (struct task **)calloc(target_n_tasks, sizeof(struct task *));
+    pv->top_task_list = (struct task **)calloc(target_n_tasks, sizeof(struct task *));
+#ifdef SWIFT_DEBUG_CHECKS
+    pv->ci_list_size = 0;
+    pv->top_task_list_size = target_n_tasks;
+#endif
   } else {
-    pv->task_list =
-        (struct task **)calloc(target_n_tasks, sizeof(struct task *));
     pv->ci_list = (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
-    pv->top_task_list = NULL;
+    pv->task_list = (struct task **)calloc(target_n_tasks, sizeof(struct task *));
+#ifdef SWIFT_DEBUG_CHECKS
+    pv->ci_list_size = target_n_tasks;
+    pv->task_list_size = target_n_tasks;
+#endif
   }
 
   /* A. Nasar: Keep track of first and last particles for each self task
@@ -141,6 +156,11 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
     cu_error = cudaMallocHost((void **)&buf->fparti_fpartj_lparti_lpartj,
                               target_n_tasks * sizeof(int4));
     swift_assert(cu_error == cudaSuccess);
+#ifdef SWIFT_DEBUG_CHECKS
+    buf->fparti_fpartj_lparti_lpartj_size = target_n_tasks;
+  } else {
+    buf->fparti_fpartj_lparti_lpartj_size = 0;
+#endif
   }
 
   /* Now allocate memory for Buffer and GPU particle arrays */

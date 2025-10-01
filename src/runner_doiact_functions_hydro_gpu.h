@@ -268,16 +268,22 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
     /* if any cell empty: skip */
     if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
 
-    /*Add leaf cells to list for each top_level task*/
-    int leaves_found = pack_vars->n_leaves_found;
+    /* Add leaf cells to list for each top_level task */
+    size_t leaves_found = pack_vars->n_leaves_found;
     ci_d[n_daughters + leaves_found] = ci;
     cj_d[n_daughters + leaves_found] = cj;
 
     pack_vars->n_leaves_found++;
-    if (pack_vars->n_leaves_found >= pack_vars->n_expected_pair_tasks)
-      error("Created %i more than expected leaf cells. depth %i",
-            pack_vars->n_leaves_found, depth);
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (pack_vars->n_leaves_found >= buf->ci_d_size) {
+      error("Found more leaf cells (%ld) than expected (%ld), depth=%i", pack_vars->n_leaves_found, buf->ci_d_size, depth);
+    }
+    if (pack_vars->n_leaves_found >= buf->cj_d_size) {
+      error("Found more leaf cells (%ld) than expected (%ld), depth=%i", pack_vars->n_leaves_found, buf->cj_d_size, depth);
+    }
   }
+#endif
 
   if (timer) TIMER_TOC(timer_dopair_gpu_recurse);
 }
@@ -550,7 +556,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
-    cu_error = cudaPeekAtLastError();
+    cu_error = cudaGetLastError();
     if (cu_error != cudaSuccess) {
       error( "kernel launch self: CUDA error '%s' for task_subtype %s: cpuid=%i",
             cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
@@ -587,12 +593,14 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     }
 
     /* Record this event */
-    cudaEventRecord(buf->event_end[bid], stream[bid]);
+    cu_error = cudaEventRecord(buf->event_end[bid], stream[bid]);
+    swift_assert(cu_error == cudaSuccess);
 
 
   } /*End of looping over bundles to launch in streams*/
 
   /* Make sure all the kernels and copies back are finished */
+  /* TODO: WE STILL HAVE THIS IN PAIR TASKS. DO WE NEED THIS??? */
   /* cudaDeviceSynchronize(); */
 }
 
@@ -620,10 +628,12 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
   /* Copy the data back from the CPU thread-local buffers to the cells */
   /* Pack length counter for use in unpacking */
   size_t pack_length = 0;
+  cudaError_t cu_error;
   for (size_t bid = 0; bid < n_bundles; bid++) {
 
     /* cudaStreamSynchronize(stream[bid]); */
-    cudaEventSynchronize(buf->event_end[bid]);
+    cu_error = cudaEventSynchronize(buf->event_end[bid]);
+    swift_assert(cu_error == cudaSuccess);
 
     for (size_t tid = bid * bundle_size;
          tid < (bid + 1) * bundle_size && tid < tasks_packed; tid++) {
@@ -817,20 +827,6 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
   /* Launch the copies for each bundle and run the GPU kernel */
   for (size_t bid = 0; bid < n_bundles; bid++) {
 
-    int max_parts_i = 0;
-    int max_parts_j = 0;
-    for (size_t tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
-      if (tid < tasks_packed) {
-        /* Get an estimate for the max number of parts per cell in each bundle.
-         * Used for determining the number of GPU CUDA blocks */
-        int count_i = fparti_fpartj_lparti_lpartj_dens[tid].z -
-                      fparti_fpartj_lparti_lpartj_dens[tid].x;
-        max_parts_i = max(max_parts_i, count_i);
-        int count_j = fparti_fpartj_lparti_lpartj_dens[tid].w -
-                      fparti_fpartj_lparti_lpartj_dens[tid].y;
-        max_parts_j = max(max_parts_j, count_j);
-      }
-    }
     const size_t first_part_tmp_i = pack_vars->bundle_first_part[bid];
     const size_t bundle_n_parts =
         pack_vars->bundle_last_part[bid] - first_part_tmp_i;
@@ -892,17 +888,14 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
-    /* Kernel launches don't return cuda errors, so check here manually.
-     * Use PeekAtLastError so we can error-handle manually (GetLastError
-     * crashes if not cudaSuccess) */
-    cu_error = cudaPeekAtLastError();
+    cu_error = cudaGetLastError();
     if (cu_error != cudaSuccess) {
       /* If we're here, assume something's messed up with our code, not with CUDA. */
       error(
-          "kernel launch pair: CUDA error '%s' for task_subtype %s: cpuid=%i"
-          "nbx=%i nby=%i max_parts_i=%i max_parts_j=%i",
+          "kernel launch pair: CUDA error '%s' for task_subtype %s: cpuid=%i "
+          "nbx=%i nby=%i",
           cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
-          numBlocks_x, numBlocks_y, max_parts_i, max_parts_j);
+          numBlocks_x, numBlocks_y);
     }
 
     /* Copy results back to CPU BUFFERS */
@@ -1146,7 +1139,7 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
 
   /* Grab handles */
   struct gpu_pack_vars *pack_vars = &buf->pv;
-  int n_leaves_found = buf->pv.n_leaves_found;
+  size_t n_leaves_found = buf->pv.n_leaves_found;
   int **f_l_daughters = buf->first_and_last_daughters;
   int top_tasks_packed = pack_vars->top_tasks_packed;
 
@@ -1160,14 +1153,12 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
   buf->ci_top[top_tasks_packed] = ci;
   buf->cj_top[top_tasks_packed] = cj;
 
-  /* TODO ABOUZIED: WE HAVE BOTH LEAVES TOTAL AND DAUGHTERS TOTAL. DO WE NEED
-   * BOTH? */
-  pack_vars->n_leaves_total += n_leaves_found;
-
   int first_cell_to_move = pack_vars->n_daughters_packed_index;
   int n_daughters_left = pack_vars->n_daughters_total;
 
   /* Get pointer to top level task. Needed to enqueue deps*/
+  /* TODO: If we're already storing t, do we really need ci and cj since we
+   * have t->ci and t->cj? */
   pack_vars->top_task_list[top_tasks_packed] = t;
 
   /* Increment how many top tasks we've packed */
@@ -1180,7 +1171,7 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
   size_t target_n_tasks_tmp = pack_vars->target_n_tasks;
 
   /* Counter for how many tasks we've packed */
-  int npacked = 0;
+  size_t npacked = 0;
   int launched = 0;
 
   /* A. Nasar: Loop through the daughter tasks we found */

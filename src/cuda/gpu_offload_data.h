@@ -56,6 +56,12 @@ struct gpu_offload_data {
 
   /*! First and last particles of cells i and j for pair interactions */
   int4 *fparti_fpartj_lparti_lpartj;
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t fparti_fpartj_lparti_lpartj_size;
+#endif
+
+
 
   /*! Arrays used to send particle data from device to host. A single struct
    * gpu_offload_data will only hold data for either density, gradient, or
