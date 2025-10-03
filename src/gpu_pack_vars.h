@@ -33,12 +33,10 @@ extern "C" {
 #include "config.h"
 
 #include <stddef.h>
-#include <vector_types.h>
 
-/**
- * TODO Abouzeid: documentation
- */
-struct gpu_pack_vars {
+/*! struct holding bookkeeping meta-data required for offloading;
+ * does not depend on cuda/hip et al. */
+ struct gpu_pack_vars {
 
   /* TODO: We only need 1 of these. task_list is used in self tasks,
    * top_task_list is used in pair tasks. They never interact. Keeping
@@ -86,7 +84,7 @@ struct gpu_pack_vars {
   /*! TODO: documentation */
   size_t bundle_size;
 
-  /*! How many particles in a bundle*/
+  /*! How many particles have been packed */
   size_t count_parts;
 
   /*! TODO: DOCUMENTATION */
@@ -96,7 +94,7 @@ struct gpu_pack_vars {
   size_t top_tasks_packed;
 
   /*! TODO: documentation */
-  int *bundle_first_part;
+  size_t *bundle_first_part;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
@@ -104,7 +102,7 @@ struct gpu_pack_vars {
 #endif
 
   /*! TODO: documentation */
-  int *bundle_last_part;
+  size_t *bundle_last_part;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
@@ -112,7 +110,7 @@ struct gpu_pack_vars {
 #endif
 
   /*! TODO: documentation */
-  int *bundle_first_task_list;
+  size_t *bundle_first_task_list;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
@@ -150,6 +148,42 @@ struct gpu_pack_vars {
   /*! Number of leaf cells which require interactions found during a recursive
    * search */
   size_t n_leaves_found;
+
+
+
+
+
+  /*! TODO: Documentation */
+  struct cell **ci_d;
+  struct cell **cj_d;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t ci_d_size;
+  size_t cj_d_size;
+#endif
+
+  /*! The indexes of the first and last leaf cell packed into the particle
+   * buffer per super-level pair task. The first index of this array
+   * corresponds to the super-level task stored in */
+   size_t **first_and_last_daughters;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t first_and_last_daughters_size;
+#endif
+
+  /*! TODO: Documentation */
+  struct cell **ci_top;
+  struct cell **cj_top;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  size_t ci_top_size;
+  size_t cj_top_size;
+#endif
+
+
 };
 
 void gpu_init_pack_vars(struct gpu_pack_vars *pv);

@@ -234,8 +234,8 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
   struct gpu_pack_vars *pack_vars = &buf->pv;
 
   /* Arrays for daughter cells */
-  struct cell **ci_d = buf->ci_d;
-  struct cell **cj_d = buf->cj_d;
+  struct cell **ci_d = pack_vars->ci_d;
+  struct cell **cj_d = pack_vars->cj_d;
 
   if (depth == 0) {
     /* while at the top level, reset counters. */
@@ -276,11 +276,13 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
     pack_vars->n_leaves_found++;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    if (pack_vars->n_leaves_found >= buf->ci_d_size) {
-      error("Found more leaf cells (%ld) than expected (%ld), depth=%i", pack_vars->n_leaves_found, buf->ci_d_size, depth);
+    if (pack_vars->n_leaves_found >= pack_vars->ci_d_size) {
+      error("Found more leaf cells (%ld) than expected (%ld), depth=%i",
+          pack_vars->n_leaves_found, pack_vars->ci_d_size, depth);
     }
-    if (pack_vars->n_leaves_found >= buf->cj_d_size) {
-      error("Found more leaf cells (%ld) than expected (%ld), depth=%i", pack_vars->n_leaves_found, buf->cj_d_size, depth);
+    if (pack_vars->n_leaves_found >= pack_vars->cj_d_size) {
+      error("Found more leaf cells (%ld) than expected (%ld), depth=%i",
+          pack_vars->n_leaves_found, pack_vars->cj_d_size, depth);
     }
   }
 #endif
@@ -1006,11 +1008,11 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
   struct gpu_pack_vars *pack_vars = &buf->pv;
   int n_leaves_found = buf->pv.n_leaves_found;
 
-  struct cell **ci_d = buf->ci_d;
-  struct cell **cj_d = buf->cj_d;
-  struct cell **ci_top = buf->ci_top;
-  struct cell **cj_top = buf->cj_top;
-  int **f_l_daughters = buf->first_and_last_daughters;
+  struct cell **ci_d = pack_vars->ci_d;
+  struct cell **cj_d = pack_vars->cj_d;
+  struct cell **ci_top = pack_vars->ci_top;
+  struct cell **cj_top = pack_vars->cj_top;
+  size_t **f_l_daughters = pack_vars->first_and_last_daughters;
 
   /////////////////////////////////
   // Should this be reset to zero HERE???
@@ -1027,7 +1029,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     }
 
     /* Loop through each daughter task */
-    for (int tid = f_l_daughters[topid][0]; tid < f_l_daughters[topid][1];
+    for (size_t tid = f_l_daughters[topid][0]; tid < f_l_daughters[topid][1];
          tid++) {
 
       /*Get pointers to the leaf cells*/
@@ -1140,21 +1142,41 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
   /* Grab handles */
   struct gpu_pack_vars *pack_vars = &buf->pv;
   size_t n_leaves_found = buf->pv.n_leaves_found;
-  int **f_l_daughters = buf->first_and_last_daughters;
-  int top_tasks_packed = pack_vars->top_tasks_packed;
+  size_t **f_l_daughters = pack_vars->first_and_last_daughters;
+  size_t top_tasks_packed = pack_vars->top_tasks_packed;
 
   /* TODO: WHY IS THIS HERE AND NOT IN RUNNER_GPU_RECURSE??? */
   pack_vars->n_daughters_total += n_leaves_found;
 
+#ifdef SWIFT_DEBUG_CHECKS
+  if (top_tasks_packed >= pack_vars->top_task_list_size)
+    error("Writing out of top_task_packed array bounds: %ld/%ld",
+        top_tasks_packed, pack_vars->top_task_list_size);
+  if (top_tasks_packed >= pack_vars->ci_top_size)
+    error("Writing out of ci_top array bounds: %ld/%ld",
+        top_tasks_packed, pack_vars->ci_top_size);
+  if (top_tasks_packed >= pack_vars->cj_top_size)
+    error("Writing out of cj_top array bounds: %ld/%ld",
+        top_tasks_packed, pack_vars->cj_top_size);
+#endif
+
   /* Keep separate */
+  /* TODO: What does 'keep separate' mean...? */
+  /* Keep track of first and last index of leaf cells packed per
+   * super-level pair task in case we are packing more than one
+   * super-level task into this buffer */
   f_l_daughters[top_tasks_packed][0] = pack_vars->n_daughters_packed_index;
 
   /* Keep separate */
-  buf->ci_top[top_tasks_packed] = ci;
-  buf->cj_top[top_tasks_packed] = cj;
+  /* TODO: What does 'keep separate' mean...? */
+  /* TODO: Do we need this? We already keep track of the task, and the
+   * task has access to t->ci, t->cj */
+  /* Same for super-level cells */
+  pack_vars->ci_top[top_tasks_packed] = ci;
+  pack_vars->cj_top[top_tasks_packed] = cj;
 
-  int first_cell_to_move = pack_vars->n_daughters_packed_index;
-  int n_daughters_left = pack_vars->n_daughters_total;
+  size_t first_cell_to_move = pack_vars->n_daughters_packed_index;
+  size_t n_daughters_left = pack_vars->n_daughters_total;
 
   /* Get pointer to top level task. Needed to enqueue deps*/
   /* TODO: If we're already storing t, do we really need ci and cj since we
@@ -1166,7 +1188,8 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
 
   /* A. Nasar: Remove this from struct as not needed. Was only used for
    * de-bugging */
-  /* TODO: Abouzied, do this please! */
+  /* TODO: Abouzied, do this please! Or put it behind SWIFT_DEBUG_CHECKS macro
+   * guard */
   /* How many daughter tasks do we want to offload at once?*/
   size_t target_n_tasks_tmp = pack_vars->target_n_tasks;
 
@@ -1175,21 +1198,33 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
   int launched = 0;
 
   /* A. Nasar: Loop through the daughter tasks we found */
-  int copy_index = pack_vars->n_daughters_packed_index;
+  size_t copy_index = pack_vars->n_daughters_packed_index;
 
   /* not strictly true!!! Could be that we packed and moved on without launching
    */
   int had_prev_task = 0;
   if (pack_vars->n_daughters_packed_index > 0) had_prev_task = 1;
 
+  /* TODO: @Abouzied Please document what is happening here, this looks very
+   * important and scary. Why does this need to happen here, and not
+   * earlier/later? */
   cell_unlocktree(ci);
   cell_unlocktree(cj);
 
   while (npacked < n_leaves_found) {
 
+#ifdef SWIFT_DEBUG_CHECKS
+  if (copy_index >= pack_vars->ci_d_size)
+    error("Writing out of ci_d array bounds: %ld/%ld",
+        copy_index, pack_vars->ci_d_size);
+  if (copy_index >= pack_vars->cj_d_size)
+    error("Writing out of cj_d array bounds: %ld/%ld",
+        copy_index, pack_vars->cj_d_size);
+#endif
+
     top_tasks_packed = pack_vars->top_tasks_packed;
-    struct cell *cii = buf->ci_d[copy_index];
-    struct cell *cjj = buf->cj_d[copy_index];
+    struct cell *cii = pack_vars->ci_d[copy_index];
+    struct cell *cjj = pack_vars->cj_d[copy_index];
 
     if (t->subtype == task_subtype_gpu_pack_d) {
       runner_dopair_gpu_pack_density(r, buf, cii, cjj, t);
@@ -1244,29 +1279,28 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
       }
 
       if (npacked == n_leaves_found) {
+        /* We're done. */
         pack_vars->n_daughters_total = 0;
         pack_vars->top_tasks_packed = 0;
       }
-      /* Special treatment required here. Launched but have not packed all tasks
-       */
       else {
-        /* If we launch but still have daughters left re-set this task to be
+        /* Launched but have not packed all tasks. Re-set this task to be
          * the first in the list so that we can continue packing correctly */
         pack_vars->top_task_list[0] = t;
         /* Move all tasks forward in list so that the first next task will be
          * packed to index 0 Move remaining cell indices so that their indexing
          * starts from zero and ends in n_daughters_left */
-        for (int i = first_cell_to_move; i < n_daughters_left; i++) {
-          int shuffle = i - first_cell_to_move;
-          buf->ci_d[shuffle] = buf->ci_d[i];
-          buf->cj_d[shuffle] = buf->cj_d[i];
+        for (size_t i = first_cell_to_move; i < n_daughters_left; i++) {
+          size_t shuffle = i - first_cell_to_move;
+          pack_vars->ci_d[shuffle] = pack_vars->ci_d[i];
+          pack_vars->cj_d[shuffle] = pack_vars->cj_d[i];
         }
         copy_index = 0;
         f_l_daughters[0][0] = 0;
         f_l_daughters[0][1] = n_daughters_left - first_cell_to_move;
 
-        buf->cj_top[0] = cj;
-        buf->ci_top[0] = ci;
+        pack_vars->cj_top[0] = cj;
+        pack_vars->ci_top[0] = ci;
 
         n_daughters_left -= first_cell_to_move;
         first_cell_to_move = 0;
@@ -1277,14 +1311,15 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
       pack_vars->tasks_packed = 0;
       pack_vars->count_parts = 0;
       pack_vars->launch = 0;
+
     }
     /* case when we have launched then gone back to pack but did not pack
      * enough to launch again */
     else if (npacked == n_leaves_found) {
       if (launched == 1) {
         pack_vars->n_daughters_total = n_daughters_left;
-        buf->cj_top[0] = cj;
-        buf->ci_top[0] = ci;
+        pack_vars->cj_top[0] = cj;
+        pack_vars->ci_top[0] = ci;
         f_l_daughters[0][0] = 0;
         f_l_daughters[0][1] = n_daughters_left;
         pack_vars->top_tasks_packed = 1;
@@ -1300,7 +1335,8 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
     pack_vars->launch = 0;
   }
 
-  /* A. Nasar: Launch-leftovers counter re-set to zero and cells unlocked */
+  /* Launch-leftovers counter re-set to zero and cells unlocked */
+  /* TODO: No cell unlocking happening here. Is comment still accurate? */
   pack_vars->launch_leftovers = 0;
   pack_vars->launch = 0;
 }

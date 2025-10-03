@@ -37,14 +37,18 @@ extern "C" {
 
 #include <cuda_runtime.h>
 
-/*! Struct to hold all data for the transfer of a single task (sub)type */
+/* Rule-of-thumb: Everything related to actual particle data and everything
+ * CUDA-specific goes in here. Everything else goes into gpu_pack_vars struct.*/
+
+/*! Struct to hold all data for the transfer of a single task (sub)type. */
 struct gpu_offload_data {
 #ifdef WITH_CUDA
 
-  /*! data required for self and pair packing tasks destined for the GPU*/
+  /*! bookkeeping meta-data for offloading */
   struct gpu_pack_vars pv;
 
   /*! First and last particles for self interactions */
+  /* TODO: This should be cuda-independent and moved into gpu_pack_vars */
   int2 *task_first_part;
   int2 *d_task_first_part;
 
@@ -111,34 +115,6 @@ struct gpu_offload_data {
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
   size_t parts_recv_size;
-#endif
-
-  /*! TODO: Documentation */
-  struct cell **ci_d;
-  struct cell **cj_d;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  size_t ci_d_size;
-  size_t cj_d_size;
-#endif
-
-  /*! TODO: Documentation */
-  int **first_and_last_daughters;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  size_t first_and_last_daughters_size;
-#endif
-
-  /*! TODO: Documentation */
-  struct cell **ci_top;
-  struct cell **cj_top;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  size_t ci_top_size;
-  size_t cj_top_size;
 #endif
 
   /*! TODO: Documentation */

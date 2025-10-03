@@ -178,8 +178,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   buf->d_parts_recv_size = self_pair_fact * count_max_parts;
 #endif
 
-  cu_error =
-      cudaMallocHost((void **)&buf->parts_send_d,
+  cu_error = cudaMallocHost((void **)&buf->parts_send_d,
                      self_pair_fact * count_max_parts * send_struct_size);
   swift_assert(cu_error == cudaSuccess);
 #ifdef SWIFT_DEBUG_CHECKS
@@ -202,40 +201,40 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
      * offload. */
     size_t max_length = 2 * target_n_tasks * 2;
 
-    buf->ci_d = (struct cell **)malloc(max_length * sizeof(struct cell *));
-    buf->cj_d = (struct cell **)malloc(max_length * sizeof(struct cell *));
-    buf->first_and_last_daughters =
-        (int **)malloc(target_n_tasks * 2 * sizeof(int *));
+    pv->ci_d = (struct cell **)malloc(max_length * sizeof(struct cell *));
+    pv->cj_d = (struct cell **)malloc(max_length * sizeof(struct cell *));
+    pv->first_and_last_daughters =
+        (size_t **)malloc(target_n_tasks * 2 * sizeof(size_t *));
     for (size_t i = 0; i < target_n_tasks * 2; i++) {
-      buf->first_and_last_daughters[i] = (int *)malloc(2 * sizeof(int));
+      pv->first_and_last_daughters[i] = (size_t *)malloc(2 * sizeof(size_t));
     }
 
-    buf->ci_top =
+    pv->ci_top =
         (struct cell **)malloc(2ul * target_n_tasks * sizeof(struct cell *));
-    buf->cj_top =
+    pv->cj_top =
         (struct cell **)malloc(2ul * target_n_tasks * sizeof(struct cell *));
 
 #ifdef SWIFT_DEBUG_CHECKS
-    buf->ci_d_size = target_n_tasks * 2;
-    buf->cj_d_size = target_n_tasks * 2;
-    buf->first_and_last_daughters_size = target_n_tasks * 2;
-    buf->ci_top_size = 2ul * target_n_tasks;
-    buf->cj_top_size = 2ul * target_n_tasks;
+    pv->ci_d_size = target_n_tasks * 2;
+    pv->cj_d_size = target_n_tasks * 2;
+    pv->first_and_last_daughters_size = target_n_tasks * 2;
+    pv->ci_top_size = 2ul * target_n_tasks;
+    pv->cj_top_size = 2ul * target_n_tasks;
 #endif
 
   } else {
-    buf->ci_d = NULL;
-    buf->cj_d = NULL;
-    buf->first_and_last_daughters = NULL;
-    buf->ci_top = NULL;
-    buf->cj_top = NULL;
+    pv->ci_d = NULL;
+    pv->cj_d = NULL;
+    pv->first_and_last_daughters = NULL;
+    pv->ci_top = NULL;
+    pv->cj_top = NULL;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    buf->ci_d_size = 0;
-    buf->cj_d_size = 0;
-    buf->first_and_last_daughters_size = 0;
-    buf->ci_top_size = 0;
-    buf->cj_top_size = 0;
+    pv->ci_d_size = 0;
+    pv->cj_d_size = 0;
+    pv->first_and_last_daughters_size = 0;
+    pv->ci_top_size = 0;
+    pv->cj_top_size = 0;
 #endif
   }
 
@@ -296,13 +295,13 @@ void gpu_free_data_buffers(struct gpu_offload_data *buf,
     swift_assert(cu_error == cudaSuccess);
 
     for (size_t i = 0; i < pv->target_n_tasks * 2; i++) {
-      free(buf->first_and_last_daughters[i]);
+      free(pv->first_and_last_daughters[i]);
     }
-    free((void *)buf->first_and_last_daughters);
-    free((void *)buf->ci_d);
-    free((void *)buf->cj_d);
-    free((void *)buf->ci_top);
-    free((void *)buf->cj_top);
+    free((void *)pv->first_and_last_daughters);
+    free((void *)pv->ci_d);
+    free((void *)pv->cj_d);
+    free((void *)pv->ci_top);
+    free((void *)pv->cj_top);
 
   } else {
 

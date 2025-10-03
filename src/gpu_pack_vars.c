@@ -23,8 +23,6 @@ extern "C" {
 
 #include "gpu_pack_vars.h"
 
-#include "cuda/cuda_config.h"
-
 /**
  * @file gpu_pack_vars.c
  * @brief functions related to GPU packing data and meta-data
@@ -61,6 +59,13 @@ void gpu_init_pack_vars(struct gpu_pack_vars* pv) {
   pv->n_daughters_packed_index = 0;
   pv->n_leaves_found = 0;
 
+  pv->ci_d = NULL;
+  pv->cj_d = NULL;
+  pv->first_and_last_daughters = NULL;
+  pv->ci_top = NULL;
+  pv->cj_top = NULL;
+
+
 #ifdef SWIFT_DEBUG_CHECKS
   pv->task_list_size = 0;
   pv->top_task_list_size = 0;
@@ -68,6 +73,11 @@ void gpu_init_pack_vars(struct gpu_pack_vars* pv) {
   pv->bundle_first_part_size = 0;
   pv->bundle_last_part_size = 0;
   pv->bundle_first_task_list_size = 0;
+  pv->ci_d_size = 0;
+  pv->cj_d_size = 0;
+  pv->first_and_last_daughters_size = 0;
+  pv->ci_top_size = 0;
+  pv->cj_top_size = 0;
 #endif
 }
 
