@@ -17,8 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifndef GPU_PACK_VARS_H
-#define GPU_PACK_VARS_H
+#ifndef GPU_PACK_METADATA_H
+#define GPU_PACK_METADATA_H
 
 /**
  * @file gpu_pack_vars.h
@@ -36,7 +36,7 @@ extern "C" {
 
 /*! struct holding bookkeeping meta-data required for offloading;
  * does not depend on cuda/hip et al. */
- struct gpu_pack_vars {
+ struct gpu_pack_metadata {
 
   /* TODO: We only need 1 of these. task_list is used in self tasks,
    * top_task_list is used in pair tasks. They never interact. Keeping
@@ -66,20 +66,10 @@ extern "C" {
   int ci_list_size;
 #endif
 
-  /* List of cell shifts and positions. Shifts are used for pair tasks,
-   * while cell positions are used for self tasks.*/
-  union {
-    double *cellx;
-    double *shiftx;
-  };
-  union {
-    double *celly;
-    double *shifty;
-  };
-  union {
-    double *cellz;
-    double *shiftz;
-  };
+  /* List of cell and positions. Used for self tasks.*/
+  double *cellx;
+  double *celly;
+  double *cellz;
 
   /*! TODO: documentation */
   int bundle_size;
@@ -139,8 +129,8 @@ extern "C" {
   /*! TODO: documentation */
   int tasksperbundle;
 
-  /*! TODO: documentation */
-  int n_daughters_total;
+  /*! Total number of leaf cells in buffers */
+  int n_leaves_total;
 
   /*! TODO: documentation */
   int n_daughters_packed_index;
@@ -186,8 +176,8 @@ extern "C" {
 
 };
 
-void gpu_init_pack_vars(struct gpu_pack_vars *pv);
-void gpu_init_pack_vars_step(struct gpu_pack_vars *pv);
+void gpu_init_pack_vars(struct gpu_pack_metadata *pv);
+void gpu_init_pack_vars_step(struct gpu_pack_metadata *pv);
 
 #ifdef __cplusplus
 }

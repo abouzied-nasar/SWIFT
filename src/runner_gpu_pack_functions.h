@@ -274,7 +274,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
   const int count_cj = cj->hydro.count;
   if (count_ci == 0 || count_cj == 0) return;
 
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *pack_vars = &buf->pv;
 
   /* Get how many particles we've packed until now */
   /* DOUBLE-CHECK THIS */
@@ -335,7 +335,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
   const int count_cj = cj->hydro.count;
   if (count_ci == 0 || count_cj == 0) return;
 
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *pack_vars = &buf->pv;
 
   /* Get how many particles we've packed until now */
   int pack_ind = pack_vars->count_parts;
@@ -400,7 +400,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(
   const int count_cj = cj->hydro.count;
   if (count_ci == 0 || count_cj == 0) return;
 
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *pack_vars = &buf->pv;
 
   /* Get how many particles we've packed until now */
   int pack_ind = pack_vars->count_parts;

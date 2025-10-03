@@ -32,23 +32,23 @@ extern "C" {
 
 #include "cell.h"
 #include "gpu_pack_params.h"
-#include "gpu_pack_vars.h"
+#include "gpu_pack_metadata.h"
 #include "gpu_part_structs.h"
 
 #include <cuda_runtime.h>
 
 /* Rule-of-thumb: Everything related to actual particle data and everything
- * CUDA-specific goes in here. Everything else goes into gpu_pack_vars struct.*/
+ * CUDA-specific goes in here. Everything else goes into gpu_pack_metadata struct.*/
 
 /*! Struct to hold all data for the transfer of a single task (sub)type. */
 struct gpu_offload_data {
 #ifdef WITH_CUDA
 
   /*! bookkeeping meta-data for offloading */
-  struct gpu_pack_vars pv;
+  struct gpu_pack_metadata pv;
 
   /*! First and last particles for self interactions */
-  /* TODO: This should be cuda-independent and moved into gpu_pack_vars */
+  /* TODO: This should be cuda-independent and moved into gpu_pack_metadata */
   int2 *task_first_part;
   int2 *d_task_first_part;
 
@@ -117,7 +117,7 @@ struct gpu_offload_data {
   int parts_recv_size;
 #endif
 
-  /*! TODO: Documentation */
+  /*! Handle on events per cuda stream to register completion of async ops */
   cudaEvent_t *event_end;
 
 #endif /* WITH_CUDA */

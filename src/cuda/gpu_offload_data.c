@@ -67,12 +67,12 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
 
   /* Multiplication factor depending on whether this is for a self or a pair
    * task */
-  const size_t self_pair_fact = is_pair_task ? 2 : 1;
+  const int self_pair_fact = is_pair_task ? 2 : 1;
 
   const int tasksperbundle = (target_n_tasks + n_bundles - 1) / n_bundles;
 
   /* Initialise and set up pack_vars */
-  struct gpu_pack_vars *pv = &(buf->pv);
+  struct gpu_pack_metadata *pv = &(buf->pv);
   gpu_init_pack_vars(pv);
 
   /* Now fill out contents */
@@ -252,7 +252,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
  */
 void gpu_init_data_buffers_step(struct gpu_offload_data *buf) {
 
-  struct gpu_pack_vars *pv = &buf->pv;
+  struct gpu_pack_metadata *pv = &buf->pv;
   gpu_init_pack_vars_step(pv);
 }
 
@@ -262,7 +262,7 @@ void gpu_init_data_buffers_step(struct gpu_offload_data *buf) {
 void gpu_free_data_buffers(struct gpu_offload_data *buf,
                            const char is_pair_task) {
 
-  struct gpu_pack_vars *pv = &(buf->pv);
+  struct gpu_pack_metadata *pv = &(buf->pv);
 
   cudaError_t cu_error = cudaErrorMemoryAllocation;
   cu_error = cudaFreeHost(pv->bundle_first_part);

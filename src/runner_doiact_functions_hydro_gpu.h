@@ -64,7 +64,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
     const enum task_subtypes task_subtype) {
 
   /* Grab a hold of the packing buffers */
-  struct gpu_pack_vars *pv = &(buf->pv);
+  struct gpu_pack_metadata *pv = &(buf->pv);
 
   /* Place pointers to the task and cells packed in an array for use later
    * when unpacking after the GPU offload */
@@ -231,7 +231,7 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
 
   /* Grab some handles. */
   /* packing data and metadata */
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *pack_vars = &buf->pv;
 
   /* Arrays for daughter cells */
   struct cell **ci_d = pack_vars->ci_d;
@@ -239,11 +239,11 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
 
   if (depth == 0) {
     /* while at the top level, reset counters. */
-    pack_vars->n_daughters_packed_index = pack_vars->n_daughters_total;
+    pack_vars->n_daughters_packed_index = pack_vars->n_leaves_total;
     pack_vars->n_leaves_found = 0;
   }
 
-  const int n_daughters = pack_vars->n_daughters_total;
+  const int n_daughters = pack_vars->n_leaves_total;
 
   /* Get the type of pair and flip ci/cj if needed. */
   double shift[3];
@@ -301,7 +301,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(
   /* Grab handles */
   const struct engine *e = r->e;
   int4 *fparti_fpartj_lparti_lpartj = buf->fparti_fpartj_lparti_lpartj;
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *pack_vars = &buf->pv;
 
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
@@ -415,7 +415,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     const float d_a, const float d_H) {
 
   /* Grab pack_vars */
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *pack_vars = &buf->pv;
 
   /* Identify the number of GPU bundles to run in ideal case */
   int n_bundles = pack_vars->n_bundles;
@@ -616,7 +616,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
   const struct engine *e = r->e;
 
   /* Grab pack_vars */
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *pack_vars = &buf->pv;
 
   /* Identify the number of GPU bundles to run in ideal case */
   const int n_bundles = pack_vars->n_bundles_unpack;
@@ -794,7 +794,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
     const enum task_subtypes task_subtype) {
 
   /* Grab handles */
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *pack_vars = &buf->pv;
   int4 *fparti_fpartj_lparti_lpartj_dens = buf->fparti_fpartj_lparti_lpartj;
   cudaEvent_t *pair_end = buf->event_end;
 
@@ -1005,7 +1005,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     const enum task_subtypes task_subtype) {
 
   /* Grab handles */
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *pack_vars = &buf->pv;
   int n_leaves_found = buf->pv.n_leaves_found;
 
   struct cell **ci_d = pack_vars->ci_d;
@@ -1140,7 +1140,7 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
                                   const float d_a, const float d_H) {
 
   /* Grab handles */
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *pack_vars = &buf->pv;
   int n_leaves_found = buf->pv.n_leaves_found;
   int **f_l_daughters = pack_vars->first_and_last_daughters;
   int top_tasks_packed = pack_vars->top_tasks_packed;
@@ -1288,7 +1288,7 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
          * the first in the list so that we can continue packing correctly */
         pack_vars->top_task_list[0] = t;
         /* Move all tasks forward in list so that the first next task will be
-         * packed to index 0 Move remaining cell indices so that their indexing
+         * packed to index 0. Move remaining cell indices so that their indexing
          * starts from zero and ends in n_daughters_left */
         for (int i = first_cell_to_move; i < n_daughters_left; i++) {
           int shuffle = i - first_cell_to_move;
