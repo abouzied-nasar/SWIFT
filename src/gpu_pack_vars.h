@@ -53,8 +53,8 @@ extern "C" {
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
   union {
-    size_t task_list_size;
-    size_t top_task_list_size;
+    int task_list_size;
+    int top_task_list_size;
   };
 #endif
 
@@ -63,7 +63,7 @@ extern "C" {
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t ci_list_size;
+  int ci_list_size;
 #endif
 
   /* List of cell shifts and positions. Shifts are used for pair tasks,
@@ -82,43 +82,43 @@ extern "C" {
   };
 
   /*! TODO: documentation */
-  size_t bundle_size;
+  int bundle_size;
 
   /*! How many particles have been packed */
-  size_t count_parts;
+  int count_parts;
 
   /*! TODO: DOCUMENTATION */
-  size_t tasks_packed;
+  int tasks_packed;
 
   /*! TODO: documentation */
-  size_t top_tasks_packed;
+  int top_tasks_packed;
 
   /*! TODO: documentation */
-  size_t *bundle_first_part;
+  int *bundle_first_part;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t bundle_first_part_size;
+  int bundle_first_part_size;
 #endif
 
   /*! TODO: documentation */
-  size_t *bundle_last_part;
+  int *bundle_last_part;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t bundle_last_part_size;
+  int bundle_last_part_size;
 #endif
 
   /*! TODO: documentation */
-  size_t *bundle_first_task_list;
+  int *bundle_first_task_list;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t bundle_first_task_list_size;
+  int bundle_first_task_list_size;
 #endif
 
   /*! TODO: documentation */
-  size_t count_max_parts;
+  int count_max_parts;
 
   /*! TODO: documentation */
   char launch;
@@ -127,27 +127,27 @@ extern "C" {
   char launch_leftovers;
 
   /*! TODO: documentation */
-  size_t target_n_tasks;
+  int target_n_tasks;
 
   /*! TODO: documentation */
-  size_t n_bundles;
+  int n_bundles;
 
   /*! number of bundles to use for unpacking. May differ from n_bundles if
    * we're launching leftovers. */
-  size_t n_bundles_unpack;
+  int n_bundles_unpack;
 
   /*! TODO: documentation */
-  size_t tasksperbundle;
+  int tasksperbundle;
 
   /*! TODO: documentation */
-  size_t n_daughters_total;
+  int n_daughters_total;
 
   /*! TODO: documentation */
-  size_t n_daughters_packed_index;
+  int n_daughters_packed_index;
 
   /*! Number of leaf cells which require interactions found during a recursive
    * search */
-  size_t n_leaves_found;
+  int n_leaves_found;
 
 
 
@@ -159,18 +159,18 @@ extern "C" {
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t ci_d_size;
-  size_t cj_d_size;
+  int ci_d_size;
+  int cj_d_size;
 #endif
 
   /*! The indexes of the first and last leaf cell packed into the particle
    * buffer per super-level pair task. The first index of this array
    * corresponds to the super-level task stored in */
-   size_t **first_and_last_daughters;
+   int **first_and_last_daughters;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t first_and_last_daughters_size;
+  int first_and_last_daughters_size;
 #endif
 
   /*! TODO: Documentation */
@@ -179,8 +179,8 @@ extern "C" {
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t ci_top_size;
-  size_t cj_top_size;
+  int ci_top_size;
+  int cj_top_size;
 #endif
 
 

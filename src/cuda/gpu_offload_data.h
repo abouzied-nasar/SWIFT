@@ -54,15 +54,15 @@ struct gpu_offload_data {
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t task_first_part_size;
-  size_t d_task_first_part_size;
+  int task_first_part_size;
+  int d_task_first_part_size;
 #endif
 
   /*! First and last particles of cells i and j for pair interactions */
   int4 *fparti_fpartj_lparti_lpartj;
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t fparti_fpartj_lparti_lpartj_size;
+  int fparti_fpartj_lparti_lpartj_size;
 #endif
 
 
@@ -78,7 +78,7 @@ struct gpu_offload_data {
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t d_parts_send_size;
+  int d_parts_send_size;
 #endif
 
   /*! Array used to receive particle data on device from host */
@@ -90,7 +90,7 @@ struct gpu_offload_data {
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t d_parts_recv_size;
+  int d_parts_recv_size;
 #endif
 
   /*! Array used to send particle data from host to device */
@@ -102,7 +102,7 @@ struct gpu_offload_data {
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t parts_send_size;
+  int parts_send_size;
 #endif
 
   /*! Array used to receive particle data from device on host */
@@ -114,7 +114,7 @@ struct gpu_offload_data {
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  size_t parts_recv_size;
+  int parts_recv_size;
 #endif
 
   /*! TODO: Documentation */
@@ -125,8 +125,8 @@ struct gpu_offload_data {
 
 void gpu_init_data_buffers(struct gpu_offload_data *buf,
                            const struct gpu_global_pack_params *params,
-                           const size_t send_struct_size,
-                           const size_t recv_struct_size,
+                           const int send_struct_size,
+                           const int recv_struct_size,
                            const char is_pair_task);
 
 void gpu_init_data_buffers_step(struct gpu_offload_data *buf);

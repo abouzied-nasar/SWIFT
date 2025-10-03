@@ -91,7 +91,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_self_force(
 __attribute__((always_inline)) INLINE static void gpu_unpack_self_density(
     struct cell *restrict c,
     const struct gpu_part_recv_d *restrict parts_buffer,
-    const size_t pack_position, const size_t count, const struct engine *e) {
+    const int pack_position, const int count, const struct engine *e) {
 
   gpu_unpack_part_self_density(c, parts_buffer, pack_position, count, e);
 }
@@ -105,7 +105,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_self_density(
 __attribute__((always_inline)) INLINE static void gpu_unpack_self_gradient(
     struct cell *restrict c,
     const struct gpu_part_recv_g *restrict parts_buffer,
-    const size_t pack_position, const size_t count, const struct engine *e) {
+    const int pack_position, const int count, const struct engine *e) {
 
   gpu_unpack_part_self_gradient(c, parts_buffer, pack_position, count, e);
 }
@@ -119,7 +119,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_self_gradient(
 __attribute__((always_inline)) INLINE static void gpu_unpack_self_force(
     struct cell *restrict c,
     const struct gpu_part_recv_f *restrict parts_buffer,
-    const size_t pack_position, const size_t count, const struct engine *e) {
+    const int pack_position, const int count, const struct engine *e) {
 
   gpu_unpack_part_self_force(c, parts_buffer, pack_position, count, e);
 }
@@ -130,8 +130,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_self_force(
  */
 __attribute__((always_inline)) INLINE static void gpu_unpack_pair_density(
     const struct runner *r, struct cell *ci, struct cell *cj,
-    const struct gpu_part_recv_d *parts_aos_buffer, size_t *pack_ind,
-    size_t count_max_parts) {
+    const struct gpu_part_recv_d *parts_aos_buffer, int *pack_ind,
+    int count_max_parts) {
 
   const struct engine *e = r->e;
 
@@ -140,14 +140,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_density(
     return;
   }
 
-  size_t count_ci = ci->hydro.count;
-  size_t count_cj = cj->hydro.count;
+  int count_ci = ci->hydro.count;
+  int count_cj = cj->hydro.count;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (*pack_ind + count_ci + count_cj >= count_max_parts) {
     error(
         "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind is "
-        "%lu, counts are %lu %lu, max is %lu",
+        "%d, counts are %d %d, max is %d",
         *pack_ind, count_ci, count_cj, count_max_parts);
   }
 #endif
@@ -175,8 +175,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_density(
  */
 __attribute__((always_inline)) INLINE static void gpu_unpack_pair_gradient(
     const struct runner *r, struct cell *ci, struct cell *cj,
-    const struct gpu_part_recv_g *parts_aos_buffer, size_t *pack_ind,
-    size_t count_max_parts) {
+    const struct gpu_part_recv_g *parts_aos_buffer, int *pack_ind,
+    int count_max_parts) {
 
   const struct engine *e = r->e;
 
@@ -185,14 +185,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_gradient(
     return;
   }
 
-  size_t count_ci = ci->hydro.count;
-  size_t count_cj = cj->hydro.count;
+  int count_ci = ci->hydro.count;
+  int count_cj = cj->hydro.count;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (*pack_ind + count_ci + count_cj >= count_max_parts) {
     error(
         "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind is "
-        "%lu, counts are %lu %lu, max is %lu",
+        "%d, counts are %d %d, max is %d",
         *pack_ind, count_ci, count_cj, count_max_parts);
   }
 #endif
@@ -220,8 +220,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_gradient(
  */
 __attribute__((always_inline)) INLINE static void gpu_unpack_pair_force(
     const struct runner *r, struct cell *ci, struct cell *cj,
-    const struct gpu_part_recv_f *parts_aos_buffer, size_t *pack_ind,
-    size_t count_max_parts) {
+    const struct gpu_part_recv_f *parts_aos_buffer, int *pack_ind,
+    int count_max_parts) {
 
   const struct engine *e = r->e;
 
@@ -229,14 +229,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_force(
     return;
   }
 
-  size_t count_ci = ci->hydro.count;
-  size_t count_cj = cj->hydro.count;
+  int count_ci = ci->hydro.count;
+  int count_cj = cj->hydro.count;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (*pack_ind + count_ci + count_cj >= count_max_parts) {
     error(
         "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind is "
-        "%lu, counts are %lu %lu, max is %lu",
+        "%d, counts are %d %d, max is %d",
         *pack_ind, count_ci, count_cj, count_max_parts);
   }
 #endif
@@ -278,13 +278,13 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
 
   /* Get how many particles we've packed until now */
   /* DOUBLE-CHECK THIS */
-  size_t pack_ind = pack_vars->count_parts;
+  int pack_ind = pack_vars->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (pack_ind + count_ci + count_cj >= 2 * pack_vars->count_max_parts) {
     error(
-        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %lu"
-        "ci %i cj %i count_max %lu",
+        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %d"
+        "ci %i cj %i count_max %d",
         pack_ind, count_ci, count_cj, pack_vars->count_max_parts);
   }
 #endif
@@ -338,13 +338,13 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
   struct gpu_pack_vars *pack_vars = &buf->pv;
 
   /* Get how many particles we've packed until now */
-  size_t pack_ind = pack_vars->count_parts;
+  int pack_ind = pack_vars->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (pack_ind + count_ci + count_cj >= 2 * pack_vars->count_max_parts) {
     error(
-        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %lu"
-        "ci %i cj %i count_max %lu",
+        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %d"
+        "ci %i cj %i count_max %d",
         pack_ind, count_ci, count_cj, pack_vars->count_max_parts);
   }
 #endif
@@ -403,13 +403,13 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(
   struct gpu_pack_vars *pack_vars = &buf->pv;
 
   /* Get how many particles we've packed until now */
-  size_t pack_ind = pack_vars->count_parts;
+  int pack_ind = pack_vars->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (pack_ind + count_ci + count_cj >= 2 * pack_vars->count_max_parts) {
     error(
-        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %lu"
-        "ci %i cj %i count_max %lu",
+        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %d"
+        "ci %i cj %i count_max %d",
         pack_ind, count_ci, count_cj, pack_vars->count_max_parts);
   }
 #endif

@@ -50,14 +50,14 @@ extern "C" {
  */
 void gpu_init_data_buffers(struct gpu_offload_data *buf,
                            const struct gpu_global_pack_params *params,
-                           const size_t send_struct_size,
-                           const size_t recv_struct_size,
+                           const int send_struct_size,
+                           const int recv_struct_size,
                            const char is_pair_task) {
 
-  size_t target_n_tasks = params->pack_size;
-  size_t n_bundles = params->n_bundles;
-  size_t bundle_size = params->bundle_size;
-  size_t count_max_parts = params->count_max_parts;
+  int target_n_tasks = params->pack_size;
+  int n_bundles = params->n_bundles;
+  int bundle_size = params->bundle_size;
+  int count_max_parts = params->count_max_parts;
 
   if (is_pair_task) {
     target_n_tasks = params->pack_size_pair;
@@ -69,7 +69,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
    * task */
   const size_t self_pair_fact = is_pair_task ? 2 : 1;
 
-  const size_t tasksperbundle = (target_n_tasks + n_bundles - 1) / n_bundles;
+  const int tasksperbundle = (target_n_tasks + n_bundles - 1) / n_bundles;
 
   /* Initialise and set up pack_vars */
   struct gpu_pack_vars *pv = &(buf->pv);
@@ -199,14 +199,14 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
      * Over-allocated for now but a good guess is multiply by 2 to ensure we
      * always have room for recursing through more tasks than we plan to
      * offload. */
-    size_t max_length = 2 * target_n_tasks * 2;
+    int max_length = 2 * target_n_tasks * 2;
 
     pv->ci_d = (struct cell **)malloc(max_length * sizeof(struct cell *));
     pv->cj_d = (struct cell **)malloc(max_length * sizeof(struct cell *));
     pv->first_and_last_daughters =
-        (size_t **)malloc(target_n_tasks * 2 * sizeof(size_t *));
-    for (size_t i = 0; i < target_n_tasks * 2; i++) {
-      pv->first_and_last_daughters[i] = (size_t *)malloc(2 * sizeof(size_t));
+        (int **)malloc(target_n_tasks * 2 * sizeof(int *));
+    for (int i = 0; i < target_n_tasks * 2; i++) {
+      pv->first_and_last_daughters[i] = (int *)malloc(2 * sizeof(int));
     }
 
     pv->ci_top =
@@ -241,7 +241,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   /* Create space for cuda events */
   buf->event_end = (cudaEvent_t *)malloc(n_bundles * sizeof(cudaEvent_t));
 
-  for (size_t i = 0; i < n_bundles; i++) {
+  for (int i = 0; i < n_bundles; i++) {
     cu_error = cudaEventCreate(&(buf->event_end[i]));
     swift_assert(cu_error == cudaSuccess);
   }
@@ -294,7 +294,7 @@ void gpu_free_data_buffers(struct gpu_offload_data *buf,
     cu_error = cudaFreeHost(buf->fparti_fpartj_lparti_lpartj);
     swift_assert(cu_error == cudaSuccess);
 
-    for (size_t i = 0; i < pv->target_n_tasks * 2; i++) {
+    for (int i = 0; i < pv->target_n_tasks * 2; i++) {
       free(pv->first_and_last_daughters[i]);
     }
     free((void *)pv->first_and_last_daughters);
