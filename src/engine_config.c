@@ -950,7 +950,7 @@ void engine_config(int restart, int fof, struct engine *e,
   size_t bundle_size_pair = 1;
 #endif
 
-  gpu_set_pack_params(&e->gpu_pack_params, pack_size, pack_size_pair,
+  gpu_pack_params_set(&e->gpu_pack_params, pack_size, pack_size_pair,
                       bundle_size, bundle_size_pair, e->s->eta_neighbours);
 
   if (restart) {

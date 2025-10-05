@@ -21,7 +21,7 @@
 #define GPU_PACK_METADATA_H
 
 /**
- * @file gpu_pack_vars.h
+ * @file gpu_pack_metadata.h
  * @brief struct and corresponding functions related to GPU packing data and
  * meta-data
  */
@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 #include "config.h"
+#include "gpu_pack_params.h"
 
 #include <stddef.h>
 
@@ -38,146 +39,116 @@ extern "C" {
  * does not depend on cuda/hip et al. */
  struct gpu_pack_metadata {
 
-  /* TODO: We only need 1 of these. task_list is used in self tasks,
-   * top_task_list is used in pair tasks. They never interact. Keeping
-   * this until we've figured out current bugs so as to not modify the
-   * codebase beyond recognition yet. */
-  union {
-    /*! List of tasks and respective cells to be packed */
-    struct task **task_list;
-
-    /*! List of "top" tasks (tasks at the super level) we've packed */
-    struct task **top_task_list;
-  };
-
+  /*! List of tasks cells to be packed */
+  struct task **task_list;
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  union {
-    int task_list_size;
-    int top_task_list_size;
-  };
+  int task_list_size;
 #endif
 
-  /*! TODO: documentation */
-  struct cell **ci_list;
+  /*! Count how many (super-level) tasks we've identified for packing */
+  int tasks_in_list;
 
+  /*! List of super level cells to be packed in self tasks */
+  /* TODO: Use ci_super instead, as for pair tasks. We don't need this
+   * to be separate. */
+  struct cell **ci_list;
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
   int ci_list_size;
 #endif
 
-  /* List of cell and positions. Used for self tasks.*/
-  double *cellx;
-  double *celly;
-  double *cellz;
-
-  /*! TODO: documentation */
-  int bundle_size;
-
   /*! How many particles have been packed */
   int count_parts;
 
-  /*! TODO: DOCUMENTATION */
-  int tasks_packed;
+  /*! How many self tasks we have already packed (their particle data copied)
+   * into the buffers */
+  /* TODO: to be replaced by leaf_pairs_packed */
+  int self_tasks_packed;
 
-  /*! TODO: documentation */
-  int top_tasks_packed;
+  /*! How man pairs of leaf cells for pair interactions we have alread packed
+   * (their particle data copied) into the buffers */
+  int leaf_pairs_packed;
 
-  /*! TODO: documentation */
+  /*! Are these buffers ready to trigger launch on GPU? */
+  char launch;
+
+  /*! Are we launching leftovers (fewer than target offload size)? */
+  char launch_leftovers;
+
+  /*! Index of the first particle of a bundle in the buffer arrays */
   int *bundle_first_part;
-
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
   int bundle_first_part_size;
 #endif
 
-  /*! TODO: documentation */
+  /*! Index of the last particle of a bundle in the buffer arrays */
   int *bundle_last_part;
-
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
   int bundle_last_part_size;
 #endif
 
-  /*! TODO: documentation */
-  int *bundle_first_task_list;
-
+  /*! For self-tasks: The index of the first leaf cell (pair) of a bundle as it
+   * is stored in the task_list. For pair-tasks: The index of the first leaf
+   * cell of a bundle in the ci_leaves, cj_leaves arrays.*/
+  int *bundle_first_leaf;
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  int bundle_first_task_list_size;
+  int bundle_first_leaf_size;
 #endif
 
-  /*! TODO: documentation */
-  int count_max_parts;
-
-  /*! TODO: documentation */
-  char launch;
-
-  /*! TODO: documentation */
-  char launch_leftovers;
-
-  /*! TODO: documentation */
-  int target_n_tasks;
-
-  /*! TODO: documentation */
-  int n_bundles;
-
-  /*! number of bundles to use for unpacking. May differ from n_bundles if
+  /*! Number of bundles to use unpack. May differ from target_n_bundles if
    * we're launching leftovers. */
   int n_bundles_unpack;
 
-  /*! TODO: documentation */
-  int tasksperbundle;
-
-  /*! Total number of leaf cells in buffers */
-  int n_leaves_total;
-
-  /*! TODO: documentation */
-  int n_daughters_packed_index;
-
   /*! Number of leaf cells which require interactions found during a recursive
    * search */
-  int n_leaves_found;
+  int n_leaves;
 
+  /*! How many leaves have been identified for a single (pair) task during recursion */
+  int task_n_leaves;
 
+  /*! Lists of cell pairs (ci, cj) which are to be interacted */
+  struct cell **ci_leaves;
+  struct cell **cj_leaves;
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  int ci_leaves_size;
+  int cj_leaves_size;
+#endif
 
+  /*! The indexes of the first and last leaf cell pairs packed into the
+   * particle buffer per super-level (pair) task. The first index of this array
+   * corresponds to the super-level task stored in `task_list`.*/
+   int **task_first_last_leaf_pair;
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Keep track of allocated array size for boundary checks. */
+  int task_first_last_leaf_pair_size;
+#endif
 
-
-  /*! TODO: Documentation */
-  struct cell **ci_d;
-  struct cell **cj_d;
+  /*! Cells ci and cj at the super level of the associated pair task */
+  /* TODO: From what I see, we only use them to lock and unlock cell trees.
+   * We can access them through t->ci, t->cj since we keep track of tasks
+   * in md->task_list. So these need purging. */
+  struct cell **ci_super;
+  struct cell **cj_super;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  int ci_d_size;
-  int cj_d_size;
+  int ci_super_size;
+  int cj_super_size;
 #endif
 
-  /*! The indexes of the first and last leaf cell packed into the particle
-   * buffer per super-level pair task. The first index of this array
-   * corresponds to the super-level task stored in */
-   int **first_and_last_daughters;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int first_and_last_daughters_size;
-#endif
-
-  /*! TODO: Documentation */
-  struct cell **ci_top;
-  struct cell **cj_top;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int ci_top_size;
-  int cj_top_size;
-#endif
-
-
+  /*! Global (fixed) packing parameters */
+  struct gpu_global_pack_params params;
 };
 
-void gpu_init_pack_vars(struct gpu_pack_metadata *pv);
-void gpu_init_pack_vars_step(struct gpu_pack_metadata *pv);
+
+void gpu_pack_metadata_init(struct gpu_pack_metadata *md, const struct gpu_global_pack_params *params);
+void gpu_pack_metadata_init_step(struct gpu_pack_metadata *md);
+void gpu_pack_metadata_reset(struct gpu_pack_metadata* md);
 
 #ifdef __cplusplus
 }

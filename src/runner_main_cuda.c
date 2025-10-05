@@ -205,9 +205,9 @@ void *runner_main_cuda(void *data) {
   cudaStream_t stream[gpu_pack_params.n_bundles];
   cudaStream_t stream_pairs[gpu_pack_params.n_bundles_pair];
 
-  for (size_t i = 0; i < gpu_pack_params.n_bundles; i++)
+  for (int i = 0; i < gpu_pack_params.n_bundles; i++)
     cudaStreamCreateWithFlags(&stream[i], cudaStreamNonBlocking);
-  for (size_t i = 0; i < gpu_pack_params.n_bundles_pair; i++)
+  for (int i = 0; i < gpu_pack_params.n_bundles_pair; i++)
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
   /* Declare some global variables */
@@ -744,8 +744,8 @@ void *runner_main_cuda(void *data) {
                t->subtype != task_subtype_gpu_pack_f) {
         t = scheduler_done(sched, t);
       }
-    } /* main loop. */
-  }
+    } /* Loop while there are tasks */
+  } /* main loop. */
 
   /* Release the bytes back into the wilderness */
   gpu_free_data_buffers(&gpu_buf_self_dens, /*is_pair_task=*/0);
@@ -755,9 +755,9 @@ void *runner_main_cuda(void *data) {
   gpu_free_data_buffers(&gpu_buf_pair_grad, /*is_pair_task=*/1);
   gpu_free_data_buffers(&gpu_buf_pair_forc, /*is_pair_task=*/1);
 
-  for (size_t i = 0; i < gpu_pack_params.n_bundles; i++)
+  for (int i = 0; i < gpu_pack_params.n_bundles; i++)
     cudaStreamDestroy(stream[i]);
-  for (size_t i = 0; i < gpu_pack_params.n_bundles_pair; i++)
+  for (int i = 0; i < gpu_pack_params.n_bundles_pair; i++)
     cudaStreamDestroy(stream_pairs[i]);
   /* Be kind, rewind. */
   return NULL;

@@ -31,8 +31,8 @@ extern "C" {
 #endif
 
 #include "cell.h"
-#include "gpu_pack_params.h"
 #include "gpu_pack_metadata.h"
+#include "gpu_pack_params.h"
 #include "gpu_part_structs.h"
 
 #include <cuda_runtime.h>
@@ -45,17 +45,17 @@ struct gpu_offload_data {
 #ifdef WITH_CUDA
 
   /*! bookkeeping meta-data for offloading */
-  struct gpu_pack_metadata pv;
+  struct gpu_pack_metadata md;
 
   /*! First and last particles for self interactions */
   /* TODO: This should be cuda-independent and moved into gpu_pack_metadata */
-  int2 *task_first_part;
-  int2 *d_task_first_part;
+  int2 *self_task_first_last_part;
+  int2 *d_self_task_first_last_part;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  int task_first_part_size;
-  int d_task_first_part_size;
+  int self_task_first_last_part_size;
+  int d_self_task_first_last_part_size;
 #endif
 
   /*! First and last particles of cells i and j for pair interactions */
@@ -64,8 +64,6 @@ struct gpu_offload_data {
   /*! Keep track of allocated array size for boundary checks. */
   int fparti_fpartj_lparti_lpartj_size;
 #endif
-
-
 
   /*! Arrays used to send particle data from device to host. A single struct
    * gpu_offload_data will only hold data for either density, gradient, or
@@ -125,8 +123,8 @@ struct gpu_offload_data {
 
 void gpu_init_data_buffers(struct gpu_offload_data *buf,
                            const struct gpu_global_pack_params *params,
-                           const int send_struct_size,
-                           const int recv_struct_size,
+                           const size_t send_struct_size,
+                           const size_t recv_struct_size,
                            const char is_pair_task);
 
 void gpu_init_data_buffers_step(struct gpu_offload_data *buf);

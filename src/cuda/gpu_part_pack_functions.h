@@ -33,11 +33,15 @@
 /**
  * @brief packs particle data for density tasks into CPU-side buffers for self
  * tasks
+ *
+ * @param c the #cell
+ * @param part_send_buf the buffer to pack into
+ * @param local_pack_position the first free index in the buffer arrays
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_self_density(
     const struct cell *restrict c,
     struct gpu_part_send_d *restrict part_send_buf,
-    const size_t local_pack_position) {
+    const int local_pack_position) {
 
   const int count = c->hydro.count;
   const struct part *ptmps = c->hydro.parts;
@@ -66,11 +70,15 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_self_density(
 /**
  * @brief packs particle data for gradient tasks into CPU-side buffers for self
  * tasks
+ *
+ * @param c the #cell
+ * @param part_send_buf the buffer to pack into
+ * @param local_pack_position the first free index in the buffer arrays
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_self_gradient(
     const struct cell *restrict c,
     struct gpu_part_send_g *restrict part_send_buf,
-    const size_t local_pack_position) {
+    const int local_pack_position) {
 
   const int count = c->hydro.count;
   const struct part *ptmps = c->hydro.parts;
@@ -104,10 +112,14 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_self_gradient(
 /**
  * @brief packs particle data for force tasks into CPU-side buffers for self
  * tasks
+ *
+ * @param c the #cell
+ * @param part_send_buf the buffer to pack into
+ * @param local_pack_position the first free index in the buffer arrays
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_self_force(
     const struct cell *restrict c, struct gpu_part_send_f *part_send_buf,
-    const size_t local_pack_position) {
+    const int local_pack_position) {
 
   const int count = c->hydro.count;
   const int pp = local_pack_position;
@@ -157,11 +169,11 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_self_force(
 __attribute__((always_inline)) INLINE static void gpu_unpack_part_self_density(
     struct cell *restrict c,
     const struct gpu_part_recv_d *restrict parts_buffer,
-    const size_t pack_position, const size_t count, const struct engine *e) {
+    const int pack_position, const int count, const struct engine *e) {
 
   const struct gpu_part_recv_d *parts_tmp = &parts_buffer[pack_position];
 
-  for (size_t i = 0; i < count; i++) {
+  for (int i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
     if (!part_is_active(p, e)) continue;
@@ -190,11 +202,11 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_self_density(
 __attribute__((always_inline)) INLINE static void gpu_unpack_part_self_gradient(
     struct cell *restrict c,
     const struct gpu_part_recv_g *restrict parts_buffer,
-    const size_t pack_position, const size_t count, const struct engine *e) {
+    const int pack_position, const int count, const struct engine *e) {
 
   const struct gpu_part_recv_g *parts_tmp = &parts_buffer[pack_position];
 
-  for (size_t i = 0; i < count; i++) {
+  for (int i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
     if (!part_is_active(p, e)) continue;
@@ -214,11 +226,11 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_self_gradient(
 __attribute__((always_inline)) INLINE static void gpu_unpack_part_self_force(
     struct cell *restrict c,
     const struct gpu_part_recv_f *restrict parts_buffer,
-    const size_t pack_position, const size_t count, const struct engine *e) {
+    const int pack_position, const int count, const struct engine *e) {
 
   const struct gpu_part_recv_f *parts_tmp = &parts_buffer[pack_position];
 
-  for (size_t i = 0; i < count; i++) {
+  for (int i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
     if (!part_is_active(p, e)) continue;
@@ -238,7 +250,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_self_force(
         p, fmaxf(p_tmp.udt_hdt_vsig_mintimebin_ngb.z, part_get_v_sig(p)));
 
     timebin_t min_ngb_time_bin =
-        (int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
+        (timebin_t)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
     part_set_timestep_limiter_min_ngb_time_bin(p, min_ngb_time_bin);
   }
 }
@@ -248,13 +260,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_self_force(
  * UNNECESSARY.*/
 __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_density(
     struct cell *restrict c,
-    const struct gpu_part_recv_d *restrict parts_buffer, const size_t pack_ind,
-    const size_t count) {
+    const struct gpu_part_recv_d *restrict parts_buffer, const int pack_ind,
+    const int count) {
 
   const struct gpu_part_recv_d *parts_tmp = &parts_buffer[pack_ind];
 
-  for (size_t i = 0; i < count; i++) {
+  for (int i = 0; i < count; i++) {
     /* TODO: WHY ARE WE NOT CHECKING WHETHER PARTICLE IS ACTIVE HERE???? */
+    /* TODO: WE NEED TO ZERO OUT BUFFERS TOO ONCE WE'RE DONE */
     struct gpu_part_recv_d p_tmp = parts_tmp[i];
     struct part *p = &c->hydro.parts[i];
     part_set_rho(p, part_get_rho(p) + p_tmp.rho_dh_wcount.x);
@@ -274,12 +287,12 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_density(
  * UNNECESSARY.*/
 __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_gradient(
     struct cell *restrict c,
-    const struct gpu_part_recv_g *restrict parts_buffer, const size_t pack_ind,
-    const size_t count) {
+    const struct gpu_part_recv_g *restrict parts_buffer, const int pack_ind,
+    const int count) {
 
   const struct gpu_part_recv_g *parts_tmp = &parts_buffer[pack_ind];
 
-  for (size_t i = 0; i < count; i++) {
+  for (int i = 0; i < count; i++) {
     /* TODO: WHY ARE WE NOT CHECKING WHETHER PARTICLE IS ACTIVE HERE???? */
     struct gpu_part_recv_g p_tmp = parts_tmp[i];
     struct part *p = &c->hydro.parts[i];
@@ -296,12 +309,12 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_gradient(
  * UNNECESSARY.*/
 __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_force(
     struct cell *restrict c,
-    const struct gpu_part_recv_f *restrict parts_buffer, const size_t pack_ind,
-    const size_t count) {
+    const struct gpu_part_recv_f *restrict parts_buffer, const int pack_ind,
+    const int count) {
 
   const struct gpu_part_recv_f *parts_tmp = &parts_buffer[pack_ind];
 
-  for (size_t i = 0; i < count; i++) {
+  for (int i = 0; i < count; i++) {
     /* TODO: WHY ARE WE NOT CHECKING WHETHER PARTICLE IS ACTIVE HERE???? */
     struct gpu_part_recv_f p_tmp = parts_tmp[i];
     struct part *restrict p = &c->hydro.parts[i];
@@ -316,7 +329,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_force(
     part_set_v_sig(
         p, fmaxf(p_tmp.udt_hdt_vsig_mintimebin_ngb.z, part_get_v_sig(p)));
     timebin_t min_ngb_time_bin =
-        (int)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
+        (timebin_t)(p_tmp.udt_hdt_vsig_mintimebin_ngb.w + 0.5f);
     part_set_timestep_limiter_min_ngb_time_bin(p, min_ngb_time_bin);
   }
 }
@@ -324,10 +337,21 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_force(
 /* TODO: IDEALLY, THIS SHOULD BE IDENTICAL FOR THE SELF TASKS.
  * PASS A CELL, BUFFER, INDEX TO COPY BACK. THIS REPLICATION IS
  * UNNECESSARY.*/
-__attribute__((always_inline)) INLINE static void gpu_pack_part_pair_density(
+/**
+ * @brief Packs the cell particle data for pair density interactions into the
+ * CPU-side buffers.
+ *
+ * @param c the #cell
+ * @param parts_buffer the buffer to pack into
+ * @param local_pack_position the first free index in the buffer arrays
+ * @param shift periodic boundary shift
+ * @param cjstart start index of cell cj's particles (which this cell is to be interacted with) in buffer
+ * @param cjend end index of cell cj's particles (which this cell is to be interacted with) in buffer
+ */
+ __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_density(
     const struct cell *restrict c,
     struct gpu_part_send_d *restrict parts_buffer,
-    const int local_pack_position, const double3 shift, const int2 cstarts) {
+    const int local_pack_position, const double shift[3], const int cjstart, const int cjend) {
 
   const int count = c->hydro.count;
 
@@ -336,27 +360,38 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_density(
     const int id_in_pack = i + local_pack_position;
     const struct part *p = &c->hydro.parts[i];
     const double *x = part_get_const_x(p);
-    parts_buffer[id_in_pack].x_p_h.x = x[0] - shift.x;
-    parts_buffer[id_in_pack].x_p_h.y = x[1] - shift.y;
-    parts_buffer[id_in_pack].x_p_h.z = x[2] - shift.z;
+    parts_buffer[id_in_pack].x_p_h.x = x[0] - shift[0];
+    parts_buffer[id_in_pack].x_p_h.y = x[1] - shift[1];
+    parts_buffer[id_in_pack].x_p_h.z = x[2] - shift[2];
     parts_buffer[id_in_pack].x_p_h.w = part_get_h(p);
     const float *v = part_get_const_v(p);
     parts_buffer[id_in_pack].ux_m.x = v[0];
     parts_buffer[id_in_pack].ux_m.y = v[1];
     parts_buffer[id_in_pack].ux_m.z = v[2];
     parts_buffer[id_in_pack].ux_m.w = part_get_mass(p);
-    parts_buffer[id_in_pack].cjs_cje.x = cstarts.x;
-    parts_buffer[id_in_pack].cjs_cje.y = cstarts.y;
+    parts_buffer[id_in_pack].cjs_cje.x = cjstart;
+    parts_buffer[id_in_pack].cjs_cje.y = cjend;
   }
 }
 
 /* TODO: IDEALLY, THIS SHOULD BE IDENTICAL FOR THE SELF TASKS.
  * PASS A CELL, BUFFER, INDEX TO COPY BACK. THIS REPLICATION IS
  * UNNECESSARY.*/
+ /**
+ * @brief Packs the cell particle data for pair gradient interactions into the
+ * CPU-side buffers.
+ *
+ * @param c the #cell
+ * @param parts_buffer the buffer to pack into
+ * @param local_pack_position the first free index in the buffer arrays
+ * @param shift periodic boundary shift
+ * @param cjstart start index of cell cj's particles (which this cell is to be interacted with) in buffer
+ * @param cjend end index of cell cj's particles (which this cell is to be interacted with) in buffer
+ */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_gradient(
     const struct cell *restrict c,
     struct gpu_part_send_g *restrict parts_buffer,
-    const int local_pack_position, const double3 shift, const int2 cstarts) {
+    const int local_pack_position, const double shift[3], const int cjstart, const int cjend) {
 
   const int count = c->hydro.count;
 
@@ -367,9 +402,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_gradient(
     const int id_in_pack = i + local_pack_position;
     const struct part *p = &ptmps[i];
     const double *x = part_get_const_x(p);
-    parts_buffer[id_in_pack].x_h.x = x[0] - shift.x;
-    parts_buffer[id_in_pack].x_h.y = x[1] - shift.y;
-    parts_buffer[id_in_pack].x_h.z = x[2] - shift.z;
+    parts_buffer[id_in_pack].x_h.x = x[0] - shift[0];
+    parts_buffer[id_in_pack].x_h.y = x[1] - shift[1];
+    parts_buffer[id_in_pack].x_h.z = x[2] - shift[2];
     parts_buffer[id_in_pack].x_h.w = part_get_h(p);
     const float *v = part_get_const_v(&ptmps[i]);
     parts_buffer[id_in_pack].ux_m.x = v[0];
@@ -381,18 +416,29 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_gradient(
     parts_buffer[id_in_pack].rho_avisc_u_c.z = part_get_u(p);
     parts_buffer[id_in_pack].rho_avisc_u_c.w = part_get_soundspeed(p);
 
-    parts_buffer[id_in_pack].cjs_cje.x = cstarts.x;
-    parts_buffer[id_in_pack].cjs_cje.y = cstarts.y;
+    parts_buffer[id_in_pack].cjs_cje.x = cjstart;
+    parts_buffer[id_in_pack].cjs_cje.y = cjend;
   }
 }
 
 /* TODO: IDEALLY, THIS SHOULD BE IDENTICAL FOR THE SELF TASKS.
  * PASS A CELL, BUFFER, INDEX TO COPY BACK. THIS REPLICATION IS
  * UNNECESSARY.*/
+ /**
+ * @brief Packs the cell particle data for pair gradient interactions into the
+ * CPU-side buffers.
+ *
+ * @param c the #cell
+ * @param parts_buffer the buffer to pack into
+ * @param local_pack_position the first free index in the buffer arrays
+ * @param shift periodic boundary shift
+ * @param cjstart start index of cell cj's particles (which this cell is to be interacted with) in buffer
+ * @param cjend end index of cell cj's particles (which this cell is to be interacted with) in buffer
+ */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_force(
     const struct cell *restrict c,
     struct gpu_part_send_f *restrict parts_buffer,
-    const int local_pack_position, const double3 shift, const int2 cstarts) {
+    const int local_pack_position, const double shift[3], const int cjstart, const int cjend) {
 
   const int count = c->hydro.count;
 
@@ -403,9 +449,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_force(
     const struct part *p = &ptmps[i];
     const double *x = part_get_const_x(p);
     const int id_in_pack = local_pack_position + i;
-    parts_buffer[id_in_pack].x_h.x = x[0] - shift.x;
-    parts_buffer[id_in_pack].x_h.y = x[1] - shift.y;
-    parts_buffer[id_in_pack].x_h.z = x[2] - shift.z;
+    parts_buffer[id_in_pack].x_h.x = x[0] - shift[0];
+    parts_buffer[id_in_pack].x_h.y = x[1] - shift[1];
+    parts_buffer[id_in_pack].x_h.z = x[2] - shift[2];
 
     parts_buffer[id_in_pack].x_h.w = part_get_h(p);
 
@@ -429,8 +475,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_force(
     parts_buffer[id_in_pack].u_alphavisc_alphadiff.x = part_get_u(p);
     parts_buffer[id_in_pack].u_alphavisc_alphadiff.y = part_get_alpha_av(p);
     parts_buffer[id_in_pack].u_alphavisc_alphadiff.z = part_get_alpha_diff(p);
-    parts_buffer[id_in_pack].cjs_cje.x = cstarts.x;
-    parts_buffer[id_in_pack].cjs_cje.y = cstarts.y;
+    parts_buffer[id_in_pack].cjs_cje.x = cjstart;
+    parts_buffer[id_in_pack].cjs_cje.y = cjend;
   }
 }
 

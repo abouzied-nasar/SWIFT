@@ -90,9 +90,9 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
     message("max blocks per SM:          %i", max_blocks_SM);
     message("max blocks per stream:      %i", n_SMs * max_blocks_SM);
     message(
-        "Target n_blocks per kernel: %ld",
+        "Target n_blocks per kernel: %d",
         gpu_pack_params->bundle_size * nPartsPerCell / GPU_THREAD_BLOCK_SIZE);
-    message("Target n_blocks per stream: %ld",
+    message("Target n_blocks per stream: %d",
             gpu_pack_params->pack_size * nPartsPerCell / GPU_THREAD_BLOCK_SIZE);
     message("free mem:                   %.3g GB",
             ((double)free_mem) / (1024. * 1024. * 1024.));

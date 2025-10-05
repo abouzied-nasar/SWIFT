@@ -123,7 +123,6 @@ void gpu_launch_pair_density(struct gpu_part_send_d *parts_send,
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
 
-  /* printf("bundle_first=%d, bundle_n=%d\n", bundle_first_part, bundle_n_parts); */
   cuda_launch_pair_density<<<numBlocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
@@ -149,7 +148,6 @@ void gpu_launch_pair_force(struct gpu_part_send_f *parts_send,
                            int bundle_n_parts) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-
   cuda_launch_pair_force<<<numBlocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
@@ -163,9 +161,12 @@ void gpu_launch_self_density(struct gpu_part_send_d *parts_send,
                              int numBlocks_y, int bundle_first_task,
                              int2 *d_task_first_part_f4) {
 
-  dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  size_t shmem_size = 2ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4);
-  cuda_kernel_self_density<<<gridShape, GPU_THREAD_BLOCK_SIZE, shmem_size, stream>>>(parts_send, parts_recv, d_a, d_H, bundle_first_task, d_task_first_part_f4);
+  const dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
+  /* TODO: WHY IS THERE A FACTOR OF 2 HERE? Please document. */
+  /* Would it not be better to use sizeof(struct parts_send) */
+  const size_t bsize = GPU_THREAD_BLOCK_SIZE;
+  const size_t shmem_size = 2ul * bsize * sizeof(float4);
+  cuda_kernel_self_density<<<gridShape, bsize, shmem_size, stream>>>(parts_send, parts_recv, d_a, d_H, bundle_first_task, d_task_first_part_f4);
 }
 
 /**
@@ -177,9 +178,10 @@ void gpu_launch_self_gradient(struct gpu_part_send_g *parts_send,
                               int numBlocks_y, int bundle_first_task,
                               int2 *d_task_first_part_f4) {
 
-  dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  size_t shmem_size = 3ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4);
-  cuda_kernel_self_gradient<<<gridShape, GPU_THREAD_BLOCK_SIZE, shmem_size, stream>>>(parts_send, parts_recv, d_a, d_H, bundle_first_task, d_task_first_part_f4);
+  const dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
+  const size_t bsize = GPU_THREAD_BLOCK_SIZE;
+  const size_t shmem_size = 3ul * bsize * sizeof(float4);
+  cuda_kernel_self_gradient<<<gridShape, bsize, shmem_size, stream>>>(parts_send, parts_recv, d_a, d_H, bundle_first_task, d_task_first_part_f4);
 }
 
 /**
@@ -191,9 +193,10 @@ void gpu_launch_self_force(struct gpu_part_send_f *d_parts_send,
                            int numBlocks_y, int bundle_first_task,
                            int2 *d_task_first_part_f4) {
 
-  dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  size_t shmem_size = 4ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4) + GPU_THREAD_BLOCK_SIZE * sizeof(float3);
-  cuda_kernel_self_force<<<gridShape, GPU_THREAD_BLOCK_SIZE, shmem_size, stream>>>(d_parts_send, d_parts_recv, d_a, d_H, bundle_first_task, d_task_first_part_f4);
+  const dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
+  const size_t bsize = GPU_THREAD_BLOCK_SIZE;
+  const size_t shmem_size = 4ul * bsize * sizeof(float4) + bsize * sizeof(float3);
+  cuda_kernel_self_force<<<gridShape, bsize, shmem_size, stream>>>(d_parts_send, d_parts_recv, d_a, d_H, bundle_first_task, d_task_first_part_f4);
 }
 
 #ifdef __cplusplus
