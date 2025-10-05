@@ -38,7 +38,8 @@ extern "C" {
 #include <cuda_runtime.h>
 
 /* Rule-of-thumb: Everything related to actual particle data and everything
- * CUDA-specific goes in here. Everything else goes into gpu_pack_metadata struct.*/
+ * CUDA-specific goes in here. Everything else goes into gpu_pack_metadata
+ * struct.*/
 
 /*! Struct to hold all data for the transfer of a single task (sub)type. */
 struct gpu_offload_data {

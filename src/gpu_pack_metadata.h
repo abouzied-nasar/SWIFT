@@ -37,7 +37,7 @@ extern "C" {
 
 /*! struct holding bookkeeping meta-data required for offloading;
  * does not depend on cuda/hip et al. */
- struct gpu_pack_metadata {
+struct gpu_pack_metadata {
 
   /*! List of tasks cells to be packed */
   struct task **task_list;
@@ -107,7 +107,8 @@ extern "C" {
    * search */
   int n_leaves;
 
-  /*! How many leaves have been identified for a single (pair) task during recursion */
+  /*! How many leaves have been identified for a single (pair) task during
+   * recursion */
   int task_n_leaves;
 
   /*! Lists of cell pairs (ci, cj) which are to be interacted */
@@ -122,7 +123,7 @@ extern "C" {
   /*! The indexes of the first and last leaf cell pairs packed into the
    * particle buffer per super-level (pair) task. The first index of this array
    * corresponds to the super-level task stored in `task_list`.*/
-   int **task_first_last_packed_leaf_pair;
+  int **task_first_last_packed_leaf_pair;
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
   int task_first_last_packed_leaf_pair_size;
@@ -145,10 +146,10 @@ extern "C" {
   struct gpu_global_pack_params params;
 };
 
-
-void gpu_pack_metadata_init(struct gpu_pack_metadata *md, const struct gpu_global_pack_params *params);
+void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
+                            const struct gpu_global_pack_params *params);
 void gpu_pack_metadata_init_step(struct gpu_pack_metadata *md);
-void gpu_pack_metadata_reset(struct gpu_pack_metadata* md);
+void gpu_pack_metadata_reset(struct gpu_pack_metadata *md);
 
 #ifdef __cplusplus
 }

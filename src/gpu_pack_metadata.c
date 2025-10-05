@@ -35,7 +35,7 @@ extern "C" {
  * @param params gpu_global_pack_params struct containing valid parameters
  */
 void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
-    const struct gpu_global_pack_params *params) {
+                            const struct gpu_global_pack_params* params) {
 
   md->task_list = NULL;
   md->tasks_in_list = 0;
@@ -77,7 +77,6 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
   md->ci_super_size = 0;
   md->cj_super_size = 0;
 #endif
-
 }
 
 /**
@@ -92,7 +91,7 @@ void gpu_pack_metadata_init_step(struct gpu_pack_metadata* md) {
  * @brief reset the meta-data after a completed launch and unpack to prepare
  * for the next pack operation
  */
-void gpu_pack_metadata_reset(struct gpu_pack_metadata* md){
+void gpu_pack_metadata_reset(struct gpu_pack_metadata* md) {
 
   md->launch = 0;
   md->launch_leftovers = 0;
@@ -103,10 +102,8 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata* md){
   md->n_bundles_unpack = 0;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  for (int i = 0; i < md->task_list_size; i++)
-    md->task_list[i] = NULL;
-  for (int i = 0; i < md->ci_list_size; i++)
-    md->ci_list[i] = NULL;
+  for (int i = 0; i < md->task_list_size; i++) md->task_list[i] = NULL;
+  for (int i = 0; i < md->ci_list_size; i++) md->ci_list[i] = NULL;
   for (int i = 0; i < md->bundle_first_part_size; i++)
     md->bundle_first_part[i] = -123;
   for (int i = 0; i < md->bundle_last_part_size; i++)
@@ -122,14 +119,12 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata* md){
   /* md->count_parts = 0; */ /* Already covered in self task section above */
 
 #ifdef SWIFT_DEBUG_CHECKS
-  for (int i = 0; i < md->task_first_last_packed_leaf_pair_size; i++){
+  for (int i = 0; i < md->task_first_last_packed_leaf_pair_size; i++) {
     md->task_first_last_packed_leaf_pair[i][0] = -123;
     md->task_first_last_packed_leaf_pair[i][1] = -123;
   }
-  for (int i = 0; i < md->ci_super_size; i++)
-    md->ci_super[i] = NULL;
-  for (int i = 0; i < md->cj_super_size; i++)
-    md->cj_super[i] = NULL;
+  for (int i = 0; i < md->ci_super_size; i++) md->ci_super[i] = NULL;
+  for (int i = 0; i < md->cj_super_size; i++) md->cj_super[i] = NULL;
   for (int i = 0; i < md->bundle_first_part_size; i++)
     md->bundle_first_part[i] = -123;
   for (int i = 0; i < md->bundle_first_leaf_size; i++)

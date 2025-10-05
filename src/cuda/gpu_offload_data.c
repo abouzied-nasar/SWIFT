@@ -54,8 +54,10 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
                            const char is_pair_task) {
 
   /* Grab some handles */
-  const size_t target_n_tasks = is_pair_task ? params->pack_size_pair : params->pack_size;
-  const size_t n_bundles = is_pair_task ? params->n_bundles_pair : params->n_bundles;
+  const size_t target_n_tasks =
+      is_pair_task ? params->pack_size_pair : params->pack_size;
+  const size_t n_bundles =
+      is_pair_task ? params->n_bundles_pair : params->n_bundles;
   const size_t count_max_parts = params->count_max_parts;
 
   /* Multiplication factor depending on whether this is for a self or a pair
@@ -89,21 +91,22 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   md->bundle_first_leaf_size = self_pair_fact * n_bundles;
 #endif
 
-
   md->count_parts = 0;
 
   /* Watch out, task_list and top_tasks_lists are temporarily a union until we
    * purge one of them. */
   if (is_pair_task) {
     md->ci_list = NULL;
-    md->task_list = (struct task **)calloc(target_n_tasks, sizeof(struct task *));
+    md->task_list =
+        (struct task **)calloc(target_n_tasks, sizeof(struct task *));
 #ifdef SWIFT_DEBUG_CHECKS
     md->ci_list_size = 0;
     md->task_list_size = target_n_tasks;
 #endif
   } else {
     md->ci_list = (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
-    md->task_list = (struct task **)calloc(target_n_tasks, sizeof(struct task *));
+    md->task_list =
+        (struct task **)calloc(target_n_tasks, sizeof(struct task *));
 #ifdef SWIFT_DEBUG_CHECKS
     md->ci_list_size = target_n_tasks;
     md->task_list_size = target_n_tasks;
@@ -119,7 +122,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
     buf->d_self_task_first_last_part = NULL;
 #ifdef SWIFT_DEBUG_CHECKS
     buf->self_task_first_last_part_size = 0;
-    buf->d_self_task_first_last_part_size= 0;
+    buf->d_self_task_first_last_part_size = 0;
 #endif
   } else {
     cu_error = cudaMallocHost((void **)&buf->self_task_first_last_part,
@@ -164,7 +167,8 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   buf->d_parts_recv_size = self_pair_fact * count_max_parts;
 #endif
 
-  cu_error = cudaMallocHost((void **)&buf->parts_send_d,
+  cu_error =
+      cudaMallocHost((void **)&buf->parts_send_d,
                      self_pair_fact * count_max_parts * send_struct_size);
   swift_assert(cu_error == cudaSuccess);
 #ifdef SWIFT_DEBUG_CHECKS

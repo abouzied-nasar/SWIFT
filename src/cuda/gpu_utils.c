@@ -69,10 +69,12 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
   cu_error = cudaGetDeviceProperties(&prop, dev_id);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaDeviceGetAttribute(&max_blocks_SM, cudaDevAttrMaxBlocksPerMultiprocessor, dev_id);
+  cu_error = cudaDeviceGetAttribute(
+      &max_blocks_SM, cudaDevAttrMaxBlocksPerMultiprocessor, dev_id);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaDeviceGetAttribute(&n_SMs, cudaDevAttrMultiProcessorCount, dev_id);
+  cu_error =
+      cudaDeviceGetAttribute(&n_SMs, cudaDevAttrMultiProcessorCount, dev_id);
   swift_assert(cu_error == cudaSuccess);
 
   size_t free_mem;

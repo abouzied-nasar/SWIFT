@@ -168,7 +168,8 @@ __global__ void cuda_kernel_self_gradient(
    * kernel invocation */
   float4 *__restrict__ x_h_tmp = (float4 *)&varsf4_g[0];
   float4 *__restrict__ ux_m_tmp = (float4 *)&varsf4_g[GPU_THREAD_BLOCK_SIZE];
-  float4 *__restrict__ rho_avisc_u_c_tmp = (float4 *)&varsf4_g[GPU_THREAD_BLOCK_SIZE * 2];
+  float4 *__restrict__ rho_avisc_u_c_tmp =
+      (float4 *)&varsf4_g[GPU_THREAD_BLOCK_SIZE * 2];
 
   /*Particles copied in blocks to shared memory*/
   for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks;

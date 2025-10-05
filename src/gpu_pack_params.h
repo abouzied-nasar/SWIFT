@@ -47,9 +47,9 @@ struct gpu_global_pack_params {
 
 void gpu_pack_params_set(struct gpu_global_pack_params *pars,
                          const int pack_size, const int pack_size_pair,
-                         const int bundle_size,
-                         const int bundle_size_pair,
+                         const int bundle_size, const int bundle_size_pair,
                          const float eta_neighbours);
-void gpu_pack_params_copy(const struct gpu_global_pack_params *src, struct gpu_global_pack_params *dest);
+void gpu_pack_params_copy(const struct gpu_global_pack_params *src,
+                          struct gpu_global_pack_params *dest);
 
 #endif

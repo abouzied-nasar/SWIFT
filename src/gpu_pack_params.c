@@ -28,8 +28,6 @@
  * @brief functions related to global GPU packing parameters struct
  */
 
-
-
 /**
  * @brief Get the global packing parameters and fill out the
  * gpu_global_pack_params struct with meaningful data.
@@ -42,10 +40,9 @@
  *                          tasks
  * @param eta_neighours: Neighbour resolution eta.
  */
-void gpu_pack_params_set(struct gpu_global_pack_params* pars,
+void gpu_pack_params_set(struct gpu_global_pack_params *pars,
                          const int pack_size, const int pack_size_pair,
-                         const int bundle_size,
-                         const int bundle_size_pair,
+                         const int bundle_size, const int bundle_size_pair,
                          const float eta_neighbours) {
 
   pars->pack_size = pack_size;
@@ -60,8 +57,10 @@ void gpu_pack_params_set(struct gpu_global_pack_params* pars,
 
   /* n_bundles is the number of task bundles each thread has. Used to
    * loop through bundles */
-  pars->n_bundles = (pars->pack_size + pars->bundle_size - 1) / pars->bundle_size;
-  pars->n_bundles_pair = (pars->pack_size_pair + pars->bundle_size_pair - 1) / pars->bundle_size_pair;
+  pars->n_bundles =
+      (pars->pack_size + pars->bundle_size - 1) / pars->bundle_size;
+  pars->n_bundles_pair = (pars->pack_size_pair + pars->bundle_size_pair - 1) /
+                         pars->bundle_size_pair;
 
   swift_assert(pars->n_bundles > 0);
   swift_assert(pars->n_bundles_pair > 0);
@@ -97,7 +96,8 @@ void gpu_pack_params_set(struct gpu_global_pack_params* pars,
 /**
  * @brief Copy the global packing parameters from src to dest
  */
-void gpu_pack_params_copy(const struct gpu_global_pack_params *src, struct gpu_global_pack_params *dest){
+void gpu_pack_params_copy(const struct gpu_global_pack_params *src,
+                          struct gpu_global_pack_params *dest) {
 
   dest->pack_size = src->pack_size;
   dest->pack_size_pair = src->pack_size_pair;
@@ -106,5 +106,4 @@ void gpu_pack_params_copy(const struct gpu_global_pack_params *src, struct gpu_g
   dest->n_bundles = src->n_bundles;
   dest->n_bundles_pair = src->n_bundles_pair;
   dest->count_max_parts = src->count_max_parts;
-
 }

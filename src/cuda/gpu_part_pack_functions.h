@@ -345,13 +345,16 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_force(
  * @param parts_buffer the buffer to pack into
  * @param local_pack_position the first free index in the buffer arrays
  * @param shift periodic boundary shift
- * @param cjstart start index of cell cj's particles (which this cell is to be interacted with) in buffer
- * @param cjend end index of cell cj's particles (which this cell is to be interacted with) in buffer
+ * @param cjstart start index of cell cj's particles (which this cell is to be
+ * interacted with) in buffer
+ * @param cjend end index of cell cj's particles (which this cell is to be
+ * interacted with) in buffer
  */
- __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_density(
+__attribute__((always_inline)) INLINE static void gpu_pack_part_pair_density(
     const struct cell *restrict c,
     struct gpu_part_send_d *restrict parts_buffer,
-    const int local_pack_position, const double shift[3], const int cjstart, const int cjend) {
+    const int local_pack_position, const double shift[3], const int cjstart,
+    const int cjend) {
 
   const int count = c->hydro.count;
 
@@ -377,7 +380,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_force(
 /* TODO: IDEALLY, THIS SHOULD BE IDENTICAL FOR THE SELF TASKS.
  * PASS A CELL, BUFFER, INDEX TO COPY BACK. THIS REPLICATION IS
  * UNNECESSARY.*/
- /**
+/**
  * @brief Packs the cell particle data for pair gradient interactions into the
  * CPU-side buffers.
  *
@@ -385,13 +388,16 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_force(
  * @param parts_buffer the buffer to pack into
  * @param local_pack_position the first free index in the buffer arrays
  * @param shift periodic boundary shift
- * @param cjstart start index of cell cj's particles (which this cell is to be interacted with) in buffer
- * @param cjend end index of cell cj's particles (which this cell is to be interacted with) in buffer
+ * @param cjstart start index of cell cj's particles (which this cell is to be
+ * interacted with) in buffer
+ * @param cjend end index of cell cj's particles (which this cell is to be
+ * interacted with) in buffer
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_gradient(
     const struct cell *restrict c,
     struct gpu_part_send_g *restrict parts_buffer,
-    const int local_pack_position, const double shift[3], const int cjstart, const int cjend) {
+    const int local_pack_position, const double shift[3], const int cjstart,
+    const int cjend) {
 
   const int count = c->hydro.count;
 
@@ -424,7 +430,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_gradient(
 /* TODO: IDEALLY, THIS SHOULD BE IDENTICAL FOR THE SELF TASKS.
  * PASS A CELL, BUFFER, INDEX TO COPY BACK. THIS REPLICATION IS
  * UNNECESSARY.*/
- /**
+/**
  * @brief Packs the cell particle data for pair gradient interactions into the
  * CPU-side buffers.
  *
@@ -432,13 +438,16 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_gradient(
  * @param parts_buffer the buffer to pack into
  * @param local_pack_position the first free index in the buffer arrays
  * @param shift periodic boundary shift
- * @param cjstart start index of cell cj's particles (which this cell is to be interacted with) in buffer
- * @param cjend end index of cell cj's particles (which this cell is to be interacted with) in buffer
+ * @param cjstart start index of cell cj's particles (which this cell is to be
+ * interacted with) in buffer
+ * @param cjend end index of cell cj's particles (which this cell is to be
+ * interacted with) in buffer
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_force(
     const struct cell *restrict c,
     struct gpu_part_send_f *restrict parts_buffer,
-    const int local_pack_position, const double shift[3], const int cjstart, const int cjend) {
+    const int local_pack_position, const double shift[3], const int cjstart,
+    const int cjend) {
 
   const int count = c->hydro.count;
 
