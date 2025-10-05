@@ -488,11 +488,13 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     n_bundles = (tasks_packed + bundle_size - 1) / bundle_size;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    // TODO: TEMPORARY CHECK FOR MLADEN
-    if (md->bundle_first_part[n_bundles - 1] != buf->self_task_first_last_part[tasks_packed - 1].x){
-      warning("In self_density: bundle_first_part indices not equal for launch_leftovers");
-    }
+    /* TODO MLADEN: This warning keeps getting raised, but everything seems fine???
+     * Double-check this */
+    /* if (md->bundle_first_part[n_bundles - 1] != buf->self_task_first_last_part[tasks_packed - 1].x){ */
+    /*   warning("In self_density: bundle_first_part indices not equal for launch_leftovers"); */
+    /* } */
 #endif
+
     /* Get the index of the first particle of the last (incomplete) bundle */
     md->bundle_first_part[n_bundles] = buf->self_task_first_last_part[tasks_packed - 1].x;
   }
@@ -1138,7 +1140,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
 
   /* Grab handles */
   struct gpu_pack_metadata *md = &buf->md;
-  int n_leaves_packed = md->leaf_pairs_packed;
+  /* int n_leaves_packed = md->leaf_pairs_packed; */
 
   struct cell **ci_leaves = md->ci_leaves;
   struct cell **cj_leaves = md->cj_leaves;
@@ -1204,19 +1206,15 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     cell_unlocktree(ci_super[tid]);
     cell_unlocktree(cj_super[tid]);
 
+    /* TODO (Mladen): There used to be some exception handling here (commented
+     * out below), but current code deadlocks with it. Double-check this. */
+
     /* For some reason the code fails if we get a leaf pair task
      * this if->continue statement stops the code from trying to unlock same
      * cells twice*/
-    /* TODO (Mladen): I don't understand, but this seems like a genuine problem
-     * we need to get to the bottom of. */
-    if (tid == md->tasks_in_list - 1 && npacked != n_leaves_packed) {
-
-/* #ifdef SWIFT_DEBUG_CHECKS */
-/*       warning("Encountered edge case we need to look into."); */
-/* #endif */
-
-      continue;
-    }
+    /* if (tid == md->tasks_in_list - 1 && npacked != n_leaves_packed) { */
+    /*   continue; */
+    /* } */
 
     /* TODO: DOCUMENT WHAT'S HAPPENING HERE AND WHY */
     enqueue_dependencies(s, md->task_list[tid]);
