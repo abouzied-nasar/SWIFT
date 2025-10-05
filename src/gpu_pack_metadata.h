@@ -122,10 +122,10 @@ extern "C" {
   /*! The indexes of the first and last leaf cell pairs packed into the
    * particle buffer per super-level (pair) task. The first index of this array
    * corresponds to the super-level task stored in `task_list`.*/
-   int **task_first_last_leaf_pair;
+   int **task_first_last_packed_leaf_pair;
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
-  int task_first_last_leaf_pair_size;
+  int task_first_last_packed_leaf_pair_size;
 #endif
 
   /*! Cells ci and cj at the super level of the associated pair task */

@@ -189,10 +189,10 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
 
     md->ci_leaves = (struct cell **)malloc(max_length * sizeof(struct cell *));
     md->cj_leaves = (struct cell **)malloc(max_length * sizeof(struct cell *));
-    md->task_first_last_leaf_pair =
+    md->task_first_last_packed_leaf_pair =
         (int **)malloc(target_n_tasks * 2 * sizeof(int *));
     for (size_t i = 0; i < target_n_tasks * 2; i++) {
-      md->task_first_last_leaf_pair[i] = (int *)malloc(2 * sizeof(int));
+      md->task_first_last_packed_leaf_pair[i] = (int *)malloc(2 * sizeof(int));
     }
 
     md->ci_super =
@@ -203,7 +203,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
 #ifdef SWIFT_DEBUG_CHECKS
     md->ci_leaves_size = target_n_tasks * 2;
     md->cj_leaves_size = target_n_tasks * 2;
-    md->task_first_last_leaf_pair_size = target_n_tasks * 2;
+    md->task_first_last_packed_leaf_pair_size = target_n_tasks * 2;
     md->ci_super_size = 2ul * target_n_tasks;
     md->cj_super_size = 2ul * target_n_tasks;
 #endif
@@ -211,14 +211,14 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   } else {
     md->ci_leaves = NULL;
     md->cj_leaves = NULL;
-    md->task_first_last_leaf_pair = NULL;
+    md->task_first_last_packed_leaf_pair = NULL;
     md->ci_super = NULL;
     md->cj_super = NULL;
 
 #ifdef SWIFT_DEBUG_CHECKS
     md->ci_leaves_size = 0;
     md->cj_leaves_size = 0;
-    md->task_first_last_leaf_pair_size = 0;
+    md->task_first_last_packed_leaf_pair_size = 0;
     md->ci_super_size = 0;
     md->cj_super_size = 0;
 #endif
@@ -278,9 +278,9 @@ void gpu_free_data_buffers(struct gpu_offload_data *buf,
     swift_assert(cu_error == cudaSuccess);
 
     for (int i = 0; i < md->params.pack_size_pair * 2; i++) {
-      free(md->task_first_last_leaf_pair[i]);
+      free(md->task_first_last_packed_leaf_pair[i]);
     }
-    free((void *)md->task_first_last_leaf_pair);
+    free((void *)md->task_first_last_packed_leaf_pair);
     free((void *)md->ci_leaves);
     free((void *)md->cj_leaves);
     free((void *)md->ci_super);

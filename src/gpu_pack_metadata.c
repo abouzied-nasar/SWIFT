@@ -59,7 +59,7 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
 
   md->ci_leaves = NULL;
   md->cj_leaves = NULL;
-  md->task_first_last_leaf_pair = NULL;
+  md->task_first_last_packed_leaf_pair = NULL;
   md->ci_super = NULL;
   md->cj_super = NULL;
 
@@ -73,7 +73,7 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
   md->bundle_first_leaf_size = 0;
   md->ci_leaves_size = 0;
   md->cj_leaves_size = 0;
-  md->task_first_last_leaf_pair_size = 0;
+  md->task_first_last_packed_leaf_pair_size = 0;
   md->ci_super_size = 0;
   md->cj_super_size = 0;
 #endif
@@ -85,7 +85,6 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
  */
 void gpu_pack_metadata_init_step(struct gpu_pack_metadata* md) {
 
-  /* Initialise packing counters */
   gpu_pack_metadata_reset(md);
 }
 
@@ -123,9 +122,9 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata* md){
   /* md->count_parts = 0; */ /* Already covered in self task section above */
 
 #ifdef SWIFT_DEBUG_CHECKS
-  for (int i = 0; i < md->task_first_last_leaf_pair_size; i++){
-    md->task_first_last_leaf_pair[i][0] = -123;
-    md->task_first_last_leaf_pair[i][1] = -123;
+  for (int i = 0; i < md->task_first_last_packed_leaf_pair_size; i++){
+    md->task_first_last_packed_leaf_pair[i][0] = -123;
+    md->task_first_last_packed_leaf_pair[i][1] = -123;
   }
   for (int i = 0; i < md->ci_super_size; i++)
     md->ci_super[i] = NULL;

@@ -50,14 +50,14 @@ extern "C" {
 #endif
 
 /**
- * @brief Packing procedure for the self density tasks
+ * @brief Generic function to pack self tasks.
  *
  * @param r The runner
  * @param s The scheduler
  * @param buf the gpu data buffers
  * @param ci the associated cell
  * @param t the associated task to pack
- * @param mode: 0 for density, 1 for gradient, 2 for force
+ * @param task_subtype this task's subtype
  */
 __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
     struct cell *ci, struct task *t, struct gpu_offload_data *restrict buf,
@@ -65,6 +65,15 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
 
   /* Grab a hold of the packing buffers */
   struct gpu_pack_metadata *md = &(buf->md);
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (md->task_list_size <= md->self_tasks_packed)
+    error("Trying to write outside of array bounds");
+  if (md->ci_list_size <= md->self_tasks_packed)
+    error("Trying to write outside of array bounds");
+  if (buf->self_task_first_last_part_size <= md->self_tasks_packed)
+    error("Trying to write outside of array bounds");
+#endif
 
   /* Place pointers to the task and cells packed in an array for use later
    * when unpacking after the GPU offload */
@@ -78,20 +87,22 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
   /* Anything to do here? */
   int count = ci->hydro.count;
   if (count > 0) {
+    /* TODO: WE ALREADY DID SOME BOOKKEEPING ABOVE. THIS MAY MESS WITH THE
+     * LOGIC FOR EMPTY OR INACTIVE CELLS. NEEDS CHECKING AND TESTING. */
 
 #ifdef SWIFT_DEBUG_CHECKS
     const int local_pack_position = md->count_parts;
-    const int count_max_parts_tmp = md->params.count_max_parts;
-    if (local_pack_position + count >= count_max_parts_tmp) {
+    const int count_max_parts = md->params.count_max_parts;
+    if (local_pack_position + count >= count_max_parts) {
       error(
           "Exceeded count_max_parts_tmp. Make arrays bigger! "
-          "count_max %d count %d",
-          count_max_parts_tmp, local_pack_position + count);
+          "count_max=%d count=%d",
+          count_max_parts, local_pack_position + count);
     }
 #endif
 
-    /* This re-arranges the particle data from cell->hydro->parts into a
-       long array of part structs */
+    /* This re-arranges the particle data from cell->hydro->parts into a long
+     * array of part structs */
     if (task_subtype == task_subtype_gpu_pack_d) {
       gpu_pack_self_density(ci, buf);
     } else if (task_subtype == task_subtype_gpu_pack_g) {
@@ -140,6 +151,12 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
 
 /**
  * @brief packs the data required for the self density tasks.
+ *
+ * @param r The #runner
+ * @param s The #scheduler
+ * @param buf the gpu data buffers
+ * @param ci the #cell to pack
+ * @param t the #task to pack
  */
 __attribute__((always_inline)) INLINE static void
 runner_doself_gpu_pack_density(const struct runner *r, struct scheduler *s,
@@ -165,6 +182,12 @@ runner_doself_gpu_pack_density(const struct runner *r, struct scheduler *s,
 
 /**
  * @brief packs the data required for the self gradient tasks.
+ *
+ * @param r The #runner
+ * @param s The #scheduler
+ * @param buf the gpu data buffers
+ * @param ci the #cell to pack
+ * @param t the #task to pack
  */
 __attribute__((always_inline)) INLINE static void
 runner_doself_gpu_pack_gradient(const struct runner *r, struct scheduler *s,
@@ -190,6 +213,12 @@ runner_doself_gpu_pack_gradient(const struct runner *r, struct scheduler *s,
 
 /**
  * @brief packs the data required for the self force tasks.
+ *
+ * @param r The #runner
+ * @param s The #scheduler
+ * @param buf the gpu data buffers
+ * @param ci the #cell to pack
+ * @param t the #task to pack
  */
 __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_force(
     const struct runner *r, struct scheduler *s, struct gpu_offload_data *restrict buf,
@@ -215,6 +244,15 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_force(
 /**
  * @brief recurse into a (sub-)pair task and identify all cell-cell
  * interactions.
+ *
+ * @param r The #runner
+ * @param s The #scheduler
+ * @param buf the data buffers
+ * @param ci the first #cell associated with this pair task
+ * @param cj the second #cell associated with this pair task
+ * @param t the pair #task to pack
+ * @param depth current recursion depth
+ * @param timer are we timing this?
  */
 static void runner_dopair_gpu_recurse(const struct runner *r,
                                       const struct scheduler *s,
@@ -241,12 +279,7 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
   struct cell **cj_leaves = md->cj_leaves;
 
   if (depth == 0) {
-    /* Keep track of how many leaves we've packed already before we enter the
-     * recursion here */
-    /* TODO: remove this? */
-    /* md->n_leaves_in_list = md->n_leaves; */
-
-    /* Reset counter before we recurse down */
+    /* Reset leaf cell pair counter for this task before we recurse down */
     md->task_n_leaves = 0;
   }
 
@@ -273,30 +306,33 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
     /* if any cell empty: skip */
     if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
 
-    /* Found leaves with work to do. Add them to list. */
-    ci_leaves[md->n_leaves] = ci;
-    cj_leaves[md->n_leaves] = cj;
-
-    md->task_n_leaves++;
-
 #ifdef SWIFT_DEBUG_CHECKS
-    if (md->n_leaves >= md->ci_leaves_size) {
+    if (md->n_leaves + md->task_n_leaves >= md->ci_leaves_size) {
       error("Found more leaf cells (%d) than expected (%d), depth=%i",
-          md->n_leaves, md->ci_leaves_size, depth);
+          md->n_leaves + md->task_n_leaves, md->ci_leaves_size, depth);
     }
-    if (md->n_leaves >= md->cj_leaves_size) {
+    if (md->n_leaves + md->task_n_leaves >= md->cj_leaves_size) {
       error("Found more leaf cells (%d) than expected (%d), depth=%i",
-          md->n_leaves, md->cj_leaves_size, depth);
+          md->n_leaves + md->task_n_leaves, md->cj_leaves_size, depth);
     }
 #endif
 
+    /* Found leaves with work to do. Add them to list. */
+    /* Note: We leave md->n_leaves unmodified during the recursion. So the
+     * correct cell index will be md->n_leaves + how many new leaf cells we've
+     * found for this task's recursion, which is stored in md->task_n_leaves. */
+    const int ind = md->n_leaves + md->task_n_leaves;
+    ci_leaves[ind] = ci;
+    cj_leaves[ind] = cj;
+
+    md->task_n_leaves++;
   }
 
   if (timer) TIMER_TOC(timer_dopair_gpu_recurse);
 }
 
 /**
- * @brief Generic function to pack GPU pair tasks' leaf cells
+ * @brief Generic function to pack GPU pair tasks' leaf cell pairs
  *
  * @param r the #runner
  * @param buf the CPU-side buffer to copy into
@@ -311,14 +347,11 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(
 
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
+
 #ifdef SWIFT_DEBUG_CHECKS
   /* Anything to do here? */
-  /* if (count_ci == 0 || count_cj == 0) return; */
   if (count_ci == 0 || count_cj == 0)
-    error(
-        "ToDo: We should be doing none of this if the cells are not interacting, "
-        "but that behaviour is untested. Code below assumes both cells are active "
-        "and have non-zero particle counts.");
+    error("Empty cells should've been excluded during the recursion.");
 #endif
 
   /* Grab handles */
@@ -384,7 +417,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(
 };
 
 /**
- * Wrapper to pack data for density pair tasks on the GPU.
+ * @brief Wrapper to pack data for density pair tasks on the GPU.
  */
 __attribute__((always_inline)) INLINE static void
 runner_dopair_gpu_pack_density(const struct runner *r,
@@ -438,11 +471,11 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
   /* Identify the number of GPU bundles to run in ideal case */
   int n_bundles = md->params.n_bundles;
 
-  /* How many tasks have we packed? */
-  const int tasks_packed = md->self_tasks_packed;
-
   /* How many tasks should be in a bundle? */
   const int bundle_size = md->params.bundle_size;
+
+  /* How many tasks have we packed? */
+  const int tasks_packed = md->self_tasks_packed;
 
   if (md->launch_leftovers) {
     /* Special case for incomplete bundles (when not having enough leftover
@@ -454,6 +487,12 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     /* Compute how many bundles we actually have, rounding up */
     n_bundles = (tasks_packed + bundle_size - 1) / bundle_size;
 
+#ifdef SWIFT_DEBUG_CHECKS
+    // TODO: TEMPORARY CHECK FOR MLADEN
+    if (md->bundle_first_part[n_bundles - 1] != buf->self_task_first_last_part[tasks_packed - 1].x){
+      warning("In self_density: bundle_first_part indices not equal for launch_leftovers");
+    }
+#endif
     /* Get the index of the first particle of the last (incomplete) bundle */
     md->bundle_first_part[n_bundles] = buf->self_task_first_last_part[tasks_packed - 1].x;
   }
@@ -466,6 +505,18 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     md->bundle_last_part[bid] = md->bundle_first_part[bid + 1];
   }
 
+
+
+
+#ifdef SWIFT_DEBUG_CHECKS
+  // TODO: TEMPORARY CHECK FOR MLADEN
+  if (n_bundles == 0)
+    warning("Found case with n_bundles == 0");
+#endif
+
+
+
+
   /* special treatment for the last bundle */
   if (n_bundles > 1)
     md->bundle_last_part[n_bundles - 1] = md->count_parts;
@@ -477,11 +528,11 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
    n_bundles will be zero DUHDUHDUHDUHHHHHH!!!!!*/
   for (int bid = 0; bid < n_bundles; bid++) {
 
+    /* First, get the max number of parts per cell in the bundle. Used for
+     * determining the number of GPU CUDA blocks*/
     int max_parts = 0;
     for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size; tid++) {
       if (tid < tasks_packed) {
-        /* Get an estimate for the max number of parts per cell in the bundle.
-         * Used for determining the number of GPU CUDA blocks*/
         int count = buf->self_task_first_last_part[tid].y - buf->self_task_first_last_part[tid].x;
         max_parts = max(max_parts, count);
       }
@@ -500,23 +551,23 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     const int last_task = first_task + tasks_left;
 #ifdef SWIFT_DEBUG_CHECKS
     if (last_task > buf->d_self_task_first_last_part_size)
-      error("Trying to access out-of-boundary in d_task_first_part");
+      error("Trying to access out-of-boundary in d_self_task_first_last_part");
     if (last_task > buf->self_task_first_last_part_size)
-      error("Trying to access out-of-boundary in d_task_first_part");
+      error("Trying to access out-of-boundary in task_first_last_part");
 #endif
 
     /* Copy data over to GPU */
     /* First the meta-data */
     cudaError_t cu_error = cudaMemcpyAsync(&buf->d_self_task_first_last_part[first_task],
                     &buf->self_task_first_last_part[first_task],
-                    (last_task + 1 - first_task) * sizeof(int2),
+                    tasks_left * sizeof(int2),
                     cudaMemcpyHostToDevice, stream[bid]);
 
     if (cu_error != cudaSuccess) {
       error("H2D memcpy metadata self: CUDA error '%s' for task_sybtype %s: "
           "cpuid=%i, first_task=%d, size=%lu",
             cudaGetErrorString(cu_error), subtaskID_names[task_subtype],
-            r->cpuid, first_task, (last_task + 1 - first_task) * sizeof(int2)
+            r->cpuid, first_task, tasks_left * sizeof(int2)
             );
     }
 
@@ -644,48 +695,50 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
   /* How many tasks should be in a bundle? */
   const int bundle_size = md->params.bundle_size;
 
-  /* Copy the data back from the CPU thread-local buffers to the cells */
-  /* Pack length counter for use in unpacking */
-  int pack_length = 0;
+  /* Current index in buffer particle arrays */
+  int unpack_index = 0;
   cudaError_t cu_error;
+
+  /* Copy the data back from the CPU thread-local buffers to the cells, bundle
+   * by bundle */
   for (int bid = 0; bid < n_bundles; bid++) {
 
     cu_error = cudaEventSynchronize(buf->event_end[bid]);
     swift_assert(cu_error == cudaSuccess);
 
-    for (int tid = bid * bundle_size; tid < (bid + 1) * bundle_size && tid < tasks_packed; tid++) {
+    for (int tid = bid * bundle_size; (tid < (bid + 1) * bundle_size) && (tid < tasks_packed); tid++) {
 
       struct cell *c = md->ci_list[tid];
       struct task *t = md->task_list[tid];
       const int count = c->hydro.count;
 
-      /* Anything to do here? */
-      if (count == 0) continue;
 #ifdef SWIFT_DEBUG_CHECKS
       if (!cell_is_active_hydro(c, e))
         error("We packed an inactive cell for self tasks???");
 #endif
+      /* Anything to do here? */
+      if (count == 0) continue;
 
       while (cell_locktree(c)) {
         ; /* spin until we acquire the lock */
       }
 
 #ifdef SWIFT_DEBUG_CHECKS
-      if (pack_length + count >= md->params.count_max_parts) {
+      if (unpack_index + count >= md->params.count_max_parts) {
         error(
             "Exceeded count_max_parts. Make arrays bigger! pack_length is "
             "%d, count is %d, max_parts is %d",
-            pack_length, count, md->params.count_max_parts);
+            unpack_index, count, md->params.count_max_parts);
       }
 #endif
 
       /* Do the copy */
       if (task_subtype == task_subtype_gpu_pack_d) {
-        gpu_unpack_self_density(c, buf->parts_recv_d, pack_length, count, e);
+        gpu_unpack_self_density(c, buf->parts_recv_d, unpack_index, count, e);
       } else if (task_subtype == task_subtype_gpu_pack_g) {
-        gpu_unpack_self_gradient(c, buf->parts_recv_g, pack_length, count, e);
+        gpu_unpack_self_gradient(c, buf->parts_recv_g, unpack_index, count, e);
       } else if (task_subtype == task_subtype_gpu_pack_f) {
-        gpu_unpack_self_force(c, buf->parts_recv_f, pack_length, count, e);
+        gpu_unpack_self_force(c, buf->parts_recv_f, unpack_index, count, e);
       }
 #ifdef SWIFT_DEBUG_CHECKS
       else {
@@ -694,7 +747,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
 #endif
 
       /* Increase our index in the buffer with the newly unpacked size. */
-      pack_length += count;
+      unpack_index += count;
 
       /* TODO: What exactly is happening here? Please document. */
       pthread_mutex_lock(&s->sleep_mutex);
@@ -845,8 +898,8 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
     md->bundle_first_part[n_bundles] = fi_fj_li_lj[leaves_packed - 1].x;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    if (n_bundles > md->params.bundle_size_pair)
-      error("Launching leftovers with too many bundles?");
+    if (n_bundles > md->params.n_bundles_pair)
+      error("Launching leftovers with too many bundles? Target size=%d, got=%d", md->params.n_bundles_pair, n_bundles);
 #endif
   }
 
@@ -862,6 +915,17 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
   } else {
     md->bundle_last_part[0] = md->count_parts;
   }
+
+
+
+#ifdef SWIFT_DEBUG_CHECKS
+  // TODO: TEMPORARY CHECK FOR MLADEN
+  if (n_bundles == 0)
+    warning("Found case with n_bundles == 0");
+#endif
+
+
+
 
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
    * its own stream. */
@@ -1067,8 +1131,6 @@ runner_dopair_gpu_launch_force(const struct runner *r,
  * cell pairs if there have been leftover leaf cell pairs from a previous task.
  * @param task_subtype this task's subtype
  */
-#pragma GCC push_options
-#pragma GCC optimize ("O0")
 __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     const struct runner *r, struct scheduler *s,
     struct gpu_offload_data *restrict buf, const int npacked,
@@ -1082,7 +1144,9 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
   struct cell **cj_leaves = md->cj_leaves;
   struct cell **ci_super = md->ci_super;
   struct cell **cj_super = md->cj_super;
-  int **tfllp = md->task_first_last_leaf_pair;
+  int **tflplp = md->task_first_last_packed_leaf_pair;
+
+// TODO MLADEN: IF IT STILL DOESN'T WORK, CHECK WHETHER TASK_FIST_LAST_LEAF_PAIR MAKES SENSE
 
   int unpack_index = 0;
 
@@ -1101,7 +1165,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     }
 
     /* Loop through leaf cell pairs by index */
-    for (int lid = tfllp[tid][0]; lid < tfllp[tid][1]; lid++) {
+    for (int lid = tflplp[tid][0]; lid < tflplp[tid][1]; lid++) {
 
       /*Get pointers to the leaf cells*/
       struct cell *cii_l = ci_leaves[lid];
@@ -1111,18 +1175,23 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
        * called at the end of packing, running, and possibly launching. */
       /* Note that these calls increment pack_length_unpack. */
       if (task_subtype == task_subtype_gpu_pack_d) {
+
         /* TODO: WHY IS THERE A FACTOR OF 2 HERE? LEAVE A COMMENT. */
         gpu_unpack_pair_density(r, cii_l, cjj_l, buf->parts_recv_d,
-                                &unpack_index,
-                                2 * md->params.count_max_parts);
+                                &unpack_index, 2 * md->params.count_max_parts);
+
       } else if (task_subtype == task_subtype_gpu_pack_g) {
+
         gpu_unpack_pair_gradient(r, cii_l, cjj_l, buf->parts_recv_g,
                                  &unpack_index,
                                  2 * md->params.count_max_parts);
+
       } else if (task_subtype == task_subtype_gpu_pack_f) {
+
         gpu_unpack_pair_force(r, cii_l, cjj_l, buf->parts_recv_f,
                               &unpack_index,
                               2 * md->params.count_max_parts);
+
       }
 #ifdef SWIFT_DEBUG_CHECKS
       else {
@@ -1141,9 +1210,11 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     /* TODO (Mladen): I don't understand, but this seems like a genuine problem
      * we need to get to the bottom of. */
     if (tid == md->tasks_in_list - 1 && npacked != n_leaves_packed) {
-#ifdef SWIFT_DEBUG_CHECKS
-      warning("Encountered edge case we need to look into.");
-#endif
+
+/* #ifdef SWIFT_DEBUG_CHECKS */
+/*       warning("Encountered edge case we need to look into."); */
+/* #endif */
+
       continue;
     }
 
@@ -1155,12 +1226,17 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     pthread_mutex_unlock(&s->sleep_mutex);
   }
 }
-#pragma GCC pop_options
 
 /**
- * Wrapper for the density unpacking of pair tasks:
+ * @brief Wrapper for the density unpacking of pair tasks:
  * Provide the correct subtype to use and time the runtime separately
- * TODO: Documentation: WHAT IS NPACKED??
+ *
+ * @param r the #runner
+ * @param s the #scheduler
+ * @param buf the particle data buffers
+ * @param npacked how many leaf cell pairs have been packed during the current
+ * pair task offloading call. May differ from the total number of packed leaf
+ * cell pairs if there have been leftover leaf cell pairs from a previous task.
  */
 __attribute__((always_inline)) INLINE static void
 runner_dopair_gpu_unpack_density(const struct runner *r, struct scheduler *s,
@@ -1175,9 +1251,15 @@ runner_dopair_gpu_unpack_density(const struct runner *r, struct scheduler *s,
 }
 
 /**
- * Wrapper for the gradient unpacking of pair tasks:
+ * @brief Wrapper for the gradient unpacking of pair tasks:
  * Provide the correct subtype to use and time the runtime separately
- * TODO: Documentation: WHAT IS NPACKED??
+ *
+ * @param r the #runner
+ * @param s the #scheduler
+ * @param buf the particle data buffers
+ * @param npacked how many leaf cell pairs have been packed during the current
+ * pair task offloading call. May differ from the total number of packed leaf
+ * cell pairs if there have been leftover leaf cell pairs from a previous task.
  */
 __attribute__((always_inline)) INLINE static void
 runner_dopair_gpu_unpack_gradient(const struct runner *r, struct scheduler *s,
@@ -1192,9 +1274,15 @@ runner_dopair_gpu_unpack_gradient(const struct runner *r, struct scheduler *s,
 }
 
 /**
- * Wrapper for the force unpacking of pair tasks:
+ * @brief Wrapper for the force unpacking of pair tasks:
  * Provide the correct subtype to use and time the runtime separately
- * TODO: Documentation: WHAT IS NPACKED??
+ *
+ * @param r the #runner
+ * @param s the #scheduler
+ * @param buf the particle data buffers
+ * @param npacked how many leaf cell pairs have been packed during the current
+ * pair task offloading call. May differ from the total number of packed leaf
+ * cell pairs if there have been leftover leaf cell pairs from a previous task.
  */
 __attribute__((always_inline)) INLINE static void
 runner_dopair_gpu_unpack_force(const struct runner *r, struct scheduler *s,
@@ -1209,8 +1297,18 @@ runner_dopair_gpu_unpack_force(const struct runner *r, struct scheduler *s,
 }
 
 /**
- * Generic function to pack pair tasks and launch them
- * on the device depending on the task subtype
+ * @brief Generic function to pack pair tasks and launch them on the device
+ * depending on the task subtype.
+ *
+ * @param r the #runner
+ * @param s the #scheduler
+ * @param buf the buffer to use for offloading
+ * @param ci first #cell involved in this pair task
+ * @param cj second #cell involved in this pair task
+ * @param t the #task
+ * @param stream array of cuda streams to use for offloading
+ * @param d_a current expansion scale factor
+ * @param d_H current Hubble constant
  */
 __attribute__((always_inline)) INLINE static void
 runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
@@ -1221,9 +1319,9 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
 
   /* Grab handles */
   struct gpu_pack_metadata *md = &buf->md;
-  int **tfllp = md->task_first_last_leaf_pair;
+  int **tflplp = md->task_first_last_packed_leaf_pair;
   /* Nr of super-level tasks we've accounted for in the meda-data arrays. */
-  const int tind = md->tasks_in_list;
+  int tind = md->tasks_in_list;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (tind >= md->task_list_size)
@@ -1237,17 +1335,14 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
         tind, md->cj_super_size);
 #endif
 
-  /* Keep track of first and last index of leaf cell pairs in lists per
-   * super-level pair task in case we are packing more than one super-level
-   * task into this buffer */
-  tfllp[tind][0] = md->n_leaves;
-  /* TODO: Add last in list here too? */
-  /* tfllp[tind][1] = md->n_leaves + md->task_n_leaves; */
+  /* Keep track of index of first leaf cell pairs in lists per super-level pair
+   * task in case we are packing more than one super-level task into this
+   * buffer. Note that md->n_leaves has not been yet updated to contain this
+   * task's leaf cell pair count.*/
+  tflplp[tind][0] = md->n_leaves;
 
   /* TODO: Do we need this? We already keep track of the task, and the
    * task has access to t->ci, t->cj */
-  /* Possibly necessary due to swap of cell pointers in
-   * space_getsid_and_swap_cells */
   /* Same for super-level cells */
   md->ci_super[tind] = ci;
   md->cj_super[tind] = cj;
@@ -1258,21 +1353,23 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
   /* Increment how many tasks we've accounted for */
   md->tasks_in_list++;
 
+#ifdef SWIFT_DEBUG_CHECKS
+  /* At this point, md->leaf_pairs_packed and md->n_leaves should be identical.
+   * They will diverge during the main offloading loop below, but if they
+   * aren't equal here, then something's wrong with our bookkeeping. */
+  if (md->leaf_pairs_packed != md->n_leaves)
+    error("Found leaf_pairs_packed=%d and n_leaves=%d", md->leaf_pairs_packed, md->n_leaves);
+#endif
+
   /* Update the total number of leaf pair interactions we found through the
    * recursion. */
   md->n_leaves += md->task_n_leaves;
-
-  /* Index of the last leaf cell pair we need to pack */
-  int last_leaf_ind = md->n_leaves;
 
   /* How many leaf cell interactions do we want to offload at once? */
   const int target_n_leaves = md->params.pack_size_pair;
 
   /* Counter for how many leaf cell pairs of this task we've packed */
   int npacked = 0;
-
-  /* Loop through the leaf cell interactions we found */
-  int copy_index = md->leaf_pairs_packed;
 
   /* TODO: @Abouzied Please document what is happening here, this looks very
    * important and scary. Why does this need to happen here, and not
@@ -1287,21 +1384,23 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
    * of it (possibly all of it) will have been solved on the GPU already. */
   while (npacked < md->task_n_leaves) {
 
-    /* Have we launched the computation on the GPU in this iteration? */
-    /* int launched = 0; */
+    /* We're always working on the last task in our list. If we launch, we will
+     * shift data back to index 0 afterwards, so read the correct task index
+     * here each loop. */
+    tind = md->tasks_in_list - 1;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    if (copy_index >= md->ci_leaves_size)
+    if (md->leaf_pairs_packed >= md->ci_leaves_size)
       error("Writing out of ci_d array bounds: %d/%d",
-          copy_index, md->ci_leaves_size);
-    if (copy_index >= md->cj_leaves_size)
+          md->leaf_pairs_packed, md->ci_leaves_size);
+    if (md->leaf_pairs_packed >= md->cj_leaves_size)
       error("Writing out of cj_d array bounds: %d/%d",
-          copy_index, md->cj_leaves_size);
+          md->leaf_pairs_packed, md->cj_leaves_size);
 #endif
 
     /* Grab handles. */
-    struct cell *cii = md->ci_leaves[copy_index];
-    struct cell *cjj = md->cj_leaves[copy_index];
+    struct cell *cii = md->ci_leaves[md->leaf_pairs_packed];
+    struct cell *cjj = md->cj_leaves[md->leaf_pairs_packed];
 
 #ifdef SWIFT_DEBUG_CHECKS
     if (cii->hydro.count == 0)
@@ -1326,22 +1425,19 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
     }
 #endif
 
-    /* record number of leaf cell pairs we've copied since last launch */
-    copy_index++;
     /* record how many leaves we've packed in total during this while loop */
     npacked++;
 
-    /* Record the !current! last leaf cell pair of this task */
-    tfllp[tind][1] = tfllp[tind][0] + copy_index;
+    /* Record the current last leaf cell pair of this task. */
+    /* md->leaf_pairs_packed was incremented in runner_dopair_gpu_pack_<*>. */
+    tflplp[tind][1] = md->leaf_pairs_packed;
 
     /* Can we launch? */
     if (md->leaf_pairs_packed == target_n_leaves) md->launch = 1;
 
     /* Are we launching, or are we launching leftovers AND have packed all
      * remaining leaves? */
-    if (md->launch || (md->launch_leftovers && npacked == md->task_n_leaves)) {
-
-      /* launched = 1; */
+    if (md->launch || (md->launch_leftovers && (npacked == md->task_n_leaves))) {
 
       if (t->subtype == task_subtype_gpu_pack_d) {
 
@@ -1374,7 +1470,7 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
       }
 #endif
 
-      if (npacked == md->n_leaves) {
+      if (npacked == md->task_n_leaves) {
         /* We have launched, finished all leaf cell pairs, and now we're done. */
         gpu_pack_metadata_reset(md);
       }
@@ -1383,10 +1479,9 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
          * and set this task to be the first in the list so that we can
          * continue packing correctly. */
         md->task_list[0] = t;
-        /* Move all tasks forward in list so that the first next task will be
-         * packed to index 0. Move remaining cell indices so that their indexing
-         * starts from zero and ends in n_daughters_left */
-        for (int i = md->leaf_pairs_packed; i < last_leaf_ind; i++) {
+        /* Move all tasks and leaf cell pairs forward in list so that the first
+         * next task/leaf cell pair will be packed at index 0. */
+        for (int i = md->leaf_pairs_packed; i < md->n_leaves; i++) {
           int shuffle = i - md->leaf_pairs_packed;
           md->ci_leaves[shuffle] = md->ci_leaves[i];
           md->cj_leaves[shuffle] = md->cj_leaves[i];
@@ -1396,14 +1491,16 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
 #endif
         }
 
-        last_leaf_ind -= md->leaf_pairs_packed;
-        copy_index = 0;
+        /* We're now looking after fewer leaf cell pairs */
+        md->n_leaves -= md->leaf_pairs_packed;
 
-        tfllp[0][0] = 0;
-        tfllp[0][1] = last_leaf_ind;
+        /* Whatever the remaining leaf cells are will belong to the current
+         * task. Any previous task will already have been offloaded before. */
+        tflplp[0][0] = 0;
+        tflplp[0][1] = 0; /* Nothing's packed yet. */
 
-        md->cj_super[0] = cj;
         md->ci_super[0] = ci;
+        md->cj_super[0] = cj;
 
         md->tasks_in_list = 1;
         md->leaf_pairs_packed = 0;
@@ -1416,9 +1513,9 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
           md->ci_super[i] = NULL;
         for (int i = 1; i < md->cj_super_size; i++)
           md->cj_super[i] = NULL;
-        for (int i = 1; i < md->task_first_last_leaf_pair_size; i++){
-          tfllp[i][0] = -234;
-          tfllp[i][1] = -234;
+        for (int i = 1; i < md->task_first_last_packed_leaf_pair_size; i++){
+          tflplp[i][0] = -234;
+          tflplp[i][1] = -234;
         }
 #endif
       }
@@ -1468,7 +1565,17 @@ static void runner_dopair_gpu_density(const struct runner *r,
 }
 
 /**
- * Top level runner function to solve hydro gradient pair tasks on GPU.
+ * @brief Top level runner function to solve hydro gradient pair tasks on GPU.
+ *
+ * @param r the #runner
+ * @param s the #scheduler
+ * @param ci first #cell to interact
+ * @param cj second #cell to interact
+ * @param buf struct holding buffer arrays
+ * @param t the current task
+ * @param stream array of streams to use during offloading
+ * @param d_a the current expansion scale factor
+ * @param d_H the current Hubble constant
  */
 static void runner_dopair_gpu_gradient(const struct runner *r,
                                        struct scheduler *s, struct cell *ci,
@@ -1494,7 +1601,17 @@ static void runner_dopair_gpu_gradient(const struct runner *r,
 }
 
 /**
- * Top level runner function to solve hydro force pair tasks on GPU.
+ * @brief Top level runner function to solve hydro force pair tasks on GPU.
+ *
+ * @param r the #runner
+ * @param s the #scheduler
+ * @param ci first #cell to interact
+ * @param cj second #cell to interact
+ * @param buf struct holding buffer arrays
+ * @param t the current task
+ * @param stream array of streams to use during offloading
+ * @param d_a the current expansion scale factor
+ * @param d_H the current Hubble constant
  */
 static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
                                     struct cell *ci, struct cell *cj,
