@@ -68,17 +68,17 @@ __global__ void cuda_kernel_self_density(
    * regions of the single shared memory space "vars" which we allocate in
    * kernel invocation */
   float4 *__restrict__ x_p_h_tmp = (float4 *)&vars_f4[0];
-  float4 *__restrict__ ux_m_tmp = (float4 *)&vars_f4[BLOCK_SIZE];
+  float4 *__restrict__ ux_m_tmp = (float4 *)&vars_f4[GPU_THREAD_BLOCK_SIZE];
   /* Particles copied in blocks to shared memory */
   for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks;
-       b += BLOCK_SIZE) {
+       b += GPU_THREAD_BLOCK_SIZE) {
 
     int j = b + threadIdx.x;
     struct gpu_part_send_d pj = parts_send[j];
     x_p_h_tmp[threadIdx.x] = pj.x_p_h;
     ux_m_tmp[threadIdx.x] = pj.ux_m;
     __syncthreads();
-    for (int j_block = 0; j_block < BLOCK_SIZE; j_block++) {
+    for (int j_block = 0; j_block < GPU_THREAD_BLOCK_SIZE; j_block++) {
       j = j_block + b;
       if (j < last_part_in_task_blocks) {
         /* Compute the pairwise distance. */
@@ -165,12 +165,13 @@ __global__ void cuda_kernel_self_gradient(
    * regions of the single shared memory space "vars" which we allocate in
    * kernel invocation */
   float4 *__restrict__ x_h_tmp = (float4 *)&varsf4_g[0];
-  float4 *__restrict__ ux_m_tmp = (float4 *)&varsf4_g[BLOCK_SIZE];
-  float4 *__restrict__ rho_avisc_u_c_tmp = (float4 *)&varsf4_g[BLOCK_SIZE * 2];
+  float4 *__restrict__ ux_m_tmp = (float4 *)&varsf4_g[GPU_THREAD_BLOCK_SIZE];
+  float4 *__restrict__ rho_avisc_u_c_tmp =
+      (float4 *)&varsf4_g[GPU_THREAD_BLOCK_SIZE * 2];
 
   /*Particles copied in blocks to shared memory*/
   for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks;
-       b += BLOCK_SIZE) {
+       b += GPU_THREAD_BLOCK_SIZE) {
 
     int j = b + threadIdx.x;
 
@@ -180,7 +181,7 @@ __global__ void cuda_kernel_self_gradient(
     rho_avisc_u_c_tmp[threadIdx.x] = pj.rho_avisc_u_c;
 
     __syncthreads();
-    for (int j_block = 0; j_block < BLOCK_SIZE; j_block++) {
+    for (int j_block = 0; j_block < GPU_THREAD_BLOCK_SIZE; j_block++) {
       j = j_block + b;
       if (j < last_part_in_task_blocks) {
         float4 x_h_j = x_h_tmp[j_block];
@@ -286,15 +287,17 @@ __global__ void cuda_kernel_self_force(
    * of the single shared memory space "vars" which we allocate in kernel
    * invocation*/
   float4 *__restrict__ x_h_tmp = (float4 *)&varsf4_f[0];
-  float4 *__restrict__ ux_m_tmp = (float4 *)&varsf4_f[BLOCK_SIZE];
+  float4 *__restrict__ ux_m_tmp = (float4 *)&varsf4_f[GPU_THREAD_BLOCK_SIZE];
   float4 *__restrict__ f_b_t_mintbinngb_tmp =
-      (float4 *)&varsf4_f[BLOCK_SIZE * 2];
-  float4 *__restrict__ rho_p_c_vsig_tmp = (float4 *)&varsf4_f[BLOCK_SIZE * 3];
-  float3 *__restrict__ u_avisc_adiff_tmp = (float3 *)&varsf4_f[BLOCK_SIZE * 4];
+      (float4 *)&varsf4_f[GPU_THREAD_BLOCK_SIZE * 2];
+  float4 *__restrict__ rho_p_c_vsig_tmp =
+      (float4 *)&varsf4_f[GPU_THREAD_BLOCK_SIZE * 3];
+  float3 *__restrict__ u_avisc_adiff_tmp =
+      (float3 *)&varsf4_f[GPU_THREAD_BLOCK_SIZE * 4];
 
   /*Particles copied in blocks to shared memory*/
   for (int b = first_part_in_task_blocks; b < last_part_in_task_blocks;
-       b += BLOCK_SIZE) {
+       b += GPU_THREAD_BLOCK_SIZE) {
     int j = b + threadIdx.x;
     struct gpu_part_send_f pj = parts_send[j];
     x_h_tmp[threadIdx.x] = pj.x_h;
@@ -304,7 +307,7 @@ __global__ void cuda_kernel_self_force(
     //    alpha_tmp[threadIdx.x] = parts_aos[j].visc_alpha;
     u_avisc_adiff_tmp[threadIdx.x] = pj.u_alphavisc_alphadiff;
     __syncthreads();
-    for (int j_block = 0; j_block < BLOCK_SIZE; j_block++) {
+    for (int j_block = 0; j_block < GPU_THREAD_BLOCK_SIZE; j_block++) {
       j = j_block + b;
       if (j < last_part_in_task_blocks) {
         /* Compute the pairwise distance. */
@@ -506,7 +509,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_density(
       res_rot.z += faci * curlvrz;
       res_rot.w -= faci * dvdr;
     }
-  } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
+  } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
   parts_recv[pid].rho_dh_wcount = res_rho;
   parts_recv[pid].rot_ux_div_v = res_rot;
@@ -584,7 +587,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_gradient(
       const float alpha_j = rho_avisc_u_c_j.y;
       vsig_lapu_aviscmax_i.z = fmaxf(vsig_lapu_aviscmax_i.z, alpha_j);
     }
-  } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
+  } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
   parts_recv[pid].vsig_lapu_aviscmax = vsig_lapu_aviscmax_i;
 }
@@ -737,7 +740,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_force(
       unsigned int min_tb_i = (f_b_t_mintbinngb_i.w + 0.5f);
       if (time_bin_j > 0) f_b_t_mintbinngb_i.w = min(min_tb_i, time_bin_j);
     }
-  } /*Loop through parts in cell j one BLOCK_SIZE at a time*/
+  } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
   udt_hdt_vsig_mintbinngb.w = f_b_t_mintbinngb_i.w;
   parts_recv[pid].udt_hdt_vsig_mintimebin_ngb = udt_hdt_vsig_mintbinngb;

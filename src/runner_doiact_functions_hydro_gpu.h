@@ -471,7 +471,8 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     /* Will launch a 2d grid of GPU thread blocks (number of tasks is
        the y dimension and max_parts is the x dimension */
     const size_t numBlocks_y = tasks_left;
-    const size_t numBlocks_x = (max_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    const size_t numBlocks_x =
+        (max_parts + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
     const size_t bundle_first_task = pack_vars->bundle_first_task_list[bid];
 
     /* Copy data over to GPU */
@@ -507,7 +508,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
-#ifdef CUDA_DEBUG
+#ifdef SWIFT_DEBUG_CHECKS
     cudaError_t cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error("CUDA error in task subtype %s H2D memcpy: '%s' cpuid id is: %i",
@@ -537,7 +538,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
-#ifdef CUDA_DEBUG
+#ifdef SWIFT_DEBUG_CHECKS
     cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error("CUDA error in task subtype %s kernel launch: '%s' cpuid id is: %i",
@@ -574,7 +575,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     /* Record this event */
     cudaEventRecord(buf->event_end[bid], stream[bid]);
 
-#ifdef CUDA_DEBUG
+#ifdef SWIFT_DEBUG_CHECKS
     cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error("CUDA error in task subtype %s D2H memcpy: %s cpuid id is: %i",
@@ -849,7 +850,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
-#ifdef CUDA_DEBUG
+#ifdef SWIFT_DEBUG_CHECKS
     cudaError_t cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error(
@@ -866,7 +867,8 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
      * the y dimension and max_parts is the x dimension */
     int numBlocks_y = 0; /* tasks_left; //Changed this to 1D grid of blocks so
                             this is no longer necessary */
-    int numBlocks_x = (bundle_n_parts + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    int numBlocks_x =
+        (bundle_n_parts + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
     int bundle_part_0 = pack_vars->bundle_first_part[bid];
 
     /* Launch the kernel for ci using data for ci and cj */
@@ -886,7 +888,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 
-#ifdef CUDA_DEBUG
+#ifdef SWIFT_DEBUG_CHECKS
     cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error(
@@ -921,7 +923,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
     /* Issue event to be recorded by GPU after copy back to CPU */
     cudaEventRecord(pair_end[bid], stream[bid]);
 
-#ifdef CUDA_DEBUG
+#ifdef SWIFT_DEBUG_CHECKS
     cu_error = cudaPeekAtLastError();
     if (cu_error != cudaSuccess) {
       error(

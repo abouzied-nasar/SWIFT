@@ -54,13 +54,13 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
                            const size_t recv_struct_size,
                            const char is_pair_task) {
 
-  size_t target_n_tasks = params->target_n_tasks;
+  size_t target_n_tasks = params->pack_size;
   size_t n_bundles = params->n_bundles;
   size_t bundle_size = params->bundle_size;
   size_t count_max_parts = params->count_max_parts;
 
   if (is_pair_task) {
-    target_n_tasks = params->target_n_tasks_pair;
+    target_n_tasks = params->pack_size_pair;
     n_bundles = params->n_bundles_pair;
     bundle_size = params->bundle_size_pair;
   }
@@ -80,7 +80,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   pv->bundle_size = bundle_size;
   pv->n_bundles = n_bundles;
 
-  /* A. Nasar: Need to come up with a good estimate for this */
+  /* TODO: Need to come up with a good estimate for this */
   pv->n_expected_pair_tasks = 4096;
 
   cudaError_t cu_error = cudaErrorMemoryAllocation;

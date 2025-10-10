@@ -122,7 +122,7 @@ void gpu_launch_pair_density(struct gpu_part_send_d *parts_send,
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
 
-  cuda_launch_pair_density<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
+  cuda_launch_pair_density<<<numBlocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
@@ -137,7 +137,7 @@ void gpu_launch_pair_gradient(struct gpu_part_send_g *parts_send,
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
 
-  cuda_launch_pair_gradient<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
+  cuda_launch_pair_gradient<<<numBlocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
@@ -152,7 +152,7 @@ void gpu_launch_pair_force(struct gpu_part_send_f *parts_send,
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
 
-  cuda_launch_pair_force<<<numBlocks_x, BLOCK_SIZE, 0, stream>>>(
+  cuda_launch_pair_force<<<numBlocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       parts_send, parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
@@ -166,10 +166,10 @@ void gpu_launch_self_density(struct gpu_part_send_d *parts_send,
                              int2 *d_task_first_part_f4) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  cuda_kernel_self_density<<<gridShape, BLOCK_SIZE,
-                             2ul * BLOCK_SIZE * sizeof(float4), stream>>>(
-      parts_send, parts_recv, d_a, d_H, bundle_first_task,
-      d_task_first_part_f4);
+  cuda_kernel_self_density<<<gridShape, GPU_THREAD_BLOCK_SIZE,
+                             2ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4),
+                             stream>>>(parts_send, parts_recv, d_a, d_H,
+                                       bundle_first_task, d_task_first_part_f4);
 }
 
 /**
@@ -182,10 +182,11 @@ void gpu_launch_self_gradient(struct gpu_part_send_g *parts_send,
                               int2 *d_task_first_part_f4) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  cuda_kernel_self_gradient<<<gridShape, BLOCK_SIZE,
-                              3ul * BLOCK_SIZE * sizeof(float4), stream>>>(
-      parts_send, parts_recv, d_a, d_H, bundle_first_task,
-      d_task_first_part_f4);
+  cuda_kernel_self_gradient<<<gridShape, GPU_THREAD_BLOCK_SIZE,
+                              3ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4),
+                              stream>>>(parts_send, parts_recv, d_a, d_H,
+                                        bundle_first_task,
+                                        d_task_first_part_f4);
 }
 
 /**
@@ -198,9 +199,9 @@ void gpu_launch_self_force(struct gpu_part_send_f *d_parts_send,
                            int2 *d_task_first_part_f4) {
 
   dim3 gridShape = dim3(numBlocks_x, numBlocks_y);
-  cuda_kernel_self_force<<<gridShape, BLOCK_SIZE,
-                           4ul * BLOCK_SIZE * sizeof(float4) +
-                               BLOCK_SIZE * sizeof(float3),
+  cuda_kernel_self_force<<<gridShape, GPU_THREAD_BLOCK_SIZE,
+                           4ul * GPU_THREAD_BLOCK_SIZE * sizeof(float4) +
+                               GPU_THREAD_BLOCK_SIZE * sizeof(float3),
                            stream>>>(d_parts_send, d_parts_recv, d_a, d_H,
                                      bundle_first_task, d_task_first_part_f4);
 }

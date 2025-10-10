@@ -106,6 +106,7 @@ include_HEADERS += power_spectrum.h
 include_HEADERS += ghost_stats.h
 include_HEADERS += swift_lustre_api.h
 include_HEADERS += runner_gpu_pack_functions.h
+include_HEADERS += gpu_pack_vars.h  gpu_pack_params.h
 include_HEADERS += cuda/gpu_offload_data.h cuda/gpu_utils.h
 include_HEADERS += cuda/cuda_config.h cuda/gpu_part_pack_functions.h
 
@@ -198,7 +199,7 @@ endif
 if HAVEHIP 
 # TODO: This is not up to date. Look at what we did for CUDA.
 # GPU_HIP_SOURCES = runner_main_hip.c
-GPU_CUDA_SOURCES = gpu_pack_vars.c engine_maketasks_gpu.c
+GPU_HIP_SOURCES = runner_main_cuda.c gpu_pack_vars.c engine_maketasks_gpu.c
 # TODO: Fix this. Do the same as cuda.
 GPU_SOURCES+=$(GPU_HIP_SOURCES)
 endif
@@ -259,6 +260,7 @@ AM_SOURCES += $(PS2020_COOLING_SOURCES)
 AM_SOURCES += $(SPHM1RT_RT_SOURCES)
 AM_SOURCES += $(GEAR_RT_SOURCES)
 AM_SOURCES += swift_lustre_api.c
+AM_SOURCES += gpu_pack_params.c # we need this here so we can still compile without GPU support enabled.
 
 # Include files for distribution, not installation.
 nobase_noinst_HEADERS = align.h approx_math.h atomic.h barrier.h cycle.h error.h inline.h kernel_hydro.h kernel_gravity.h
@@ -560,7 +562,6 @@ nobase_noinst_HEADERS += fvpm_geometry.h fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/None/fvpm_geometry.h fvpm_geometry/None/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/fvpm_geometry.h fvpm_geometry/Gizmo/fvpm_geometry_struct.h
 nobase_noinst_HEADERS += fvpm_geometry/Gizmo/MFM/fvpm_geometry.h fvpm_geometry/Gizmo/MFV/fvpm_geometry.h
-nobase_noinst_HEADERS += gpu_pack_vars.h 
 nobase_noinst_HEADERS += cuda/gpu_part_structs.h
 nobase_noinst_HEADERS += runner_doiact_functions_hydro_gpu.h cuda/gpu_launch.h
 nobase_noinst_HEADERS += cuda/device_functions.cuh cuda/cuda_particle_kernels.cuh

@@ -30,22 +30,8 @@
 extern "C" {
 #endif
 
-#include "scheduler.h"
-
 #include <stddef.h>
 #include <vector_types.h>
-
-/*! Struct holding global packing parameters. */
-struct gpu_global_pack_params {
-
-  size_t target_n_tasks;
-  size_t target_n_tasks_pair;
-  size_t bundle_size;
-  size_t bundle_size_pair;
-  size_t n_bundles;
-  size_t n_bundles_pair;
-  int count_max_parts;
-};
 
 /**
  * TODO Abouzeid: documentation
@@ -140,9 +126,6 @@ struct gpu_pack_vars {
 };
 
 void gpu_init_pack_vars(struct gpu_pack_vars *pv);
-void gpu_get_pack_params(struct gpu_global_pack_params *pars,
-                         const struct scheduler *sched,
-                         const float eta_neighbours);
 void gpu_init_pack_vars_step(struct gpu_pack_vars *pv);
 
 #ifdef __cplusplus

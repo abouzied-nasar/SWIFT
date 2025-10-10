@@ -27,17 +27,16 @@
  * configuring the cuda setup/run until we sort everything out cleanly.
  */
 
-#define BLOCK_SIZE 64
-#define N_TASKS_PER_PACK_SELF 8
-#define N_TASKS_BUNDLE_SELF 2
+#define GPU_THREAD_BLOCK_SIZE 64
 
-#define BLOCK_SIZE_PAIR 64
-#define N_TASKS_PER_PACK_PAIR 8
-#define N_TASKS_BUNDLE_PAIR 2
+#define _N_TASKS_PER_PACK_SELF 8
+#define _N_TASKS_BUNDLE_SELF 2
 
-#define CUDA_DEBUG
+#define _N_TASKS_PER_PACK_PAIR 8
+#define _N_TASKS_BUNDLE_PAIR 2
 
 /* Config parameters. */
+/* TODO: DO WE STILL NEED THESE??? */
 #define GPUOFFLOAD_DENSITY 1  /* off-load hydro density to GPU */
 #define GPUOFFLOAD_GRADIENT 1 /* off-load hydro gradient to GPU */
 #define GPUOFFLOAD_FORCE 1    /* off-load hydro force to GPU */
