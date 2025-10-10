@@ -3579,15 +3579,13 @@ void scheduler_init(struct scheduler *s, struct space *space, int nr_tasks,
   /* Initialize each queue. */
   for (int k = 0; k < nr_queues; k++) queue_init(&s->queues[k], NULL);
 
-  /* Initialize each queue. */
-  for (int k = 0; k < nr_queues; k++) {
-    s->s_d_left = (int *)malloc(sizeof(int) * nr_queues);
-    s->s_g_left = (int *)malloc(sizeof(int) * nr_queues);
-    s->s_f_left = (int *)malloc(sizeof(int) * nr_queues);
-    s->p_d_left = (int *)malloc(sizeof(int) * nr_queues);
-    s->p_g_left = (int *)malloc(sizeof(int) * nr_queues);
-    s->p_f_left = (int *)malloc(sizeof(int) * nr_queues);
-  }
+  /* Initialize each queue's counters. */
+  s->s_d_left = (int *)malloc(sizeof(int) * nr_queues);
+  s->s_g_left = (int *)malloc(sizeof(int) * nr_queues);
+  s->s_f_left = (int *)malloc(sizeof(int) * nr_queues);
+  s->p_d_left = (int *)malloc(sizeof(int) * nr_queues);
+  s->p_g_left = (int *)malloc(sizeof(int) * nr_queues);
+  s->p_f_left = (int *)malloc(sizeof(int) * nr_queues);
 
   /* Init the sleep mutex and cond. */
   if (pthread_cond_init(&s->sleep_cond, NULL) != 0 ||
