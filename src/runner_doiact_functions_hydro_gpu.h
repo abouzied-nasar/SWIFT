@@ -87,8 +87,9 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
   /* Anything to do here? */
   int count = ci->hydro.count;
   if (count > 0) {
-    /* TODO: WE ALREADY DID SOME BOOKKEEPING ABOVE. THIS MAY MESS WITH THE
-     * LOGIC FOR EMPTY OR INACTIVE CELLS. NEEDS CHECKING AND TESTING. */
+    /* TODO: we already did some bookkeeping above. Doing stuff conditionally
+     * at this poin logic for empty or inactive cells. needs checking and
+     * testing. */
 
 #ifdef SWIFT_DEBUG_CHECKS
     const int local_pack_position = md->count_parts;
@@ -472,15 +473,15 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     /* Special case for incomplete bundles (when not having enough leftover
      * tasks to fill a bundle) */
 
-    if (tasks_packed == 0)
-      error("zero tasks packed but somehow got into GPU loop");
 
     /* Compute how many bundles we actually have, rounding up */
     n_bundles = (tasks_packed + bundle_size - 1) / bundle_size;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    /* TODO: TEMPORARY CHECK. SHOULD TURN INTO n_bundles = max(n_bundles, 1) */
-    if (n_bundles <= 0) error("Found case with n_bundles <= 0");
+    if (tasks_packed == 0)
+      error("zero tasks packed but somehow got into GPU loop");
+    if (n_bundles <= 0)
+      error("Found case with n_bundles <= 0");
 #endif
   }
 
@@ -887,7 +888,6 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
   for (int bid = 0; bid < n_bundles - 1; bid++) {
     md->bundle_last_part[bid] = md->bundle_first_part[bid + 1];
   }
-  /* Note: This also correctly handles the case when launching leftovers. */
   md->bundle_last_part[n_bundles - 1] = md->count_parts;
 
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets

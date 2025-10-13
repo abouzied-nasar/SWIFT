@@ -33,9 +33,10 @@ extern "C" {
 #include "../align.h"
 #include "../timeline.h"
 
-/*! Container for particle data requierd for density calcs */
+/*! Container for particle data required for density calcs */
 struct gpu_part_send_d {
 #ifdef WITH_CUDA
+
   /*! Particle position and h -> x, y, z, h */
   float4 x_p_h;
 
@@ -46,10 +47,6 @@ struct gpu_part_send_d {
    * pair tasks*/
   int2 cjs_cje;
 
-  // TODO: DEBUGGING ONLY, REMOVE AGAIN
-  int cis;
-  int ci_count;
-  int ci_id;
 #endif
 } __attribute__((aligned(SWIFT_STRUCT_ALIGNMENT)));
 
@@ -65,7 +62,7 @@ struct gpu_part_recv_d {
 #endif
 };
 
-/*Container for particle data requierd for force calcs*/
+/*Container for particle data required for force calcs*/
 struct gpu_part_send_f {
 #ifdef WITH_CUDA
 
@@ -88,7 +85,7 @@ struct gpu_part_send_f {
 #endif
 };
 
-/*! Container for particle data requierd for force calcs */
+/*! Container for particle data required for force calcs */
 struct gpu_part_recv_f {
 #ifdef WITH_CUDA
 
