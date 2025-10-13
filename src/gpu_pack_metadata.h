@@ -84,6 +84,7 @@ struct gpu_pack_metadata {
 #endif
 
   /*! Index of the last particle of a bundle in the buffer arrays */
+  /* TODO: Turn this into bundle_count */
   int *bundle_last_part;
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
@@ -111,7 +112,8 @@ struct gpu_pack_metadata {
    * recursion */
   int task_n_leaves;
 
-  /*! Lists of cell pairs (ci, cj) which are to be interacted */
+  /*! Lists of leaf cell pairs (ci, cj) which are to be interacted. May contain
+   * entries of multiple tasks' leaf cells. */
   struct cell **ci_leaves;
   struct cell **cj_leaves;
 #ifdef SWIFT_DEBUG_CHECKS
@@ -149,7 +151,7 @@ struct gpu_pack_metadata {
 void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
                             const struct gpu_global_pack_params *params);
 void gpu_pack_metadata_init_step(struct gpu_pack_metadata *md);
-void gpu_pack_metadata_reset(struct gpu_pack_metadata *md);
+void gpu_pack_metadata_reset(struct gpu_pack_metadata *md, int reset_leaves_lists);
 
 #ifdef __cplusplus
 }

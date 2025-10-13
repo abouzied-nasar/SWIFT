@@ -137,21 +137,6 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
 #endif
   }
 
-  /* Get array of first and last particles for pair interactions. */
-  /*A. N.: Needed but only for small part in launch functions. Might
-           be useful for recursion on the GPU so keep for now     */
-  buf->fparti_fpartj_lparti_lpartj = NULL;
-  if (is_pair_task) {
-    cu_error = cudaMallocHost((void **)&buf->fparti_fpartj_lparti_lpartj,
-                              target_n_tasks * sizeof(int4));
-    swift_assert(cu_error == cudaSuccess);
-#ifdef SWIFT_DEBUG_CHECKS
-    buf->fparti_fpartj_lparti_lpartj_size = target_n_tasks;
-  } else {
-    buf->fparti_fpartj_lparti_lpartj_size = 0;
-#endif
-  }
-
   /* Now allocate memory for Buffer and GPU particle arrays */
   cu_error = cudaMalloc((void **)&buf->d_parts_send_d,
                         self_pair_fact * count_max_parts * send_struct_size);
@@ -273,13 +258,6 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf){
   /*   buf->d_self_task_first_last_part[i].y = 0; */
   /* } */
 
-  for (int i = 0; i < buf->fparti_fpartj_lparti_lpartj_size; i++){
-    buf->fparti_fpartj_lparti_lpartj[i].x = 0;
-    buf->fparti_fpartj_lparti_lpartj[i].y = 0;
-    buf->fparti_fpartj_lparti_lpartj[i].z = 0;
-    buf->fparti_fpartj_lparti_lpartj[i].w = 0;
-  }
-
   bzero(buf->parts_send_d, buf->parts_send_allocd_size);
   bzero(buf->parts_recv_d, buf->parts_recv_allocd_size);
 
@@ -321,9 +299,6 @@ void gpu_free_data_buffers(struct gpu_offload_data *buf,
 
   if (is_pair_task) {
     free((void *)md->task_list);
-
-    cu_error = cudaFreeHost(buf->fparti_fpartj_lparti_lpartj);
-    swift_assert(cu_error == cudaSuccess);
 
     for (int i = 0; i < md->params.pack_size_pair * 2; i++) {
       free(md->task_first_last_packed_leaf_pair[i]);

@@ -378,7 +378,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_density(
 // TODO: TEMPORARY DEBUG CHECKS
 
 parts_buffer[id_in_pack].cis = local_pack_position;
-parts_buffer[id_in_pack].ci_id = ci->cellID;
+/* parts_buffer[id_in_pack].ci_id = ci->cellID; */
 parts_buffer[id_in_pack].ci_count = count;
 
 if (cjstart < 0)
