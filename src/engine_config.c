@@ -936,18 +936,16 @@ void engine_config(int restart, int fof, struct engine *e,
       parser_get_opt_param_int(params, "Scheduler:mpi_message_limit", 4) * 1024;
 
   /* Setup GPU packing parameters. */
-  /* TODO (Mladen): READ PARAMETERS FROM YAML FILE HERE and remove inclusion of
-   * cuda_config.h. */
 #if defined(WITH_CUDA) || defined(WITH_HIP)
-  size_t pack_size = _N_TASKS_PER_PACK_SELF;
-  size_t pack_size_pair = _N_TASKS_PER_PACK_PAIR;
-  size_t bundle_size = _N_TASKS_BUNDLE_SELF;
-  size_t bundle_size_pair = _N_TASKS_BUNDLE_PAIR;
+  int pack_size = parser_get_param_int(params, "Scheduler:gpu_self_pack_size");
+  int bundle_size = parser_get_param_int(params, "Scheduler:gpu_self_bundle_size");
+  int pack_size_pair = parser_get_param_int(params, "Scheduler:gpu_pair_pack_size");
+  int bundle_size_pair = parser_get_param_int(params, "Scheduler:gpu_pair_bundle_size");
 #else
-  size_t pack_size = 1;
-  size_t pack_size_pair = 1;
-  size_t bundle_size = 1;
-  size_t bundle_size_pair = 1;
+  int pack_size = 1;
+  int bundle_size = 1;
+  int pack_size_pair = 1;
+  int bundle_size_pair = 1;
 #endif
 
   gpu_pack_params_set(&e->gpu_pack_params, pack_size, pack_size_pair,
