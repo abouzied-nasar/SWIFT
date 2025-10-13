@@ -306,25 +306,27 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
     /* if any cell empty: skip */
     if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
 
-#ifdef SWIFT_DEBUG_CHECKS
-    if (md->n_leaves + md->task_n_leaves >= md->ci_leaves_size) {
-      error("Found more leaf cells (%d) than expected (%d), depth=%i",
-            md->n_leaves + md->task_n_leaves, md->ci_leaves_size, depth);
-    }
-    if (md->n_leaves + md->task_n_leaves >= md->cj_leaves_size) {
-      error("Found more leaf cells (%d) than expected (%d), depth=%i",
-            md->n_leaves + md->task_n_leaves, md->cj_leaves_size, depth);
-    }
-#endif
-
-    /* Found leaves with work to do. Add them to list. */
+    /* At this point, we found leaves with work to do. Add them to list. */
     /* Note: We leave md->n_leaves unmodified during the recursion. So the
      * correct cell index will be md->n_leaves + how many new leaf cells we've
      * found for this task's recursion, which is stored in md->task_n_leaves. */
     const int ind = md->n_leaves + md->task_n_leaves;
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (ind >= md->ci_leaves_size) {
+      error("Found more leaf cells (%d) than expected (%d), depth=%i; "
+            "Increase array size.", ind, md->ci_leaves_size, depth);
+    }
+    if (ind >= md->cj_leaves_size) {
+      error("Found more leaf cells (%d) than expected (%d), depth=%i; "
+            "Increase array size.", ind, md->cj_leaves_size, depth);
+    }
+#endif
+
     ci_leaves[ind] = ci;
     cj_leaves[ind] = cj;
 
+    /* Increment the counter. */
     md->task_n_leaves++;
   }
 
@@ -356,7 +358,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(
 
   /* Grab handles */
   const struct engine *e = r->e;
-  int4 *fparti_fpartj_lparti_lpartj = buf->fparti_fpartj_lparti_lpartj;
+  int4 *fi_fj_li_lj = buf->fparti_fpartj_lparti_lpartj;
   struct gpu_pack_metadata *md = &buf->md;
 
   /* Get the index for the leaf cell pair */
@@ -378,10 +380,10 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(
   ////////////////////////
   /* TODO ABOUZIED: Is the 'problem' comment above still accurate? */
   /* Store first and last particle indices in the buffers for ci and cj. */
-  fparti_fpartj_lparti_lpartj[lid].x = md->count_parts;
-  fparti_fpartj_lparti_lpartj[lid].y = md->count_parts + count_ci;
-  fparti_fpartj_lparti_lpartj[lid].z = md->count_parts + count_ci;
-  fparti_fpartj_lparti_lpartj[lid].w = md->count_parts + count_ci + count_cj;
+  fi_fj_li_lj[lid].x = md->count_parts;
+  fi_fj_li_lj[lid].y = md->count_parts + count_ci;
+  fi_fj_li_lj[lid].z = md->count_parts + count_ci;
+  fi_fj_li_lj[lid].w = md->count_parts + count_ci + count_cj;
 
   /* Pack the data into the CPU-side buffers for offloading. */
   if (task_subtype == task_subtype_gpu_pack_d) {
@@ -404,7 +406,7 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(
   const int bundle_size = md->params.bundle_size_pair;
   if (lid % bundle_size == 0) {
     int bid = lid / bundle_size;
-    md->bundle_first_part[bid] = fparti_fpartj_lparti_lpartj[lid].x;
+    md->bundle_first_part[bid] = fi_fj_li_lj[lid].x;
 
     /* A. Nasar: This is possibly a problem! */
     /* TODO: Why? Is this still accurate? */
@@ -769,8 +771,9 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
     } /* Loop over tasks in bundle */
   } /* Loop over bundles */
 
-  /* Zero counters for the next pack operations */
+  /* Zero counters and buffers for the next pack operations */
   gpu_pack_metadata_reset(md);
+  gpu_data_buffers_reset(buf);
 }
 
 /**
@@ -1317,6 +1320,7 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
   /* Grab handles */
   struct gpu_pack_metadata *md = &buf->md;
   int **tflplp = md->task_first_last_packed_leaf_pair;
+
   /* Nr of super-level tasks we've accounted for in the meda-data arrays. */
   int tind = md->tasks_in_list;
 
@@ -1380,9 +1384,9 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
    * of it (possibly all of it) will have been solved on the GPU already. */
   while (npacked < md->task_n_leaves) {
 
-    /* We're always working on the last task in our list. If we launch, we will
-     * shift data back to index 0 afterwards, so read the correct task index
-     * here each loop. */
+    /* Inside this loop, we're always working on the last task in our list. But
+     * if we launch within this loop, we will shift data back to index 0
+     * afterwards, so read the correct task index here each loop. */
     tind = md->tasks_in_list - 1;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -1470,9 +1474,9 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
 #endif
 
       if (npacked == md->task_n_leaves) {
-        /* We have launched, finished all leaf cell pairs, and now we're done.
-         */
+        /* We have launched, finished all leaf cell pairs, and are done. */
         gpu_pack_metadata_reset(md);
+        gpu_data_buffers_reset(buf);
       } else {
         /* Launched, but have not packed all leaf cell pairs. Re-set counters
          * and set this task to be the first in the list so that we can
@@ -1515,9 +1519,9 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
           tflplp[i][1] = -234;
         }
 #endif
-      }
-
-    } /* <- if launch or launch_leftovers */
+        gpu_data_buffers_reset(buf);
+      } /* Launched, but not finished packing */
+    } /* if launch or launch_leftovers */
   } /* while npacked < md->task_n_leaves */
 
   /* Launch-leftovers counter re-set to zero and cells unlocked */

@@ -180,22 +180,22 @@ void *runner_main_cuda(void *data) {
   struct gpu_offload_data gpu_buf_pair_grad;
   struct gpu_offload_data gpu_buf_pair_forc;
 
-  gpu_init_data_buffers(&gpu_buf_self_dens, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_self_dens, &gpu_pack_params,
                         sizeof(struct gpu_part_send_d),
                         sizeof(struct gpu_part_recv_d), /*is_pair_task=*/0);
-  gpu_init_data_buffers(&gpu_buf_self_grad, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_self_grad, &gpu_pack_params,
                         sizeof(struct gpu_part_send_g),
                         sizeof(struct gpu_part_recv_g), /*is_pair_task=*/0);
-  gpu_init_data_buffers(&gpu_buf_self_forc, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_self_forc, &gpu_pack_params,
                         sizeof(struct gpu_part_send_f),
                         sizeof(struct gpu_part_recv_f), /*is_pair_task=*/0);
-  gpu_init_data_buffers(&gpu_buf_pair_dens, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_pair_dens, &gpu_pack_params,
                         sizeof(struct gpu_part_send_d),
                         sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
-  gpu_init_data_buffers(&gpu_buf_pair_grad, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_pair_grad, &gpu_pack_params,
                         sizeof(struct gpu_part_send_g),
                         sizeof(struct gpu_part_recv_g), /*is_pair_task=*/1);
-  gpu_init_data_buffers(&gpu_buf_pair_forc, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_pair_forc, &gpu_pack_params,
                         sizeof(struct gpu_part_send_f),
                         sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
 
@@ -224,12 +224,12 @@ void *runner_main_cuda(void *data) {
     /* Can we go home yet? */
     if (e->step_props & engine_step_prop_done) break;
 
-    gpu_init_data_buffers_step(&gpu_buf_self_dens);
-    gpu_init_data_buffers_step(&gpu_buf_self_grad);
-    gpu_init_data_buffers_step(&gpu_buf_self_forc);
-    gpu_init_data_buffers_step(&gpu_buf_pair_dens);
-    gpu_init_data_buffers_step(&gpu_buf_pair_grad);
-    gpu_init_data_buffers_step(&gpu_buf_pair_forc);
+    gpu_data_buffers_init_step(&gpu_buf_self_dens);
+    gpu_data_buffers_init_step(&gpu_buf_self_grad);
+    gpu_data_buffers_init_step(&gpu_buf_self_forc);
+    gpu_data_buffers_init_step(&gpu_buf_pair_dens);
+    gpu_data_buffers_init_step(&gpu_buf_pair_grad);
+    gpu_data_buffers_init_step(&gpu_buf_pair_forc);
 
     /* Get some global variables' values for this step */
     const float d_a = e->cosmology->a;

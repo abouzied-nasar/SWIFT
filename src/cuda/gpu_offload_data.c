@@ -47,7 +47,7 @@ extern "C" {
  * device)
  * @param is_pair_task: if 1, we allocate enough space for pair tasks
  */
-void gpu_init_data_buffers(struct gpu_offload_data *buf,
+void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const struct gpu_global_pack_params *params,
                            const size_t send_struct_size,
                            const size_t recv_struct_size,
@@ -158,6 +158,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   swift_assert(cu_error == cudaSuccess);
 #ifdef SWIFT_DEBUG_CHECKS
   buf->d_parts_send_size = self_pair_fact * count_max_parts;
+  buf->d_parts_send_allocd_size = self_pair_fact * count_max_parts * send_struct_size;
 #endif
 
   cu_error = cudaMalloc((void **)&buf->d_parts_recv_d,
@@ -165,6 +166,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   swift_assert(cu_error == cudaSuccess);
 #ifdef SWIFT_DEBUG_CHECKS
   buf->d_parts_recv_size = self_pair_fact * count_max_parts;
+  buf->d_parts_recv_allocd_size = self_pair_fact * count_max_parts * recv_struct_size;
 #endif
 
   cu_error =
@@ -173,6 +175,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   swift_assert(cu_error == cudaSuccess);
 #ifdef SWIFT_DEBUG_CHECKS
   buf->parts_send_size = self_pair_fact * count_max_parts;
+  buf->parts_send_allocd_size = self_pair_fact * count_max_parts * send_struct_size;
 #endif
 
   cu_error =
@@ -181,6 +184,7 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
   swift_assert(cu_error == cudaSuccess);
 #ifdef SWIFT_DEBUG_CHECKS
   buf->parts_recv_size = self_pair_fact * count_max_parts;
+  buf->parts_recv_allocd_size = self_pair_fact * count_max_parts * recv_struct_size;
 #endif
 
   if (is_pair_task) {
@@ -240,10 +244,50 @@ void gpu_init_data_buffers(struct gpu_offload_data *buf,
 /**
  * @brief perform the initialisations required at the start of each step
  */
-void gpu_init_data_buffers_step(struct gpu_offload_data *buf) {
+void gpu_data_buffers_init_step(struct gpu_offload_data *buf) {
 
   struct gpu_pack_metadata *md = &buf->md;
   gpu_pack_metadata_init_step(md);
+  gpu_data_buffers_reset(buf);
+}
+
+/**
+ * @brief reset (zero out) the data buffers.
+ */
+void gpu_data_buffers_reset(struct gpu_offload_data *buf){
+
+#ifdef SWIFT_DEBUG_CHECKS
+
+  /* In principle, if our book-keeping is correct, we shouldn't ever
+   * need to zero out the contents. So we don't do it outside of debug
+   * mode. */
+
+  for (int i = 0; i < buf->self_task_first_last_part_size; i++){
+    buf->self_task_first_last_part[i].x = 0;
+    buf->self_task_first_last_part[i].y = 0;
+  }
+
+  /* Can't do this from the host side */
+  /* for (int i = 0; i < buf->d_self_task_first_last_part_size; i++){ */
+  /*   buf->d_self_task_first_last_part[i].x = 0; */
+  /*   buf->d_self_task_first_last_part[i].y = 0; */
+  /* } */
+
+  for (int i = 0; i < buf->fparti_fpartj_lparti_lpartj_size; i++){
+    buf->fparti_fpartj_lparti_lpartj[i].x = 0;
+    buf->fparti_fpartj_lparti_lpartj[i].y = 0;
+    buf->fparti_fpartj_lparti_lpartj[i].z = 0;
+    buf->fparti_fpartj_lparti_lpartj[i].w = 0;
+  }
+
+  bzero(buf->parts_send_d, buf->parts_send_allocd_size);
+  bzero(buf->parts_recv_d, buf->parts_recv_allocd_size);
+
+  /* Can't do this from the host side */
+  /* bzero(buf->d_parts_recv_d, buf->d_parts_recv_allocd_size); */
+  /* bzero(buf->d_parts_send_d, buf->d_parts_send_allocd_size); */
+
+#endif
 }
 
 /**

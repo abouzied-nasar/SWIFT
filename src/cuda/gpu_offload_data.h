@@ -78,6 +78,7 @@ struct gpu_offload_data {
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
   int d_parts_send_size;
+  size_t d_parts_send_allocd_size;
 #endif
 
   /*! Array used to receive particle data on device from host */
@@ -90,6 +91,7 @@ struct gpu_offload_data {
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
   int d_parts_recv_size;
+  size_t d_parts_recv_allocd_size;
 #endif
 
   /*! Array used to send particle data from host to device */
@@ -102,6 +104,7 @@ struct gpu_offload_data {
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
   int parts_send_size;
+  size_t parts_send_allocd_size;
 #endif
 
   /*! Array used to receive particle data from device on host */
@@ -114,6 +117,7 @@ struct gpu_offload_data {
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Keep track of allocated array size for boundary checks. */
   int parts_recv_size;
+  size_t parts_recv_allocd_size;
 #endif
 
   /*! Handle on events per cuda stream to register completion of async ops */
@@ -122,13 +126,15 @@ struct gpu_offload_data {
 #endif /* WITH_CUDA */
 };
 
-void gpu_init_data_buffers(struct gpu_offload_data *buf,
+void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const struct gpu_global_pack_params *params,
                            const size_t send_struct_size,
                            const size_t recv_struct_size,
                            const char is_pair_task);
 
-void gpu_init_data_buffers_step(struct gpu_offload_data *buf);
+void gpu_data_buffers_init_step(struct gpu_offload_data *buf);
+
+void gpu_data_buffers_reset(struct gpu_offload_data *buf);
 
 void gpu_free_data_buffers(struct gpu_offload_data *buf,
                            const char is_pair_task);
