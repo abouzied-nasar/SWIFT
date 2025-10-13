@@ -151,7 +151,8 @@ struct gpu_pack_metadata {
 void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
                             const struct gpu_global_pack_params *params);
 void gpu_pack_metadata_init_step(struct gpu_pack_metadata *md);
-void gpu_pack_metadata_reset(struct gpu_pack_metadata *md, int reset_leaves_lists);
+void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
+                             int reset_leaves_lists);
 
 #ifdef __cplusplus
 }

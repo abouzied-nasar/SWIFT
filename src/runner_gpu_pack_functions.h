@@ -309,7 +309,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
 #ifdef SWIFT_DEBUG_CHECKS
   /* TODO: @Abouzied: Please document factor of 2 here: Why is it here? */
   if (pack_ind + count_ci + count_cj >= 2 * md->params.count_max_parts) {
-    error( "Exceeded count_max_parts. Make arrays bigger! pack_ind=%d"
+    error(
+        "Exceeded count_max_parts. Make arrays bigger! pack_ind=%d"
         "ci=%i cj=%i count_max=%d",
         pack_ind, count_ci, count_cj, md->params.count_max_parts);
   }

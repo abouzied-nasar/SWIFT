@@ -93,7 +93,8 @@ void gpu_pack_metadata_init_step(struct gpu_pack_metadata* md) {
  *
  * @param reset_leaves_lists if 1, also reset lists containing leaves.
  */
-void gpu_pack_metadata_reset(struct gpu_pack_metadata* md, int reset_leaves_lists) {
+void gpu_pack_metadata_reset(struct gpu_pack_metadata* md,
+                             int reset_leaves_lists) {
 
   md->launch = 0;
   md->launch_leftovers = 0;
@@ -104,11 +105,9 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata* md, int reset_leaves_list
   md->n_bundles_unpack = 0;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  for (int i = 0; i < md->task_list_size; i++)
-    md->task_list[i] = NULL;
-  if (reset_leaves_lists){
-    for (int i = 0; i < md->ci_list_size; i++)
-      md->ci_list[i] = NULL;
+  for (int i = 0; i < md->task_list_size; i++) md->task_list[i] = NULL;
+  if (reset_leaves_lists) {
+    for (int i = 0; i < md->ci_list_size; i++) md->ci_list[i] = NULL;
   }
   for (int i = 0; i < md->bundle_first_part_size; i++)
     md->bundle_first_part[i] = -123;
@@ -129,21 +128,17 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata* md, int reset_leaves_list
     md->task_first_last_packed_leaf_pair[i][0] = -123;
     md->task_first_last_packed_leaf_pair[i][1] = -123;
   }
-  for (int i = 0; i < md->ci_super_size; i++)
-    md->ci_super[i] = NULL;
-  for (int i = 0; i < md->cj_super_size; i++)
-    md->cj_super[i] = NULL;
+  for (int i = 0; i < md->ci_super_size; i++) md->ci_super[i] = NULL;
+  for (int i = 0; i < md->cj_super_size; i++) md->cj_super[i] = NULL;
   /* Already covered in self task section above */
   /* for (int i = 0; i < md->bundle_first_part_size; i++) */
   /*   md->bundle_first_part[i] = -123; */
   /* for (int i = 0; i < md->bundle_first_leaf_size; i++) */
   /*   md->bundle_first_leaf[i] = -123; */
 
-  if (reset_leaves_lists){
-    for (int i = 0; i < md->ci_leaves_size; i++)
-      md->ci_leaves[i] = NULL;
-    for (int i = 0; i < md->cj_leaves_size; i++)
-      md->cj_leaves[i] = NULL;
+  if (reset_leaves_lists) {
+    for (int i = 0; i < md->ci_leaves_size; i++) md->ci_leaves[i] = NULL;
+    for (int i = 0; i < md->cj_leaves_size; i++) md->cj_leaves[i] = NULL;
   }
 #endif
 }

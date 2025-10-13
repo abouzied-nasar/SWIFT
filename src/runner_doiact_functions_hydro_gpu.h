@@ -315,12 +315,16 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
 
 #ifdef SWIFT_DEBUG_CHECKS
     if (ind >= md->ci_leaves_size) {
-      error("Found more leaf cells (%d) than expected (%d), depth=%i; "
-            "Increase array size.", ind, md->ci_leaves_size, depth);
+      error(
+          "Found more leaf cells (%d) than expected (%d), depth=%i; "
+          "Increase array size.",
+          ind, md->ci_leaves_size, depth);
     }
     if (ind >= md->cj_leaves_size) {
-      error("Found more leaf cells (%d) than expected (%d), depth=%i; "
-            "Increase array size.", ind, md->cj_leaves_size, depth);
+      error(
+          "Found more leaf cells (%d) than expected (%d), depth=%i; "
+          "Increase array size.",
+          ind, md->cj_leaves_size, depth);
     }
 #endif
 
@@ -473,15 +477,13 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     /* Special case for incomplete bundles (when not having enough leftover
      * tasks to fill a bundle) */
 
-
     /* Compute how many bundles we actually have, rounding up */
     n_bundles = (tasks_packed + bundle_size - 1) / bundle_size;
 
 #ifdef SWIFT_DEBUG_CHECKS
     if (tasks_packed == 0)
       error("zero tasks packed but somehow got into GPU loop");
-    if (n_bundles <= 0)
-      error("Found case with n_bundles <= 0");
+    if (n_bundles <= 0) error("Found case with n_bundles <= 0");
 #endif
   }
 
@@ -874,12 +876,13 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
     n_bundles = (leaves_packed + bundle_size - 1) / bundle_size;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    if (n_bundles > md->params.n_bundles_pair){
+    if (n_bundles > md->params.n_bundles_pair) {
       error("Launching leftovers with too many bundles? Target size=%d, got=%d",
             md->params.n_bundles_pair, n_bundles);
     }
-    if (n_bundles == 0){
-      error("Got 0 bundles. leaves_packed=%d, bundle_size=%d", leaves_packed, bundle_size);
+    if (n_bundles == 0) {
+      error("Got 0 bundles. leaves_packed=%d, bundle_size=%d", leaves_packed,
+            bundle_size);
     }
 #endif
   }
@@ -1452,7 +1455,7 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
         int task_n_leaves = md->task_n_leaves;
 
         /* Shift the leaf cells down to index 0 in their arrays. */
-        for (int i = md->leaf_pairs_packed; i < md->task_n_leaves; i++){
+        for (int i = md->leaf_pairs_packed; i < md->task_n_leaves; i++) {
           const int shift_ind = i - md->leaf_pairs_packed;
           md->ci_leaves[shift_ind] = md->ci_leaves[i];
           md->cj_leaves[shift_ind] = md->cj_leaves[i];

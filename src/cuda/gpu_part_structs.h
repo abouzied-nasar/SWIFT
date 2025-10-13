@@ -131,7 +131,6 @@ struct gpu_part_recv_g {
 #endif
 };
 
-
 #ifdef __cplusplus
 }
 #endif

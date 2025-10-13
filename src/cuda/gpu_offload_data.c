@@ -143,7 +143,8 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   swift_assert(cu_error == cudaSuccess);
 #ifdef SWIFT_DEBUG_CHECKS
   buf->d_parts_send_size = self_pair_fact * count_max_parts;
-  buf->d_parts_send_allocd_size = self_pair_fact * count_max_parts * send_struct_size;
+  buf->d_parts_send_allocd_size =
+      self_pair_fact * count_max_parts * send_struct_size;
 #endif
 
   cu_error = cudaMalloc((void **)&buf->d_parts_recv_d,
@@ -151,7 +152,8 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   swift_assert(cu_error == cudaSuccess);
 #ifdef SWIFT_DEBUG_CHECKS
   buf->d_parts_recv_size = self_pair_fact * count_max_parts;
-  buf->d_parts_recv_allocd_size = self_pair_fact * count_max_parts * recv_struct_size;
+  buf->d_parts_recv_allocd_size =
+      self_pair_fact * count_max_parts * recv_struct_size;
 #endif
 
   cu_error =
@@ -160,7 +162,8 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   swift_assert(cu_error == cudaSuccess);
 #ifdef SWIFT_DEBUG_CHECKS
   buf->parts_send_size = self_pair_fact * count_max_parts;
-  buf->parts_send_allocd_size = self_pair_fact * count_max_parts * send_struct_size;
+  buf->parts_send_allocd_size =
+      self_pair_fact * count_max_parts * send_struct_size;
 #endif
 
   cu_error =
@@ -169,7 +172,8 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   swift_assert(cu_error == cudaSuccess);
 #ifdef SWIFT_DEBUG_CHECKS
   buf->parts_recv_size = self_pair_fact * count_max_parts;
-  buf->parts_recv_allocd_size = self_pair_fact * count_max_parts * recv_struct_size;
+  buf->parts_recv_allocd_size =
+      self_pair_fact * count_max_parts * recv_struct_size;
 #endif
 
   if (is_pair_task) {
@@ -239,7 +243,7 @@ void gpu_data_buffers_init_step(struct gpu_offload_data *buf) {
 /**
  * @brief reset (zero out) the data buffers.
  */
-void gpu_data_buffers_reset(struct gpu_offload_data *buf){
+void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
 
 #ifdef SWIFT_DEBUG_CHECKS
 
@@ -247,7 +251,7 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf){
    * need to zero out the contents. So we don't do it outside of debug
    * mode. */
 
-  for (int i = 0; i < buf->self_task_first_last_part_size; i++){
+  for (int i = 0; i < buf->self_task_first_last_part_size; i++) {
     buf->self_task_first_last_part[i].x = 0;
     buf->self_task_first_last_part[i].y = 0;
   }
