@@ -582,7 +582,7 @@ void *runner_main_cuda(void *data) {
             free(t->buff);
           } else if (t->subtype == task_subtype_sf_counts) {
             cell_unpack_sf_counts(ci, (struct pcell_sf_stars *)t->buff);
-            cell_clear_stars_sort_flags(ci, /*clear_unused_flags=*/0);
+            cell_clear_stars_sort_flags(ci, /*unused_flags=*/0);
             free(t->buff);
           } else if (t->subtype == task_subtype_grav_counts) {
             cell_unpack_grav_counts(ci, (struct pcell_sf_grav *)t->buff);
@@ -701,8 +701,10 @@ void *runner_main_cuda(void *data) {
       /* This runner is not doing a task anymore */
       r->t = NULL;
 #endif
+
       /* We're done with this task, see if we get a next one. */
       prev = t;
+
       if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
         /* Don't enqueue unpacks yet. Just signal the runners */
