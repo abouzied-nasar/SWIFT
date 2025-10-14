@@ -67,11 +67,11 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
   struct gpu_pack_metadata *md = &(buf->md);
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (md->task_list_size <= md->self_tasks_packed)
+  if (md->params.pack_size <= md->self_tasks_packed)
     error("Trying to write outside of array bounds");
-  if (md->ci_list_size <= md->self_tasks_packed)
+  if (md->params.pack_size <= md->self_tasks_packed)
     error("Trying to write outside of array bounds");
-  if (buf->self_task_first_last_part_size <= md->self_tasks_packed)
+  if (md->params.pack_size <= md->self_tasks_packed)
     error("Trying to write outside of array bounds");
 #endif
 
@@ -93,7 +93,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
 
 #ifdef SWIFT_DEBUG_CHECKS
     const int local_pack_position = md->count_parts;
-    const int count_max_parts = md->params.count_max_parts;
+    const int count_max_parts = md->params.part_buffer_size;
     if (local_pack_position + count >= count_max_parts) {
       error(
           "Exceeded count_max_parts_tmp. Make arrays bigger! "
@@ -314,17 +314,17 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
     const int ind = md->n_leaves + md->task_n_leaves;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    if (ind >= md->ci_leaves_size) {
+    if (ind >= md->params.leaf_buffer_size) {
       error(
           "Found more leaf cells (%d) than expected (%d), depth=%i; "
           "Increase array size.",
-          ind, md->ci_leaves_size, depth);
+          ind, md->params.leaf_buffer_size, depth);
     }
-    if (ind >= md->cj_leaves_size) {
+    if (ind >= md->params.leaf_buffer_size) {
       error(
           "Found more leaf cells (%d) than expected (%d), depth=%i; "
           "Increase array size.",
-          ind, md->cj_leaves_size, depth);
+          ind, md->params.leaf_buffer_size, depth);
     }
 #endif
 
@@ -527,9 +527,9 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     const int first_task = md->bundle_first_leaf[bid];
 #ifdef SWIFT_DEBUG_CHECKS
     const int last_task = first_task + tasks_left;
-    if (last_task > buf->d_self_task_first_last_part_size)
+    if (last_task > md->params.pack_size)
       error("Trying to access out-of-boundary in d_self_task_first_last_part");
-    if (last_task > buf->self_task_first_last_part_size)
+    if (last_task > md->params.pack_size)
       error("Trying to access out-of-boundary in task_first_last_part");
 #endif
 
@@ -704,11 +704,11 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
       }
 
 #ifdef SWIFT_DEBUG_CHECKS
-      if (unpack_index + count >= md->params.count_max_parts) {
+      if (unpack_index + count >= md->params.part_buffer_size) {
         error(
             "Exceeded count_max_parts. Make arrays bigger! pack_length is "
             "%d, count is %d, max_parts is %d",
-            unpack_index, count, md->params.count_max_parts);
+            unpack_index, count, md->params.part_buffer_size);
       }
 #endif
 
@@ -899,7 +899,8 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
 
     const int first_part_i = md->bundle_first_part[bid];
     const int bundle_n_parts = md->bundle_last_part[bid] - first_part_i;
-    cudaError_t cu_error;
+    /* initialise to just some meaningless value to silence the compiler */
+    cudaError_t cu_error = cudaErrorMemoryAllocation;
 
     /* Transfer memory to device */
     if (task_subtype == task_subtype_gpu_launch_d) {
@@ -925,8 +926,6 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
     }
 #ifdef SWIFT_DEBUG_CHECKS
     else {
-      /* just some value to silence the compiler */
-      cu_error = cudaErrorMemoryAllocation;
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 #endif
@@ -1142,19 +1141,18 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
       /* Note that these calls increment pack_length_unpack. */
       if (task_subtype == task_subtype_gpu_pack_d) {
 
-        /* TODO: WHY IS THERE A FACTOR OF 2 HERE? LEAVE A COMMENT. */
         gpu_unpack_pair_density(r, cii_l, cjj_l, buf->parts_recv_d,
-                                &unpack_index, 2 * md->params.count_max_parts);
+                                &unpack_index, md->params.part_buffer_size);
 
       } else if (task_subtype == task_subtype_gpu_pack_g) {
 
         gpu_unpack_pair_gradient(r, cii_l, cjj_l, buf->parts_recv_g,
-                                 &unpack_index, 2 * md->params.count_max_parts);
+                                 &unpack_index, md->params.part_buffer_size);
 
       } else if (task_subtype == task_subtype_gpu_pack_f) {
 
         gpu_unpack_pair_force(r, cii_l, cjj_l, buf->parts_recv_f, &unpack_index,
-                              2 * md->params.count_max_parts);
+                              md->params.part_buffer_size);
 
       }
 #ifdef SWIFT_DEBUG_CHECKS
@@ -1284,13 +1282,13 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
   int tind = md->tasks_in_list;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (tind >= md->task_list_size)
+  if (tind >= md->params.pack_size_pair)
     error("Writing out of top_task_packed array bounds: %d/%d", tind,
-          md->task_list_size);
-  if (tind >= md->ci_super_size)
-    error("Writing out of ci_top array bounds: %d/%d", tind, md->ci_super_size);
-  if (tind >= md->cj_super_size)
-    error("Writing out of cj_top array bounds: %d/%d", tind, md->cj_super_size);
+          md->params.pack_size_pair);
+  if (tind >= md->params.pack_size_pair)
+    error("Writing out of ci_top array bounds: %d/%d", tind, md->params.pack_size_pair);
+  if (tind >= md->params.pack_size_pair)
+    error("Writing out of cj_top array bounds: %d/%d", tind, md->params.pack_size_pair);
 #endif
 
   /* Keep track of index of first leaf cell pairs in lists per super-level pair
@@ -1349,12 +1347,12 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
     tind = md->tasks_in_list - 1;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    if (md->leaf_pairs_packed >= md->ci_leaves_size)
+    if (md->leaf_pairs_packed >= md->params.leaf_buffer_size)
       error("Writing out of ci_d array bounds: %d/%d", md->leaf_pairs_packed,
-            md->ci_leaves_size);
-    if (md->leaf_pairs_packed >= md->cj_leaves_size)
+            md->params.leaf_buffer_size);
+    if (md->leaf_pairs_packed >= md->params.leaf_buffer_size)
       error("Writing out of cj_d array bounds: %d/%d", md->leaf_pairs_packed,
-            md->cj_leaves_size);
+            md->params.leaf_buffer_size);
 #endif
 
     /* Grab handles. */

@@ -54,15 +54,11 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const char is_pair_task) {
 
   /* Grab some handles */
-  const size_t target_n_tasks =
-      is_pair_task ? params->pack_size_pair : params->pack_size;
+  const size_t pack_size = is_pair_task ? params->pack_size_pair : params->pack_size;
   const size_t n_bundles =
       is_pair_task ? params->n_bundles_pair : params->n_bundles;
-  const size_t count_max_parts = params->count_max_parts;
-
-  /* Multiplication factor depending on whether this is for a self or a pair
-   * task */
-  const size_t self_pair_fact = is_pair_task ? 2 : 1;
+  const size_t part_buffer_size = params->part_buffer_size;
+  const size_t leaf_buffer_size = params->leaf_buffer_size;
 
   /* Initialise and set up metadata */
   struct gpu_pack_metadata *md = &(buf->md);
@@ -70,26 +66,14 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
 
   /* Now allocate arrays */
   cudaError_t cu_error;
-  cu_error = cudaMallocHost((void **)&md->bundle_first_part,
-                            self_pair_fact * n_bundles * sizeof(int));
+  cu_error = cudaMallocHost((void **)&md->bundle_first_part, n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
-#ifdef SWIFT_DEBUG_CHECKS
-  md->bundle_first_part_size = self_pair_fact * n_bundles;
-#endif
 
-  cu_error = cudaMallocHost((void **)&md->bundle_last_part,
-                            self_pair_fact * n_bundles * sizeof(int));
+  cu_error = cudaMallocHost((void **)&md->bundle_last_part, n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
-#ifdef SWIFT_DEBUG_CHECKS
-  md->bundle_last_part_size = self_pair_fact * n_bundles;
-#endif
 
-  cu_error = cudaMallocHost((void **)&md->bundle_first_leaf,
-                            self_pair_fact * n_bundles * sizeof(int));
+  cu_error = cudaMallocHost((void **)&md->bundle_first_leaf, n_bundles * sizeof(int));
   swift_assert(cu_error == cudaSuccess);
-#ifdef SWIFT_DEBUG_CHECKS
-  md->bundle_first_leaf_size = self_pair_fact * n_bundles;
-#endif
 
   md->count_parts = 0;
 
@@ -97,113 +81,53 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
    * purge one of them. */
   if (is_pair_task) {
     md->ci_list = NULL;
-    md->task_list =
-        (struct task **)calloc(target_n_tasks, sizeof(struct task *));
-#ifdef SWIFT_DEBUG_CHECKS
-    md->ci_list_size = 0;
-    md->task_list_size = target_n_tasks;
-#endif
+    md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
   } else {
-    md->ci_list = (struct cell **)calloc(target_n_tasks, sizeof(struct cell *));
-    md->task_list =
-        (struct task **)calloc(target_n_tasks, sizeof(struct task *));
-#ifdef SWIFT_DEBUG_CHECKS
-    md->ci_list_size = target_n_tasks;
-    md->task_list_size = target_n_tasks;
-#endif
+    md->ci_list = (struct cell **)malloc(pack_size * sizeof(struct cell *));
+    md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
   }
 
-  /* A. Nasar: Keep track of first and last particles for each self task
-   * (particle data is arranged in long arrays containing particles from all the
-   * tasks we will work with) Needed for offloading self tasks as we use these
-   * to sort through which parts need to interact with which */
+  /* Keep track of first and last particles for each self task (particle data
+   * is arranged in long arrays containing particles from all the tasks we will
+   * work with) Needed for offloading self tasks as we use these to sort
+   * through which parts need to interact with which */
   if (is_pair_task) {
     buf->self_task_first_last_part = NULL;
     buf->d_self_task_first_last_part = NULL;
-#ifdef SWIFT_DEBUG_CHECKS
-    buf->self_task_first_last_part_size = 0;
-    buf->d_self_task_first_last_part_size = 0;
-#endif
   } else {
-    cu_error = cudaMallocHost((void **)&buf->self_task_first_last_part,
-                              target_n_tasks * sizeof(int2));
+    cu_error = cudaMallocHost((void **)&buf->self_task_first_last_part, pack_size * sizeof(int2));
     swift_assert(cu_error == cudaSuccess);
-    cu_error = cudaMalloc((void **)&buf->d_self_task_first_last_part,
-                          target_n_tasks * sizeof(int2));
+    cu_error = cudaMalloc((void **)&buf->d_self_task_first_last_part, pack_size * sizeof(int2));
     swift_assert(cu_error == cudaSuccess);
-#ifdef SWIFT_DEBUG_CHECKS
-    buf->self_task_first_last_part_size = target_n_tasks;
-    buf->d_self_task_first_last_part_size = target_n_tasks;
-#endif
   }
 
   /* Now allocate memory for Buffer and GPU particle arrays */
-  cu_error = cudaMalloc((void **)&buf->d_parts_send_d,
-                        self_pair_fact * count_max_parts * send_struct_size);
+  cu_error = cudaMalloc((void **)&buf->d_parts_send_d, part_buffer_size * send_struct_size);
   swift_assert(cu_error == cudaSuccess);
-#ifdef SWIFT_DEBUG_CHECKS
-  buf->d_parts_send_size = self_pair_fact * count_max_parts;
-  buf->d_parts_send_allocd_size =
-      self_pair_fact * count_max_parts * send_struct_size;
-#endif
 
-  cu_error = cudaMalloc((void **)&buf->d_parts_recv_d,
-                        self_pair_fact * count_max_parts * recv_struct_size);
+  cu_error = cudaMalloc((void **)&buf->d_parts_recv_d, part_buffer_size * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
-#ifdef SWIFT_DEBUG_CHECKS
-  buf->d_parts_recv_size = self_pair_fact * count_max_parts;
-  buf->d_parts_recv_allocd_size =
-      self_pair_fact * count_max_parts * recv_struct_size;
-#endif
 
-  cu_error =
-      cudaMallocHost((void **)&buf->parts_send_d,
-                     self_pair_fact * count_max_parts * send_struct_size);
+  cu_error = cudaMallocHost((void **)&buf->parts_send_d, part_buffer_size * send_struct_size);
   swift_assert(cu_error == cudaSuccess);
-#ifdef SWIFT_DEBUG_CHECKS
-  buf->parts_send_size = self_pair_fact * count_max_parts;
-  buf->parts_send_allocd_size =
-      self_pair_fact * count_max_parts * send_struct_size;
-#endif
 
-  cu_error =
-      cudaMallocHost((void **)&buf->parts_recv_d,
-                     self_pair_fact * count_max_parts * recv_struct_size);
+  cu_error = cudaMallocHost((void **)&buf->parts_recv_d, part_buffer_size * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
-#ifdef SWIFT_DEBUG_CHECKS
-  buf->parts_recv_size = self_pair_fact * count_max_parts;
-  buf->parts_recv_allocd_size =
-      self_pair_fact * count_max_parts * recv_struct_size;
-#endif
 
   if (is_pair_task) {
 
-    /* A. Nasar: Over-setimate better than under-estimate
-     * Over-allocated for now but a good guess is multiply by 2 to ensure we
-     * always have room for recursing through more tasks than we plan to
-     * offload. */
-    int max_length = 2 * target_n_tasks * 2;
-
-    md->ci_leaves = (struct cell **)malloc(max_length * sizeof(struct cell *));
-    md->cj_leaves = (struct cell **)malloc(max_length * sizeof(struct cell *));
+    md->ci_leaves = (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
+    md->cj_leaves = (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
     md->task_first_last_packed_leaf_pair =
-        (int **)malloc(target_n_tasks * 2 * sizeof(int *));
-    for (size_t i = 0; i < target_n_tasks * 2; i++) {
+        (int **)malloc(pack_size * sizeof(int *));
+    for (size_t i = 0; i < pack_size; i++) {
       md->task_first_last_packed_leaf_pair[i] = (int *)malloc(2 * sizeof(int));
     }
 
     md->ci_super =
-        (struct cell **)malloc(2ul * target_n_tasks * sizeof(struct cell *));
+        (struct cell **)malloc(pack_size * sizeof(struct cell *));
     md->cj_super =
-        (struct cell **)malloc(2ul * target_n_tasks * sizeof(struct cell *));
-
-#ifdef SWIFT_DEBUG_CHECKS
-    md->ci_leaves_size = target_n_tasks * 2;
-    md->cj_leaves_size = target_n_tasks * 2;
-    md->task_first_last_packed_leaf_pair_size = target_n_tasks * 2;
-    md->ci_super_size = 2ul * target_n_tasks;
-    md->cj_super_size = 2ul * target_n_tasks;
-#endif
+        (struct cell **)malloc(pack_size * sizeof(struct cell *));
 
   } else {
     md->ci_leaves = NULL;
@@ -212,13 +136,6 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
     md->ci_super = NULL;
     md->cj_super = NULL;
 
-#ifdef SWIFT_DEBUG_CHECKS
-    md->ci_leaves_size = 0;
-    md->cj_leaves_size = 0;
-    md->task_first_last_packed_leaf_pair_size = 0;
-    md->ci_super_size = 0;
-    md->cj_super_size = 0;
-#endif
   }
 
   /* Create space for cuda events */
@@ -251,23 +168,25 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
    * need to zero out the contents. So we don't do it outside of debug
    * mode. */
 
-  for (int i = 0; i < buf->self_task_first_last_part_size; i++) {
-    buf->self_task_first_last_part[i].x = 0;
-    buf->self_task_first_last_part[i].y = 0;
-  }
+  /* const struct gpu_global_pack_params pars = buf.md.params; */
+
+  /* for (int i = 0; i < pars.pack_size; i++) { */
+  /*   buf->self_task_first_last_part[i].x = 0; */
+  /*   buf->self_task_first_last_part[i].y = 0; */
+  /* } */
 
   /* Can't do this from the host side */
-  /* for (int i = 0; i < buf->d_self_task_first_last_part_size; i++){ */
+  /* for (int i = 0; i < pars.pack_size; i++) { */
   /*   buf->d_self_task_first_last_part[i].x = 0; */
   /*   buf->d_self_task_first_last_part[i].y = 0; */
   /* } */
 
-  bzero(buf->parts_send_d, buf->parts_send_allocd_size);
-  bzero(buf->parts_recv_d, buf->parts_recv_allocd_size);
+  /* bzero(buf->parts_send_d, pars.part_buffer_size); */
+  /* bzero(buf->parts_recv_d, pars.part_buffer_size); */
 
   /* Can't do this from the host side */
-  /* bzero(buf->d_parts_recv_d, buf->d_parts_recv_allocd_size); */
-  /* bzero(buf->d_parts_send_d, buf->d_parts_send_allocd_size); */
+  /* bzero(buf->d_parts_recv_d, pars.part_buffer_size); */
+  /* bzero(buf->d_parts_send_d, pars.part_buffer_size); */
 
 #endif
 }

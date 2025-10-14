@@ -96,6 +96,8 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
         gpu_pack_params->bundle_size * nPartsPerCell / GPU_THREAD_BLOCK_SIZE);
     message("Target n_blocks per stream: %d",
             gpu_pack_params->pack_size * nPartsPerCell / GPU_THREAD_BLOCK_SIZE);
+    message("Leaf cell buffer size:      %i", gpu_pack_params->leaf_buffer_size);
+    message("Particles buffer size:      %i", gpu_pack_params->part_buffer_size);
     message("free mem:                   %.3g GB",
             ((double)free_mem) / (1024. * 1024. * 1024.));
     message("total mem:                  %.3g GB",

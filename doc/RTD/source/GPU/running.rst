@@ -17,6 +17,9 @@ Details below.
 Runtime Parameters
 ------------------------
 
+Mandatory Parameters
+~~~~~~~~~~~~~~~~~~~~~~~
+
 
 To run SWIFT with GPU acceleration, the following mandatory parameters must be
 provided in your ``parameters.yml`` file:
@@ -46,4 +49,18 @@ provided in your ``parameters.yml`` file:
 
 See ``examples/HydroTests/GreshoVortex_3D/greshoGPU256.yml`` for an example.
 
- 
+
+Optional Parameters
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block::yaml
+
+   # Parameters for the task scheduling
+   Scheduler:
+     gpu_recursion_max_depth:          0
+
+
+- ``gpu_recursion_max_depth``: Sets the maximal depth we expect to recurse down
+  to from super-level tasks to reach leaf cells. We need this to estimate the
+  size of buffers to allocate.
+

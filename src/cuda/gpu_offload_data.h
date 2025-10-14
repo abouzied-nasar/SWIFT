@@ -53,12 +53,6 @@ struct gpu_offload_data {
   int2 *self_task_first_last_part;
   int2 *d_self_task_first_last_part;
 
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int self_task_first_last_part_size;
-  int d_self_task_first_last_part_size;
-#endif
-
   /*! Arrays used to send particle data from device to host. A single struct
    * gpu_offload_data will only hold data for either density, gradient, or
    * force task, so we hide them behind a union. */
@@ -68,24 +62,12 @@ struct gpu_offload_data {
     struct gpu_part_send_f *d_parts_send_f;
   };
 
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int d_parts_send_size;
-  size_t d_parts_send_allocd_size;
-#endif
-
   /*! Array used to receive particle data on device from host */
   union {
     struct gpu_part_recv_d *d_parts_recv_d;
     struct gpu_part_recv_g *d_parts_recv_g;
     struct gpu_part_recv_f *d_parts_recv_f;
   };
-
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int d_parts_recv_size;
-  size_t d_parts_recv_allocd_size;
-#endif
 
   /*! Array used to send particle data from host to device */
   union {
@@ -94,24 +76,12 @@ struct gpu_offload_data {
     struct gpu_part_send_f *parts_send_f;
   };
 
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int parts_send_size;
-  size_t parts_send_allocd_size;
-#endif
-
   /*! Array used to receive particle data from device on host */
   union {
     struct gpu_part_recv_d *parts_recv_d;
     struct gpu_part_recv_g *parts_recv_g;
     struct gpu_part_recv_f *parts_recv_f;
   };
-
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int parts_recv_size;
-  size_t parts_recv_allocd_size;
-#endif
 
   /*! Handle on events per cuda stream to register completion of async ops */
   cudaEvent_t *event_end;

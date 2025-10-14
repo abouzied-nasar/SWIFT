@@ -7,10 +7,14 @@ InternalUnitSystem:
   UnitTemp_in_cgs:     1   # Kelvin
 
 Scheduler:
-  max_top_level_cells: 32  # Use 16 for 64^3 with replicate 2, 32 for replicate 4
-  tasks_per_cell: 200
+  gpu_self_pack_size:        64
+  gpu_self_bundle_size:      8
+  gpu_pair_pack_size:        64
+  gpu_pair_bundle_size:      8
+  max_top_level_cells:       8
+  # tasks_per_cell:            200
   # deadlock_waiting_time_s:   10
-  # cell_split_size: 100
+  # cell_split_size:           100
   # cell_sub_size_pair_hydro:  10000 # (Optional) Maximal number of hydro-hydro interactions per sub-pair hydro/star task (this is the default value).
   # cell_sub_size_self_hydro:  100 # (Optional) Maximal number of hydro-hydro interactions per sub-self hydro/star task. Set to how many cells are targeted for GPU tasks
 

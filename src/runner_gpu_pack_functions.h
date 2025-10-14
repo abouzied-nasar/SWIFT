@@ -307,12 +307,11 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
   int pack_ind = md->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  /* TODO: @Abouzied: Please document factor of 2 here: Why is it here? */
-  if (pack_ind + count_ci + count_cj >= 2 * md->params.count_max_parts) {
+  if (pack_ind + count_ci + count_cj >= md->params.part_buffer_size) {
     error(
         "Exceeded count_max_parts. Make arrays bigger! pack_ind=%d"
         "ci=%i cj=%i count_max=%d",
-        pack_ind, count_ci, count_cj, md->params.count_max_parts);
+        pack_ind, count_ci, count_cj, md->params.part_buffer_size);
   }
 #endif
 
@@ -372,11 +371,11 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
   int pack_ind = md->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (pack_ind + count_ci + count_cj >= 2 * md->params.count_max_parts) {
+  if (pack_ind + count_ci + count_cj >= md->params.part_buffer_size) {
     error(
         "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %d"
         "ci %i cj %i count_max %d",
-        pack_ind, count_ci, count_cj, md->params.count_max_parts);
+        pack_ind, count_ci, count_cj, md->params.part_buffer_size);
   }
 #endif
 
@@ -436,11 +435,11 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(
   int pack_ind = md->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (pack_ind + count_ci + count_cj >= 2 * md->params.count_max_parts) {
+  if (pack_ind + count_ci + count_cj >= md->params.part_buffer_size) {
     error(
         "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %d"
-        "ci %i cj %i count_max %d",
-        pack_ind, count_ci, count_cj, md->params.count_max_parts);
+        "ci_count=%i cj_count=%i count_max=%d",
+        pack_ind, count_ci, count_cj, md->params.part_buffer_size);
   }
 #endif
 

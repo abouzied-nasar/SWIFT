@@ -941,15 +941,29 @@ void engine_config(int restart, int fof, struct engine *e,
   int bundle_size = parser_get_param_int(params, "Scheduler:gpu_self_bundle_size");
   int pack_size_pair = parser_get_param_int(params, "Scheduler:gpu_pair_pack_size");
   int bundle_size_pair = parser_get_param_int(params, "Scheduler:gpu_pair_bundle_size");
+  int gpu_recursion_max_depth = parser_get_opt_param_int(params, "Scheduler:gpu_recursion_max_depth", 4);
+  if (e->s->maxdepth > gpu_recursion_max_depth)
+    warning("space max depth=%d > gpu_recursion_max_depth=%d, "
+        "this may lead to trouble with buffer sizes.",
+        e->s->maxdepth, gpu_recursion_max_depth);
+  int nparts_hydro = e->s->nr_parts;
+  int nthreads = e->nr_threads;
+  int n_top_level_cells = e->s->nr_cells;
 #else
   int pack_size = 1;
   int bundle_size = 1;
   int pack_size_pair = 1;
   int bundle_size_pair = 1;
+  int gpu_recursion_max_depth = 1;
+  int nparts_hydro = 1;
+  int nthreads = 1;
+  int n_top_level_cells = 1;
 #endif
 
   gpu_pack_params_set(&e->gpu_pack_params, pack_size, pack_size_pair,
-                      bundle_size, bundle_size_pair, e->s->eta_neighbours);
+                      bundle_size, bundle_size_pair,
+                      gpu_recursion_max_depth, e->s->eta_neighbours,
+                      nparts_hydro, n_top_level_cells, nthreads);
 
   if (restart) {
 
