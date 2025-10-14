@@ -633,12 +633,12 @@ void engine_addtasks_recv_hydro(
   /* Early abort (are we below the level where tasks are)? */
   if (!cell_get_flag(c, cell_flag_has_tasks)) return;
 
-    /* Have we reached a level where there are any hydro tasks ? */
-#ifdef WITH_CUDA  // A. Nasar
+  /* Have we reached a level where there are any hydro tasks ? */
+#if defined(WITH_CUDA) || defined(WITH_HIP)
   if (t_xv == NULL && c->hydro.density != NULL && c->hydro.density_pack != NULL)
 #else
   if (t_xv == NULL && c->hydro.density != NULL)
-#endif /*WITH_CUDA*/
+#endif
   {
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -766,7 +766,8 @@ void engine_addtasks_recv_hydro(
       scheduler_addunlock(s, t_xv, l->t);
       scheduler_addunlock(s, l->t, t_rho);
     }
-#ifdef WITH_CUDA /* A. Nasar POSSIBLE BUG HERE (More like PROBABLE) NOT \
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+ /* A. Nasar POSSIBLE BUG HERE (More like PROBABLE) NOT \
                     REQUIRED Ghost in for cell j is*/
     for (struct link *l = c->hydro.density_pack; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_xv, l->t);
@@ -787,7 +788,7 @@ void engine_addtasks_recv_hydro(
       scheduler_addunlock(s, t_gradient, l->t);
       scheduler_addunlock(s, l->t, tend);
     }
-#ifdef WITH_CUDA
+#if defined(WITH_CUDA) || defined(WITH_HIP)
     for (struct link *l = c->hydro.gradient_pack; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_rho, l->t);
       scheduler_addunlock(s, l->t, t_gradient);
@@ -804,13 +805,13 @@ void engine_addtasks_recv_hydro(
       scheduler_addunlock(s, l->t, tend);
     }
 
-#endif /*WITH_CUDA*/
+#endif /*WITH_CUDA || WITH_HIP*/
 #else  /*EXTRA_HYDRO_LOOP*/
     for (struct link *l = c->hydro.force; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_rho, l->t);
       scheduler_addunlock(s, l->t, tend);
     }
-#ifdef WITH_CUDA
+#if defined(WITH_CUDA) || defined(WITH_HIP)
     for (struct link *l = c->hydro.force_pack; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_rho, l->t);
       //      scheduler_addunlock(s, l->t, t_ti);
@@ -2580,6 +2581,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
     }
 
+#if defined(WITH_CUDA) || defined(WITH_HIP)
     /*Make packing depend on sorts and drift A. Nasar */
     else if (t_type == task_type_self && t_subtype == task_subtype_gpu_pack_d) {
       scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
@@ -2606,6 +2608,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out, t_force_gpu);
 #endif
     }
+#endif /* WITH_CUDA || WITH_HIP */
 
     /* Sort tasks depend on the drift of the cell (stars version). */
     else if (t_type == task_type_stars_sort && ci->nodeID == nodeID) {
@@ -2697,7 +2700,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
       /* Add the link between the new loop and the cell */
       engine_addlink(e, &ci->hydro.force, t_force);
-
       if (with_timestep_limiter) {
         engine_addlink(e, &ci->hydro.limiter, t_limiter);
       }

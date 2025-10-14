@@ -729,17 +729,17 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
       /* Increase our index in the buffer with the newly unpacked size. */
       unpack_index += count;
 
-      /* TODO: What exactly is happening here? Please document. */
+      /* Release the lock */
+      cell_unlocktree(c);
+
+      /* schedule my dependencies */
+      enqueue_dependencies(s, t);
+
+      /* Tell the scheduler's bookkeeping that this task is done */
       pthread_mutex_lock(&s->sleep_mutex);
       atomic_dec(&s->waiting);
       pthread_cond_broadcast(&s->sleep_cond);
       pthread_mutex_unlock(&s->sleep_mutex);
-
-      /* Release the lock */
-      cell_unlocktree(c);
-
-      /* schedule my dependencies (Only unpacks really) */
-      enqueue_dependencies(s, t);
 
     } /* Loop over tasks in bundle */
   } /* Loop over bundles */
@@ -925,6 +925,8 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_launch(
     }
 #ifdef SWIFT_DEBUG_CHECKS
     else {
+      /* just some value to silence the compiler */
+      cu_error = cudaErrorMemoryAllocation;
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 #endif
@@ -1105,7 +1107,6 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
 
   /* Grab handles */
   struct gpu_pack_metadata *md = &buf->md;
-  /* int n_leaves_packed = md->leaf_pairs_packed; */
 
   struct cell **ci_leaves = md->ci_leaves;
   struct cell **cj_leaves = md->cj_leaves;
@@ -1167,23 +1168,22 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     cell_unlocktree(ci_super[tid]);
     cell_unlocktree(cj_super[tid]);
 
-    /* TODO (Mladen): There used to be some exception handling here (commented
-     * out below), but current code deadlocks with it. Double-check this. */
+    /* If we haven't finished packing the currently handled task's leaf cells,
+     * we mustn't unlock its dependencies yet. */
+    if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves)) {
+      continue;
+    }
 
-    /* For some reason the code fails if we get a leaf pair task
-     * this if->continue statement stops the code from trying to unlock same
-     * cells twice*/
-    /* if (tid == md->tasks_in_list - 1 && npacked != n_leaves_packed) { */
-    /*   continue; */
-    /* } */
-
-    /* TODO: DOCUMENT WHAT'S HAPPENING HERE AND WHY */
+    /* schedule my dependencies */
     enqueue_dependencies(s, md->task_list[tid]);
+
+    /* Tell the scheduler's bookkeeping that this task is done */
     pthread_mutex_lock(&s->sleep_mutex);
     atomic_dec(&s->waiting);
     pthread_cond_broadcast(&s->sleep_cond);
     pthread_mutex_unlock(&s->sleep_mutex);
-  }
+
+  } /* Loop over tasks in list */
 }
 
 /**
@@ -1390,7 +1390,7 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
     /* record how many leaves we've packed in total during this while loop */
     npacked++;
 
-    /* Update the current last leaf cell pair of this task. */
+    /* Update the current last leaf cell pair index of this task. */
     /* md->leaf_pairs_packed was incremented in runner_dopair_gpu_pack_<*>. */
     tflplp[tind][1] = md->leaf_pairs_packed;
 

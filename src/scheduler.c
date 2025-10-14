@@ -3196,19 +3196,8 @@ struct task *scheduler_done(struct scheduler *s, struct task *t) {
   /* Release whatever locks this task held. */
   if (!t->implicit) task_unlock(t);
 
-  /* Loop through the dependencies and add them to a queue if
-     they are ready. */
-  for (int k = 0; k < t->nr_unlock_tasks; k++) {
-    struct task *t2 = t->unlock_tasks[k];
-    if (t2->skip) continue;
-
-    const int res = atomic_dec(&t2->wait);
-    if (res < 1) {
-      error("Negative wait!");
-    } else if (res == 1) {
-      scheduler_enqueue(s, t2);
-    }
-  }
+  /* Enqueue its dependencies */
+  enqueue_dependencies(s, t);
 
   /* Task definitely done, signal any sleeping runners. */
   if (!t->implicit) {
