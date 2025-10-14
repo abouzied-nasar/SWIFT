@@ -1455,7 +1455,10 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
         int task_n_leaves = md->task_n_leaves;
 
         /* Shift the leaf cells down to index 0 in their arrays. */
-        for (int i = md->leaf_pairs_packed; i < md->task_n_leaves; i++) {
+        /* Reminder: md->leaf_pairs_packed is the current number of leaf pairs
+         * in the buffers. md->n_leaves is the total number of leaf pairs we have
+         * identified for offloading, including all of this task's leaves. */
+         for (int i = md->leaf_pairs_packed; i < md->n_leaves; i++) {
           const int shift_ind = i - md->leaf_pairs_packed;
           md->ci_leaves[shift_ind] = md->ci_leaves[i];
           md->cj_leaves[shift_ind] = md->cj_leaves[i];
