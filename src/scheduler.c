@@ -3386,8 +3386,7 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
   /* Loop as long as there are tasks... */
   while (s->waiting > 0 && res == NULL) {
     /* Try more than once before sleeping. */
-    for (int tries = 0;
-         res == NULL && s->waiting && tries < scheduler_maxtries * 100;
+    for (int tries = 0; res == NULL && s->waiting && tries < scheduler_maxtries;
          tries++) {
       /* Try to get a task from the suggested queue. */
       if (s->queues[qid].count > 0 || s->queues[qid].count_incoming > 0) {
@@ -3400,11 +3399,11 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
       /* If unsuccessful, try stealing from the other queues. */
       if (s->flags & scheduler_flag_steal) {
 
-        int count = 0, qids[nr_queues];
+        int count = 0;
+        int qids[nr_queues];
 
         /* Make list of queues that have 1 or more tasks in them */
         for (int k = 0; k < nr_queues; k++) {
-          if (k == qid) continue;
           if (s->queues[k].count > 0 || s->queues[k].count_incoming > 0) {
             qids[count++] = k;
           }
@@ -3461,35 +3460,33 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
             enum task_subtypes subtype = res->subtype;
 
             /*Move counter from the robbed to the robber*/
-            if ((type == task_type_self) &&
-                subtype == task_subtype_gpu_pack_d) {
-              q->n_packs_self_left_d--;
-              q_stl->n_packs_self_left_d--;
+            if (type == task_type_self) {
+              if (subtype == task_subtype_gpu_pack_d) {
+                q->n_packs_self_left_d++;
+                q_stl->n_packs_self_left_d--;
+              }
+              else if (subtype == task_subtype_gpu_pack_g) {
+                q->n_packs_self_left_g++;
+                q_stl->n_packs_self_left_g--;
+              }
+              else if (subtype == task_subtype_gpu_pack_f) {
+                q->n_packs_self_left_f++;
+                q_stl->n_packs_self_left_f--;
+              }
             }
-            if ((type == task_type_self) &&
-                subtype == task_subtype_gpu_pack_g) {
-              q->n_packs_self_left_g--;
-              q_stl->n_packs_self_left_g--;
-            }
-            if ((type == task_type_self) &&
-                subtype == task_subtype_gpu_pack_f) {
-              q->n_packs_self_left_f--;
-              q_stl->n_packs_self_left_f--;
-            }
-            if ((type == task_type_pair) &&
-                subtype == task_subtype_gpu_pack_d) {
-              q->n_packs_pair_left_d--;
-              q_stl->n_packs_pair_left_d--;
-            }
-            if ((type == task_type_pair) &&
-                subtype == task_subtype_gpu_pack_g) {
-              q->n_packs_pair_left_g--;
-              q_stl->n_packs_pair_left_g--;
-            }
-            if ((type == task_type_pair) &&
-                subtype == task_subtype_gpu_pack_f) {
-              q->n_packs_pair_left_f--;
-              q_stl->n_packs_pair_left_f--;
+            else if (type == task_type_pair) {
+              if (subtype == task_subtype_gpu_pack_d) {
+                q->n_packs_pair_left_d++;
+                q_stl->n_packs_pair_left_d--;
+              }
+              else if (subtype == task_subtype_gpu_pack_g) {
+                q->n_packs_pair_left_g++;
+                q_stl->n_packs_pair_left_g--;
+              }
+              else if (subtype == task_subtype_gpu_pack_f) {
+                q->n_packs_pair_left_f++;
+                q_stl->n_packs_pair_left_f--;
+              }
             }
             /* Run with the task */
             break;
@@ -3517,11 +3514,6 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
       pthread_mutex_lock(&s->sleep_mutex);
       res = queue_gettask(&s->queues[qid], prev, 1);
       if (res == NULL && s->waiting > 0) {
-        // struct queue qq = s->queues[qid];
-        //     	message("s->waiting %i self_stolen %i, self_left %i, pair_stolen
-        //     %i, pair_left %i", s->waiting,
-        //     qq.n_packs_self_stolen_f, qq.n_packs_self_left_f,
-        //     qq.n_packs_pair_stolen_f, qq.n_packs_pair_left_f);
         pthread_cond_wait(&s->sleep_cond, &s->sleep_mutex);
       }
       pthread_mutex_unlock(&s->sleep_mutex);
