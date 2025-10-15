@@ -110,6 +110,17 @@ struct gpu_pack_metadata {
 
   /*! Global (fixed) packing parameters */
   struct gpu_global_pack_params params;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /*! Size of the send_part struct used */
+  size_t send_struct_size;
+
+  /*! Size of the recv_part struct used */
+  size_t recv_struct_size;
+
+  /*! Is this metadata for a pair task? */
+  char is_pair_task;
+#endif
 };
 
 void gpu_pack_metadata_init(struct gpu_pack_metadata *md,

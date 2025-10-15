@@ -240,6 +240,7 @@ void *runner_main_cuda(void *data) {
     struct task *prev = NULL;
     /*Some bits for output in case of debug*/
 
+    /* TODO: DO WE STILL NEED THIS?? */
     if (step == 0) cudaProfilerStart();
     step++;
 
@@ -256,6 +257,8 @@ void *runner_main_cuda(void *data) {
         /* Did I get anything? */
         if (t == NULL) break;
       }
+message("Runner %d grabbed task %s/%s scheduler->waiting=%d, queues count=%d, %d",
+    r->cpuid, taskID_names[t->type], subtaskID_names[t->subtype], sched->waiting, sched->queues[0].count, sched->queues[1].count);
 
       /* Get the cells. */
       struct cell *ci = t->ci;

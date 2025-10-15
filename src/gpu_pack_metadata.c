@@ -65,6 +65,12 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
 
   gpu_pack_params_copy(params, &md->params);
 
+#ifdef SWIFT_DEBUG_CHECKS
+  md->is_pair_task = 0;
+  md->send_struct_size = 0;
+  md->recv_struct_size = 0;
+#endif
+
 }
 
 /**
@@ -96,6 +102,56 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata* md,
   md->n_leaves = 0;
   md->tasks_in_list = 0;
   md->leaf_pairs_packed = 0;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  const struct gpu_global_pack_params pars = md->params;
+  size_t n_bundles = pars.n_bundles;
+  size_t pack_size = pars.pack_size;
+  if (md->is_pair_task){
+    n_bundles = pars.n_bundles_pair;
+    pack_size = pars.pack_size_pair;
+  }
+
+  for (size_t i = 0; i < n_bundles; i++)
+    md->bundle_first_part[i] = 0;
+  for (size_t i = 0; i < n_bundles; i++)
+    md->bundle_last_part[i] = 0;
+  for (size_t i = 0; i < n_bundles; i++)
+    md->bundle_first_leaf[i] = 0;
+
+  for (size_t i = 0; i < pack_size; i++)
+    md->task_list[i] = NULL;
+
+  if (md->is_pair_task){
+    for (size_t i = 0; i < pack_size; i++){
+      md->task_first_last_packed_leaf_pair[i][0] = 0;
+      md->task_first_last_packed_leaf_pair[i][1] = 0;
+    }
+
+    for (size_t i = 0; i < pack_size; i++){
+      md->ci_super[i] = NULL;
+    }
+    for (size_t i = 0; i < pack_size; i++){
+      md->cj_super[i] = NULL;
+    }
+
+    if (reset_leaves_lists){
+      for (int i = 0; i < pars.leaf_buffer_size; i++){
+        md->ci_leaves[i] = NULL;
+      }
+      for (int i = 0; i < pars.leaf_buffer_size; i++){
+        md->cj_leaves[i] = NULL;
+      }
+    }
+
+  } else { /* self task */
+
+    for (size_t i = 0; i < pack_size; i++)
+      md->ci_list[i] = NULL;
+
+  }
+
+#endif
 
 }
 

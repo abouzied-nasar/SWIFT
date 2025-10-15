@@ -30,7 +30,6 @@ extern "C" {
 
 #include "gpu_offload_data.h"
 
-#include "error.h"
 #include "task.h"
 
 #include <cuda.h>
@@ -77,15 +76,12 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
 
   md->count_parts = 0;
 
-  /* Watch out, task_list and top_tasks_lists are temporarily a union until we
-   * purge one of them. */
   if (is_pair_task) {
     md->ci_list = NULL;
-    md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
   } else {
     md->ci_list = (struct cell **)malloc(pack_size * sizeof(struct cell *));
-    md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
   }
+  md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
 
   /* Keep track of first and last particles for each self task (particle data
    * is arranged in long arrays containing particles from all the tasks we will
@@ -135,7 +131,6 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
     md->task_first_last_packed_leaf_pair = NULL;
     md->ci_super = NULL;
     md->cj_super = NULL;
-
   }
 
   /* Create space for cuda events */
@@ -145,6 +140,12 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
     cu_error = cudaEventCreate(&(buf->event_end[i]));
     swift_assert(cu_error == cudaSuccess);
   }
+
+#ifdef SWIFT_DEBUG_CHECKS
+  md->send_struct_size = send_struct_size;
+  md->recv_struct_size = recv_struct_size;
+  md->is_pair_task = is_pair_task;
+#endif
 }
 
 /**
@@ -168,12 +169,15 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
    * need to zero out the contents. So we don't do it outside of debug
    * mode. */
 
-  /* const struct gpu_global_pack_params pars = buf.md.params; */
+  const struct gpu_global_pack_params pars = buf->md.params;
+  const struct gpu_pack_metadata md = buf->md;
 
-  /* for (int i = 0; i < pars.pack_size; i++) { */
-  /*   buf->self_task_first_last_part[i].x = 0; */
-  /*   buf->self_task_first_last_part[i].y = 0; */
-  /* } */
+  if (!md.is_pair_task){
+    for (int i = 0; i < pars.pack_size; i++) {
+      buf->self_task_first_last_part[i].x = 0;
+      buf->self_task_first_last_part[i].y = 0;
+    }
+  }
 
   /* Can't do this from the host side */
   /* for (int i = 0; i < pars.pack_size; i++) { */
@@ -181,12 +185,12 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
   /*   buf->d_self_task_first_last_part[i].y = 0; */
   /* } */
 
-  /* bzero(buf->parts_send_d, pars.part_buffer_size); */
-  /* bzero(buf->parts_recv_d, pars.part_buffer_size); */
+  bzero(buf->parts_send_d, pars.part_buffer_size * sizeof(md.send_struct_size));
+  bzero(buf->parts_recv_d, pars.part_buffer_size * sizeof(md.recv_struct_size));
 
   /* Can't do this from the host side */
-  /* bzero(buf->d_parts_recv_d, pars.part_buffer_size); */
-  /* bzero(buf->d_parts_send_d, pars.part_buffer_size); */
+  /* bzero(buf->d_parts_recv_d, pars.part_buffer_size * sizeof(md.send_struct_size)); */
+  /* bzero(buf->d_parts_send_d, pars.part_buffer_size) * sizeof(md.recv_struct_size); */
 
 #endif
 }
