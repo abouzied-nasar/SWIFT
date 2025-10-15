@@ -29,11 +29,11 @@
 
 #define GPU_THREAD_BLOCK_SIZE 64
 
-#define _N_TASKS_PER_PACK_SELF 8
-#define _N_TASKS_BUNDLE_SELF 2
+#define _N_TASKS_PER_PACK_SELF 16
+#define _N_TASKS_BUNDLE_SELF 4
 
-#define _N_TASKS_PER_PACK_PAIR 8
-#define _N_TASKS_BUNDLE_PAIR 2
+#define _N_TASKS_PER_PACK_PAIR 1024
+#define _N_TASKS_BUNDLE_PAIR 256
 
 /* Config parameters. */
 /* TODO: DO WE STILL NEED THESE??? */

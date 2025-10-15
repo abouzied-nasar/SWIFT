@@ -3474,32 +3474,32 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
             /*Move counter from the robbed to the robber*/
             if ((type == task_type_self) &&
                 subtype == task_subtype_gpu_pack_d) {
-              q->n_packs_self_left_d--;
+              q->n_packs_self_left_d++;
               q_stl->n_packs_self_left_d--;
             }
             if ((type == task_type_self) &&
                 subtype == task_subtype_gpu_pack_g) {
-              q->n_packs_self_left_g--;
+              q->n_packs_self_left_g++;
               q_stl->n_packs_self_left_g--;
             }
             if ((type == task_type_self) &&
                 subtype == task_subtype_gpu_pack_f) {
-              q->n_packs_self_left_f--;
+              q->n_packs_self_left_f++;
               q_stl->n_packs_self_left_f--;
             }
             if ((type == task_type_pair) &&
                 subtype == task_subtype_gpu_pack_d) {
-              q->n_packs_pair_left_d--;
+              q->n_packs_pair_left_d++;
               q_stl->n_packs_pair_left_d--;
             }
             if ((type == task_type_pair) &&
                 subtype == task_subtype_gpu_pack_g) {
-              q->n_packs_pair_left_g--;
+              q->n_packs_pair_left_g++;
               q_stl->n_packs_pair_left_g--;
             }
             if ((type == task_type_pair) &&
                 subtype == task_subtype_gpu_pack_f) {
-              q->n_packs_pair_left_f--;
+              q->n_packs_pair_left_f++;
               q_stl->n_packs_pair_left_f--;
             }
             /* Run with the task */
