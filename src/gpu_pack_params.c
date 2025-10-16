@@ -50,10 +50,8 @@ void gpu_pack_params_set(struct gpu_global_pack_params *pars,
                          const int pack_size, const int pack_size_pair,
                          const int bundle_size, const int bundle_size_pair,
                          const int gpu_recursion_max_depth,
-                         const float eta_neighbours,
-                         const int nparts_hydro,
-                         const int n_top_level_cells,
-                         const int nthreads) {
+                         const float eta_neighbours, const int nparts_hydro,
+                         const int n_top_level_cells, const int nthreads) {
 
   /* Store quantities we'll need directly */
   pars->pack_size = pack_size;
@@ -82,8 +80,7 @@ void gpu_pack_params_set(struct gpu_global_pack_params *pars,
 
   /* Try to estimate array sizes containing leaf cells */
   int leafcount = 1;
-  for (int i = 0; i < gpu_recursion_max_depth; i++)
-    leafcount *= 8;
+  for (int i = 0; i < gpu_recursion_max_depth; i++) leafcount *= 8;
   /* Add some extra buffer space */
   leafcount = ceil(leafcount * 1.2);
   pars->leaf_buffer_size = leafcount;
@@ -108,7 +105,8 @@ void gpu_pack_params_set(struct gpu_global_pack_params *pars,
 
   /* Also guess a reasonable upper limit here based on how many particles we
    * have in total. */
-  int partbuff_upper = ceil(1.2 * nparts_hydro / (nthreads * n_top_level_cells));
+  int partbuff_upper =
+      ceil(1.2 * nparts_hydro / (nthreads * n_top_level_cells));
   partbuff = min(partbuff, partbuff_upper);
 
   /* ... but have at least space to store 2 recursion levels... */

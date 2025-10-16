@@ -633,7 +633,7 @@ void engine_addtasks_recv_hydro(
   /* Early abort (are we below the level where tasks are)? */
   if (!cell_get_flag(c, cell_flag_has_tasks)) return;
 
-  /* Have we reached a level where there are any hydro tasks ? */
+    /* Have we reached a level where there are any hydro tasks ? */
 #if defined(WITH_CUDA) || defined(WITH_HIP)
   if (t_xv == NULL && c->hydro.density != NULL && c->hydro.density_pack != NULL)
 #else
@@ -767,8 +767,8 @@ void engine_addtasks_recv_hydro(
       scheduler_addunlock(s, l->t, t_rho);
     }
 #if defined(WITH_CUDA) || defined(WITH_HIP)
- /* A. Nasar POSSIBLE BUG HERE (More like PROBABLE) NOT \
-                    REQUIRED Ghost in for cell j is*/
+    /* A. Nasar POSSIBLE BUG HERE (More like PROBABLE) NOT \
+                       REQUIRED Ghost in for cell j is*/
     for (struct link *l = c->hydro.density_pack; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_xv, l->t);
       scheduler_addunlock(s, l->t, t_rho);

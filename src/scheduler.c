@@ -1990,15 +1990,13 @@ struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
     } else if (t->type == task_type_pair) {
       atomic_inc(&s->nr_pair_pack_tasks_d);
     }
-  }
-  else if (t->subtype == task_subtype_gpu_pack_f) {
+  } else if (t->subtype == task_subtype_gpu_pack_f) {
     if (t->type == task_type_self) {
       atomic_inc(&s->nr_self_pack_tasks_f);
     } else if (t->type == task_type_pair) {
       atomic_inc(&s->nr_pair_pack_tasks_f);
     }
-  }
-  else if (t->subtype == task_subtype_gpu_pack_g) {
+  } else if (t->subtype == task_subtype_gpu_pack_g) {
     if (t->type == task_type_self) {
       atomic_inc(&s->nr_self_pack_tasks_g);
     } else if (t->type == task_type_pair) {
@@ -3109,15 +3107,15 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
         if (lock_unlock(&s->queues[qid].lock) != 0)
           error("Error unlocking queue");
         atomic_inc(&s->s_d_left[qid]);
-      }
-      else if (t->subtype == task_subtype_gpu_pack_f && t->ci->hydro.count > 0) {
+      } else if (t->subtype == task_subtype_gpu_pack_f &&
+                 t->ci->hydro.count > 0) {
         lock_lock(&s->queues[qid].lock);
         s->queues[qid].n_packs_self_left_f++;
         if (lock_unlock(&s->queues[qid].lock) != 0)
           error("Error unlocking queue");
         atomic_inc(&s->s_f_left[qid]);
-      }
-      else if (t->subtype == task_subtype_gpu_pack_g && t->ci->hydro.count > 0) {
+      } else if (t->subtype == task_subtype_gpu_pack_g &&
+                 t->ci->hydro.count > 0) {
         lock_lock(&s->queues[qid].lock);
         s->queues[qid].n_packs_self_left_g++;
         if (lock_unlock(&s->queues[qid].lock) != 0)
@@ -3135,17 +3133,15 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
         if (lock_unlock(&s->queues[qid].lock) != 0)
           error("Error unlocking queue");
         atomic_inc(&s->p_d_left[qid]);
-      }
-      else if (t->subtype == task_subtype_gpu_pack_f && t->ci->hydro.count > 0 &&
-          t->cj->hydro.count > 0) {
+      } else if (t->subtype == task_subtype_gpu_pack_f &&
+                 t->ci->hydro.count > 0 && t->cj->hydro.count > 0) {
         lock_lock(&s->queues[qid].lock);
         s->queues[qid].n_packs_pair_left_f++;
         if (lock_unlock(&s->queues[qid].lock) != 0)
           error("Error unlocking queue");
         atomic_inc(&s->p_f_left[qid]);
-      }
-      else if (t->subtype == task_subtype_gpu_pack_g && t->ci->hydro.count > 0 &&
-          t->cj->hydro.count > 0) {
+      } else if (t->subtype == task_subtype_gpu_pack_g &&
+                 t->ci->hydro.count > 0 && t->cj->hydro.count > 0) {
         lock_lock(&s->queues[qid].lock);
         s->queues[qid].n_packs_pair_left_g++;
         if (lock_unlock(&s->queues[qid].lock) != 0)
@@ -3440,26 +3436,21 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
               if (subtype == task_subtype_gpu_pack_d) {
                 q->n_packs_self_left_d++;
                 q_stl->n_packs_self_left_d--;
-              }
-              else if (subtype == task_subtype_gpu_pack_g) {
+              } else if (subtype == task_subtype_gpu_pack_g) {
                 q->n_packs_self_left_g++;
                 q_stl->n_packs_self_left_g--;
-              }
-              else if (subtype == task_subtype_gpu_pack_f) {
+              } else if (subtype == task_subtype_gpu_pack_f) {
                 q->n_packs_self_left_f++;
                 q_stl->n_packs_self_left_f--;
               }
-            }
-            else if (type == task_type_pair) {
+            } else if (type == task_type_pair) {
               if (subtype == task_subtype_gpu_pack_d) {
                 q->n_packs_pair_left_d++;
                 q_stl->n_packs_pair_left_d--;
-              }
-              else if (subtype == task_subtype_gpu_pack_g) {
+              } else if (subtype == task_subtype_gpu_pack_g) {
                 q->n_packs_pair_left_g++;
                 q_stl->n_packs_pair_left_g--;
-              }
-              else if (subtype == task_subtype_gpu_pack_f) {
+              } else if (subtype == task_subtype_gpu_pack_f) {
                 q->n_packs_pair_left_f++;
                 q_stl->n_packs_pair_left_f--;
               }

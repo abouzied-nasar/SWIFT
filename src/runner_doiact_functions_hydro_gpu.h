@@ -1187,8 +1187,8 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     pthread_cond_broadcast(&s->sleep_cond);
     pthread_mutex_unlock(&s->sleep_mutex);
 
-  md->task_list[tid]->skip = 1;
-  md->task_list[tid]->done = 1;
+    md->task_list[tid]->skip = 1;
+    md->task_list[tid]->done = 1;
 
   } /* Loop over tasks in list */
 }
@@ -1295,9 +1295,11 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
     error("Writing out of top_task_packed array bounds: %d/%d", tind,
           md->params.pack_size_pair);
   if (tind >= md->params.pack_size_pair)
-    error("Writing out of ci_top array bounds: %d/%d", tind, md->params.pack_size_pair);
+    error("Writing out of ci_top array bounds: %d/%d", tind,
+          md->params.pack_size_pair);
   if (tind >= md->params.pack_size_pair)
-    error("Writing out of cj_top array bounds: %d/%d", tind, md->params.pack_size_pair);
+    error("Writing out of cj_top array bounds: %d/%d", tind,
+          md->params.pack_size_pair);
 #endif
 
   /* Keep track of index of first leaf cell pairs in lists per super-level pair
@@ -1466,9 +1468,10 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
 
         /* Shift the leaf cells down to index 0 in their arrays. */
         /* Reminder: md->leaf_pairs_packed is the current number of leaf pairs
-         * in the buffers. md->n_leaves is the total number of leaf pairs we have
-         * identified for offloading, including all of this task's leaves. */
-         for (int i = md->leaf_pairs_packed; i < md->n_leaves; i++) {
+         * in the buffers. md->n_leaves is the total number of leaf pairs we
+         * have identified for offloading, including all of this task's leaves.
+         */
+        for (int i = md->leaf_pairs_packed; i < md->n_leaves; i++) {
           const int shift_ind = i - md->leaf_pairs_packed;
           md->ci_leaves[shift_ind] = md->ci_leaves[i];
           md->cj_leaves[shift_ind] = md->cj_leaves[i];
