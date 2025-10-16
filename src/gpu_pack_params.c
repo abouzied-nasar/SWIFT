@@ -52,9 +52,9 @@ void gpu_pack_params_set(struct gpu_global_pack_params *pars,
                          const int pack_size, const int pack_size_pair,
                          const int bundle_size, const int bundle_size_pair,
                          const int gpu_recursion_max_depth,
-                         const int part_buffer_size,
-                         const float eta_neighbours, const int nparts_hydro,
-                         const int n_top_level_cells, const int nthreads) {
+                         const int part_buffer_size, const float eta_neighbours,
+                         const int nparts_hydro, const int n_top_level_cells,
+                         const int nthreads) {
 
   /* Store quantities we'll need directly */
   pars->pack_size = pack_size;

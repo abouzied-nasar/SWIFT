@@ -700,9 +700,9 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
 
       if (unpack_index + count >= md->params.part_buffer_size) {
         error(
-          "Exceeded part_buffer_size. count=%d buffer=%d;\n"
-          "Make arrays bigger through Scheduler:gpu_part_buffer_size",
-          unpack_index + count, md->params.part_buffer_size);
+            "Exceeded part_buffer_size. count=%d buffer=%d;\n"
+            "Make arrays bigger through Scheduler:gpu_part_buffer_size",
+            unpack_index + count, md->params.part_buffer_size);
       }
 
       /* Do the copy */
