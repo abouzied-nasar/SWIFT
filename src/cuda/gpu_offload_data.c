@@ -239,7 +239,7 @@ void gpu_free_data_buffers(struct gpu_offload_data *buf,
   if (is_pair_task) {
     free((void *)md->task_list);
 
-    for (int i = 0; i < md->params.pack_size_pair * 2; i++) {
+    for (int i = 0; i < md->params.pack_size_pair; i++) {
       free(md->task_first_last_packed_leaf_pair[i]);
     }
     free((void *)md->task_first_last_packed_leaf_pair);
