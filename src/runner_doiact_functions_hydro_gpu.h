@@ -570,9 +570,11 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
           bundle_n_parts * sizeof(struct gpu_part_send_f),
           cudaMemcpyHostToDevice, stream[bid]);
 
+#ifdef SWIFT_DEBUG_CHECKS
     } else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
+#endif
 
     if (cu_error != cudaSuccess) {
       error("H2D memcpy self: CUDA error '%s' for task_subtype %s: cpuid=%i",
@@ -685,6 +687,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
     cu_error = cudaEventSynchronize(buf->event_end[bid]);
     swift_assert(cu_error == cudaSuccess);
 
+    /* Loop over tasks in bundle */
     for (int tid = bid * bundle_size;
          (tid < (bid + 1) * bundle_size) && (tid < tasks_packed); tid++) {
 
@@ -740,6 +743,9 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
       atomic_dec(&s->waiting);
       pthread_cond_broadcast(&s->sleep_cond);
       pthread_mutex_unlock(&s->sleep_mutex);
+
+      t->skip = 1;
+      t->done = 1;
 
     } /* Loop over tasks in bundle */
   } /* Loop over bundles */
@@ -1181,6 +1187,9 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
     pthread_cond_broadcast(&s->sleep_cond);
     pthread_mutex_unlock(&s->sleep_mutex);
 
+  md->task_list[tid]->skip = 1;
+  md->task_list[tid]->done = 1;
+
   } /* Loop over tasks in list */
 }
 
@@ -1451,6 +1460,9 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
         int n_leaves_new = md->n_leaves - md->leaf_pairs_packed;
         /* How many leaves does this task have in total? */
         int task_n_leaves = md->task_n_leaves;
+        /* Store launch_leftovers in case we still need to do that after we
+         * finish packing all leaf cell pairs */
+        char launch_leftovers = md->launch_leftovers;
 
         /* Shift the leaf cells down to index 0 in their arrays. */
         /* Reminder: md->leaf_pairs_packed is the current number of leaf pairs
@@ -1473,6 +1485,8 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
         gpu_data_buffers_reset(buf);
 
         /* Now fill in relevant data. At this point, nothing is packed. */
+        md->launch = 0;
+        md->launch_leftovers = launch_leftovers;
         md->task_list[0] = t;
         md->ci_super[0] = ci;
         md->cj_super[0] = cj;

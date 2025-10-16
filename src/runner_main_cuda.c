@@ -257,8 +257,6 @@ void *runner_main_cuda(void *data) {
         /* Did I get anything? */
         if (t == NULL) break;
       }
-message("Runner %d grabbed task %s/%s scheduler->waiting=%d, queues count=%d, %d",
-    r->cpuid, taskID_names[t->type], subtaskID_names[t->subtype], sched->waiting, sched->queues[0].count, sched->queues[1].count);
 
       /* Get the cells. */
       struct cell *ci = t->ci;
@@ -585,7 +583,7 @@ message("Runner %d grabbed task %s/%s scheduler->waiting=%d, queues count=%d, %d
             free(t->buff);
           } else if (t->subtype == task_subtype_sf_counts) {
             cell_unpack_sf_counts(ci, (struct pcell_sf_stars *)t->buff);
-            cell_clear_stars_sort_flags(ci, /*unused_flags=*/0);
+            cell_clear_stars_sort_flags(ci, /*clear_unused_flags=*/0);
             free(t->buff);
           } else if (t->subtype == task_subtype_grav_counts) {
             cell_unpack_grav_counts(ci, (struct pcell_sf_grav *)t->buff);
@@ -704,10 +702,8 @@ message("Runner %d grabbed task %s/%s scheduler->waiting=%d, queues count=%d, %d
       /* This runner is not doing a task anymore */
       r->t = NULL;
 #endif
-
       /* We're done with this task, see if we get a next one. */
       prev = t;
-
       if (t->subtype == task_subtype_gpu_pack_d) {
 #ifdef GPUOFFLOAD_DENSITY
         /* Don't enqueue unpacks yet. Just signal the runners */

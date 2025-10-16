@@ -57,10 +57,6 @@
 #include "timers.h"
 #include "version.h"
 
-#ifdef WITH_CUDA
-#include "cuda/cuda_config.h"
-#endif
-
 /**
  * @brief Re-set the list of active tasks.
  */
@@ -900,9 +896,7 @@ void scheduler_write_cell_dependencies(struct scheduler *s, int verbose,
   int local_count = 0;
   for (int i = 0; i < s->nr_tasks; i++) {
     const struct task *ta = &s->tasks[i];
-    //    if(ta->subtype == task_subtype_gpu_unpack_d
-    //  		  || ta->subtype == task_subtype_gpu_unpack_f
-    //			  || ta->subtype == task_subtype_gpu_unpack_g)continue;
+
     /* Are we using this task?
      * For the 0-step, we wish to show all the tasks (even the inactives). */
     if (step != 0 && ta->skip) continue;
@@ -1991,16 +1985,25 @@ struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
   if (cj != NULL) cell_set_flag(cj, cell_flag_has_tasks);
 
   if (t->subtype == task_subtype_gpu_pack_d) {
-    if (t->type == task_type_self) atomic_inc(&s->nr_self_pack_tasks_d);
-    if (t->type == task_type_pair) atomic_inc(&s->nr_pair_pack_tasks_d);
+    if (t->type == task_type_self) {
+      atomic_inc(&s->nr_self_pack_tasks_d);
+    } else if (t->type == task_type_pair) {
+      atomic_inc(&s->nr_pair_pack_tasks_d);
+    }
   }
-  if (t->subtype == task_subtype_gpu_pack_f) {
-    if (t->type == task_type_self) atomic_inc(&s->nr_self_pack_tasks_f);
-    if (t->type == task_type_pair) atomic_inc(&s->nr_pair_pack_tasks_f);
+  else if (t->subtype == task_subtype_gpu_pack_f) {
+    if (t->type == task_type_self) {
+      atomic_inc(&s->nr_self_pack_tasks_f);
+    } else if (t->type == task_type_pair) {
+      atomic_inc(&s->nr_pair_pack_tasks_f);
+    }
   }
-  if (t->subtype == task_subtype_gpu_pack_g) {
-    if (t->type == task_type_self) atomic_inc(&s->nr_self_pack_tasks_g);
-    if (t->type == task_type_pair) atomic_inc(&s->nr_pair_pack_tasks_g);
+  else if (t->subtype == task_subtype_gpu_pack_g) {
+    if (t->type == task_type_self) {
+      atomic_inc(&s->nr_self_pack_tasks_g);
+    } else if (t->type == task_type_pair) {
+      atomic_inc(&s->nr_pair_pack_tasks_g);
+    }
   }
   /* Add an index for it. */
   s->tasks_ind[atomic_inc(&s->nr_tasks)] = ind;
@@ -3094,36 +3097,6 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
 
     /* Save qid as owner for next time a task accesses this cell. */
     if (owner != NULL) *owner = qid;
-    //    if (t->type == task_type_self) {
-    //      if (t->subtype == task_subtype_gpu_pack_d && t->ci->hydro.count > 0)
-    //      {
-    //    	  return;
-    //      }
-    //      if (t->subtype == task_subtype_gpu_pack_f && t->ci->hydro.count > 0)
-    //      {
-    //    	  return;
-    //      }
-    //      if (t->subtype == task_subtype_gpu_pack_g && t->ci->hydro.count > 0)
-    //      {
-    //    	  return;
-    //      }
-    //    }
-    //    /* A. Nasar NEED to think about how to do this with
-    //     MPI where ci may not be on this node/rank */
-    //    if (t->type == task_type_pair) {
-    //      if (t->subtype == task_subtype_gpu_pack_d  && t->ci->hydro.count > 0
-    //      && t->cj->hydro.count > 0) {
-    //    	  return;
-    //      }
-    //      if (t->subtype == task_subtype_gpu_pack_f  && t->ci->hydro.count > 0
-    //      && t->cj->hydro.count > 0) {
-    //    	  return;
-    //      }
-    //      if (t->subtype == task_subtype_gpu_pack_g  && t->ci->hydro.count > 0
-    //      && t->cj->hydro.count > 0) {
-    //    	  return;
-    //      }
-    //    }
     /* Increase the waiting counter. */
     atomic_inc(&s->waiting);
     /* Insert the task into that queue. */
@@ -3137,14 +3110,14 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
           error("Error unlocking queue");
         atomic_inc(&s->s_d_left[qid]);
       }
-      if (t->subtype == task_subtype_gpu_pack_f && t->ci->hydro.count > 0) {
+      else if (t->subtype == task_subtype_gpu_pack_f && t->ci->hydro.count > 0) {
         lock_lock(&s->queues[qid].lock);
         s->queues[qid].n_packs_self_left_f++;
         if (lock_unlock(&s->queues[qid].lock) != 0)
           error("Error unlocking queue");
         atomic_inc(&s->s_f_left[qid]);
       }
-      if (t->subtype == task_subtype_gpu_pack_g && t->ci->hydro.count > 0) {
+      else if (t->subtype == task_subtype_gpu_pack_g && t->ci->hydro.count > 0) {
         lock_lock(&s->queues[qid].lock);
         s->queues[qid].n_packs_self_left_g++;
         if (lock_unlock(&s->queues[qid].lock) != 0)
@@ -3154,7 +3127,7 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
     }
     /* A. Nasar NEED to think about how to do this with
      MPI where ci may not be on this node/rank */
-    if (t->type == task_type_pair) {
+    else if (t->type == task_type_pair) {
       if (t->subtype == task_subtype_gpu_pack_d && t->ci->hydro.count > 0 &&
           t->cj->hydro.count > 0) {
         lock_lock(&s->queues[qid].lock);
@@ -3163,7 +3136,7 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
           error("Error unlocking queue");
         atomic_inc(&s->p_d_left[qid]);
       }
-      if (t->subtype == task_subtype_gpu_pack_f && t->ci->hydro.count > 0 &&
+      else if (t->subtype == task_subtype_gpu_pack_f && t->ci->hydro.count > 0 &&
           t->cj->hydro.count > 0) {
         lock_lock(&s->queues[qid].lock);
         s->queues[qid].n_packs_pair_left_f++;
@@ -3171,7 +3144,7 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
           error("Error unlocking queue");
         atomic_inc(&s->p_f_left[qid]);
       }
-      if (t->subtype == task_subtype_gpu_pack_g && t->ci->hydro.count > 0 &&
+      else if (t->subtype == task_subtype_gpu_pack_g && t->ci->hydro.count > 0 &&
           t->cj->hydro.count > 0) {
         lock_lock(&s->queues[qid].lock);
         s->queues[qid].n_packs_pair_left_g++;
@@ -3211,7 +3184,6 @@ struct task *scheduler_done(struct scheduler *s, struct task *t) {
 
   /* Mark the task as skip. */
   t->skip = 1;
-
   t->done = 1;
 
   /* Return the next best task. Note that we currently do not
@@ -3381,7 +3353,7 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
   /* Check qid. */
   if (qid >= nr_queues || qid < 0) error("Bad queue ID.");
 
-  /*Get a pointer to our queue for re-use*/
+  /* Get a pointer to our queue for re-use */
   struct queue *q = &s->queues[qid];
   /* Loop as long as there are tasks... */
   while (s->waiting > 0 && res == NULL) {
@@ -3404,6 +3376,8 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
 
         /* Make list of queues that have 1 or more tasks in them */
         for (int k = 0; k < nr_queues; k++) {
+          /* Don't include this queue */
+          if (k == qid) continue;
           if (s->queues[k].count > 0 || s->queues[k].count_incoming > 0) {
             qids[count++] = k;
           }
@@ -3413,17 +3387,19 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
 
           /* Pick a queue at random among the non-empty ones */
           const int ind = rand_r(&seed) % count;
-          /*Get a pointer to the queue we're stealing from*/
+          /* Index of queue we are stealing from */
           int qstl_id = qids[ind];
 
-          /* If we got the queue we already have, abort */
+          /* If we got the queue we already have, skip. */
+          /* TODO: I think we can remove this, we already exclude the queue in
+           * the loop above. */
           if (qid == qstl_id) {
             /* Reduce the size of the list of non-empty queues */
             qids[ind] = qids[--count];
             continue;
           }
 
-          /* The queue we are stealing from */
+          /* Get a pointer to the queue we're stealing from */
           struct queue *q_stl = &s->queues[qstl_id];
 
           /* Can we lock our own queue? */
