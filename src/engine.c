@@ -1827,11 +1827,11 @@ void engine_skip_force_and_kick(struct engine *e) {
         t->type == task_type_rt_advance_cell_time ||
         t->type == task_type_neutrino_weight || t->type == task_type_csds ||
         t->subtype == task_subtype_force ||  // A. Nasar
-        t->subtype == task_subtype_gpu_pack_f ||
+        t->subtype == task_subtype_gpu_force ||
         t->subtype == task_subtype_gpu_unpack_f ||
         t->subtype == task_subtype_limiter ||
         t->subtype == task_subtype_gradient ||
-        t->subtype == task_subtype_gpu_pack_g ||
+        t->subtype == task_subtype_gpu_gradient ||
         t->subtype == task_subtype_gpu_unpack_g ||
         t->subtype == task_subtype_stars_prep1 ||
         t->subtype == task_subtype_stars_prep2 ||

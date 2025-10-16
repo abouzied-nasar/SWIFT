@@ -309,18 +309,18 @@ void *runner_main_cuda(void *data) {
 #ifndef GPUOFFLOAD_DENSITY
             runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
 #endif
-          } else if (t->subtype == task_subtype_gpu_pack_d) {
+          } else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
             runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream,
                                       d_a, d_H);
 #endif
           } /* self / pack */
-          else if (t->subtype == task_subtype_gpu_pack_g) {
+          else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
             runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream,
                                        d_a, d_H);
 #endif  // GPUGRADSELF
-          } else if (t->subtype == task_subtype_gpu_pack_f) {
+          } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
             runner_doself_gpu_force(r, sched, &gpu_buf_self_forc, t, stream,
                                     d_a, d_H);
@@ -389,17 +389,17 @@ void *runner_main_cuda(void *data) {
 #endif
           }
           /* GPU WORK */
-          else if (t->subtype == task_subtype_gpu_pack_d) {
+          else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
             runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_pair_dens, t,
                                       stream_pairs, d_a, d_H);
 #endif
-          } else if (t->subtype == task_subtype_gpu_pack_g) {
+          } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
             runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_pair_dens, t,
                                        stream_pairs, d_a, d_H);
 #endif
-          } else if (t->subtype == task_subtype_gpu_pack_f) {
+          } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
             runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_pair_forc, t,
                                     stream_pairs, d_a, d_H);
@@ -702,9 +702,10 @@ void *runner_main_cuda(void *data) {
       /* This runner is not doing a task anymore */
       r->t = NULL;
 #endif
+
       /* We're done with this task, see if we get a next one. */
       prev = t;
-      if (t->subtype == task_subtype_gpu_pack_d) {
+      if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
         /* Don't enqueue unpacks yet. Just signal the runners */
         t->skip = 1;
@@ -715,8 +716,7 @@ void *runner_main_cuda(void *data) {
         t = scheduler_done(sched, t);
 #endif
       }
-
-      else if (t->subtype == task_subtype_gpu_pack_g) {
+      else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
         /* Don't enqueue unpacks yet. Just signal the runners */
         t->skip = 1;
@@ -727,8 +727,7 @@ void *runner_main_cuda(void *data) {
         t = scheduler_done(sched, t);
 #endif
       }
-
-      else if (t->subtype == task_subtype_gpu_pack_f) {
+      else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
         /* Don't enqueue unpacks yet. Just signal the runners */
         t->skip = 1;
@@ -739,10 +738,7 @@ void *runner_main_cuda(void *data) {
         t = scheduler_done(sched, t);
 #endif
       }
-
-      else if (t->subtype != task_subtype_gpu_pack_d &&
-               t->subtype != task_subtype_gpu_pack_g &&
-               t->subtype != task_subtype_gpu_pack_f) {
+      else  {
         t = scheduler_done(sched, t);
       }
     } /* Loop while there are tasks */
