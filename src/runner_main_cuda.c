@@ -396,7 +396,7 @@ void *runner_main_cuda(void *data) {
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-            runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_pair_dens, t,
+            runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_pair_grad, t,
                                        stream_pairs, d_a, d_H);
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
