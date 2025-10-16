@@ -39,8 +39,8 @@
 
 /*! Atomic or: *v = *v || i, where v is a pointer.
  * Returns value that was previously held in *v. */
-
 #define atomic_or(v, i) __sync_fetch_and_or(v, i)
+
 /*! Atomic and: *v = *v && i, where v is a pointer.
  * Returns value that was previously held in *v. */
 #define atomic_and(v, i) __sync_fetch_and_and(v, i)

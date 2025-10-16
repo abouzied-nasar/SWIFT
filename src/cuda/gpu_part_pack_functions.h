@@ -267,7 +267,6 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_density(
 
   for (int i = 0; i < count; i++) {
     /* TODO: WHY ARE WE NOT CHECKING WHETHER PARTICLE IS ACTIVE HERE???? */
-    /* TODO: WE NEED TO ZERO OUT BUFFERS TOO ONCE WE'RE DONE */
     struct gpu_part_recv_d p_tmp = parts_tmp[i];
     struct part *p = &c->hydro.parts[i];
     part_set_rho(p, part_get_rho(p) + p_tmp.rho_dh_wcount.x);

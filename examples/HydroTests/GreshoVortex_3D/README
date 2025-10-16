@@ -8,7 +8,7 @@ Other parameter files for differently sized examples are available:
 
 - greshoGPU64.yml     64^3 ~= 262k  particles
 - greshoGPU128.yml   128^3 ~= 2e6   particles     Uses a 64^3 initial box and replicates it 2 times in each dimension. Plotting script will plot horrible looking results if unmodified.
-- greshoGPU256.yml   256^3 ~= 16e6  particles     Uses a 64^3 initial box and replicates it 2 times in each dimension. Plotting script will plot horrible looking results if unmodified.
-- greshoGPU384.yml   384^3 ~= 57e6  particles     Uses a 64^3 initial box and replicates it 2 times in each dimension. Plotting script will plot horrible looking results if unmodified.
-- greshoGPU512.yml   512^3 ~= 134e6 particles     Uses a 64^3 initial box and replicates it 2 times in each dimension. Plotting script will plot horrible looking results if unmodified.
+- greshoGPU256.yml   256^3 ~= 16e6  particles     Uses a 64^3 initial box and replicates it 4 times in each dimension. Plotting script will plot horrible looking results if unmodified.
+- greshoGPU384.yml   384^3 ~= 57e6  particles     Uses a 64^3 initial box and replicates it 6 times in each dimension. Plotting script will plot horrible looking results if unmodified.
+- greshoGPU512.yml   512^3 ~= 134e6 particles     Uses a 64^3 initial box and replicates it 8 times in each dimension. Plotting script will plot horrible looking results if unmodified.
 

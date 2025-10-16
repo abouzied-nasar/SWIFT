@@ -393,8 +393,6 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_pack(
     /* Store this before we increment md->count_parts */
     md->bundle_first_part[bid] = md->count_parts;
 
-    /* A. Nasar: This is possibly a problem! */
-    /* TODO: Why? Is this comment still accurate? */
     md->bundle_first_leaf[bid] = lid;
   }
 
@@ -1496,8 +1494,6 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
     } /* if launch or launch_leftovers */
   } /* while npacked < md->task_n_leaves */
 
-  /* Launch-leftovers counter re-set to zero and cells unlocked */
-  /* TODO: No cell unlocking happening here. Is comment still accurate? */
   md->launch_leftovers = 0;
   md->launch = 0;
 }
@@ -1614,3 +1610,4 @@ static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
 #endif
 
 #endif /* RUNNER_GPU_PACK_FUNCTIONS_H */
+

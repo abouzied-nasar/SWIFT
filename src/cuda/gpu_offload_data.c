@@ -44,7 +44,7 @@ extern "C" {
  * device)
  * @param recv_struct_size: size of struct used for recv arrays (both host and
  * device)
- * @param is_pair_task: if 1, we allocate enough space for pair tasks
+ * @param is_pair_task: if 1, we allocate arrays used for pair tasks
  */
 void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const struct gpu_global_pack_params *params,
