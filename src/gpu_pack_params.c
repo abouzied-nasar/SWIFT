@@ -38,9 +38,11 @@
  * @param pack_size_pair: Packing size (nr of leaf cell pairs) for pair tasks
  * @param bundle_size: Size of a bundle (nr of leaf cells) for self tasks
  * @param bundle_size_pair: Size of a bundle (nr of leaf cell pairs) for pair
- *                          tasks
+ * tasks
  * @param gpu_recursion_max_depth Max depth we expect to reach while recursing
  * down from task's super level to reach leaf cells
+ * @param part_buffer_size Size of particle buffer arrays. If -1, will be
+ * guessed.
  * @param eta_neighours Neighbour resolution eta.
  * @param nparts_hydro how many hydro particles are on this rank
  * @param n_top_level_cells how many top level cells we have
@@ -50,6 +52,7 @@ void gpu_pack_params_set(struct gpu_global_pack_params *pars,
                          const int pack_size, const int pack_size_pair,
                          const int bundle_size, const int bundle_size_pair,
                          const int gpu_recursion_max_depth,
+                         const int part_buffer_size,
                          const float eta_neighbours, const int nparts_hydro,
                          const int n_top_level_cells, const int nthreads) {
 
@@ -86,32 +89,38 @@ void gpu_pack_params_set(struct gpu_global_pack_params *pars,
   pars->leaf_buffer_size = leafcount;
   swift_assert(pars->leaf_buffer_size > 0);
 
-  /* Now try to estimate average number of particles per leaf-cell. */
-  /* First get smoothing length/particle spacing */
-  int np_per_cell = 2 * ceil(2.0 * eta_neighbours);
+  int partbuff = part_buffer_size;
+  if (part_buffer_size == -1) {
 
-  /* Apply appropriate dimensional multiplication */
+    /* Guess the particle array size. First try to estimate average number of
+     * particles per leaf-cell. */
+
+    /* Get smoothing length/particle spacing */
+    int np_per_cell = 2 * ceil(2.0 * eta_neighbours);
+
+    /* Apply appropriate dimensional multiplication */
 #if defined(HYDRO_DIMENSION_2D)
-  np_per_cell *= np_per_cell;
+    np_per_cell *= np_per_cell;
 #elif defined(HYDRO_DIMENSION_3D)
-  np_per_cell *= np_per_cell * np_per_cell;
+    np_per_cell *= np_per_cell * np_per_cell;
 #elif defined(HYDRO_DIMENSION_1D)
 #endif
 
-  /* Increase parts per recursed task-level cell by buffer to
-     ensure we allocate enough memory. */
-  int partbuff = np_per_cell * leafcount;
-  partbuff = ceil(1.2 * partbuff);
+    /* Increase parts per recursed task-level cell by buffer to
+       ensure we allocate enough memory. */
+    partbuff = np_per_cell * leafcount;
+    partbuff = ceil(1.2 * partbuff);
 
-  /* Also guess a reasonable upper limit here based on how many particles we
-   * have in total. */
-  int partbuff_upper =
-      ceil(1.2 * nparts_hydro / (nthreads * n_top_level_cells));
-  partbuff = min(partbuff, partbuff_upper);
+    /* Also guess a reasonable upper limit here based on how many particles we
+     * have in total. */
+    int partbuff_upper =
+        ceil(2. * (float)nparts_hydro / (float)(nthreads * n_top_level_cells));
+    partbuff = min(partbuff, partbuff_upper);
 
-  /* ... but have at least space to store 2 recursion levels... */
-  int partbuff_lower = ceil(1.2 * 64 * np_per_cell);
-  partbuff = max(partbuff, partbuff_lower);
+    /* ... but have at least space to store 2 recursion levels... */
+    int partbuff_lower = ceil(1.2 * 64 * np_per_cell);
+    partbuff = max(partbuff, partbuff_lower);
+  }
 
   pars->part_buffer_size = partbuff;
   swift_assert(pars->part_buffer_size > 0);

@@ -134,6 +134,7 @@ Scheduler:
   gpu_pair_pack_size:        0         # (Conditional) How many pairs of leaf cells of *pair tasks* to pack for offloading. If running with GPU, this parameter is mandatory.
   gpu_pair_bundle_size:      0         # (Conditional) How many pairs of leaf cells of *pair tasks* to pack into a bundle while offloading. `gpu_pair_pack_size` total cells will be offloaded per cycle, in bundles of size `gpu_pair_bundle_size`. When running with GPU, this parameter is mandatory.
   gpu_recursion_max_depth:   4         # (Optional) What is the maximal depth we can recurse down to from the task super level to the leaf cell levels? We need this information to estimate sufficient buffer space to allocate.
+  gpu_part_buffer_size:      1000000   # (Optional) Size for GPU particle buffer arrays. If not provided, will be guessed (probably badly.)
   nr_queues:                 0         # (Optional) The number of task queues to use. Use 0  to let the system decide.
   cell_max_size:             8000000   # (Optional) Maximal number of interactions per task if we force the split (this is the default value).
   cell_sub_size_pair_hydro:  256000000 # (Optional) Maximal number of hydro-hydro interactions per sub-pair hydro/star task (this is the default value).

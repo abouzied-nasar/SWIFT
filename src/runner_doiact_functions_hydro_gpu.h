@@ -91,16 +91,12 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
      * at this poin logic for empty or inactive cells. needs checking and
      * testing. */
 
-#ifdef SWIFT_DEBUG_CHECKS
-    const int local_pack_position = md->count_parts;
-    const int count_max_parts = md->params.part_buffer_size;
-    if (local_pack_position + count >= count_max_parts) {
+    if (md->count_parts + count >= md->params.part_buffer_size) {
       error(
-          "Exceeded count_max_parts_tmp. Make arrays bigger! "
-          "count_max=%d count=%d",
-          count_max_parts, local_pack_position + count);
+          "Exceeded part_buffer_size. count=%d buffer=%d;\n"
+          "Make arrays bigger through Scheduler:gpu_part_buffer_size ",
+          md->count_parts + count, md->params.part_buffer_size);
     }
-#endif
 
     /* This re-arranges the particle data from cell->hydro->parts into a long
      * array of part structs */
@@ -312,20 +308,18 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
      * found for this task's recursion, which is stored in md->task_n_leaves. */
     const int ind = md->n_leaves + md->task_n_leaves;
 
-#ifdef SWIFT_DEBUG_CHECKS
     if (ind >= md->params.leaf_buffer_size) {
       error(
-          "Found more leaf cells (%d) than expected (%d), depth=%i; "
-          "Increase array size.",
+          "Found more leaf cells (%d) than expected (%d), depth=%i;\n"
+          "Increase array size through Scheduler:gpu_recursion_max_depth",
           ind, md->params.leaf_buffer_size, depth);
     }
     if (ind >= md->params.leaf_buffer_size) {
       error(
-          "Found more leaf cells (%d) than expected (%d), depth=%i; "
-          "Increase array size.",
+          "Found more leaf cells (%d) than expected (%d), depth=%i;\n"
+          "Increase array size through Scheduler:gpu_recursion_max_depth",
           ind, md->params.leaf_buffer_size, depth);
     }
-#endif
 
     ci_leaves[ind] = ci;
     cj_leaves[ind] = cj;
@@ -704,14 +698,12 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
         ; /* spin until we acquire the lock */
       }
 
-#ifdef SWIFT_DEBUG_CHECKS
       if (unpack_index + count >= md->params.part_buffer_size) {
         error(
-            "Exceeded count_max_parts. Make arrays bigger! pack_length is "
-            "%d, count is %d, max_parts is %d",
-            unpack_index, count, md->params.part_buffer_size);
+          "Exceeded part_buffer_size. count=%d buffer=%d;\n"
+          "Make arrays bigger through Scheduler:gpu_part_buffer_size",
+          unpack_index + count, md->params.part_buffer_size);
       }
-#endif
 
       /* Do the copy */
       if (task_subtype == task_subtype_gpu_density) {

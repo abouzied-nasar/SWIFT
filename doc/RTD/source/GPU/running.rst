@@ -58,9 +58,11 @@ Optional Parameters
    # Parameters for the task scheduling
    Scheduler:
      gpu_recursion_max_depth:          0
+     gpu_part_buffer_size:            -1
 
 
 - ``gpu_recursion_max_depth``: Sets the maximal depth we expect to recurse down
   to from super-level tasks to reach leaf cells. We need this to estimate the
   size of buffers to allocate.
+- ``gpu_part_buffer_size``: Sets the size of GPU particle array buffers.
 
