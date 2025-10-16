@@ -195,8 +195,8 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
   /*   buf->d_self_task_first_last_part[i].y = 0; */
   /* } */
 
-  bzero(buf->parts_send_d, pars.part_buffer_size * sizeof(md.send_struct_size));
-  bzero(buf->parts_recv_d, pars.part_buffer_size * sizeof(md.recv_struct_size));
+  memset(buf->parts_send_d, 0, pars.part_buffer_size * md.send_struct_size);
+  memset(buf->parts_recv_d, 0, pars.part_buffer_size * md.recv_struct_size);
 
   /* Can't do this from the host side */
   /* bzero(buf->d_parts_recv_d, pars.part_buffer_size *

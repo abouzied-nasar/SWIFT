@@ -292,7 +292,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
 
   TIMER_TIC;
 
-  /* Anything to do here? */
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
 
@@ -332,7 +331,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
   gpu_pack_part_pair_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs,
                              cje);
 
-  /* Update the particles packed counter */
+  /* Update the packed particles counter */
+  /* Note: md->count_parts will be increased later */
   pack_ind += count_ci;
 
   /* Do the same for cj */
