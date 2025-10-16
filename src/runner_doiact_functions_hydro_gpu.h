@@ -567,9 +567,9 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
           &buf->d_parts_send_f[first_part], &buf->parts_send_f[first_part],
           bundle_n_parts * sizeof(struct gpu_part_send_f),
           cudaMemcpyHostToDevice, stream[bid]);
-
+    }
 #ifdef SWIFT_DEBUG_CHECKS
-    } else {
+    else {
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 #endif
