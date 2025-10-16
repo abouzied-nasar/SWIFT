@@ -82,8 +82,10 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
 
   if (is_pair_task) {
     md->ci_list = NULL;
+    md->task_first_part = malloc(pack_size * sizeof(int));
   } else {
     md->ci_list = (struct cell **)malloc(pack_size * sizeof(struct cell *));
+    md->task_first_part = NULL;
   }
   md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
 
@@ -247,6 +249,7 @@ void gpu_free_data_buffers(struct gpu_offload_data *buf,
     free((void *)md->cj_leaves);
     free((void *)md->ci_super);
     free((void *)md->cj_super);
+    free((void *)md->task_first_part);
 
   } else {
 
