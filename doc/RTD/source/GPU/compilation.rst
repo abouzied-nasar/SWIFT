@@ -75,15 +75,17 @@ Adding new files
 The build system doesn't play perfectly nice with ``nvcc`` in combination with
 other compilers. We found the following solution:
 
-- Background: In a CPU only build, the build system creates two main convenience
+* Background: In a CPU only build, the build system creates two main convenience
   libraries, ``libswiftsim.la`` (without MPI) and ``libswisim_mpi.la`` (with
   MPI), which are ultimately linked against the 'main' object to create the
   execuables. (There are also 2 more convenience libraries for gravity, but
   let's ignore that here.) 
-- We build two additional convenience libraries, ``libswiftsim_cuda.la`` and
+
+* We build two additional convenience libraries, ``libswiftsim_cuda.la`` and
   ``libswiftsim_mpicuda.la`` which contain **host** code necessary to run with
   GPUs.
-- We build a third convenience library, ``src/libswift_cuda_device.a``, which 
+
+* We build a third convenience library, ``src/libswift_cuda_device.a``, which 
   contains all **device** code.
 
 The third library was necessary because ``nvcc`` doesn't play too nice with
@@ -92,20 +94,27 @@ host compiler.
 
 So if you intend on adding new files, please follow this convention:
 
-- Files containing **host code** are treated the same as C code:
-  - Base files should be ``.c`` files. Add them to the ``GPU_CUDA_SOURCES``
+* Files containing **host code** are treated the same as C code:
+
+  * Base files should be ``.c`` files. Add them to the ``GPU_CUDA_SOURCES``
     variable in ``src/Makefile.am``.
-  - Corresponding header files should be ``.h`` files. Add them to the
+
+  * Corresponding header files should be ``.h`` files. Add them to the
     ``include_HEADERS`` variable.
-- Files containing **device code**:
-  - should be ``.cu`` files. Add them to the ``AM_CUDA_DEVICE_SOURCES``,
+
+* Files containing **device code**:
+
+  * should be ``.cu`` files. Add them to the ``AM_CUDA_DEVICE_SOURCES``,
     ``AM_CUDA_DEVICE_OBJECTS``, and ``AM_CUDA_DEVICE_DLINK_OBJECTS`` variables
     in ``src/Makefile.am``.
-  - Corresponding header files should be ``.h`` files. Add them to the
+  * Corresponding header files should be ``.h`` files. Add them to the
     ``include_HEADERS`` variable.
-- Headers without a corresponding base file (whether ``.c`` or ``.cu``):
-  - Add them to the ``nobase_noinst_HEADERS`` variable.
-  - Make sure their inclusion into code is guarded by appropriate macros.
+
+* Headers without a corresponding base file (whether ``.c`` or ``.cu``):
+
+  * Add them to the ``nobase_noinst_HEADERS`` variable.
+
+  * Make sure their inclusion into code is guarded by appropriate macros.
     Otherwise, you will destroy the build system.
 
 
@@ -114,11 +123,11 @@ A note on macros
 
 For cuda, we mainly use two vaguely related macros:
 
-- ``HAVE_CUDA``:
-   This is set by the ``autoconf`` configuration and signifies whether cuda was
-   found on your system. If available, it will be defined in ``config.h``.
+* ``HAVE_CUDA``:
+  This is set by the ``autoconf`` configuration and signifies whether cuda was
+  found on your system. If available, it will be defined in ``config.h``.
 
-- ``WITH_CUDA``:
+* ``WITH_CUDA``:
   This is used to include or exclude code when compiling with or without cuda.
   Internally, it is passed as a flag to the compiler. Remember that we still
   want to be able to compile SWIFT without GPU support, regardless of whether
@@ -182,10 +191,11 @@ TODO.
 
 If you want to pass on flags to the compilers, you can do so by setting variables:
 
-- ``$HIP_CFLAGS``: Cuda-related flags for host (C) code, passed on to the C
+* ``$HIP_CFLAGS``: Cuda-related flags for host (C) code, passed on to the C
   compiler. Use to e.g. manually provide include path
   (``HIP_CFLAGS=-I/path/to/hip/include``)
-- ``$HIPCC_FLAGS``: Flags to be passed on to the ``hipcc`` compiler.
+
+* ``$HIPCC_FLAGS``: Flags to be passed on to the ``hipcc`` compiler.
 
 
 

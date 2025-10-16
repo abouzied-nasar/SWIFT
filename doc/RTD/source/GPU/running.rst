@@ -34,15 +34,18 @@ provided in your ``parameters.yml`` file:
      gpu_pair_bundle_size:             0
 
 
-- ``gpu_self_pack_size``: Sets how many leaf cells and pairs of leaf cells of
+* ``gpu_self_pack_size``: Sets how many leaf cells and pairs of leaf cells of
   ``self`` tasks to pack for offloading. 
-- ``gpu_self_bundle_size``: Sets how many leaf cells and pairs of leaf cells of
+
+* ``gpu_self_bundle_size``: Sets how many leaf cells and pairs of leaf cells of
   ``self`` tasks to pack into a bundle while offloading. ``gpu_self_pack_size``
   total cells will be offloaded per cycle, in bundles of size
   ``gpu_self_bundle_size``. 
-- ``gpu_pair_pack_size``:  Sets how many pairs of leaf cells of ``pair`` tasks
+
+* ``gpu_pair_pack_size``:  Sets how many pairs of leaf cells of ``pair`` tasks
   to pack for offloading. 
-- ``gpu_pair_bundle_size``: Sets how many leaf cell pairs of ``pair`` tasks to
+
+* ``gpu_pair_bundle_size``: Sets how many leaf cell pairs of ``pair`` tasks to
   pack into a bundle while offloading. ``gpu_pair_pack_size`` total cells will
   be offloaded per cycle, in bundles of size ``gpu_pair_bundle_size``.
 
@@ -61,8 +64,9 @@ Optional Parameters
      gpu_part_buffer_size:            -1
 
 
-- ``gpu_recursion_max_depth``: Sets the maximal depth we expect to recurse down
+* ``gpu_recursion_max_depth``: Sets the maximal depth we expect to recurse down
   to from super-level tasks to reach leaf cells. We need this to estimate the
   size of buffers to allocate.
-- ``gpu_part_buffer_size``: Sets the size of GPU particle array buffers.
+
+* ``gpu_part_buffer_size``: Sets the size of GPU particle array buffers.
 
