@@ -2355,7 +2355,7 @@ void scheduler_reweight(struct scheduler *s,
         } else if (t->subtype == task_subtype_do_gas_swallow) {
           cost = 1.f * wscale * count_i;
         } else if (t->subtype == task_subtype_gpu_density) {  // A. Nasar
-          cost = 1.f * (wscale * count_i * count_i);         // * s->pack_size;
+          cost = 1.f * (wscale * count_i * count_i);          // * s->pack_size;
         } else if (t->subtype == task_subtype_gpu_force) {
           cost = 1.f * (wscale * count_i * count_i);  // * s->pack_size;
         } else if (t->subtype == task_subtype_gpu_gradient) {

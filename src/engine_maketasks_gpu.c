@@ -2583,7 +2583,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
 #if defined(WITH_CUDA) || defined(WITH_HIP)
     /*Make packing depend on sorts and drift A. Nasar */
-    else if (t_type == task_type_self && t_subtype == task_subtype_gpu_density) {
+    else if (t_type == task_type_self &&
+             t_subtype == task_subtype_gpu_density) {
       scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
       /* Task for the second GPU hydro loop A. Nasar */
       t_force_gpu = scheduler_addtask(sched, task_type_self,
@@ -2892,7 +2893,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
     }
 
     /*Make packing depend on sorts and drift A. Nasar */
-    else if (t_type == task_type_pair && t_subtype == task_subtype_gpu_density) {
+    else if (t_type == task_type_pair &&
+             t_subtype == task_subtype_gpu_density) {
       /* Make all density tasks depend on the drift */
       if (ci->nodeID == nodeID) {
         scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
@@ -3504,7 +3506,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
     }
 
     /*Make packing depend on sorts and drift A. Nasar */
-    else if (t_type == task_type_pair && t_subtype == task_subtype_gpu_density) {
+    else if (t_type == task_type_pair &&
+             t_subtype == task_subtype_gpu_density) {
       /* Make all density tasks depend on the drift */
       if (ci->nodeID == nodeID) {
         scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
@@ -3612,8 +3615,8 @@ void engine_make_hydroloop_tasks_mapper(void *map_data, int num_elements,
           const int sid = sortlistID[(kk + 1) + 3 * ((jj + 1) + 3 * (ii + 1))];
           scheduler_addtask(sched, task_type_pair, task_subtype_density, sid, 0,
                             ci, cj);
-          scheduler_addtask(sched, task_type_pair, task_subtype_gpu_density, sid,
-                            0, ci, cj);  // A. Nasar
+          scheduler_addtask(sched, task_type_pair, task_subtype_gpu_density,
+                            sid, 0, ci, cj);  // A. Nasar
 
 #ifdef SWIFT_DEBUG_CHECKS
 #ifdef WITH_MPI

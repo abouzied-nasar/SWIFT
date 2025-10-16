@@ -715,8 +715,7 @@ void *runner_main_cuda(void *data) {
 #else
         t = scheduler_done(sched, t);
 #endif
-      }
-      else if (t->subtype == task_subtype_gpu_gradient) {
+      } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
         /* Don't enqueue unpacks yet. Just signal the runners */
         t->skip = 1;
@@ -726,8 +725,7 @@ void *runner_main_cuda(void *data) {
 #else
         t = scheduler_done(sched, t);
 #endif
-      }
-      else if (t->subtype == task_subtype_gpu_force) {
+      } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
         /* Don't enqueue unpacks yet. Just signal the runners */
         t->skip = 1;
@@ -737,8 +735,7 @@ void *runner_main_cuda(void *data) {
 #else
         t = scheduler_done(sched, t);
 #endif
-      }
-      else  {
+      } else {
         t = scheduler_done(sched, t);
       }
     } /* Loop while there are tasks */
