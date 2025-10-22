@@ -667,7 +667,6 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
   const int bundle_size = md->params.bundle_size;
 
   /* Current index in buffer particle arrays */
-  int unpack_index = 0;
   cudaError_t cu_error;
 
   char *task_unpacked = malloc(tasks_packed * sizeof(char));
@@ -693,6 +692,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
         struct cell *c = md->ci_list[tid];
         struct task *t = md->task_list[tid];
         const int count = c->hydro.count;
+        const int unpack_index = buf->self_task_first_last_part[tid].x;
 
 #ifdef SWIFT_DEBUG_CHECKS
         if (!cell_is_active_hydro(c, e))
@@ -729,9 +729,6 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
           error("Unknown task subtype %s", subtaskID_names[task_subtype]);
         }
 #endif
-
-        /* Increase our index in the buffer with the newly unpacked size. */
-        unpack_index += count;
 
         /* Release the lock */
         cell_unlocktree(c);
