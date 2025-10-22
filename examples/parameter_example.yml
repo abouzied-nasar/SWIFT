@@ -129,8 +129,8 @@ FOF:
 
 # Parameters for the task scheduling
 Scheduler:
-  gpu_self_pack_size:        0         # (Conditional) How many leaf cells and pairs of leaf cells of *self tasks* to pack for offloading. If running with GPU, this parameter is mandatory.
-  gpu_self_bundle_size:      0         # (Conditional) How many leaf cells and pairs of leaf cells of *self tasks* to pack into a bundle while offloading. `gpu_self_pack_size` total cells will be offloaded per cycle, in bundles of size `gpu_self_bundle_size`. When running with GPU, this parameter is mandatory.
+  gpu_self_pack_size:        0         # (Conditional) How many leaf cells and pairs of leaf cells of *self tasks* to pack for offloading. N.B. Self tasks generate self and pair leaf computations. If running with GPU, this parameter is mandatory.
+  gpu_self_bundle_size:      0         # (Conditional) How many leaf cells and pairs of leaf cells of *self tasks* to pack into a bundle while offloading. N.B. Self tasks generate self and pair leaf computations. `gpu_self_pack_size` total cells will be offloaded per cycle, in bundles of size `gpu_self_bundle_size`. When running with GPU, this parameter is mandatory.
   gpu_pair_pack_size:        0         # (Conditional) How many pairs of leaf cells of *pair tasks* to pack for offloading. If running with GPU, this parameter is mandatory.
   gpu_pair_bundle_size:      0         # (Conditional) How many pairs of leaf cells of *pair tasks* to pack into a bundle while offloading. `gpu_pair_pack_size` total cells will be offloaded per cycle, in bundles of size `gpu_pair_bundle_size`. When running with GPU, this parameter is mandatory.
   gpu_recursion_max_depth:   4         # (Optional) What is the maximal depth we can recurse down to from the task super level to the leaf cell levels? We need this information to estimate sufficient buffer space to allocate.

@@ -29,6 +29,8 @@
 
 #define GPU_THREAD_BLOCK_SIZE 64
 
+#undef CUDA_PROFILER
+
 /* Config parameters. */
 /* TODO: DO WE STILL NEED THESE??? */
 #define GPUOFFLOAD_DENSITY 1  /* off-load hydro density to GPU */

@@ -33,7 +33,7 @@ picture of how things work internally first.
   neighbouring particles.
 
 * Typically, the interactions are executed between leaf cells of the particle
-  spacetree, i.e. on the lowest leve.
+  spacetree, i.e. on the lowest level.
 
 * At some level of that tree, we assign a "workload", i.e. all the physics
   equations we need solved, to that cell. This combination of "workload" and

@@ -38,8 +38,11 @@ extern "C" {
 /* Cuda headers */
 #ifdef WITH_CUDA
 #include <cuda.h>
-#include <cuda_profiler_api.h>
 #include <cuda_runtime.h>
+
+#ifdef CUDA_PROFILER
+#include <cuda_profiler_api.h>
+#endif
 #endif
 
 /* This object's header. */
@@ -241,7 +244,9 @@ void *runner_main_cuda(void *data) {
     /*Some bits for output in case of debug*/
 
     /* TODO: DO WE STILL NEED THIS?? */
+#ifdef CUDA_PROFILER
     if (step == 0) cudaProfilerStart();
+#endif
     step++;
 
     /* Loop while there are tasks... */

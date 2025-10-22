@@ -68,5 +68,6 @@ Optional Parameters
   to from super-level tasks to reach leaf cells. We need this to estimate the
   size of buffers to allocate.
 
-* ``gpu_part_buffer_size``: Sets the size of GPU particle array buffers.
+* ``gpu_part_buffer_size``: Sets the size of GPU particle buffers. i.e. How many
+  particles we expect we will offload per GPU offload .
 
