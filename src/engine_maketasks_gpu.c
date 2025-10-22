@@ -4167,8 +4167,8 @@ void engine_maketasks(struct engine *e) {
 
   /* Now, create unpack tasks based on the existing packs and create
    * the dependencies pack->unpack->ghost_in A. Nasar */
-  const int pack_size = e->gpu_pack_params.pack_size;
-  const int pack_size_pair = e->gpu_pack_params.pack_size_pair;
+//  const int pack_size = e->gpu_pack_params.pack_size;
+//  const int pack_size_pair = e->gpu_pack_params.pack_size_pair;
 
   int count_current_self = 0;
   int count_current_pair = 0;
@@ -4186,10 +4186,10 @@ void engine_maketasks(struct engine *e) {
 
     if (t->type == task_type_self) {
 
-      if (count_current_self % pack_size == 0) {
+//      if (count_current_self % pack_size == 0) {
         last_created_self_unpack = scheduler_addtask(
             sched, task_type_self, task_subtype_gpu_unpack_d, 0, 0, NULL, NULL);
-      }
+//      }
 
       /* pack -> unpack -> ghost_in */
       scheduler_addunlock(sched, t, last_created_self_unpack);
@@ -4248,10 +4248,10 @@ void engine_maketasks(struct engine *e) {
 
     if (t->type == task_type_self) {
 
-      if (count_current_self % pack_size == 0) {
+//      if (count_current_self % pack_size == 0) {
         last_created_self_unpack = scheduler_addtask(
             sched, task_type_self, task_subtype_gpu_unpack_g, 0, 0, NULL, NULL);
-      }
+//      }
 
       /* pack -> unpack -> ghost_in */
       scheduler_addunlock(sched, t, last_created_self_unpack);
@@ -4319,10 +4319,10 @@ void engine_maketasks(struct engine *e) {
 
     if (t->type == task_type_self) {
 
-      if (count_current_self % pack_size == 0) {
+//      if (count_current_self % pack_size == 0) {
         last_created_self_unpack = scheduler_addtask(
             sched, task_type_self, task_subtype_gpu_unpack_f, 0, 0, NULL, NULL);
-      }
+//      }
 
       /* pack -> unpack -> ghost_in */
       scheduler_addunlock(sched, t, last_created_self_unpack);
