@@ -241,7 +241,7 @@ void cell_grid_set_pair_completeness(struct cell *restrict ci,
         int sid_sub =
             space_getsid_and_swap_cells(e->s, &ci_sub, &cj_sub, shift);
 #ifdef SWIFT_DEBUG_CHECKS
-        assert(sid_sub == pairs.pairs[i].sid);
+        swift_assert(sid_sub == pairs.pairs[i].sid);
 #endif
         cell_grid_set_pair_completeness(ci_sub, cj_sub, sid_sub, e);
       }

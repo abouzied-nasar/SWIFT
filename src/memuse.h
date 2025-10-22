@@ -20,11 +20,7 @@
 #define SWIFT_MEMUSE_H
 
 /* Config parameters. */
-#ifdef WITH_CUDA
-#include "../config.h"
-#else
 #include <config.h>
-#endif
 /* Includes. */
 #include <stdlib.h>
 
@@ -194,7 +190,6 @@ __attribute__((always_inline)) inline void swift_free(const char *label,
   memuse_log_allocation(label, ptr, 0, 0);
 #endif
   free(ptr);
-  return;
 }
 
 #endif /* SWIFT_MEMUSE_H */

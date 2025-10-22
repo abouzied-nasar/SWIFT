@@ -1,9 +1,11 @@
+#ifndef HIP_GPU_PART_STRUCTS_H
+#define HIP_GPU_PART_STRUCTS_H
+
 #include "hip/hip_runtime.h"
-#ifndef PART_GPU_H
-#define PART_GPU_H
 /* Config parameters. */
-#include "../../config.h"
-#include "../align.h"
+#include "align.h"
+
+#include "<config.h>"
 typedef int8_t timebin_t;
 
 #ifdef __WITH_HIP
@@ -412,4 +414,4 @@ typedef struct part_aos_f4_g_recv {
 }
 #endif
 
-#endif  // PART_GPU_H
+#endif  // HIP_GPU_PART_STRUCTS_H

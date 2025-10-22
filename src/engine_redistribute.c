@@ -447,7 +447,7 @@ struct savelink_mapper_data {
       for (int i = 0; i < node; i++) offset += counts[nodeID * nr_nodes + i];  \
                                                                                \
       for (int k = 0; k < counts[nodeID * nr_nodes + node]; k++) {             \
-        struct gpart *gp = part_get_gpart(&parts[k + offset]);                 \
+        struct gpart *gp = parts[k + offset].gpart;                            \
         if (gp != NULL) {                                                      \
           if (CHECKS)                                                          \
             if (gp->id_or_neg_offset > 0)                                      \
@@ -466,7 +466,7 @@ struct savelink_mapper_data {
 #ifdef SWIFT_DEBUG_CHECKS
 void ENGINE_REDISTRIBUTE_SAVELINK_GETTERS_MAPPER(part, 1);
 #else
-void ENGINE_REDISTRIBUTE_SAVELINK_MAPPER(part, 0);
+void ENGINE_REDISTRIBUTE_SAVELINK_GETTERS_MAPPER(part, 0);
 #endif
 
 /**

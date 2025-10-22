@@ -1689,7 +1689,7 @@ int engine_prepare(struct engine *e) {
 
   /* Re-rank the tasks every now and then. XXX this never executes. */
   if (e->tasks_age % engine_tasksreweight == 1) {
-    scheduler_reweight(&e->sched, e->verbose);
+    scheduler_reweight(&e->sched, &e->gpu_pack_params, e->verbose);
   }
   e->tasks_age += 1;
 
@@ -1827,11 +1827,11 @@ void engine_skip_force_and_kick(struct engine *e) {
         t->type == task_type_rt_advance_cell_time ||
         t->type == task_type_neutrino_weight || t->type == task_type_csds ||
         t->subtype == task_subtype_force ||  // A. Nasar
-        t->subtype == task_subtype_gpu_pack_f ||
+        t->subtype == task_subtype_gpu_force ||
         t->subtype == task_subtype_gpu_unpack_f ||
         t->subtype == task_subtype_limiter ||
         t->subtype == task_subtype_gradient ||
-        t->subtype == task_subtype_gpu_pack_g ||
+        t->subtype == task_subtype_gpu_gradient ||
         t->subtype == task_subtype_gpu_unpack_g ||
         t->subtype == task_subtype_stars_prep1 ||
         t->subtype == task_subtype_stars_prep2 ||
@@ -1992,7 +1992,7 @@ void engine_synchronize_times(struct engine *e) {
 
 #ifdef WITH_MPI
 
-  const ticks tic = getticks();
+  const ticks tic_start = getticks();
 
   /* Collect which top-level cells have been updated */
   MPI_Allreduce(MPI_IN_PLACE, e->s->cells_top_updated, e->s->nr_cells, MPI_CHAR,
@@ -2011,7 +2011,7 @@ void engine_synchronize_times(struct engine *e) {
 
   if (e->verbose)
     message("Gathering and activating tend took %.3f %s.",
-            clocks_from_ticks(getticks() - tic), clocks_getunit());
+            clocks_from_ticks(getticks() - tic_start), clocks_getunit());
 
   TIMER_TIC;
   engine_launch(e, "tend");

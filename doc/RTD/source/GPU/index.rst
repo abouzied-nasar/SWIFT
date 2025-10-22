@@ -17,7 +17,7 @@ This section describes matters related to compiling and running swift using GPUs
    :maxdepth: 2
    :caption: Contents:
 
+   gpu_general
    compilation
    running
-   runtime_parameters
 

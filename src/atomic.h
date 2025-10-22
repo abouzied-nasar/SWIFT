@@ -29,13 +29,36 @@
 /* Standard includes */
 #include <stdint.h>
 
+/*! Atomic addition: *v = *v + i, where v is a pointer.
+ * Returns value that was previously held in *v. */
 #define atomic_add(v, i) __sync_fetch_and_add(v, i)
+
+/*! Atomic subtraction: *v = *v - i, where v is a pointer.
+ * Returns value that was previously held in *v. */
 #define atomic_sub(v, i) __sync_fetch_and_sub(v, i)
+
+/*! Atomic or: *v = *v || i, where v is a pointer.
+ * Returns value that was previously held in *v. */
 #define atomic_or(v, i) __sync_fetch_and_or(v, i)
+
+/*! Atomic and: *v = *v && i, where v is a pointer.
+ * Returns value that was previously held in *v. */
 #define atomic_and(v, i) __sync_fetch_and_and(v, i)
+
+/*! Atomic increment: *v++, where v is a pointer.
+ * Returns value that was previously held in *v. */
 #define atomic_inc(v) atomic_add(v, 1)
+
+/*! Atomic increment: *v++, where v is a pointer.
+ * Returns value that was previously held in *v. */
 #define atomic_dec(v) atomic_sub(v, 1)
+
+/*! Atomic increment: if (*v == o) {*v = n}; where v is a pointer.
+ * Returns value that was previously held in *v. */
 #define atomic_cas(v, o, n) __sync_val_compare_and_swap(v, o, n)
+
+/*! Atomic swap: *v = n.
+ * Returns value that was previously held in *v. */
 #define atomic_swap(v, n) __sync_lock_test_and_set(v, n)
 
 /**

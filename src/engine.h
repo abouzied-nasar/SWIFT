@@ -36,6 +36,7 @@
 #include "barrier.h"
 #include "clocks.h"
 #include "collectgroup.h"
+#include "gpu_pack_params.h"
 #include "ic_info.h"
 #include "lightcone/lightcone.h"
 #include "lightcone/lightcone_array.h"
@@ -675,6 +676,9 @@ struct engine {
 
   /* Lightcone information */
   int flush_lightcone_maps;
+
+  /*! GPU packing/offloading parameters */
+  struct gpu_global_pack_params gpu_pack_params;
 
 #ifdef SWIFT_GRAVITY_FORCE_CHECKS
   /* Run brute force checks only on steps when all gparts active? */

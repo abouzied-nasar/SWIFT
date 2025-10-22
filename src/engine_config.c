@@ -33,13 +33,10 @@
 #endif
 
 #ifdef WITH_CUDA
-#include "runner_main_clean.cu"
-
-#include <cuda_runtime.h> /* A. Nasar */
+#include <cuda_runtime.h>
 #endif
 
 #ifdef WITH_HIP
-// #include "/opt/rocm-5.1.0/hip/include/hip/hip_runtime.h"
 #include "runner_main_clean.hip"
 
 #include <hip/hip_runtime.h>
@@ -49,6 +46,7 @@
 #include "engine.h"
 
 /* Local headers. */
+#include "cuda/cuda_config.h"
 #include "fof.h"
 #include "line_of_sight.h"
 #include "mpiuse.h"
@@ -929,9 +927,6 @@ void engine_config(int restart, int fof, struct engine *e,
   /* Init the scheduler. Allow stealing*/
   scheduler_init(&e->sched, e->s, maxtasks, nr_queues,
                  (e->policy & scheduler_flag_steal), e->nodeID, &e->threadpool);
-  /* Init the scheduler. NO stealing  A. Nasar */
-  //  scheduler_init(&e->sched, e->s, maxtasks, nr_queues, 0, e->nodeID,
-  //                 &e->threadpool);
 
   /* Maximum size of MPI task messages, in KB, that should not be buffered,
    * that is sent using MPI_Issend, not MPI_Isend. 4Mb by default. Can be
@@ -939,6 +934,44 @@ void engine_config(int restart, int fof, struct engine *e,
    */
   e->sched.mpi_message_limit =
       parser_get_opt_param_int(params, "Scheduler:mpi_message_limit", 4) * 1024;
+
+  /* Setup GPU packing parameters. */
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+  int pack_size = parser_get_param_int(params, "Scheduler:gpu_self_pack_size");
+  int bundle_size =
+      parser_get_param_int(params, "Scheduler:gpu_self_bundle_size");
+  int pack_size_pair =
+      parser_get_param_int(params, "Scheduler:gpu_pair_pack_size");
+  int bundle_size_pair =
+      parser_get_param_int(params, "Scheduler:gpu_pair_bundle_size");
+  int gpu_recursion_max_depth =
+      parser_get_opt_param_int(params, "Scheduler:gpu_recursion_max_depth", 4);
+  int gpu_part_buffer_size =
+      parser_get_opt_param_int(params, "Scheduler:gpu_part_buffer_size", -1);
+  if (e->s->maxdepth > gpu_recursion_max_depth)
+    warning(
+        "space max depth=%d > gpu_recursion_max_depth=%d, "
+        "this may lead to trouble with buffer sizes.",
+        e->s->maxdepth, gpu_recursion_max_depth);
+  int nparts_hydro = e->s->nr_parts;
+  int nthreads = e->nr_threads;
+  int n_top_level_cells = e->s->nr_cells;
+#else
+  int pack_size = 1;
+  int bundle_size = 1;
+  int pack_size_pair = 1;
+  int bundle_size_pair = 1;
+  int gpu_recursion_max_depth = 1;
+  int gpu_part_buffer_size = 1;
+  int nparts_hydro = 1;
+  int nthreads = 1;
+  int n_top_level_cells = 1;
+#endif
+
+  gpu_pack_params_set(&e->gpu_pack_params, pack_size, pack_size_pair,
+                      bundle_size, bundle_size_pair, gpu_recursion_max_depth,
+                      gpu_part_buffer_size, e->s->eta_neighbours, nparts_hydro,
+                      n_top_level_cells, nthreads);
 
   if (restart) {
 
@@ -1005,7 +1038,7 @@ void engine_config(int restart, int fof, struct engine *e,
     e->runners[k].e = e;
 
 #ifdef WITH_CUDA
-    if (pthread_create(&e->runners[k].thread, NULL, &runner_main2,
+    if (pthread_create(&e->runners[k].thread, NULL, &runner_main_cuda,
                        &e->runners[k]) != 0)
       error("Failed to create GPU runner thread.");
 #elif defined(WITH_HIP)

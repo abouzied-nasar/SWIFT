@@ -23,8 +23,6 @@
 
 /* Config parameters. */
 #ifdef WITH_CUDA
-#include "../config.h"
-#else
 #include <config.h>
 #endif
 
@@ -60,7 +58,6 @@
  *
  */
 #ifdef WITH_MPI
-extern int engine_rank;
 #define error(s, ...)                                                      \
   ({                                                                       \
     fflush(stdout);                                                        \
@@ -85,7 +82,6 @@ extern int engine_rank;
 #endif
 
 #ifdef WITH_MPI
-extern int engine_rank;
 /**
  * @brief MPI error macro. Prints the message given in argument,
  *                         followed by the MPI error string and aborts.
@@ -146,7 +142,6 @@ extern int engine_rank;
  *
  */
 #ifdef WITH_MPI
-extern int engine_rank;
 #define pretime_message(s, ...)                                             \
   ({                                                                        \
     printf("[%04i] %s: " s "\n", engine_rank, __FUNCTION__, ##__VA_ARGS__); \
@@ -167,7 +162,6 @@ extern int engine_rank;
  *
  */
 #ifdef WITH_MPI
-extern int engine_rank;
 #define warning(s, ...)                                                \
   ({                                                                   \
     fprintf(stderr, "[%04i] %s %s: WARNING: " s "\n", engine_rank,     \
@@ -186,8 +180,7 @@ extern int engine_rank;
  *
  */
 #ifdef WITH_MPI
-extern int engine_rank;
-#define assert(expr)                                                          \
+#define swift_assert(expr)                                                    \
   ({                                                                          \
     if (!(expr)) {                                                            \
       fflush(stdout);                                                         \
@@ -199,7 +192,7 @@ extern int engine_rank;
     }                                                                         \
   })
 #else
-#define assert(expr)                                                          \
+#define swift_assert(expr)                                                    \
   ({                                                                          \
     if (!(expr)) {                                                            \
       fflush(stdout);                                                         \
@@ -242,8 +235,8 @@ extern int engine_rank;
 #endif /* SWIFT_DEBUG_CHECKS */
 
 /* Define which particles you'd like to trace. */
-#define PROBLEMPART1 -1
-#define PROBLEMPART2 -1
+#define PROBLEMPART1 (-1)
+#define PROBLEMPART2 (-1)
 
 /**
  * @brief Macro to trace particles throughout the code.
