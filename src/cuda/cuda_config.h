@@ -29,11 +29,7 @@
 
 #define GPU_THREAD_BLOCK_SIZE 64
 
-#define _N_TASKS_PER_PACK_SELF 8
-#define _N_TASKS_BUNDLE_SELF 2
-
-#define _N_TASKS_PER_PACK_PAIR 8
-#define _N_TASKS_BUNDLE_PAIR 2
+#undef CUDA_PROFILER
 
 /* Config parameters. */
 /* TODO: DO WE STILL NEED THESE??? */

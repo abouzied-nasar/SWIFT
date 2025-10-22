@@ -27,36 +27,42 @@ extern "C" {
 
 #include <cuda_runtime.h>
 
-void gpu_launch_self_density(struct gpu_part_send_d *parts_send,
-                             struct gpu_part_recv_d *parts_recv, float d_a,
-                             float d_H, cudaStream_t stream, int numBlocks_x,
-                             int numBlocks_y, int bundle_first_task,
-                             int2 *d_task_first_part_f4);
-void gpu_launch_self_gradient(struct gpu_part_send_g *parts_send,
-                              struct gpu_part_recv_g *parts_recv, float d_a,
-                              float d_H, cudaStream_t stream, int numBlocks_x,
-                              int numBlocks_y, int bundle_first_task,
-                              int2 *d_task_first_part_f4);
-void gpu_launch_self_force(struct gpu_part_send_f *parts_send,
-                           struct gpu_part_recv_f *parts_recv, float d_a,
-                           float d_H, cudaStream_t stream, int numBlocks_x,
-                           int numBlocks_y, int bundle_first_task,
+void gpu_launch_self_density(
+    const struct gpu_part_send_d *restrict d_parts_send,
+    struct gpu_part_recv_d *restrict d_parts_recv, const float d_a,
+    const float d_H, cudaStream_t stream, const int num_blocks_x,
+    const int num_blocks_y, const int bundle_first_task,
+    int2 *d_task_first_part_f4);
+void gpu_launch_self_gradient(
+    const struct gpu_part_send_g *restrict d_parts_send,
+    struct gpu_part_recv_g *restrict d_parts_recv, const float d_a,
+    const float d_H, cudaStream_t stream, const int num_blocks_x,
+    const int num_blocks_y, const int bundle_first_task,
+    int2 *d_task_first_part_f4);
+void gpu_launch_self_force(const struct gpu_part_send_f *restrict parts_send,
+                           struct gpu_part_recv_f *restrict parts_recv,
+                           const float d_a, const float d_H,
+                           cudaStream_t stream, const int num_blocks_x,
+                           const int num_blocks_y, const int bundle_first_task,
                            int2 *d_task_first_part_f4);
-void gpu_launch_pair_density(struct gpu_part_send_d *parts_send,
-                             struct gpu_part_recv_d *parts_recv, float d_a,
-                             float d_H, cudaStream_t stream, int numBlocks_x,
-                             int numBlocks_y, int bundle_first_part,
-                             int bundle_n_parts);
-void gpu_launch_pair_gradient(struct gpu_part_send_g *parts_send,
-                              struct gpu_part_recv_g *parts_recv, float d_a,
-                              float d_H, cudaStream_t stream, int numBlocks_x,
-                              int numBlocks_y, int bundle_first_part,
-                              int bundle_n_parts);
-void gpu_launch_pair_force(struct gpu_part_send_f *parts_send,
-                           struct gpu_part_recv_f *parts_recv, float d_a,
-                           float d_H, cudaStream_t stream, int numBlocks_x,
-                           int numBlocks_y, int bundle_first_part,
-                           int bundle_n_parts);
+void gpu_launch_pair_density(
+    const struct gpu_part_send_d *restrict d_parts_send,
+    struct gpu_part_recv_d *restrict d_parts_recv, const float d_a,
+    const float d_H, cudaStream_t stream, const int num_blocks_x,
+    const int num_blocks_y, const int bundle_first_part,
+    const int bundle_n_parts);
+void gpu_launch_pair_gradient(
+    const struct gpu_part_send_g *restrict d_parts_send,
+    struct gpu_part_recv_g *restrict d_parts_recv, const float d_a,
+    const float d_H, cudaStream_t stream, const int num_blocks_x,
+    const int num_blocks_y, const int bundle_first_part,
+    const int bundle_n_parts);
+void gpu_launch_pair_force(const struct gpu_part_send_f *restrict d_parts_send,
+                           struct gpu_part_recv_f *restrict d_parts_recv,
+                           const float d_a, const float d_H,
+                           cudaStream_t stream, const int num_blocks_x,
+                           const int num_blocks_y, const int bundle_first_part,
+                           const int bundle_n_parts);
 #ifdef __cplusplus
 }
 #endif

@@ -31,25 +31,27 @@ extern "C" {
 #endif
 
 #include "cell.h"
+#include "gpu_pack_metadata.h"
 #include "gpu_pack_params.h"
-#include "gpu_pack_vars.h"
 #include "gpu_part_structs.h"
 
 #include <cuda_runtime.h>
 
-/*! Struct to hold all data for the transfer of a single task (sub)type */
+/* Rule-of-thumb: Everything related to actual particle data and everything
+ * CUDA-specific goes in here. Everything else goes into gpu_pack_metadata
+ * struct.*/
+
+/*! Struct to hold all data for the transfer of a single task (sub)type. */
 struct gpu_offload_data {
 #ifdef WITH_CUDA
 
-  /*! data required for self and pair packing tasks destined for the GPU*/
-  struct gpu_pack_vars pv;
+  /*! bookkeeping meta-data for offloading */
+  struct gpu_pack_metadata md;
 
   /*! First and last particles for self interactions */
-  int2 *task_first_part;
-  int2 *d_task_first_part;
-
-  /*! First and last particles of cells i and j for pair interactions */
-  int4 *fparti_fpartj_lparti_lpartj;
+  /* TODO: This should be cuda-independent and moved into gpu_pack_metadata */
+  int2 *self_task_first_last_part;
+  int2 *d_self_task_first_last_part;
 
   /*! Arrays used to send particle data from device to host. A single struct
    * gpu_offload_data will only hold data for either density, gradient, or
@@ -81,30 +83,21 @@ struct gpu_offload_data {
     struct gpu_part_recv_f *parts_recv_f;
   };
 
-  /*! TODO: Documentation */
-  struct cell **ci_d;
-  struct cell **cj_d;
-
-  /*! TODO: Documentation */
-  int **first_and_last_daughters;
-
-  /*! TODO: Documentation */
-  struct cell **ci_top;
-  struct cell **cj_top;
-
-  /*! TODO: Documentation */
+  /*! Handle on events per cuda stream to register completion of async ops */
   cudaEvent_t *event_end;
 
 #endif /* WITH_CUDA */
 };
 
-void gpu_init_data_buffers(struct gpu_offload_data *buf,
+void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const struct gpu_global_pack_params *params,
                            const size_t send_struct_size,
                            const size_t recv_struct_size,
                            const char is_pair_task);
 
-void gpu_init_data_buffers_step(struct gpu_offload_data *buf);
+void gpu_data_buffers_init_step(struct gpu_offload_data *buf);
+
+void gpu_data_buffers_reset(struct gpu_offload_data *buf);
 
 void gpu_free_data_buffers(struct gpu_offload_data *buf,
                            const char is_pair_task);

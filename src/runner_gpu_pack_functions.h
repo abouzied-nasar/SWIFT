@@ -53,7 +53,7 @@
 __attribute__((always_inline)) INLINE static void gpu_pack_self_density(
     const struct cell *restrict c, struct gpu_offload_data *restrict buf) {
 
-  gpu_pack_part_self_density(c, buf->parts_send_d, buf->pv.count_parts);
+  gpu_pack_part_self_density(c, buf->parts_send_d, buf->md.count_parts);
 }
 
 /**
@@ -66,7 +66,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_self_density(
 __attribute__((always_inline)) INLINE static void gpu_pack_self_gradient(
     const struct cell *restrict c, struct gpu_offload_data *restrict buf) {
 
-  gpu_pack_part_self_gradient(c, buf->parts_send_g, buf->pv.count_parts);
+  gpu_pack_part_self_gradient(c, buf->parts_send_g, buf->md.count_parts);
 }
 
 /**
@@ -79,7 +79,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_self_gradient(
 __attribute__((always_inline)) INLINE static void gpu_pack_self_force(
     const struct cell *restrict c, struct gpu_offload_data *restrict buf) {
 
-  gpu_pack_part_self_force(c, buf->parts_send_f, buf->pv.count_parts);
+  gpu_pack_part_self_force(c, buf->parts_send_f, buf->md.count_parts);
 }
 
 /**
@@ -87,11 +87,17 @@ __attribute__((always_inline)) INLINE static void gpu_pack_self_force(
  * Currently only a wrapper around gpu_unpack_part_self_density, but we'll need
  * to distinguish between SPH flavours in the future here by including the
  * correct corresponding header file.
+ *
+ * @param c cell to unpack particle data into
+ * @param parts_buffer particle buffer to unpack into cell particle data
+ * @param pack_position the index in the parts_buffer where to start unpacking
+ * @param count the number of particles to unpack into the cell
+ * @param engine the #engine
  */
 __attribute__((always_inline)) INLINE static void gpu_unpack_self_density(
     struct cell *restrict c,
     const struct gpu_part_recv_d *restrict parts_buffer,
-    const size_t pack_position, const size_t count, const struct engine *e) {
+    const int pack_position, const int count, const struct engine *e) {
 
   gpu_unpack_part_self_density(c, parts_buffer, pack_position, count, e);
 }
@@ -101,11 +107,17 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_self_density(
  * particles Currently only a wrapper around gpu_unpack_part_self_gradient, but
  * we'll need to distinguish between SPH flavours in the future here by
  * including the correct corresponding header file.
+ *
+ * @param c cell to unpack particle data into
+ * @param parts_buffer particle buffer to unpack into cell particle data
+ * @param pack_position the index in the parts_buffer where to start unpacking
+ * @param count the number of particles to unpack into the cell
+ * @param engine the #engine
  */
 __attribute__((always_inline)) INLINE static void gpu_unpack_self_gradient(
     struct cell *restrict c,
     const struct gpu_part_recv_g *restrict parts_buffer,
-    const size_t pack_position, const size_t count, const struct engine *e) {
+    const int pack_position, const int count, const struct engine *e) {
 
   gpu_unpack_part_self_gradient(c, parts_buffer, pack_position, count, e);
 }
@@ -115,11 +127,17 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_self_gradient(
  * Currently only a wrapper around gpu_unpack_part_self_force, but we'll need
  * to distinguish between SPH flavours in the future here by including the
  * correct corresponding header file.
+ *
+ * @param c cell to unpack particle data into
+ * @param parts_buffer particle buffer to unpack into cell particle data
+ * @param pack_position the index in the parts_buffer where to start unpacking
+ * @param count the number of particles to unpack into the cell
+ * @param engine the #engine
  */
 __attribute__((always_inline)) INLINE static void gpu_unpack_self_force(
     struct cell *restrict c,
     const struct gpu_part_recv_f *restrict parts_buffer,
-    const size_t pack_position, const size_t count, const struct engine *e) {
+    const int pack_position, const int count, const struct engine *e) {
 
   gpu_unpack_part_self_force(c, parts_buffer, pack_position, count, e);
 }
@@ -130,8 +148,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_self_force(
  */
 __attribute__((always_inline)) INLINE static void gpu_unpack_pair_density(
     const struct runner *r, struct cell *ci, struct cell *cj,
-    const struct gpu_part_recv_d *parts_aos_buffer, size_t *pack_ind,
-    size_t count_max_parts) {
+    const struct gpu_part_recv_d *parts_aos_buffer, int *pack_ind,
+    int count_max_parts) {
 
   const struct engine *e = r->e;
 
@@ -140,14 +158,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_density(
     return;
   }
 
-  size_t count_ci = ci->hydro.count;
-  size_t count_cj = cj->hydro.count;
+  int count_ci = ci->hydro.count;
+  int count_cj = cj->hydro.count;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (*pack_ind + count_ci + count_cj >= count_max_parts) {
     error(
         "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind is "
-        "%lu, counts are %lu %lu, max is %lu",
+        "%d, counts are %d %d, max is %d",
         *pack_ind, count_ci, count_cj, count_max_parts);
   }
 #endif
@@ -175,8 +193,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_density(
  */
 __attribute__((always_inline)) INLINE static void gpu_unpack_pair_gradient(
     const struct runner *r, struct cell *ci, struct cell *cj,
-    const struct gpu_part_recv_g *parts_aos_buffer, size_t *pack_ind,
-    size_t count_max_parts) {
+    const struct gpu_part_recv_g *parts_aos_buffer, int *pack_ind,
+    int count_max_parts) {
 
   const struct engine *e = r->e;
 
@@ -185,14 +203,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_gradient(
     return;
   }
 
-  size_t count_ci = ci->hydro.count;
-  size_t count_cj = cj->hydro.count;
+  int count_ci = ci->hydro.count;
+  int count_cj = cj->hydro.count;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (*pack_ind + count_ci + count_cj >= count_max_parts) {
     error(
         "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind is "
-        "%lu, counts are %lu %lu, max is %lu",
+        "%d, counts are %d %d, max is %d",
         *pack_ind, count_ci, count_cj, count_max_parts);
   }
 #endif
@@ -220,8 +238,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_gradient(
  */
 __attribute__((always_inline)) INLINE static void gpu_unpack_pair_force(
     const struct runner *r, struct cell *ci, struct cell *cj,
-    const struct gpu_part_recv_f *parts_aos_buffer, size_t *pack_ind,
-    size_t count_max_parts) {
+    const struct gpu_part_recv_f *parts_aos_buffer, int *pack_ind,
+    int count_max_parts) {
 
   const struct engine *e = r->e;
 
@@ -229,14 +247,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_force(
     return;
   }
 
-  size_t count_ci = ci->hydro.count;
-  size_t count_cj = cj->hydro.count;
+  int count_ci = ci->hydro.count;
+  int count_cj = cj->hydro.count;
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (*pack_ind + count_ci + count_cj >= count_max_parts) {
     error(
         "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind is "
-        "%lu, counts are %lu %lu, max is %lu",
+        "%d, counts are %d %d, max is %d",
         *pack_ind, count_ci, count_cj, count_max_parts);
   }
 #endif
@@ -259,74 +277,86 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_force(
 }
 
 /**
- * @brief packs up particle data of two cells for the pair density GPU task into
- * the buffers
- * @TODO: WHAT IS SHIFT_TMP?
+ * @brief packs up particle data of two leaf cells for the pair density GPU
+ * interactions into the buffers.
+ *
+ * @param buf the offload buffer struct
+ * @param ci a #cell to pack and interact with cj
+ * @param cj a #cell to pack and interact with ci
+ * @param shift shift cell/particle coordinates to apply periodic boundary
+ * wrapping, if needed
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
     struct gpu_offload_data *buf, const struct cell *ci, const struct cell *cj,
-    const double3 shift_tmp) {
+    const double shift[3]) {
 
   TIMER_TIC;
 
-  /* Anything to do here? */
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
-  if (count_ci == 0 || count_cj == 0) return;
-
-  struct gpu_pack_vars *pack_vars = &buf->pv;
-
-  /* Get how many particles we've packed until now */
-  /* DOUBLE-CHECK THIS */
-  size_t pack_ind = pack_vars->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (pack_ind + count_ci + count_cj >= 2 * pack_vars->count_max_parts) {
+  if (count_ci == 0 || count_cj == 0)
+    error("Empty cells should've been weeded out during recursion.");
+#endif
+
+  struct gpu_pack_metadata *md = &buf->md;
+
+  /* Get how many particles we've packed until now */
+  int pack_ind = md->count_parts;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (pack_ind + count_ci + count_cj >= md->params.part_buffer_size) {
     error(
-        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %lu"
-        "ci %i cj %i count_max %lu",
-        pack_ind, count_ci, count_cj, pack_vars->count_max_parts);
+        "Exceeded count_max_parts. Make arrays bigger! pack_ind=%d"
+        "ci=%i cj=%i count_max=%d",
+        pack_ind, count_ci, count_cj, md->params.part_buffer_size);
   }
 #endif
 
   /* Pack the particle data into CPU-side buffers. Start by assigning the shifts
    * (if positions shifts are required)*/
-  const double3 shift_i = {shift_tmp.x + cj->loc[0], shift_tmp.y + cj->loc[1],
-                           shift_tmp.z + cj->loc[2]};
+  const double shift_i[3] = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
+                             shift[2] + cj->loc[2]};
 
   /* Get first and last particles of cell i */
-  const int2 cis_cie = {pack_ind, pack_ind + count_ci};
+  const int cis = pack_ind;
+  const int cie = pack_ind + count_ci;
 
   /* Get first and last particles of cell j */
-  const int2 cjs_cje = {pack_ind + count_ci, pack_ind + count_ci + count_cj};
+  const int cjs = pack_ind + count_ci;
+  const int cje = pack_ind + count_ci + count_cj;
 
   /* Pack cell i */
-  gpu_pack_part_pair_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs_cje);
+  gpu_pack_part_pair_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs,
+                             cje);
 
-  /* Update the particles packed counter */
+  /* Update the packed particles counter */
+  /* Note: md->count_parts will be increased later */
   pack_ind += count_ci;
 
   /* Do the same for cj */
-  const double3 shift_j = {cj->loc[0], cj->loc[1], cj->loc[2]};
+  const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
 
-  gpu_pack_part_pair_density(cj, buf->parts_send_d, pack_ind, shift_j, cis_cie);
-
-  pack_ind += count_cj;
-
-  /* Update incremented pack length accordingly */
-  pack_vars->count_parts = pack_ind;
+  gpu_pack_part_pair_density(cj, buf->parts_send_d, pack_ind, shift_j, cis,
+                             cie);
 
   TIMER_TOC(timer_dopair_gpu_pack_d);
 }
 
 /**
- * @brief packs up particle data of two cells for the pair gradient GPU task
- * into the buffers
- * @TODO: WHAT IS SHIFT_TMP?
+ * @brief packs up particle data of two leaf cells for the pair gradient GPU
+ * interactions into the buffers.
+ *
+ * @param buf the offload buffer struct
+ * @param ci a #cell to pack and interact with cj
+ * @param cj a #cell to pack and interact with ci
+ * @param shift shift cell/particle coordinates to apply periodic boundary
+ * wrapping, if needed
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
     struct gpu_offload_data *buf, const struct cell *ci, const struct cell *cj,
-    const double3 shift_tmp) {
+    const double shift[3]) {
 
   TIMER_TIC;
 
@@ -335,110 +365,105 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
   const int count_cj = cj->hydro.count;
   if (count_ci == 0 || count_cj == 0) return;
 
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *md = &buf->md;
 
   /* Get how many particles we've packed until now */
-  size_t pack_ind = pack_vars->count_parts;
+  int pack_ind = md->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (pack_ind + count_ci + count_cj >= 2 * pack_vars->count_max_parts) {
+  if (pack_ind + count_ci + count_cj >= md->params.part_buffer_size) {
     error(
-        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %lu"
-        "ci %i cj %i count_max %lu",
-        pack_ind, count_ci, count_cj, pack_vars->count_max_parts);
+        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %d"
+        "ci %i cj %i count_max %d",
+        pack_ind, count_ci, count_cj, md->params.part_buffer_size);
   }
 #endif
 
   /* Pack the particle data into CPU-side buffers. Start by assigning the shifts
    * (if positions shifts are required)*/
-  const double3 shift_i = {shift_tmp.x + cj->loc[0], shift_tmp.y + cj->loc[1],
-                           shift_tmp.z + cj->loc[2]};
+  const double shift_i[3] = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
+                             shift[2] + cj->loc[2]};
 
   /* Get first and last particles of cell i */
-  const int2 cis_cie = {pack_ind, pack_ind + count_ci};
+  const int cis = pack_ind;
+  const int cie = pack_ind + count_ci;
 
   /* Get first and last particles of cell j */
-  const int2 cjs_cje = {pack_ind + count_ci, pack_ind + count_ci + count_cj};
+  const int cjs = pack_ind + count_ci;
+  const int cje = pack_ind + count_ci + count_cj;
 
   /* Pack cell i */
-  gpu_pack_part_pair_gradient(ci, buf->parts_send_g, pack_ind, shift_i,
-                              cjs_cje);
+  gpu_pack_part_pair_gradient(ci, buf->parts_send_g, pack_ind, shift_i, cjs,
+                              cje);
 
   /* Update the particles packed counter */
   pack_ind += count_ci;
 
   /* Do the same for cj */
-  const double3 shift_j = {cj->loc[0], cj->loc[1], cj->loc[2]};
+  const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
 
-  gpu_pack_part_pair_gradient(cj, buf->parts_send_g, pack_ind, shift_j,
-                              cis_cie);
-
-  /* Update the particles packed counter */
-  pack_ind += count_cj;
-
-  /* Store incremented pack length accordingly */
-  pack_vars->count_parts = pack_ind;
+  gpu_pack_part_pair_gradient(cj, buf->parts_send_g, pack_ind, shift_j, cis,
+                              cie);
 
   TIMER_TOC(timer_dopair_gpu_pack_g);
 }
 
 /**
- * @brief packs up particle data of two cells for the pair force GPU task into
- * the buffers
- * @TODO: WHAT IS SHIFT_TMP?
+ * @brief packs up particle data of two leaf cells for the pair gradient GPU
+ * interactions into the buffers.
+ *
+ * @param buf the offload buffer struct
+ * @param ci a #cell to pack and interact with cj
+ * @param cj a #cell to pack and interact with ci
+ * @param shift shift cell/particle coordinates to apply periodic boundary
+ * wrapping, if needed
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(
     struct gpu_offload_data *buf, const struct cell *ci, const struct cell *cj,
-    const double3 shift_tmp) {
+    const double shift[3]) {
 
   TIMER_TIC;
-
-  /* Anything to do here? */
 
   /* Anything to do here? */
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
   if (count_ci == 0 || count_cj == 0) return;
 
-  struct gpu_pack_vars *pack_vars = &buf->pv;
+  struct gpu_pack_metadata *md = &buf->md;
 
   /* Get how many particles we've packed until now */
-  size_t pack_ind = pack_vars->count_parts;
+  int pack_ind = md->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (pack_ind + count_ci + count_cj >= 2 * pack_vars->count_max_parts) {
+  if (pack_ind + count_ci + count_cj >= md->params.part_buffer_size) {
     error(
-        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %lu"
-        "ci %i cj %i count_max %lu",
-        pack_ind, count_ci, count_cj, pack_vars->count_max_parts);
+        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %d"
+        "ci_count=%i cj_count=%i count_max=%d",
+        pack_ind, count_ci, count_cj, md->params.part_buffer_size);
   }
 #endif
 
   /* Pack the particle data into CPU-side buffers*/
-  const double3 shift_i = {shift_tmp.x + cj->loc[0], shift_tmp.y + cj->loc[1],
-                           shift_tmp.z + cj->loc[2]};
+  const double shift_i[3] = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
+                             shift[2] + cj->loc[2]};
 
   /* Get first and last particles of cell i */
-  const int2 cis_cie = {pack_ind, pack_ind + count_ci};
+  const int cis = pack_ind;
+  const int cie = pack_ind + count_ci;
 
   /* Get first and last particles of cell j */
-  const int2 cjs_cje = {pack_ind + count_ci, pack_ind + count_ci + count_cj};
+  const int cjs = pack_ind + count_ci;
+  const int cje = pack_ind + count_ci + count_cj;
 
-  gpu_pack_part_pair_force(ci, buf->parts_send_f, pack_ind, shift_i, cjs_cje);
+  gpu_pack_part_pair_force(ci, buf->parts_send_f, pack_ind, shift_i, cjs, cje);
 
   /* Update the particles packed counter */
   pack_ind += count_ci;
 
   /* Pack the particle data into CPU-side buffers*/
-  const double3 shift_j = {cj->loc[0], cj->loc[1], cj->loc[2]};
+  const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
 
-  gpu_pack_part_pair_force(cj, buf->parts_send_f, pack_ind, shift_j, cis_cie);
-
-  /* Update the particles packed counter */
-  pack_ind += count_cj;
-
-  /* Store incremented pack length accordingly */
-  pack_vars->count_parts = pack_ind;
+  gpu_pack_part_pair_force(cj, buf->parts_send_f, pack_ind, shift_j, cis, cie);
 
   TIMER_TOC(timer_dopair_gpu_pack_f);
 }

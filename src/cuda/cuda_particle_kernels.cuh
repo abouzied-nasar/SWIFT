@@ -38,10 +38,11 @@ extern "C" {
 #include <config.h>
 
 /**
- * Does the self density computation on device
+ * @brief Does the self density computation on device
+ * TODO: parameter documentation
  */
 __global__ void cuda_kernel_self_density(
-    struct gpu_part_send_d *__restrict__ parts_send,
+    const struct gpu_part_send_d *__restrict__ parts_send,
     struct gpu_part_recv_d *__restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
     const int2 *__restrict__ d_task_first_part_f4) {
@@ -135,9 +136,10 @@ __global__ void cuda_kernel_self_density(
 
 /**
  * Does the self gradient computation on device
+ * TODO: parameter documentation
  */
 __global__ void cuda_kernel_self_gradient(
-    struct gpu_part_send_g *__restrict__ parts_send,
+    const struct gpu_part_send_g *__restrict__ parts_send,
     struct gpu_part_recv_g *__restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
     const int2 *__restrict__ d_task_first_part_f4) {
@@ -246,10 +248,11 @@ __global__ void cuda_kernel_self_gradient(
 }
 
 /**
- * Does the self force computation on device
+ * @brief Does the self force computation on device
+ * TODO: parameter documentation
  */
 __global__ void cuda_kernel_self_force(
-    struct gpu_part_send_f *__restrict__ parts_send,
+    const struct gpu_part_send_f *__restrict__ parts_send,
     struct gpu_part_recv_f *__restrict__ parts_recv, const float d_a,
     const float d_H, const int bundle_first_task,
     const int2 *__restrict__ d_task_first_part_f4) {
@@ -447,12 +450,13 @@ __global__ void cuda_kernel_self_force(
 }
 
 /**
- * Naive kernel computing density interaction for pair task
+ * @brief Naive kernel computing density interaction for pair task
+ * TODO: parameter documentation
  */
 __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_density(
     const struct gpu_part_send_d pi,
-    struct gpu_part_send_d *__restrict__ parts_send,
-    struct gpu_part_recv_d *__restrict__ parts_recv, int pid,
+    const struct gpu_part_send_d *__restrict__ d_parts_send,
+    struct gpu_part_recv_d *__restrict__ d_parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
   float hi = 0.0;
@@ -466,7 +470,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_density(
 
   /* Particles copied in blocks to shared memory */
   for (int j = cj_start; j < cj_end; j++) {
-    struct gpu_part_send_d pj = parts_send[j];
+    struct gpu_part_send_d pj = d_parts_send[j];
 
     const float4 x_p_h_j = pj.x_p_h;
     const float4 ux_m_j = pj.ux_m;
@@ -511,17 +515,18 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_density(
     }
   } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
-  parts_recv[pid].rho_dh_wcount = res_rho;
-  parts_recv[pid].rot_ux_div_v = res_rot;
+  d_parts_recv[pid].rho_dh_wcount = res_rho;
+  d_parts_recv[pid].rot_ux_div_v = res_rot;
 }
 
 /**
  * Naive kernel computing gradient interaction for pair task
+ * TODO: parameter documentation
  */
 __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_gradient(
     const struct gpu_part_send_g pi,
-    struct gpu_part_send_g *__restrict__ parts_send,
-    struct gpu_part_recv_g *__restrict__ parts_recv, int pid,
+    const struct gpu_part_send_g *__restrict__ d_parts_send,
+    struct gpu_part_recv_g *__restrict__ d_parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
   float hi = 0.0;
@@ -536,7 +541,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_gradient(
 
   /* Particles copied in blocks to shared memory */
   for (int j = cj_start; j < cj_end; j++) {
-    struct gpu_part_send_g pj = parts_send[j];
+    struct gpu_part_send_g pj = d_parts_send[j];
 
     const float4 x_h_j = pj.x_h;
     const float4 ux_m_j = pj.ux_m;
@@ -589,16 +594,17 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_gradient(
     }
   } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
-  parts_recv[pid].vsig_lapu_aviscmax = vsig_lapu_aviscmax_i;
+  d_parts_recv[pid].vsig_lapu_aviscmax = vsig_lapu_aviscmax_i;
 }
 
 /**
  * Naive kernel computing force interaction for pair task
+ * TODO: parameter documentation
  */
 __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_force(
     const struct gpu_part_send_f pi,
-    struct gpu_part_send_f *__restrict__ parts_send,
-    struct gpu_part_recv_f *__restrict__ parts_recv, int pid,
+    const struct gpu_part_send_f *__restrict__ d_parts_send,
+    struct gpu_part_recv_f *__restrict__ d_parts_recv, int pid,
     const int cj_start, const int cj_end, float d_a, float d_H) {
 
   const float4 x_h_i = pi.x_h;
@@ -621,7 +627,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_force(
 
   /* Particles copied in blocks to shared memory */
   for (int j = cj_start; j < cj_end; j++) {
-    struct gpu_part_send_f pj = parts_send[j];
+    struct gpu_part_send_f pj = d_parts_send[j];
     const float4 x_h_j = pj.x_h;
     const float4 ux_m_j = pj.ux_m;
     const float4 f_b_t_mintbinngb_j = pj.f_bals_timebin_mintimebin_ngb;
@@ -743,8 +749,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_force(
   } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
   udt_hdt_vsig_mintbinngb.w = f_b_t_mintbinngb_i.w;
-  parts_recv[pid].udt_hdt_vsig_mintimebin_ngb = udt_hdt_vsig_mintbinngb;
-  parts_recv[pid].a_hydro = ahydro;
+  d_parts_recv[pid].udt_hdt_vsig_mintimebin_ngb = udt_hdt_vsig_mintbinngb;
+  d_parts_recv[pid].a_hydro = ahydro;
 }
 
 #ifdef __cplusplus

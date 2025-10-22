@@ -20,6 +20,7 @@
 #include "gpu_pack_params.h"
 
 #include "error.h"
+#include "minmax.h"
 
 #include <math.h>
 
@@ -29,19 +30,33 @@
  */
 
 /**
- * Get global packing parameters from the scheduler and fill out the
- * gpu_pack_params struct
+ * @brief Get the global packing parameters and fill out the
+ * gpu_global_pack_params struct with meaningful data.
  *
- * @params pars (return): the gpu global pack parameter struct to be filled out
- * @params sched: the @scheduler
- * @params eta_neighours: Neighbour resolution eta.
+ * @param pars (return): the gpu global pack parameter struct to be filled out
+ * @param pack_size: Packing size (nr of leaf cells) for self tasks
+ * @param pack_size_pair: Packing size (nr of leaf cell pairs) for pair tasks
+ * @param bundle_size: Size of a bundle (nr of leaf cells) for self tasks
+ * @param bundle_size_pair: Size of a bundle (nr of leaf cell pairs) for pair
+ * tasks
+ * @param gpu_recursion_max_depth Max depth we expect to reach while recursing
+ * down from task's super level to reach leaf cells
+ * @param part_buffer_size Size of particle buffer arrays. If -1, will be
+ * guessed.
+ * @param eta_neighours Neighbour resolution eta.
+ * @param nparts_hydro how many hydro particles are on this rank
+ * @param n_top_level_cells how many top level cells we have
+ * @param nthreads how many threads we're running on
  */
-void gpu_set_pack_params(struct gpu_global_pack_params* pars,
-                         const size_t pack_size, const size_t pack_size_pair,
-                         const size_t bundle_size,
-                         const size_t bundle_size_pair,
-                         const float eta_neighbours) {
+void gpu_pack_params_set(struct gpu_global_pack_params *pars,
+                         const int pack_size, const int pack_size_pair,
+                         const int bundle_size, const int bundle_size_pair,
+                         const int gpu_recursion_max_depth,
+                         const int part_buffer_size, const float eta_neighbours,
+                         const int nparts_hydro, const int n_top_level_cells,
+                         const int nthreads) {
 
+  /* Store quantities we'll need directly */
   pars->pack_size = pack_size;
   pars->pack_size_pair = pack_size_pair;
   pars->bundle_size = bundle_size;
@@ -52,7 +67,11 @@ void gpu_set_pack_params(struct gpu_global_pack_params* pars,
   swift_assert(pars->bundle_size > 0);
   swift_assert(pars->bundle_size_pair > 0);
 
-  /* A. Nasar: n_bundles is the number of task bundles each thread has. Used to
+  /* bundles need to be smaller than packs */
+  swift_assert(pars->pack_size >= pars->bundle_size);
+  swift_assert(pars->pack_size_pair >= pars->bundle_size_pair);
+
+  /* n_bundles is the number of task bundles each thread has. Used to
    * loop through bundles */
   pars->n_bundles =
       (pars->pack_size + pars->bundle_size - 1) / pars->bundle_size;
@@ -62,30 +81,63 @@ void gpu_set_pack_params(struct gpu_global_pack_params* pars,
   swift_assert(pars->n_bundles > 0);
   swift_assert(pars->n_bundles_pair > 0);
 
-  /* Now try to estimate average number of particles per leaf-cell. */
-  /* First get smoothing length/particle spacing */
-  /* Multiplication by 2 is also to ensure we do not over-run the allocated
-   * memory on buffers and GPU. This can happen if calculated h is larger than
-   * cell width and splitting makes bigger than target cells */
-  size_t np_per_cell = 2 * ceil(2.0 * eta_neighbours);
+  /* Try to estimate array sizes containing leaf cells */
+  int leafcount = 1;
+  for (int i = 0; i < gpu_recursion_max_depth; i++) leafcount *= 8;
+  /* Add some extra buffer space */
+  leafcount = ceil(leafcount * 1.2);
+  pars->leaf_buffer_size = leafcount;
+  swift_assert(pars->leaf_buffer_size > 0);
 
-  /* Apply appropriate dimensional multiplication */
+  int partbuff = part_buffer_size;
+  if (part_buffer_size == -1) {
+
+    /* Guess the particle array size. First try to estimate average number of
+     * particles per leaf-cell. */
+
+    /* Get smoothing length/particle spacing */
+    int np_per_cell = 2 * ceil(2.0 * eta_neighbours);
+
+    /* Apply appropriate dimensional multiplication */
 #if defined(HYDRO_DIMENSION_2D)
-  np_per_cell *= np_per_cell;
+    np_per_cell *= np_per_cell;
 #elif defined(HYDRO_DIMENSION_3D)
-  np_per_cell *= np_per_cell * np_per_cell;
+    np_per_cell *= np_per_cell * np_per_cell;
 #elif defined(HYDRO_DIMENSION_1D)
-#else
-#pragma error("We shouldn't be here.")
 #endif
 
-  /* Increase parts per recursed task-level cell by buffer to
-     ensure we allocate enough memory. */
-  const size_t buff = ceil(0.25 * np_per_cell);
+    /* Increase parts per recursed task-level cell by buffer to
+       ensure we allocate enough memory. */
+    partbuff = np_per_cell * leafcount;
+    partbuff = ceil(1.2 * partbuff);
 
-  /* Leave this until we implement recursive self tasks -> Exaggerated as we
-   * will off-load really big cells since we don't recurse */
-  pars->count_max_parts = 64ul * pars->pack_size * (np_per_cell + buff);
+    /* Also guess a reasonable upper limit here based on how many particles we
+     * have in total. */
+    int partbuff_upper =
+        ceil(2. * (float)nparts_hydro / (float)(nthreads * n_top_level_cells));
+    partbuff = min(partbuff, partbuff_upper);
 
-  swift_assert(pars->count_max_parts > 0);
+    /* ... but have at least space to store 2 recursion levels... */
+    int partbuff_lower = ceil(1.2 * 64 * np_per_cell);
+    partbuff = max(partbuff, partbuff_lower);
+  }
+
+  pars->part_buffer_size = partbuff;
+  swift_assert(pars->part_buffer_size > 0);
+}
+
+/**
+ * @brief Copy the global packing parameters from src to dest
+ */
+void gpu_pack_params_copy(const struct gpu_global_pack_params *src,
+                          struct gpu_global_pack_params *dest) {
+
+  dest->pack_size = src->pack_size;
+  dest->pack_size_pair = src->pack_size_pair;
+  dest->bundle_size = src->bundle_size;
+  dest->bundle_size_pair = src->bundle_size_pair;
+  dest->n_bundles = src->n_bundles;
+  dest->n_bundles_pair = src->n_bundles_pair;
+  dest->leaf_buffer_size = src->leaf_buffer_size;
+  dest->part_buffer_size = src->part_buffer_size;
 }

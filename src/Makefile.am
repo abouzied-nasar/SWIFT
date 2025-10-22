@@ -106,7 +106,7 @@ include_HEADERS += power_spectrum.h
 include_HEADERS += ghost_stats.h
 include_HEADERS += swift_lustre_api.h
 include_HEADERS += runner_gpu_pack_functions.h
-include_HEADERS += gpu_pack_vars.h  gpu_pack_params.h
+include_HEADERS += gpu_pack_metadata.h  gpu_pack_params.h
 include_HEADERS += cuda/gpu_offload_data.h cuda/gpu_utils.h
 include_HEADERS += cuda/cuda_config.h cuda/gpu_part_pack_functions.h
 
@@ -190,7 +190,7 @@ endif
 GPU_SOURCES = 
 if HAVECUDA
 # list here files to be compiled without nvcc, but needed for execution with GPU
-GPU_CUDA_SOURCES = runner_main_cuda.c gpu_pack_vars.c engine_maketasks_gpu.c
+GPU_CUDA_SOURCES = runner_main_cuda.c gpu_pack_metadata.c engine_maketasks_gpu.c
 GPU_CUDA_SOURCES += cuda/gpu_offload_data.c cuda/gpu_utils.c
 # TODO????
 GPU_SOURCES+=$(GPU_CUDA_SOURCES)
@@ -199,7 +199,7 @@ endif
 if HAVEHIP 
 # TODO: This is not up to date. Look at what we did for CUDA.
 # GPU_HIP_SOURCES = runner_main_hip.c
-GPU_HIP_SOURCES = runner_main_cuda.c gpu_pack_vars.c engine_maketasks_gpu.c
+GPU_HIP_SOURCES = runner_main_cuda.c gpu_pack_metadata.c engine_maketasks_gpu.c
 # TODO: Fix this. Do the same as cuda.
 GPU_SOURCES+=$(GPU_HIP_SOURCES)
 endif
