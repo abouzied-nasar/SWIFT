@@ -132,13 +132,13 @@ SUBTYPES = [
     "sink_do_gas_swallow",
     "rt_gradient",
     "rt_transport",
-    "gpu_pack_d",
-    "gpu_pack_g",
-    "gpu_pack_f",
+    "gpu_density",
+    "gpu_gradient",
+    "gpu_force",
     "gpu_unpack_d",
     "gpu_unpack_g",
-    "gpu_unpack_f",    
-    
+    "gpu_unpack_f",
+
     #  "count",
 ]
 
@@ -206,6 +206,12 @@ FULLTYPES = [
     "pair/sink_do_swallow",
     "self/sink_do_gas_swallow",
     "pair/sink_do_gas_swallow",
+    "self/gpu_force",
+    "self/gpu_gradient",
+    "self/gpu_density",
+    "pair/gpu_force",
+    "pair/gpu_gradient",
+    "pair/gpu_density",
 ]
 
 #  A number of colours for the various types. Recycled when there are

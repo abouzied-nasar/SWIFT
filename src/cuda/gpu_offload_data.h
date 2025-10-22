@@ -53,19 +53,6 @@ struct gpu_offload_data {
   int2 *self_task_first_last_part;
   int2 *d_self_task_first_last_part;
 
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int self_task_first_last_part_size;
-  int d_self_task_first_last_part_size;
-#endif
-
-  /*! First and last particles of cells i and j for pair interactions */
-  int4 *fparti_fpartj_lparti_lpartj;
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int fparti_fpartj_lparti_lpartj_size;
-#endif
-
   /*! Arrays used to send particle data from device to host. A single struct
    * gpu_offload_data will only hold data for either density, gradient, or
    * force task, so we hide them behind a union. */
@@ -75,22 +62,12 @@ struct gpu_offload_data {
     struct gpu_part_send_f *d_parts_send_f;
   };
 
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int d_parts_send_size;
-#endif
-
   /*! Array used to receive particle data on device from host */
   union {
     struct gpu_part_recv_d *d_parts_recv_d;
     struct gpu_part_recv_g *d_parts_recv_g;
     struct gpu_part_recv_f *d_parts_recv_f;
   };
-
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int d_parts_recv_size;
-#endif
 
   /*! Array used to send particle data from host to device */
   union {
@@ -99,11 +76,6 @@ struct gpu_offload_data {
     struct gpu_part_send_f *parts_send_f;
   };
 
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int parts_send_size;
-#endif
-
   /*! Array used to receive particle data from device on host */
   union {
     struct gpu_part_recv_d *parts_recv_d;
@@ -111,24 +83,21 @@ struct gpu_offload_data {
     struct gpu_part_recv_f *parts_recv_f;
   };
 
-#ifdef SWIFT_DEBUG_CHECKS
-  /*! Keep track of allocated array size for boundary checks. */
-  int parts_recv_size;
-#endif
-
   /*! Handle on events per cuda stream to register completion of async ops */
   cudaEvent_t *event_end;
 
 #endif /* WITH_CUDA */
 };
 
-void gpu_init_data_buffers(struct gpu_offload_data *buf,
+void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const struct gpu_global_pack_params *params,
                            const size_t send_struct_size,
                            const size_t recv_struct_size,
                            const char is_pair_task);
 
-void gpu_init_data_buffers_step(struct gpu_offload_data *buf);
+void gpu_data_buffers_init_step(struct gpu_offload_data *buf);
+
+void gpu_data_buffers_reset(struct gpu_offload_data *buf);
 
 void gpu_free_data_buffers(struct gpu_offload_data *buf,
                            const char is_pair_task);

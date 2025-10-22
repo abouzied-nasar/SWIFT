@@ -634,11 +634,11 @@ void engine_addtasks_recv_hydro(
   if (!cell_get_flag(c, cell_flag_has_tasks)) return;
 
     /* Have we reached a level where there are any hydro tasks ? */
-#ifdef WITH_CUDA  // A. Nasar
+#if defined(WITH_CUDA) || defined(WITH_HIP)
   if (t_xv == NULL && c->hydro.density != NULL && c->hydro.density_pack != NULL)
 #else
   if (t_xv == NULL && c->hydro.density != NULL)
-#endif /*WITH_CUDA*/
+#endif
   {
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -766,8 +766,9 @@ void engine_addtasks_recv_hydro(
       scheduler_addunlock(s, t_xv, l->t);
       scheduler_addunlock(s, l->t, t_rho);
     }
-#ifdef WITH_CUDA /* A. Nasar POSSIBLE BUG HERE (More like PROBABLE) NOT \
-                    REQUIRED Ghost in for cell j is*/
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+    /* A. Nasar POSSIBLE BUG HERE (More like PROBABLE) NOT \
+                       REQUIRED Ghost in for cell j is*/
     for (struct link *l = c->hydro.density_pack; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_xv, l->t);
       scheduler_addunlock(s, l->t, t_rho);
@@ -787,7 +788,7 @@ void engine_addtasks_recv_hydro(
       scheduler_addunlock(s, t_gradient, l->t);
       scheduler_addunlock(s, l->t, tend);
     }
-#ifdef WITH_CUDA
+#if defined(WITH_CUDA) || defined(WITH_HIP)
     for (struct link *l = c->hydro.gradient_pack; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_rho, l->t);
       scheduler_addunlock(s, l->t, t_gradient);
@@ -804,13 +805,13 @@ void engine_addtasks_recv_hydro(
       scheduler_addunlock(s, l->t, tend);
     }
 
-#endif /*WITH_CUDA*/
+#endif /*WITH_CUDA || WITH_HIP*/
 #else  /*EXTRA_HYDRO_LOOP*/
     for (struct link *l = c->hydro.force; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_rho, l->t);
       scheduler_addunlock(s, l->t, tend);
     }
-#ifdef WITH_CUDA
+#if defined(WITH_CUDA) || defined(WITH_HIP)
     for (struct link *l = c->hydro.force_pack; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_rho, l->t);
       //      scheduler_addunlock(s, l->t, t_ti);
@@ -2245,7 +2246,7 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
 #endif
       if (t_subtype == task_subtype_density) {
         engine_addlink(e, &ci->hydro.density, t);
-      } else if (t_subtype == task_subtype_gpu_pack_d) {
+      } else if (t_subtype == task_subtype_gpu_density) {
         engine_addlink(e, &ci->hydro.density_pack, t);
       } else if (t_subtype == task_subtype_grav) {
         engine_addlink(e, &ci->grav.grav, t);
@@ -2263,7 +2264,7 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
       if (t_subtype == task_subtype_density) {
         engine_addlink(e, &ci->hydro.density, t);
         engine_addlink(e, &cj->hydro.density, t);
-      } else if (t_subtype == task_subtype_gpu_pack_d) {  // A. Nasar
+      } else if (t_subtype == task_subtype_gpu_density) {  // A. Nasar
         engine_addlink(e, &ci->hydro.density_pack, t);
         engine_addlink(e, &cj->hydro.density_pack, t);
       } else if (t_subtype == task_subtype_grav) {
@@ -2580,18 +2581,20 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
     }
 
+#if defined(WITH_CUDA) || defined(WITH_HIP)
     /*Make packing depend on sorts and drift A. Nasar */
-    else if (t_type == task_type_self && t_subtype == task_subtype_gpu_pack_d) {
+    else if (t_type == task_type_self &&
+             t_subtype == task_subtype_gpu_density) {
       scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
       /* Task for the second GPU hydro loop A. Nasar */
       t_force_gpu = scheduler_addtask(sched, task_type_self,
-                                      task_subtype_gpu_pack_f, 0, 0, ci, NULL);
+                                      task_subtype_gpu_force, 0, 0, ci, NULL);
       /* Link the tasks to the cells. Do the same for GPU tasks A. Nasar */
       engine_addlink(e, &ci->hydro.force_pack, t_force_gpu);
 #ifdef EXTRA_HYDRO_LOOP
       /* Same work for the additional GPU hydro loop A. Nasar */
       t_gradient_gpu = scheduler_addtask(
-          sched, task_type_self, task_subtype_gpu_pack_g, 0, 0, ci, NULL);
+          sched, task_type_self, task_subtype_gpu_gradient, 0, 0, ci, NULL);
       /* Add the link between the new loops and the cell. Same for GPU task A.
        * Nasar */
       engine_addlink(e, &ci->hydro.gradient_pack, t_gradient_gpu);
@@ -2606,6 +2609,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       scheduler_addunlock(sched, ci->hydro.super->hydro.ghost_out, t_force_gpu);
 #endif
     }
+#endif /* WITH_CUDA || WITH_HIP */
 
     /* Sort tasks depend on the drift of the cell (stars version). */
     else if (t_type == task_type_stars_sort && ci->nodeID == nodeID) {
@@ -2697,7 +2701,6 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
       /* Add the link between the new loop and the cell */
       engine_addlink(e, &ci->hydro.force, t_force);
-
       if (with_timestep_limiter) {
         engine_addlink(e, &ci->hydro.limiter, t_limiter);
       }
@@ -2890,7 +2893,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
     }
 
     /*Make packing depend on sorts and drift A. Nasar */
-    else if (t_type == task_type_pair && t_subtype == task_subtype_gpu_pack_d) {
+    else if (t_type == task_type_pair &&
+             t_subtype == task_subtype_gpu_density) {
       /* Make all density tasks depend on the drift */
       if (ci->nodeID == nodeID) {
         scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
@@ -2905,7 +2909,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       }
       /* New task for the force A. Nasar */
       t_force_gpu = scheduler_addtask(sched, task_type_pair,
-                                      task_subtype_gpu_pack_f, 0, 0, ci, cj);
+                                      task_subtype_gpu_force, 0, 0, ci, cj);
 #ifdef MPI_SYMMETRIC_FORCE_INTERACTION
       /* The order of operations for an inactive local cell interacting
        * with an active foreign cell is not guaranteed because the density
@@ -2923,7 +2927,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       engine_addlink(e, &cj->hydro.force_pack, t_force_gpu);
 #ifdef EXTRA_HYDRO_LOOP
       t_gradient_gpu = scheduler_addtask(
-          sched, task_type_pair, task_subtype_gpu_pack_g, flags, 0, ci, cj);
+          sched, task_type_pair, task_subtype_gpu_gradient, flags, 0, ci, cj);
       engine_addlink(e, &ci->hydro.gradient_pack, t_gradient_gpu);
       engine_addlink(e, &cj->hydro.gradient_pack, t_gradient_gpu);
       /* Now, build all the dependencies for the hydro for the cells */
@@ -3502,7 +3506,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
     }
 
     /*Make packing depend on sorts and drift A. Nasar */
-    else if (t_type == task_type_pair && t_subtype == task_subtype_gpu_pack_d) {
+    else if (t_type == task_type_pair &&
+             t_subtype == task_subtype_gpu_density) {
       /* Make all density tasks depend on the drift */
       if (ci->nodeID == nodeID) {
         scheduler_addunlock(sched, ci->hydro.super->hydro.drift, t);
@@ -3575,7 +3580,7 @@ void engine_make_hydroloop_tasks_mapper(void *map_data, int num_elements,
       scheduler_addtask(sched, task_type_self, task_subtype_density, 0, 0, ci,
                         NULL);
       // A. Nasar also add a pack task for GPU
-      scheduler_addtask(sched, task_type_self, task_subtype_gpu_pack_d, 0, 0,
+      scheduler_addtask(sched, task_type_self, task_subtype_gpu_density, 0, 0,
                         ci, NULL);
     }
 
@@ -3610,8 +3615,8 @@ void engine_make_hydroloop_tasks_mapper(void *map_data, int num_elements,
           const int sid = sortlistID[(kk + 1) + 3 * ((jj + 1) + 3 * (ii + 1))];
           scheduler_addtask(sched, task_type_pair, task_subtype_density, sid, 0,
                             ci, cj);
-          scheduler_addtask(sched, task_type_pair, task_subtype_gpu_pack_d, sid,
-                            0, ci, cj);  // A. Nasar
+          scheduler_addtask(sched, task_type_pair, task_subtype_gpu_density,
+                            sid, 0, ci, cj);  // A. Nasar
 
 #ifdef SWIFT_DEBUG_CHECKS
 #ifdef WITH_MPI
@@ -4177,7 +4182,7 @@ void engine_maketasks(struct engine *e) {
   for (int i = 0; i < sched->nr_tasks; i++) {
 
     struct task *t = &sched->tasks[i];
-    if (t->subtype != task_subtype_gpu_pack_d) continue;
+    if (t->subtype != task_subtype_gpu_density) continue;
 
     if (t->type == task_type_self) {
 
@@ -4239,7 +4244,7 @@ void engine_maketasks(struct engine *e) {
   for (int i = 0; i < sched->nr_tasks; i++) {
 
     struct task *t = &sched->tasks[i];
-    if (t->subtype != task_subtype_gpu_pack_g) continue;
+    if (t->subtype != task_subtype_gpu_gradient) continue;
 
     if (t->type == task_type_self) {
 
@@ -4310,7 +4315,7 @@ void engine_maketasks(struct engine *e) {
   for (int i = 0; i < sched->nr_tasks; i++) {
 
     struct task *t = &sched->tasks[i];
-    if (t->subtype != task_subtype_gpu_pack_f) continue;
+    if (t->subtype != task_subtype_gpu_force) continue;
 
     if (t->type == task_type_self) {
 

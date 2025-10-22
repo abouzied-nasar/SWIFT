@@ -180,22 +180,22 @@ void *runner_main_cuda(void *data) {
   struct gpu_offload_data gpu_buf_pair_grad;
   struct gpu_offload_data gpu_buf_pair_forc;
 
-  gpu_init_data_buffers(&gpu_buf_self_dens, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_self_dens, &gpu_pack_params,
                         sizeof(struct gpu_part_send_d),
                         sizeof(struct gpu_part_recv_d), /*is_pair_task=*/0);
-  gpu_init_data_buffers(&gpu_buf_self_grad, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_self_grad, &gpu_pack_params,
                         sizeof(struct gpu_part_send_g),
                         sizeof(struct gpu_part_recv_g), /*is_pair_task=*/0);
-  gpu_init_data_buffers(&gpu_buf_self_forc, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_self_forc, &gpu_pack_params,
                         sizeof(struct gpu_part_send_f),
                         sizeof(struct gpu_part_recv_f), /*is_pair_task=*/0);
-  gpu_init_data_buffers(&gpu_buf_pair_dens, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_pair_dens, &gpu_pack_params,
                         sizeof(struct gpu_part_send_d),
                         sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
-  gpu_init_data_buffers(&gpu_buf_pair_grad, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_pair_grad, &gpu_pack_params,
                         sizeof(struct gpu_part_send_g),
                         sizeof(struct gpu_part_recv_g), /*is_pair_task=*/1);
-  gpu_init_data_buffers(&gpu_buf_pair_forc, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_pair_forc, &gpu_pack_params,
                         sizeof(struct gpu_part_send_f),
                         sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
 
@@ -224,12 +224,12 @@ void *runner_main_cuda(void *data) {
     /* Can we go home yet? */
     if (e->step_props & engine_step_prop_done) break;
 
-    gpu_init_data_buffers_step(&gpu_buf_self_dens);
-    gpu_init_data_buffers_step(&gpu_buf_self_grad);
-    gpu_init_data_buffers_step(&gpu_buf_self_forc);
-    gpu_init_data_buffers_step(&gpu_buf_pair_dens);
-    gpu_init_data_buffers_step(&gpu_buf_pair_grad);
-    gpu_init_data_buffers_step(&gpu_buf_pair_forc);
+    gpu_data_buffers_init_step(&gpu_buf_self_dens);
+    gpu_data_buffers_init_step(&gpu_buf_self_grad);
+    gpu_data_buffers_init_step(&gpu_buf_self_forc);
+    gpu_data_buffers_init_step(&gpu_buf_pair_dens);
+    gpu_data_buffers_init_step(&gpu_buf_pair_grad);
+    gpu_data_buffers_init_step(&gpu_buf_pair_forc);
 
     /* Get some global variables' values for this step */
     const float d_a = e->cosmology->a;
@@ -240,6 +240,7 @@ void *runner_main_cuda(void *data) {
     struct task *prev = NULL;
     /*Some bits for output in case of debug*/
 
+    /* TODO: DO WE STILL NEED THIS?? */
     if (step == 0) cudaProfilerStart();
     step++;
 
@@ -308,18 +309,18 @@ void *runner_main_cuda(void *data) {
 #ifndef GPUOFFLOAD_DENSITY
             runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
 #endif
-          } else if (t->subtype == task_subtype_gpu_pack_d) {
+          } else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
             runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream,
                                       d_a, d_H);
 #endif
           } /* self / pack */
-          else if (t->subtype == task_subtype_gpu_pack_g) {
+          else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
             runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream,
                                        d_a, d_H);
 #endif  // GPUGRADSELF
-          } else if (t->subtype == task_subtype_gpu_pack_f) {
+          } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
             runner_doself_gpu_force(r, sched, &gpu_buf_self_forc, t, stream,
                                     d_a, d_H);
@@ -388,17 +389,17 @@ void *runner_main_cuda(void *data) {
 #endif
           }
           /* GPU WORK */
-          else if (t->subtype == task_subtype_gpu_pack_d) {
+          else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
             runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_pair_dens, t,
                                       stream_pairs, d_a, d_H);
 #endif
-          } else if (t->subtype == task_subtype_gpu_pack_g) {
+          } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-            runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_pair_dens, t,
+            runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_pair_grad, t,
                                        stream_pairs, d_a, d_H);
 #endif
-          } else if (t->subtype == task_subtype_gpu_pack_f) {
+          } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
             runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_pair_forc, t,
                                     stream_pairs, d_a, d_H);
@@ -701,9 +702,10 @@ void *runner_main_cuda(void *data) {
       /* This runner is not doing a task anymore */
       r->t = NULL;
 #endif
+
       /* We're done with this task, see if we get a next one. */
       prev = t;
-      if (t->subtype == task_subtype_gpu_pack_d) {
+      if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
         /* Don't enqueue unpacks yet. Just signal the runners */
         t->skip = 1;
@@ -713,9 +715,7 @@ void *runner_main_cuda(void *data) {
 #else
         t = scheduler_done(sched, t);
 #endif
-      }
-
-      else if (t->subtype == task_subtype_gpu_pack_g) {
+      } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
         /* Don't enqueue unpacks yet. Just signal the runners */
         t->skip = 1;
@@ -725,9 +725,7 @@ void *runner_main_cuda(void *data) {
 #else
         t = scheduler_done(sched, t);
 #endif
-      }
-
-      else if (t->subtype == task_subtype_gpu_pack_f) {
+      } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
         /* Don't enqueue unpacks yet. Just signal the runners */
         t->skip = 1;
@@ -737,11 +735,7 @@ void *runner_main_cuda(void *data) {
 #else
         t = scheduler_done(sched, t);
 #endif
-      }
-
-      else if (t->subtype != task_subtype_gpu_pack_d &&
-               t->subtype != task_subtype_gpu_pack_g &&
-               t->subtype != task_subtype_gpu_pack_f) {
+      } else {
         t = scheduler_done(sched, t);
       }
     } /* Loop while there are tasks */

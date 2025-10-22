@@ -33,9 +33,10 @@ extern "C" {
 #include "../align.h"
 #include "../timeline.h"
 
-/*Container for particle data requierd for density calcs*/
+/*! Container for particle data required for density calcs */
 struct gpu_part_send_d {
 #ifdef WITH_CUDA
+
   /*! Particle position and h -> x, y, z, h */
   float4 x_p_h;
 
@@ -52,7 +53,7 @@ struct gpu_part_send_d {
 struct gpu_part_recv_d {
 #ifdef WITH_CUDA
 
-  /* Derivative of the neighbour number with respect to h; w_count_dh */
+  /*! Derivative of the neighbour number with respect to h; w_count_dh */
   float4 rho_dh_wcount;
 
   /*! Particle velocity curl; rot_ux and velocity divergence; div_v */
@@ -61,7 +62,7 @@ struct gpu_part_recv_d {
 #endif
 };
 
-/*Container for particle data requierd for force calcs*/
+/*Container for particle data required for force calcs*/
 struct gpu_part_send_f {
 #ifdef WITH_CUDA
 
@@ -84,7 +85,7 @@ struct gpu_part_send_f {
 #endif
 };
 
-/*Container for particle data requierd for force calcs*/
+/*! Container for particle data required for force calcs */
 struct gpu_part_recv_f {
 #ifdef WITH_CUDA
 
@@ -98,7 +99,7 @@ struct gpu_part_recv_f {
 #endif
 };
 
-/*Container for particle data requierd for gradient calcs*/
+/*! Container for particle data required for gradient calcs */
 struct gpu_part_send_g {
 #ifdef WITH_CUDA
 
@@ -111,20 +112,20 @@ struct gpu_part_send_g {
   /*! Particle density alpha visc internal energy u and speed of sound c */
   float4 rho_avisc_u_c;
 
-  /* viscosity information results */
+  /*! viscosity information results */
   float3 vsig_lapu_aviscmax;
 
-  /*Data for cell start and end*/
+  /*! Data for cell start and end*/
   int2 cjs_cje;
 
 #endif
 };
 
-/*Container for particle data requierd for gradient calcs*/
+/*! Container for particle data required for gradient calcs */
 struct gpu_part_recv_g {
 #ifdef WITH_CUDA
 
-  /* viscosity information results */
+  /*! viscosity information results */
   float3 vsig_lapu_aviscmax;
 
 #endif

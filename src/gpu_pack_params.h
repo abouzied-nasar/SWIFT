@@ -42,13 +42,17 @@ struct gpu_global_pack_params {
   int n_bundles;
   int n_bundles_pair;
 
-  int count_max_parts;
+  int part_buffer_size;
+  int leaf_buffer_size;
 };
 
 void gpu_pack_params_set(struct gpu_global_pack_params *pars,
                          const int pack_size, const int pack_size_pair,
                          const int bundle_size, const int bundle_size_pair,
-                         const float eta_neighbours);
+                         const int gpu_recursion_max_depth,
+                         const int part_buffer_size, const float eta_neighbours,
+                         const int nparts_hydro, const int n_top_level_cells,
+                         const int nthreads);
 void gpu_pack_params_copy(const struct gpu_global_pack_params *src,
                           struct gpu_global_pack_params *dest);
 

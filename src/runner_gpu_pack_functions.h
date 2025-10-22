@@ -292,10 +292,13 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
 
   TIMER_TIC;
 
-  /* Anything to do here? */
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
-  if (count_ci == 0 || count_cj == 0) return;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (count_ci == 0 || count_cj == 0)
+    error("Empty cells should've been weeded out during recursion.");
+#endif
 
   struct gpu_pack_metadata *md = &buf->md;
 
@@ -303,12 +306,11 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
   int pack_ind = md->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  /* TODO: Please document factor of 2 here: Why is it here? */
-  if (pack_ind + count_ci + count_cj >= 2 * md->params.count_max_parts) {
+  if (pack_ind + count_ci + count_cj >= md->params.part_buffer_size) {
     error(
-        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %d"
-        "ci %i cj %i count_max %d",
-        pack_ind, count_ci, count_cj, md->params.count_max_parts);
+        "Exceeded count_max_parts. Make arrays bigger! pack_ind=%d"
+        "ci=%i cj=%i count_max=%d",
+        pack_ind, count_ci, count_cj, md->params.part_buffer_size);
   }
 #endif
 
@@ -329,7 +331,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
   gpu_pack_part_pair_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs,
                              cje);
 
-  /* Update the particles packed counter */
+  /* Update the packed particles counter */
+  /* Note: md->count_parts will be increased later */
   pack_ind += count_ci;
 
   /* Do the same for cj */
@@ -368,11 +371,11 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
   int pack_ind = md->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (pack_ind + count_ci + count_cj >= 2 * md->params.count_max_parts) {
+  if (pack_ind + count_ci + count_cj >= md->params.part_buffer_size) {
     error(
         "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %d"
         "ci %i cj %i count_max %d",
-        pack_ind, count_ci, count_cj, md->params.count_max_parts);
+        pack_ind, count_ci, count_cj, md->params.part_buffer_size);
   }
 #endif
 
@@ -432,11 +435,11 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(
   int pack_ind = md->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (pack_ind + count_ci + count_cj >= 2 * md->params.count_max_parts) {
+  if (pack_ind + count_ci + count_cj >= md->params.part_buffer_size) {
     error(
         "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind %d"
-        "ci %i cj %i count_max %d",
-        pack_ind, count_ci, count_cj, md->params.count_max_parts);
+        "ci_count=%i cj_count=%i count_max=%d",
+        pack_ind, count_ci, count_cj, md->params.part_buffer_size);
   }
 #endif
 

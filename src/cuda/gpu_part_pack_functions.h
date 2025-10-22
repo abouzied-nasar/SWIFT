@@ -267,7 +267,6 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_density(
 
   for (int i = 0; i < count; i++) {
     /* TODO: WHY ARE WE NOT CHECKING WHETHER PARTICLE IS ACTIVE HERE???? */
-    /* TODO: WE NEED TO ZERO OUT BUFFERS TOO ONCE WE'RE DONE */
     struct gpu_part_recv_d p_tmp = parts_tmp[i];
     struct part *p = &c->hydro.parts[i];
     part_set_rho(p, part_get_rho(p) + p_tmp.rho_dh_wcount.x);
@@ -341,27 +340,27 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_force(
  * @brief Packs the cell particle data for pair density interactions into the
  * CPU-side buffers.
  *
- * @param c the #cell
+ * @param ci the #cell
  * @param parts_buffer the buffer to pack into
  * @param local_pack_position the first free index in the buffer arrays
  * @param shift periodic boundary shift
- * @param cjstart start index of cell cj's particles (which this cell is to be
+ * @param cjstart start index of cell cj's particles (which cell ci is to be
  * interacted with) in buffer
- * @param cjend end index of cell cj's particles (which this cell is to be
+ * @param cjend end index of cell cj's particles (which cell ci is to be
  * interacted with) in buffer
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_density(
-    const struct cell *restrict c,
+    const struct cell *restrict ci,
     struct gpu_part_send_d *restrict parts_buffer,
     const int local_pack_position, const double shift[3], const int cjstart,
     const int cjend) {
 
-  const int count = c->hydro.count;
+  const int count = ci->hydro.count;
 
   /* Data to be copied to GPU */
   for (int i = 0; i < count; i++) {
     const int id_in_pack = i + local_pack_position;
-    const struct part *p = &c->hydro.parts[i];
+    const struct part *p = &ci->hydro.parts[i];
     const double *x = part_get_const_x(p);
     parts_buffer[id_in_pack].x_p_h.x = x[0] - shift[0];
     parts_buffer[id_in_pack].x_p_h.y = x[1] - shift[1];
@@ -384,25 +383,25 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_density(
  * @brief Packs the cell particle data for pair gradient interactions into the
  * CPU-side buffers.
  *
- * @param c the #cell
+ * @param ci the #cell
  * @param parts_buffer the buffer to pack into
  * @param local_pack_position the first free index in the buffer arrays
  * @param shift periodic boundary shift
- * @param cjstart start index of cell cj's particles (which this cell is to be
+ * @param cjstart start index of cell cj's particles (which cell ci is to be
  * interacted with) in buffer
- * @param cjend end index of cell cj's particles (which this cell is to be
+ * @param cjend end index of cell cj's particles (which cell ci is to be
  * interacted with) in buffer
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_gradient(
-    const struct cell *restrict c,
+    const struct cell *restrict ci,
     struct gpu_part_send_g *restrict parts_buffer,
     const int local_pack_position, const double shift[3], const int cjstart,
     const int cjend) {
 
-  const int count = c->hydro.count;
+  const int count = ci->hydro.count;
 
   /* Data to be copied to GPU */
-  const struct part *ptmps = c->hydro.parts;
+  const struct part *ptmps = ci->hydro.parts;
 
   for (int i = 0; i < count; i++) {
     const int id_in_pack = i + local_pack_position;
@@ -434,24 +433,24 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_gradient(
  * @brief Packs the cell particle data for pair gradient interactions into the
  * CPU-side buffers.
  *
- * @param c the #cell
+ * @param ci the #cell
  * @param parts_buffer the buffer to pack into
  * @param local_pack_position the first free index in the buffer arrays
  * @param shift periodic boundary shift
- * @param cjstart start index of cell cj's particles (which this cell is to be
+ * @param cjstart start index of cell cj's particles (which cell ci is to be
  * interacted with) in buffer
- * @param cjend end index of cell cj's particles (which this cell is to be
+ * @param cjend end index of cell cj's particles (which cell ci is to be
  * interacted with) in buffer
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_pair_force(
-    const struct cell *restrict c,
+    const struct cell *restrict ci,
     struct gpu_part_send_f *restrict parts_buffer,
     const int local_pack_position, const double shift[3], const int cjstart,
     const int cjend) {
 
-  const int count = c->hydro.count;
+  const int count = ci->hydro.count;
 
-  const struct part *ptmps = c->hydro.parts;
+  const struct part *ptmps = ci->hydro.parts;
 
   /*Data to be copied to GPU local memory*/
   for (int i = 0; i < count; i++) {

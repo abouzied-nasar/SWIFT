@@ -30,8 +30,6 @@
 extern "C" {
 #endif
 
-#include <stdio.h>
-
 /* Required header files */
 #include "cuda_config.h"
 #include "cuda_particle_kernels.cuh"

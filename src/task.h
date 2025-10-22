@@ -162,15 +162,12 @@ enum task_subtypes {
   task_subtype_sink_do_gas_swallow,
   task_subtype_rt_gradient,
   task_subtype_rt_transport,
-  task_subtype_gpu_pack_d,
-  task_subtype_gpu_pack_g,
-  task_subtype_gpu_pack_f,
+  task_subtype_gpu_density,
+  task_subtype_gpu_gradient,
+  task_subtype_gpu_force,
   task_subtype_gpu_unpack_d,
   task_subtype_gpu_unpack_g,
   task_subtype_gpu_unpack_f,
-  task_subtype_gpu_launch_d,
-  task_subtype_gpu_launch_g,
-  task_subtype_gpu_launch_f,
   task_subtype_count
 } __attribute__((packed));
 
@@ -208,7 +205,6 @@ enum task_categories {
   task_category_mpi,
   task_category_pack,
   task_category_gpu,
-  task_category_gpu_pack,
   task_category_gpu_unpack,
   task_category_fof,
   task_category_others,
