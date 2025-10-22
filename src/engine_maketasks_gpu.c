@@ -4204,10 +4204,10 @@ void engine_maketasks(struct engine *e) {
     }
 
     else if (t->type == task_type_pair) {
-      if (count_current_pair % pack_size_pair == 0) {
+//      if (count_current_pair % pack_size_pair == 0) {
         last_created_pair_unpack = scheduler_addtask(
             sched, task_type_pair, task_subtype_gpu_unpack_d, 0, 0, NULL, NULL);
-      }
+//      }
 
       scheduler_addunlock(sched, t, last_created_pair_unpack);
       if (t->ci->nodeID == e->nodeID)
@@ -4266,10 +4266,10 @@ void engine_maketasks(struct engine *e) {
     }
 
     else if (t->type == task_type_pair) {
-      if (count_current_pair % pack_size_pair == 0) {
+//      if (count_current_pair % pack_size_pair == 0) {
         last_created_pair_unpack = scheduler_addtask(
             sched, task_type_pair, task_subtype_gpu_unpack_g, 0, 0, NULL, NULL);
-      }
+//      }
 
       /* pack -> unpack -> ghost_in */
       scheduler_addunlock(sched, t, last_created_pair_unpack);
@@ -4335,10 +4335,10 @@ void engine_maketasks(struct engine *e) {
     }
 
     else if (t->type == task_type_pair) {
-      if (count_current_pair % pack_size_pair == 0) {
+//      if (count_current_pair % pack_size_pair == 0) {
         last_created_pair_unpack = scheduler_addtask(
             sched, task_type_pair, task_subtype_gpu_unpack_f, 0, 0, NULL, NULL);
-      }
+//      }
 
       /* pack -> unpack -> ghost_in */
       scheduler_addunlock(sched, t, last_created_pair_unpack);
