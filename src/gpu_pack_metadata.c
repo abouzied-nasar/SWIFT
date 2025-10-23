@@ -130,6 +130,8 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata* md,
       md->cj_super[i] = NULL;
     }
 
+    for (size_t i = 0; i < pack_size; i++) md->task_first_part[i] = 0;
+
     if (reset_leaves_lists) {
       for (int i = 0; i < pars.leaf_buffer_size; i++) {
         md->ci_leaves[i] = NULL;

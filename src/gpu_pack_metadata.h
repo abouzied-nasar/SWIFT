@@ -101,6 +101,9 @@ struct gpu_pack_metadata {
    * corresponds to the super-level task stored in `task_list`.*/
   int **task_first_last_packed_leaf_pair;
 
+  /*! The index of the first particle of this task in the buffer arrays. */
+  int *task_first_part;
+
   /*! Cells ci and cj at the super level of the associated pair task */
   /* TODO: From what I see, we only use them to lock and unlock cell trees.
    * We can access them through t->ci, t->cj since we keep track of tasks

@@ -7,10 +7,10 @@ InternalUnitSystem:
   UnitTemp_in_cgs:     1   # Kelvin
 
 Scheduler:
-  gpu_self_pack_size:        64
-  gpu_self_bundle_size:      16 
-  gpu_pair_pack_size:        2048
-  gpu_pair_bundle_size:      512
+  gpu_self_pack_size:        512
+  gpu_self_bundle_size:      256
+  gpu_pair_pack_size:        1024
+  gpu_pair_bundle_size:      256
   gpu_recursion_max_depth:   4
   gpu_part_buffer_size:      500000
   max_top_level_cells:       16  # Use 16 for 64^3 with replicate 2, 32 for replicate 4

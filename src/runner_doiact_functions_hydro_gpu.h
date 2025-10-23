@@ -667,76 +667,90 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
   const int bundle_size = md->params.bundle_size;
 
   /* Current index in buffer particle arrays */
-  int unpack_index = 0;
   cudaError_t cu_error;
+
+  char *task_unpacked = malloc(tasks_packed * sizeof(char));
+  for (int i = 0; i < tasks_packed; i++) task_unpacked[i] = 0;
+  int ntasks_unpacked = 0;
 
   /* Copy the data back from the CPU thread-local buffers to the cells, bundle
    * by bundle */
-  for (int bid = 0; bid < n_bundles; bid++) {
+  while (ntasks_unpacked < tasks_packed) {
 
-    cu_error = cudaEventSynchronize(buf->event_end[bid]);
-    swift_assert(cu_error == cudaSuccess);
+    for (int bid = 0; bid < n_bundles; bid++) {
 
-    /* Loop over tasks in bundle */
-    for (int tid = bid * bundle_size;
-         (tid < (bid + 1) * bundle_size) && (tid < tasks_packed); tid++) {
+      cu_error = cudaEventSynchronize(buf->event_end[bid]);
+      swift_assert(cu_error == cudaSuccess);
 
-      struct cell *c = md->ci_list[tid];
-      struct task *t = md->task_list[tid];
-      const int count = c->hydro.count;
+      /* Loop over tasks in bundle */
+      for (int tid = bid * bundle_size;
+           (tid < (bid + 1) * bundle_size) && (tid < tasks_packed); tid++) {
+
+        /* Anything to do here? */
+        if (task_unpacked[tid]) continue;
+
+        struct cell *c = md->ci_list[tid];
+        struct task *t = md->task_list[tid];
+        const int count = c->hydro.count;
+        const int unpack_index = buf->self_task_first_last_part[tid].x;
 
 #ifdef SWIFT_DEBUG_CHECKS
-      if (!cell_is_active_hydro(c, e))
-        error("We packed an inactive cell for self tasks???");
+        if (!cell_is_active_hydro(c, e))
+          error("We packed an inactive cell for self tasks???");
 #endif
-      /* Anything to do here? */
-      if (count == 0) continue;
+        /* Anything to do here? */
+        if (count == 0) continue;
 
-      while (cell_locktree(c)) {
-        ; /* spin until we acquire the lock */
-      }
+        /* Can we get the lock? */
+        if (cell_locktree(c) != 0) continue;
 
-      if (unpack_index + count >= md->params.part_buffer_size) {
-        error(
-            "Exceeded part_buffer_size. count=%d buffer=%d;\n"
-            "Make arrays bigger through Scheduler:gpu_part_buffer_size",
-            unpack_index + count, md->params.part_buffer_size);
-      }
+        /* We got it! Mark that. */
+        task_unpacked[tid] = 1;
+        ntasks_unpacked++;
 
-      /* Do the copy */
-      if (task_subtype == task_subtype_gpu_density) {
-        gpu_unpack_self_density(c, buf->parts_recv_d, unpack_index, count, e);
-      } else if (task_subtype == task_subtype_gpu_gradient) {
-        gpu_unpack_self_gradient(c, buf->parts_recv_g, unpack_index, count, e);
-      } else if (task_subtype == task_subtype_gpu_force) {
-        gpu_unpack_self_force(c, buf->parts_recv_f, unpack_index, count, e);
-      }
+        if (unpack_index + count >= md->params.part_buffer_size) {
+          error(
+              "Exceeded part_buffer_size. count=%d buffer=%d;\n"
+              "Make arrays bigger through Scheduler:gpu_part_buffer_size",
+              unpack_index + count, md->params.part_buffer_size);
+        }
+
+        /* Do the copy */
+        if (task_subtype == task_subtype_gpu_density) {
+          gpu_unpack_self_density(c, buf->parts_recv_d, unpack_index, count, e);
+        } else if (task_subtype == task_subtype_gpu_gradient) {
+          gpu_unpack_self_gradient(c, buf->parts_recv_g, unpack_index, count,
+                                   e);
+        } else if (task_subtype == task_subtype_gpu_force) {
+          gpu_unpack_self_force(c, buf->parts_recv_f, unpack_index, count, e);
+        }
 #ifdef SWIFT_DEBUG_CHECKS
-      else {
-        error("Unknown task subtype %s", subtaskID_names[task_subtype]);
-      }
+        else {
+          error("Unknown task subtype %s", subtaskID_names[task_subtype]);
+        }
 #endif
 
-      /* Increase our index in the buffer with the newly unpacked size. */
-      unpack_index += count;
+        /* Release the lock */
+        cell_unlocktree(c);
 
-      /* Release the lock */
-      cell_unlocktree(c);
+        /* schedule my dependencies */
+        enqueue_dependencies(s, t);
 
-      /* schedule my dependencies */
-      enqueue_dependencies(s, t);
+        /* Tell the scheduler's bookkeeping that this task is done */
+        pthread_mutex_lock(&s->sleep_mutex);
+        atomic_dec(&s->waiting);
+        pthread_cond_broadcast(&s->sleep_cond);
+        pthread_mutex_unlock(&s->sleep_mutex);
 
-      /* Tell the scheduler's bookkeeping that this task is done */
-      pthread_mutex_lock(&s->sleep_mutex);
-      atomic_dec(&s->waiting);
-      pthread_cond_broadcast(&s->sleep_cond);
-      pthread_mutex_unlock(&s->sleep_mutex);
+        t->skip = 1;
+        t->done = 1;
 
-      t->skip = 1;
-      t->done = 1;
+      } /* Loop over tasks in bundle */
+    } /* Loop over bundles */
+  }
 
-    } /* Loop over tasks in bundle */
-  } /* Loop over bundles */
+  /* Clean up after yourself */
+  free(task_unpacked);
 
   /* Zero counters and buffers for the next pack operations */
   gpu_pack_metadata_reset(md, /*reset_leaves_lists=*/1);
@@ -1107,78 +1121,93 @@ __attribute__((always_inline)) INLINE static void runner_dopair_gpu_unpack(
   struct cell **cj_super = md->cj_super;
   int **tflplp = md->task_first_last_packed_leaf_pair;
 
-  int unpack_index = 0;
+  /* Keep track which tasks we've unpacked already */
+  char *task_unpacked = malloc(md->tasks_in_list * sizeof(char));
+  for (int i = 0; i < md->tasks_in_list; i++) task_unpacked[i] = 0;
+  int ntasks_unpacked = 0;
 
-  /* Loop over all tasks that we have offloaded */
-  for (int tid = 0; tid < md->tasks_in_list; tid++) {
+  while (ntasks_unpacked < md->tasks_in_list) {
 
-    /* TODO: if this is a bottleneck, what we could do is not spin until we get
-     * the lock, but continue with the main for loop and return back to the
-     * unfinished ones later. Basically wrap the for loop into a while loop,
-     * while keeping track which indices we've finished already. */
-    while (cell_locktree(ci_super[tid])) {
-      ; /* spin until we acquire the lock */
-    }
-    while (cell_locktree(cj_super[tid])) {
-      ; /* spin until we acquire the lock */
-    }
+    /* Loop over all tasks that we have offloaded */
+    for (int tid = 0; tid < md->tasks_in_list; tid++) {
 
-    /* Loop through leaf cell pairs of this task by index */
-    for (int lid = tflplp[tid][0]; lid < tflplp[tid][1]; lid++) {
+      /* Anything to do here? */
+      if (task_unpacked[tid]) continue;
 
-      /*Get pointers to the leaf cells*/
-      struct cell *cii_l = ci_leaves[lid];
-      struct cell *cjj_l = cj_leaves[lid];
+      /* Can we get the locks? */
+      if (cell_locktree(ci_super[tid]) != 0) continue;
+      if (cell_locktree(cj_super[tid]) != 0) {
+        cell_unlocktree(ci_super[tid]);
+        continue;
+      }
 
-      /* Not a typo: task subtype is task_subtype_pack_*. The unpacking gets
-       * called at the end of packing, running, and possibly launching. */
-      /* Note that these calls increment pack_length_unpack. */
-      if (task_subtype == task_subtype_gpu_density) {
+      /* We got it! Mark that. */
+      task_unpacked[tid] = 1;
+      ntasks_unpacked++;
 
-        gpu_unpack_pair_density(r, cii_l, cjj_l, buf->parts_recv_d,
+      /* Get the index in the particle buffer array where to read from */
+      int unpack_index = md->task_first_part[tid];
+
+      /* Loop through leaf cell pairs of this task by index */
+      for (int lid = tflplp[tid][0]; lid < tflplp[tid][1]; lid++) {
+
+        /*Get pointers to the leaf cells*/
+        struct cell *cii_l = ci_leaves[lid];
+        struct cell *cjj_l = cj_leaves[lid];
+
+        /* Not a typo: task subtype is task_subtype_pack_*. The unpacking gets
+         * called at the end of packing, running, and possibly launching. */
+        /* Note that these calls increment pack_length_unpack. */
+        if (task_subtype == task_subtype_gpu_density) {
+
+          gpu_unpack_pair_density(r, cii_l, cjj_l, buf->parts_recv_d,
+                                  &unpack_index, md->params.part_buffer_size);
+
+        } else if (task_subtype == task_subtype_gpu_gradient) {
+
+          gpu_unpack_pair_gradient(r, cii_l, cjj_l, buf->parts_recv_g,
+                                   &unpack_index, md->params.part_buffer_size);
+
+        } else if (task_subtype == task_subtype_gpu_force) {
+
+          gpu_unpack_pair_force(r, cii_l, cjj_l, buf->parts_recv_f,
                                 &unpack_index, md->params.part_buffer_size);
 
-      } else if (task_subtype == task_subtype_gpu_gradient) {
-
-        gpu_unpack_pair_gradient(r, cii_l, cjj_l, buf->parts_recv_g,
-                                 &unpack_index, md->params.part_buffer_size);
-
-      } else if (task_subtype == task_subtype_gpu_force) {
-
-        gpu_unpack_pair_force(r, cii_l, cjj_l, buf->parts_recv_f, &unpack_index,
-                              md->params.part_buffer_size);
-
-      }
+        }
 #ifdef SWIFT_DEBUG_CHECKS
-      else {
-        error("Unknown task subtype %s", subtaskID_names[task_subtype]);
-      }
+        else {
+          error("Unknown task subtype %s", subtaskID_names[task_subtype]);
+        }
 #endif
-    }
+      }
 
-    /* Release the cells */
-    cell_unlocktree(ci_super[tid]);
-    cell_unlocktree(cj_super[tid]);
+      /* Release the cells */
+      cell_unlocktree(ci_super[tid]);
+      cell_unlocktree(cj_super[tid]);
 
-    /* If we haven't finished packing the currently handled task's leaf cells,
-     * we mustn't unlock its dependencies yet. */
-    if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves)) {
-      continue;
-    }
+      /* If we haven't finished packing the currently handled task's leaf cells,
+       * we mustn't unlock its dependencies yet. */
+      if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves)) {
+        continue;
+      }
 
-    /* schedule my dependencies */
-    enqueue_dependencies(s, md->task_list[tid]);
+      /* schedule my dependencies */
+      enqueue_dependencies(s, md->task_list[tid]);
 
-    /* Tell the scheduler's bookkeeping that this task is done */
-    pthread_mutex_lock(&s->sleep_mutex);
-    atomic_dec(&s->waiting);
-    pthread_cond_broadcast(&s->sleep_cond);
-    pthread_mutex_unlock(&s->sleep_mutex);
+      /* Tell the scheduler's bookkeeping that this task is done */
+      pthread_mutex_lock(&s->sleep_mutex);
+      atomic_dec(&s->waiting);
+      pthread_cond_broadcast(&s->sleep_cond);
+      pthread_mutex_unlock(&s->sleep_mutex);
 
-    md->task_list[tid]->skip = 1;
-    md->task_list[tid]->done = 1;
+      md->task_list[tid]->skip = 1;
+      md->task_list[tid]->done = 1;
 
-  } /* Loop over tasks in list */
+    } /* Loop over tasks in list */
+  }
+
+  /* clean up after yourself */
+  free(task_unpacked);
 }
 
 /**
@@ -1295,6 +1324,8 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
    * buffer. Note that md->n_leaves has not been yet updated to contain this
    * task's leaf cell pair count.*/
   tflplp[tind][0] = md->n_leaves;
+  /* Same for the first particle index in particle buffers */
+  md->task_first_part[tind] = md->count_parts;
 
   /* TODO: Do we need this? We already keep track of the task, and the
    * task has access to t->ci, t->cj */
@@ -1489,6 +1520,8 @@ runner_dopair_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
          * current task. Any previous task will already have been offloaded. */
         tflplp[0][0] = 0; /* First index is now 0 */
         tflplp[0][1] = 0; /* Nothing's packed yet. */
+        /* Same for first particle index of task */
+        md->task_first_part[0] = 0;
 
       } /* Launched, but not finished packing */
     } /* if launch or launch_leftovers */

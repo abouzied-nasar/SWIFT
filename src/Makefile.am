@@ -161,11 +161,20 @@ if HAVEEAGLEFLOOR
 EAGLE_FLOOR_SOURCES += entropy_floor/EAGLE/entropy_floor.c
 endif
 
-# source files for GEAR feedback
+# Common source files for GEAR and GEAR-mechanical feedback
 GEAR_FEEDBACK_SOURCES =
+
+if COMMON_GEAR_NEEDED
+COMMON_GEAR_SOURCES = \
+    feedback/GEAR/stellar_evolution.c feedback/GEAR/initial_mass_function.c \
+    feedback/GEAR/supernovae_ia.c feedback/GEAR/supernovae_ii.c \
+    feedback/GEAR/feedback_common.c
+
+GEAR_FEEDBACK_SOURCES += $(COMMON_GEAR_SOURCES)
+endif
+
 if HAVEGEARFEEDBACK
-GEAR_FEEDBACK_SOURCES += feedback/GEAR/stellar_evolution.c feedback/GEAR/feedback.c
-GEAR_FEEDBACK_SOURCES += feedback/GEAR/initial_mass_function.c feedback/GEAR/supernovae_ia.c feedback/GEAR/supernovae_ii.c
+GEAR_FEEDBACK_SOURCES += feedback/GEAR/feedback.c
 endif
 
 # source files for AGORA feedback
@@ -186,6 +195,10 @@ if HAVESPHM1RTRT
 SPHM1RT_RT_SOURCES += rt/SPHM1RT/rt_rate_equations.c
 SPHM1RT_RT_SOURCES += rt/SPHM1RT/rt_cooling.c
 endif
+
+# Add here files which we need for default swift, but will be replaced by GPU
+# specific versions
+CPU_SOURCES = runner_main.c engine_maketasks.c
 
 GPU_SOURCES = 
 if HAVECUDA
@@ -210,7 +223,7 @@ endif
 AM_SOURCES = space.c space_rebuild.c space_regrid.c space_unique_id.c 
 AM_SOURCES += space_sort.c space_split.c space_extras.c space_first_init.c space_init.c 
 AM_SOURCES += space_cell_index.c space_recycle.c 
-AM_SOURCES += runner_main.c runner_doiact_hydro.c runner_doiact_limiter.c 
+AM_SOURCES += runner_doiact_hydro.c runner_doiact_limiter.c
 AM_SOURCES += runner_doiact_stars.c runner_doiact_black_holes.c runner_doiact_sinks.c runner_ghost.c
 AM_SOURCES += runner_recv.c runner_pack.c
 AM_SOURCES += runner_sort.c runner_drift.c runner_black_holes.c runner_time_integration.c
@@ -218,11 +231,7 @@ AM_SOURCES += runner_doiact_hydro_vec.c runner_others.c
 AM_SOURCES += runner_sinks.c
 AM_SOURCES += cell.c cell_convert_part.c cell_drift.c cell_lock.c cell_pack.c cell_split.c
 AM_SOURCES += cell_unskip.c cell_grid.c
-if HAVECUDA
-AM_SOURCES += engine.c engine_maketasks_gpu.c engine_split_particles.c engine_strays.c
-else	
-AM_SOURCES += engine.c engine_maketasks.c engine_split_particles.c engine_strays.c
-endif	
+AM_SOURCES += engine.c engine_split_particles.c engine_strays.c
 AM_SOURCES += engine_drift.c engine_unskip.c engine_collect_end_of_step.c
 AM_SOURCES += engine_redistribute.c engine_fof.c engine_proxy.c engine_io.c engine_config.c
 AM_SOURCES += queue.c task.c timers.c debug.c scheduler.c proxy.c version.c
@@ -524,7 +533,7 @@ nobase_noinst_HEADERS += feedback/EAGLE_thermal/feedback_debug.h
 nobase_noinst_HEADERS += feedback/EAGLE/yield_tables.h feedback/EAGLE/imf.h feedback/EAGLE/interpolate.h
 nobase_noinst_HEADERS += feedback/EAGLE/enrichment.h
 nobase_noinst_HEADERS += feedback/GEAR/stellar_evolution_struct.h feedback/GEAR/stellar_evolution.h
-nobase_noinst_HEADERS += feedback/GEAR/feedback.h feedback/GEAR/feedback_iact.h
+nobase_noinst_HEADERS += feedback/GEAR/feedback.h feedback/GEAR/feedback_iact.h feedback/GEAR/feedback_common.h
 nobase_noinst_HEADERS += feedback/GEAR/feedback_properties.h feedback/GEAR/feedback_struct.h
 nobase_noinst_HEADERS += feedback/GEAR/initial_mass_function.h feedback/GEAR/supernovae_ia.h feedback/GEAR/supernovae_ii.h
 nobase_noinst_HEADERS += feedback/GEAR/lifetime.h feedback/GEAR/hdf5_functions.h feedback/GEAR/interpolation.h
@@ -579,13 +588,13 @@ libgrav_mpi_la_CFLAGS = $(AM_CFLAGS) $(GRAVITY_CFLAGS) -DWITH_MPI
 libgrav_mpi_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS)
 
 # Sources and flags for regular library
-libswiftsim_la_SOURCES = $(AM_SOURCES)
+libswiftsim_la_SOURCES = $(AM_SOURCES) $(CPU_SOURCES)
 libswiftsim_la_CFLAGS = $(AM_CFLAGS)
 libswiftsim_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) -version-info 0:0:0
 libswiftsim_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) libgrav.la
 
 # Sources and flags for MPI library
-libswiftsim_mpi_la_SOURCES = $(AM_SOURCES)
+libswiftsim_mpi_la_SOURCES = $(AM_SOURCES) $(CPU_SOURCES)
 libswiftsim_mpi_la_CFLAGS = $(AM_CFLAGS) $(MPI_FLAGS)
 libswiftsim_mpi_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS) -version-info 0:0:0
 libswiftsim_mpi_la_SHORTNAME = mpi
@@ -600,7 +609,7 @@ libswiftsim_cuda_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS) li
 
 # Sources and flags for regular HIP library
 # TODO: Needs fixing. See what we did for CUDA.
-libswiftsim_hip_la_SOURCES = $(AM_SOURCES)
+libswiftsim_hip_la_SOURCES = $(AM_SOURCES) $(GPU_SOURCES)
 libswiftsim_hip_la_CFLAGS = $(AM_CFLAGS) $(HIP_FLAGS)
 libswiftsim_hip_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) $(HIP_LDFLAGS) $(HIP_LIBS) -lamdhip64
 libswiftsim_hip_la_SHORTNAME = hip
@@ -615,7 +624,7 @@ libswiftsim_mpicuda_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) $(MPI_LIBS)
 
 # Sources and flags for MPI HIP library
 # TODO: Needs fixing. See what we did for CUDA.
-libswiftsim_mpihip_la_SOURCES = $(AM_SOURCES)
+libswiftsim_mpihip_la_SOURCES = $(AM_SOURCES) $(GPU_SOURCES)
 libswiftsim_mpihip_la_CFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_FLAGS)
 libswiftsim_mpihip_la_CXXFLAGS = $(AM_CFLAGS) $(MPI_FLAGS) $(HIP_FLAGS)
 libswiftsim_mpihip_la_LDFLAGS = $(AM_LDFLAGS) $(MPI_LIBS) $(EXTRA_LIBS) $(HIP_LDFLAGS) $(HIP_LIBS)
@@ -627,6 +636,8 @@ AM_CUDA_DEVICE_SOURCES = cuda/gpu_launch.cu cuda/device_functions.h
 AM_CUDA_DEVICE_OBJECTS = cuda/gpu_launch.o
 AM_CUDA_DEVICE_DLINK_OBJECTS = cuda/gpu_launch.dlink_o
 
+# auxiliary library containing cuda device code, to be linked with main
+# libswiftsim_{cuda,mpicuda} library
 libswift_cuda_device_a_SOURCES = $(AM_CUDA_DEVICE_SOURCES)
 libswift_cuda_device_a_LIBADD = $(AM_CUDA_DEVICE_OBJECTS) $(AM_CUDA_DEVICE_DLINK_OBJECTS)
 
