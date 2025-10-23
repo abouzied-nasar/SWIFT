@@ -13,7 +13,7 @@ then
 fi
 
 # Run SWIFT
-../../../swift_cuda --pin --hydro --threads=32 sodShockGPU.yml 2>&1 | tee output.log
+../../../swift_cuda --pin --hydro --threads=32 sodShockGPU.yml 2>&1 | tee outputGPU.log
 
 # Get the high resolution 1D reference solution if not present.
 if [ ! -e sodShockSpherical3D_exact.txt ]
