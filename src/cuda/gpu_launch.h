@@ -45,7 +45,7 @@ void gpu_launch_self_force(const struct gpu_part_send_f *restrict parts_send,
                            cudaStream_t stream, const int num_blocks_x,
                            const int num_blocks_y, const int bundle_first_task,
                            int2 *d_task_first_part_f4);
-void gpu_launch_pair_density(
+void gpu_launch_density(
     const struct gpu_part_send_d *restrict d_parts_send,
     struct gpu_part_recv_d *restrict d_parts_recv, const float d_a,
     const float d_H, cudaStream_t stream, const int num_blocks_x,

@@ -134,15 +134,10 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
       md->task_first_last_packed_leaf_pair[i] = (int *)malloc(2 * sizeof(int));
     }
 
-    md->ci_super = (struct cell **)malloc(pack_size * sizeof(struct cell *));
-    md->cj_super = (struct cell **)malloc(pack_size * sizeof(struct cell *));
-
   } else {
     md->ci_leaves = NULL;
     md->cj_leaves = NULL;
     md->task_first_last_packed_leaf_pair = NULL;
-    md->ci_super = NULL;
-    md->cj_super = NULL;
   }
 
   /* Create space for cuda events */
@@ -247,8 +242,6 @@ void gpu_free_data_buffers(struct gpu_offload_data *buf,
     free((void *)md->task_first_last_packed_leaf_pair);
     free((void *)md->ci_leaves);
     free((void *)md->cj_leaves);
-    free((void *)md->ci_super);
-    free((void *)md->cj_super);
     free((void *)md->task_first_part);
 
   } else {

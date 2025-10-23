@@ -39,22 +39,8 @@
 #endif
 
 #ifdef WITH_HIP
-#pragma message "YES"
-#include "hip/gpu_part_structs.h"
+#pragma error "Header inclusions missing"
 #endif
-
-/**
- * @brief packs particle data for density tasks into CPU-side buffers for self
- * tasks.
- * Currently only a wrapper around gpu_pack_part_self_density, but we'll need
- * to distinguish between SPH flavours in the future here by including the
- * correct corresponding header file.
- */
-__attribute__((always_inline)) INLINE static void gpu_pack_self_density(
-    const struct cell *restrict c, struct gpu_offload_data *restrict buf) {
-
-  gpu_pack_part_self_density(c, buf->parts_send_d, buf->md.count_parts);
-}
 
 /**
  * @brief packs particle data for gradient tasks into CPU-side buffers for self
@@ -145,16 +131,19 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_self_force(
 /**
  * @brief unpacks particle data of two cells for the pair density GPU task from
  * the buffers
+ *
+ * @TODO parameter documentation
+ * @param pack_ind (return): Current index in particle array to read from.
  */
-__attribute__((always_inline)) INLINE static void gpu_unpack_pair_density(
+__attribute__((always_inline)) INLINE static void gpu_unpack_density(
     const struct runner *r, struct cell *ci, struct cell *cj,
-    const struct gpu_part_recv_d *parts_aos_buffer, int *pack_ind,
+    const struct gpu_part_recv_d *parts_aos_buffer, int pack_ind,
     int count_max_parts) {
 
   const struct engine *e = r->e;
 
   if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) {
-    message("Inactive cell");
+    message("In unpack: Inactive cell");
     return;
   }
 
@@ -162,6 +151,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_density(
   int count_cj = cj->hydro.count;
 
 #ifdef SWIFT_DEBUG_CHECKS
+  int last_ind = *pack_;
   if (*pack_ind + count_ci + count_cj >= count_max_parts) {
     error(
         "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind is "
@@ -172,18 +162,12 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_density(
 
   if (cell_is_active_hydro(ci, e)) {
     /* Pack the particle data into CPU-side buffers*/
-    gpu_unpack_part_pair_density(ci, parts_aos_buffer, *pack_ind, count_ci);
-
-    /* Increment packed index accordingly */
-    *pack_ind += count_ci;
+    gpu_unpack_part_density(ci, parts_aos_buffer, pack_ind, count_ci);
   }
 
-  if (cell_is_active_hydro(cj, e)) {
-    /* Pack the particle data into CPU-side buffers*/
-    gpu_unpack_part_pair_density(cj, parts_aos_buffer, *pack_ind, count_cj);
-
-    /* Increment packed index accordingly */
-    *pack_ind += count_cj;
+  if (ci != cj && cell_is_active_hydro(cj, e)) {
+    /* We have a pair interaction. Get the other cell too */
+    gpu_unpack_part_density(cj, parts_aos_buffer, pack_ind + count_ci, count_cj);
   }
 }
 
@@ -282,15 +266,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_force(
  *
  * @param buf the offload buffer struct
  * @param ci a #cell to pack and interact with cj
- * @param cj a #cell to pack and interact with ci
+ * @param cj a #cell to pack and interact with ci. May be ci for self-interactions.
  * @param shift shift cell/particle coordinates to apply periodic boundary
  * wrapping, if needed
  */
-__attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
-    struct gpu_offload_data *buf, const struct cell *ci, const struct cell *cj,
-    const double shift[3]) {
-
-  TIMER_TIC;
+__attribute__((always_inline)) INLINE static void gpu_pack_density(
+    const struct cell *ci, const struct cell *cj,
+    const double shift[3],
+    struct gpu_offload_data *buf) {
 
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
@@ -306,42 +289,49 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
   int pack_ind = md->count_parts;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (pack_ind + count_ci + count_cj >= md->params.part_buffer_size) {
+  int last_ind = pack_ind + count_ci;
+  if (ci != cj) last_ind += count_cj;
+  if (last_ind >= md->params.part_buffer_size) {
     error(
-        "Exceeded count_max_parts. Make arrays bigger! pack_ind=%d"
-        "ci=%i cj=%i count_max=%d",
-        pack_ind, count_ci, count_cj, md->params.part_buffer_size);
+        "Exceeded part_buffer_size. Make arrays bigger! pack_ind=%d"
+        "ci=%i cj=%i self_interaction=%d part_buffer_size=%d",
+        pack_ind, count_ci, count_cj, ci==cj, md->params.part_buffer_size);
   }
 #endif
-
-  /* Pack the particle data into CPU-side buffers. Start by assigning the shifts
-   * (if positions shifts are required)*/
-  const double shift_i[3] = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
-                             shift[2] + cj->loc[2]};
 
   /* Get first and last particles of cell i */
   const int cis = pack_ind;
   const int cie = pack_ind + count_ci;
 
-  /* Get first and last particles of cell j */
-  const int cjs = pack_ind + count_ci;
-  const int cje = pack_ind + count_ci + count_cj;
+  if (ci == cj) {
+    /* Self interaction. */
+    const double shift_i[3] = {0., 0., 0.};
+    gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift_i, cis, cie);
+    TIMER_TOC(timer_doself_gpu_pack_d);
 
-  /* Pack cell i */
-  gpu_pack_part_pair_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs,
-                             cje);
+  } else { /* Pair interaction. */
 
-  /* Update the packed particles counter */
-  /* Note: md->count_parts will be increased later */
-  pack_ind += count_ci;
+    /* Pack the particle data into CPU-side buffers. Start by assigning the shifts
+     * (if positions shifts are required)*/
+    const double shift_i[3] = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
+                               shift[2] + cj->loc[2]};
 
-  /* Do the same for cj */
-  const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
+    /* Get first and last particles of cell j */
+    const int cjs = pack_ind + count_ci;
+    const int cje = pack_ind + count_ci + count_cj;
 
-  gpu_pack_part_pair_density(cj, buf->parts_send_d, pack_ind, shift_j, cis,
-                             cie);
+    /* Pack cell i */
+    gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs, cje);
 
-  TIMER_TOC(timer_dopair_gpu_pack_d);
+    /* Update the packed particles counter */
+    /* Note: md->count_parts will be increased later */
+    pack_ind += count_ci;
+
+    /* Do the same for cj */
+    const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
+
+    gpu_pack_part_density(cj, buf->parts_send_d, pack_ind, shift_j, cis, cie);
+  }
 }
 
 /**
@@ -355,10 +345,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
  * wrapping, if needed
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
-    struct gpu_offload_data *buf, const struct cell *ci, const struct cell *cj,
-    const double shift[3]) {
-
-  TIMER_TIC;
+    const struct cell *ci, const struct cell *cj,
+    const double shift[3], struct gpu_offload_data *buf) {
 
   /* Anything to do here? */
   const int count_ci = ci->hydro.count;
@@ -404,8 +392,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
 
   gpu_pack_part_pair_gradient(cj, buf->parts_send_g, pack_ind, shift_j, cis,
                               cie);
-
-  TIMER_TOC(timer_dopair_gpu_pack_g);
 }
 
 /**
@@ -419,8 +405,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
  * wrapping, if needed
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(
-    struct gpu_offload_data *buf, const struct cell *ci, const struct cell *cj,
-    const double shift[3]) {
+    const struct cell *ci, const struct cell *cj,
+    const double shift[3], struct gpu_offload_data *buf) {
 
   TIMER_TIC;
 
@@ -464,7 +450,5 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(
   const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
 
   gpu_pack_part_pair_force(cj, buf->parts_send_f, pack_ind, shift_j, cis, cie);
-
-  TIMER_TOC(timer_dopair_gpu_pack_f);
 }
 #endif /* RUNNER_GPU_PACK_FUNCTIONS_H */

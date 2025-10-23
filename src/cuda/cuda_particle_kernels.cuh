@@ -456,7 +456,7 @@ __global__ void cuda_kernel_self_force(
  * @brief Naive kernel computing density interaction for pair task
  * TODO: parameter documentation
  */
-__device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_density(
+__device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     const struct gpu_part_send_d pi,
     const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv, int pid,

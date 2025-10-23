@@ -60,8 +60,6 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
   md->ci_leaves = NULL;
   md->cj_leaves = NULL;
   md->task_first_last_packed_leaf_pair = NULL;
-  md->ci_super = NULL;
-  md->cj_super = NULL;
 
   gpu_pack_params_copy(params, &md->params);
 
@@ -121,13 +119,6 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata* md,
     for (size_t i = 0; i < pack_size; i++) {
       md->task_first_last_packed_leaf_pair[i][0] = 0;
       md->task_first_last_packed_leaf_pair[i][1] = 0;
-    }
-
-    for (size_t i = 0; i < pack_size; i++) {
-      md->ci_super[i] = NULL;
-    }
-    for (size_t i = 0; i < pack_size; i++) {
-      md->cj_super[i] = NULL;
     }
 
     for (size_t i = 0; i < pack_size; i++) md->task_first_part[i] = 0;

@@ -258,7 +258,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_self_force(
 /* TODO: IDEALLY, THIS SHOULD BE IDENTICAL FOR THE SELF TASKS.
  * PASS A CELL, BUFFER, INDEX TO COPY BACK. THIS REPLICATION IS
  * UNNECESSARY.*/
-__attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_density(
+__attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
     struct cell *restrict c,
     const struct gpu_part_recv_d *restrict parts_buffer, const int pack_ind,
     const int count) {
@@ -349,7 +349,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_pair_force(
  * @param cjend end index of cell cj's particles (which cell ci is to be
  * interacted with) in buffer
  */
-__attribute__((always_inline)) INLINE static void gpu_pack_part_pair_density(
+__attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     const struct cell *restrict ci,
     struct gpu_part_send_d *restrict parts_buffer,
     const int local_pack_position, const double shift[3], const int cjstart,

@@ -104,13 +104,6 @@ struct gpu_pack_metadata {
   /*! The index of the first particle of this task in the buffer arrays. */
   int *task_first_part;
 
-  /*! Cells ci and cj at the super level of the associated pair task */
-  /* TODO: From what I see, we only use them to lock and unlock cell trees.
-   * We can access them through t->ci, t->cj since we keep track of tasks
-   * in md->task_list. So these need purging. */
-  struct cell **ci_super;
-  struct cell **cj_super;
-
   /*! Global (fixed) packing parameters */
   struct gpu_global_pack_params params;
 

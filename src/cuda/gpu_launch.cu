@@ -43,10 +43,10 @@ extern "C" {
 #include <cuda_runtime.h>
 
 /**
- * Launch the pair density computations on the GPU
+ * Launch the density computations on the GPU
  * TODO: Parameter documentation
  */
-__global__ void cuda_launch_pair_density(
+__global__ void cuda_launch_density(
     const struct gpu_part_send_d *restrict d_parts_send,
     struct gpu_part_recv_d *restrict d_parts_recv, const float d_a,
     const float d_H, const int bundle_first_part, const int bundle_n_parts) {
@@ -59,8 +59,8 @@ __global__ void cuda_launch_pair_density(
     const int cj_start = pi.cjs_cje.x;
     const int cj_end = pi.cjs_cje.y;
 
-    /* Start calculations for particles in cell i*/
-    cuda_kernel_pair_density(pi, d_parts_send, d_parts_recv, pid, cj_start,
+    /* Start calculations for particles in cell i */
+    cuda_kernel_density(pi, d_parts_send, d_parts_recv, pid, cj_start,
                              cj_end, d_a, d_H);
   }
 }
@@ -112,17 +112,17 @@ __global__ void cuda_launch_pair_force(
 }
 
 /**
- * @brief Launch the pair density computation on the GPU.
+ * @brief Launch the density computation on the GPU.
  * TODO: Parameter documentation
  */
-void gpu_launch_pair_density(
+void gpu_launch_density(
     const struct gpu_part_send_d *restrict d_parts_send,
     struct gpu_part_recv_d *restrict d_parts_recv, const float d_a,
     const float d_H, cudaStream_t stream, const int num_blocks_x,
     const int num_blocks_y, const int bundle_first_part,
     const int bundle_n_parts) {
 
-  cuda_launch_pair_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
+  cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
