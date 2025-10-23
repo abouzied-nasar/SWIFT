@@ -267,9 +267,7 @@ void *runner_main_cuda(void *data) {
       struct cell *ci = t->ci;
       struct cell *cj = t->cj;
 
-      if (ci == NULL && (t->subtype != task_subtype_gpu_unpack_d &&
-                         t->subtype != task_subtype_gpu_unpack_g &&
-                         t->subtype != task_subtype_gpu_unpack_f))
+      if (ci == NULL)
         error("This cannot be");
 
 #ifdef SWIFT_DEBUG_TASKS
@@ -281,12 +279,7 @@ void *runner_main_cuda(void *data) {
         struct cell *ci_temp = ci;
         struct cell *cj_temp = cj;
         double shift[3];
-        if (t->subtype != task_subtype_gpu_unpack_d &&
-            t->subtype != task_subtype_gpu_unpack_g &&
-            t->subtype != task_subtype_gpu_unpack_f)
-          t->sid = space_getsid_and_swap_cells(e->s, &ci_temp, &cj_temp, shift);
-      } else {
-        t->sid = -1;
+        t->sid = space_getsid_and_swap_cells(e->s, &ci_temp, &cj_temp, shift);
       }
 #endif
 
@@ -306,11 +299,7 @@ void *runner_main_cuda(void *data) {
             runner_doself_recursive_grav(r, ci, 1);
           else if (t->subtype == task_subtype_external_grav)
             runner_do_grav_external(r, ci, 1);
-          else if (t->subtype == task_subtype_gpu_unpack_d) {
-            /* TODO: WHY ARE THESE EMPTY? WHY DO WE HAVE THEM HERE THEN? */
-          } else if (t->subtype == task_subtype_gpu_unpack_g) {
-          } else if (t->subtype == task_subtype_gpu_unpack_f) {
-          } else if (t->subtype == task_subtype_density) {
+          else if (t->subtype == task_subtype_density) {
 #ifndef GPUOFFLOAD_DENSITY
             runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
 #endif
@@ -409,9 +398,6 @@ void *runner_main_cuda(void *data) {
             runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_pair_forc, t,
                                     stream_pairs, d_a, d_H);
 #endif
-          } else if (t->subtype == task_subtype_gpu_unpack_d) {
-          } else if (t->subtype == task_subtype_gpu_unpack_g) {
-          } else if (t->subtype == task_subtype_gpu_unpack_f) {
           }
 
 #ifdef EXTRA_HYDRO_LOOP

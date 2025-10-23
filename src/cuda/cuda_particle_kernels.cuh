@@ -480,8 +480,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_density(
     const float xij = x_pi.x - x_p_h_j.x;
     const float yij = x_pi.y - x_p_h_j.y;
     const float zij = x_pi.z - x_p_h_j.z;
-    const float hj = x_h_j.w;
-    const float hjg2 = hj * hj * kernel_gamma2;
     const float r2 = xij * xij + yij * yij + zij * zij;
 
     if (r2 < hig2) {
@@ -553,8 +551,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_pair_gradient(
     const float xij = x_h_i.x - x_h_j.x;
     const float yij = x_h_i.y - x_h_j.y;
     const float zij = x_h_i.z - x_h_j.z;
-    const float hj = x_h_j.w;
-    const float hjg2 = hj * hj * kernel_gamma2;
     const float r2 = xij * xij + yij * yij + zij * zij;
 
     if (r2 < hig2) {
