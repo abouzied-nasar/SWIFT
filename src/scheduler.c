@@ -1873,6 +1873,21 @@ void scheduler_splittasks_mapper(void *map_data, int num_elements,
 
     /* Invoke the correct splitting strategy */
     //TODO: Remove this once code works without creating CPU density, force and gradient tasks
+#ifdef WITH_CUDA
+    if (t->subtype == task_subtype_gpu_density) {
+      scheduler_splittask_hydro(t, s);
+    } else if (t->subtype == task_subtype_external_grav) {
+      scheduler_splittask_gravity(t, s);
+    } else if (t->subtype == task_subtype_grav) {
+      scheduler_splittask_gravity(t, s);
+      // if task is gpu task do not split A. Nasar
+    } else {
+#ifdef SWIFT_DEBUG_CHECKS
+      error("Unexpected task sub-type %s/%s", taskID_names[t->type],
+            subtaskID_names[t->subtype]);
+#endif
+    }
+#else
     if (t->subtype == task_subtype_density) {
       scheduler_splittask_hydro(t, s);
     } else if (t->subtype == task_subtype_external_grav) {
@@ -1880,14 +1895,13 @@ void scheduler_splittasks_mapper(void *map_data, int num_elements,
     } else if (t->subtype == task_subtype_grav) {
       scheduler_splittask_gravity(t, s);
       // if task is gpu task do not split A. Nasar
-    } else if (t->subtype == task_subtype_gpu_density) {
-      scheduler_splittask_hydro(t, s);
     } else {
 #ifdef SWIFT_DEBUG_CHECKS
       error("Unexpected task sub-type %s/%s", taskID_names[t->type],
             subtaskID_names[t->subtype]);
 #endif
     }
+#endif
   }
 }
 

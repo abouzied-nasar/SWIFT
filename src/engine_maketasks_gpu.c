@@ -757,21 +757,21 @@ void engine_addtasks_recv_hydro(
 #endif
     }
 
-    for (struct link *l = c->hydro.density_pack; l != NULL; l = l->next) {
+    for (struct link *l = c->hydro.density; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_xv, l->t);
       scheduler_addunlock(s, l->t, t_rho);
     }
 #ifdef EXTRA_HYDRO_LOOP
-    for (struct link *l = c->hydro.gradient_pack; l != NULL; l = l->next) {
+    for (struct link *l = c->hydro.gradient; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_rho, l->t);
       scheduler_addunlock(s, l->t, t_gradient);
     }
-    for (struct link *l = c->hydro.force_pack; l != NULL; l = l->next) {
+    for (struct link *l = c->hydro.force; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_gradient, l->t);
       scheduler_addunlock(s, l->t, tend);
     }
 #else
-    for (struct link *l = c->hydro.force_pack; l != NULL; l = l->next) {
+    for (struct link *l = c->hydro.force; l != NULL; l = l->next) {
       scheduler_addunlock(s, t_rho, l->t);
       scheduler_addunlock(s, l->t, tend);
     }
@@ -820,7 +820,7 @@ void engine_addtasks_recv_hydro(
       engine_addlink(e, &c->mpi.recv, t_rt_transport);
 
       /* RT recvs mustn't run before hydro force has completed. */
-      for (struct link *l = c->hydro.force_pack; l != NULL; l = l->next) {
+      for (struct link *l = c->hydro.force; l != NULL; l = l->next) {
         scheduler_addunlock(s, l->t, t_rt_gradient);
       }
 
@@ -2199,7 +2199,7 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
       atomic_inc(&ci->nr_tasks);
 #endif
       if (t_subtype == task_subtype_gpu_density) {
-        engine_addlink(e, &ci->hydro.density_pack, t);
+        engine_addlink(e, &ci->hydro.density, t);
       } else if (t_subtype == task_subtype_grav) {
         engine_addlink(e, &ci->grav.grav, t);
       } else if (t_subtype == task_subtype_external_grav) {
@@ -2214,8 +2214,8 @@ void engine_count_and_link_tasks_mapper(void *map_data, int num_elements,
 #endif
 
       if (t_subtype == task_subtype_gpu_density) {
-        engine_addlink(e, &ci->hydro.density_pack, t);
-        engine_addlink(e, &cj->hydro.density_pack, t);
+        engine_addlink(e, &ci->hydro.density, t);
+        engine_addlink(e, &cj->hydro.density, t);
       } else if (t_subtype == task_subtype_grav) {
         engine_addlink(e, &ci->grav.grav, t);
         engine_addlink(e, &cj->grav.grav, t);
@@ -2617,7 +2617,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
       }
 
       /* Add the link between the new loop and the cell */
-      engine_addlink(e, &ci->hydro.force_pack, t_force);
+      engine_addlink(e, &ci->hydro.force, t_force);
       if (with_timestep_limiter) {
         engine_addlink(e, &ci->hydro.limiter, t_limiter);
       }
@@ -2654,7 +2654,7 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
                                      task_subtype_gpu_gradient, flags, 0, ci, NULL);
 
       /* Add the link between the new loop and the cell */
-      engine_addlink(e, &ci->hydro.gradient_pack, t_gradient);
+      engine_addlink(e, &ci->hydro.gradient, t_gradient);
 
       /* Now, build all the dependencies for the hydro for the cells */
       /* that are local and are not descendant of the same super_hydro-cells */
@@ -2930,8 +2930,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 #endif
       }
 
-      engine_addlink(e, &ci->hydro.force_pack, t_force);
-      engine_addlink(e, &cj->hydro.force_pack, t_force);
+      engine_addlink(e, &ci->hydro.force, t_force);
+      engine_addlink(e, &cj->hydro.force, t_force);
       if (with_timestep_limiter) {
         engine_addlink(e, &ci->hydro.limiter, t_limiter);
         engine_addlink(e, &cj->hydro.limiter, t_limiter);
@@ -2984,8 +2984,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
                                      task_subtype_gpu_gradient, flags, 0, ci, cj);
 
       /* Add the link between the new loop and both cells */
-      engine_addlink(e, &ci->hydro.gradient_pack, t_gradient);
-      engine_addlink(e, &cj->hydro.gradient_pack, t_gradient);
+      engine_addlink(e, &ci->hydro.gradient, t_gradient);
+      engine_addlink(e, &cj->hydro.gradient, t_gradient);
 
       /* Now, build all the dependencies for the hydro for the cells */
       /* that are local and are not descendant of the same super_hydro-cells */
