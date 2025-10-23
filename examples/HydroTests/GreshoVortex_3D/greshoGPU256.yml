@@ -13,8 +13,8 @@ Scheduler:
   gpu_pair_bundle_size:      256
   gpu_recursion_max_depth:   4
   gpu_part_buffer_size:      500000
-  max_top_level_cells:       16  # Use 16 for 64^3 with replicate 2, 32 for replicate 4
-  # tasks_per_cell:            200
+  max_top_level_cells:       32  # Use 16 for 64^3 with replicate 2, 32 for replicate 4
+  tasks_per_cell:            200
   # deadlock_waiting_time_s:   10
   # cell_split_size:           100
   # cell_sub_size_pair_hydro:  10000 # (Optional) Maximal number of hydro-hydro interactions per sub-pair hydro/star task (this is the default value).
