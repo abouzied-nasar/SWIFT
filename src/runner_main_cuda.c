@@ -762,6 +762,12 @@ void *runner_main_cuda(void *data) {
   return NULL;
 }
 
+ticks runner_get_active_time(const struct runner *restrict r) {
+  return r->active_time;
+}
+
+void runner_reset_active_time(struct runner *restrict r) { r->active_time = 0; }
+
 #ifdef __cplusplus
 }
 #endif
