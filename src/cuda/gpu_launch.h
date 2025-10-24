@@ -20,6 +20,11 @@
 #ifndef CUDA_GPU_LAUNCH_H
 #define CUDA_GPU_LAUNCH_H
 
+/* TODO: This header should be outside the src/cuda directory, and should be
+ * cuda independent. The base file, src/cuda/gpu_launch.cu, should be the only
+ * thing containing cuda code. This header needs to be shared between all
+ * implementations */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -27,12 +32,6 @@ extern "C" {
 
 #include <cuda_runtime.h>
 
-void gpu_launch_self_density(
-    const struct gpu_part_send_d *restrict d_parts_send,
-    struct gpu_part_recv_d *restrict d_parts_recv, const float d_a,
-    const float d_H, cudaStream_t stream, const int num_blocks_x,
-    const int num_blocks_y, const int bundle_first_task,
-    int2 *d_task_first_part_f4);
 void gpu_launch_self_gradient(
     const struct gpu_part_send_g *restrict d_parts_send,
     struct gpu_part_recv_g *restrict d_parts_recv, const float d_a,

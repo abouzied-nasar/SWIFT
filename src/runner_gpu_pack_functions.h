@@ -128,16 +128,21 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_self_force(
   gpu_unpack_part_self_force(c, parts_buffer, pack_position, count, e);
 }
 
-/**
- * @brief unpacks particle data of two cells for the pair density GPU task from
- * the buffers
+ /**
+ * @brief Unpacks the density data from GPU buffers into cell particle arrays.
+ * TODO: We'll need to distinguish between SPH flavours in the future here by
+ * including the correct corresponding header file.
  *
- * @TODO parameter documentation
- * @param pack_ind (return): Current index in particle array to read from.
+ * @param ci first #cell to unpack particle data into
+ * @param cj second #cell to unpack particle data into. If ci == cj, we're
+ * unpacking a self interaction.
+ * @param parts_buffer particle buffer to unpack into cell particle data
+ * @param pack_ind index to start unpacking in the parts_buffer
+ * @param parts_buffer_size size of parts_buffer (number of elements)
  */
 __attribute__((always_inline)) INLINE static void gpu_unpack_density(
     const struct runner *r, struct cell *ci, struct cell *cj,
-    const struct gpu_part_recv_d *parts_aos_buffer, int pack_ind,
+    const struct gpu_part_recv_d *parts_buffer, int pack_ind,
     int parts_buffer_size) {
 
   const struct engine *e = r->e;
@@ -164,12 +169,12 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_density(
 
   if (cell_is_active_hydro(ci, e)) {
     /* Pack the particle data into CPU-side buffers*/
-    gpu_unpack_part_density(ci, parts_aos_buffer, pack_ind, count_ci);
+    gpu_unpack_part_density(ci, parts_buffer, pack_ind, count_ci);
   }
 
   if ((ci != cj) && cell_is_active_hydro(cj, e)) {
     /* We have a pair interaction. Get the other cell too. */
-    gpu_unpack_part_density(cj, parts_aos_buffer, pack_ind + count_ci, count_cj);
+    gpu_unpack_part_density(cj, parts_buffer, pack_ind + count_ci, count_cj);
   }
 }
 

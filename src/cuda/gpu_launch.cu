@@ -122,6 +122,7 @@ void gpu_launch_density(
     const int num_blocks_y, const int bundle_first_part,
     const int bundle_n_parts) {
 
+  /* TODO: do we want shared memory allocations here? */
   cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
@@ -153,27 +154,6 @@ void gpu_launch_pair_force(const struct gpu_part_send_f *restrict d_parts_send,
 
   cuda_launch_pair_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
-}
-
-/**
- * @brief Launch the self density computation on the GPU.
- * TODO: Parameter documentation
- */
-void gpu_launch_self_density(
-    const struct gpu_part_send_d *restrict d_parts_send,
-    struct gpu_part_recv_d *restrict d_parts_recv, const float d_a,
-    const float d_H, cudaStream_t stream, const int num_blocks_x,
-    const int num_blocks_y, const int bundle_first_task,
-    int2 *d_task_first_part_f4) {
-
-  const dim3 gridShape = dim3(num_blocks_x, num_blocks_y);
-  /* TODO: WHY IS THERE A FACTOR OF 2 HERE? Please document. */
-  /* Would it not be better to use sizeof(struct parts_send) */
-  const size_t bsize = GPU_THREAD_BLOCK_SIZE;
-  const size_t shmem_size = 2ul * bsize * sizeof(float4);
-  cuda_kernel_self_density<<<gridShape, bsize, shmem_size, stream>>>(
-      d_parts_send, d_parts_recv, d_a, d_H, bundle_first_task,
-      d_task_first_part_f4);
 }
 
 /**

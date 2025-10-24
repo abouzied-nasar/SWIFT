@@ -150,37 +150,6 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
 }
 
 /**
- * @brief packs the data required for the self density tasks.
- *
- * @param r The #runner
- * @param s The #scheduler
- * @param buf the gpu data buffers
- * @param ci the #cell to pack
- * @param t the #task to pack
- */
-__attribute__((always_inline)) INLINE static void
-runner_doself_gpu_pack_density(const struct runner *r, struct scheduler *s,
-                               struct gpu_offload_data *restrict buf,
-                               struct cell *ci, struct task *t) {
-
-  TIMER_TIC;
-
-  runner_doself_gpu_pack(ci, t, buf, t->subtype);
-
-  /* Get a lock to the queue so we can safely decrement counter and check for
-   * launch leftover condition*/
-  int qid = r->qid;
-  lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_self_left_d--;
-  if (s->queues[qid].n_packs_self_left_d < 1) {
-    buf->md.launch_leftovers = 1;
-  }
-  (void)lock_unlock(&s->queues[qid].lock);
-
-  TIMER_TOC(timer_doself_gpu_pack_d);
-}
-
-/**
  * @brief packs the data required for the self gradient tasks.
  *
  * @param r The #runner
@@ -277,10 +246,6 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
   struct cell **ci_leaves = md->ci_leaves;
   struct cell **cj_leaves = md->cj_leaves;
 
-  if (depth == 0) {
-    /* Reset leaf cell pair counter for this task before we recurse down */
-    md->task_n_leaves = 0;
-  }
 
   /* Get the type of pair and flip ci/cj if needed. */
   double shift[3];
@@ -358,11 +323,6 @@ static void runner_doself_gpu_recurse(const struct runner *r,
   /* Arrays for leaf cells */
   struct cell **ci_leaves = md->ci_leaves;
   struct cell **cj_leaves = md->cj_leaves;
-
-  if (depth == 0) {
-    /* Reset leaf cell pair counter for this task before we recurse down */
-    md->task_n_leaves = 0;
-  }
 
   /* Recurse? */
   if (cell_can_recurse_in_self_hydro_task(ci)){
@@ -637,10 +597,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     /* Now the actual particle data */
     if (task_subtype == task_subtype_gpu_density) {
 
-      cu_error = cudaMemcpyAsync(
-          &buf->d_parts_send_d[first_part], &buf->parts_send_d[first_part],
-          bundle_n_parts * sizeof(struct gpu_part_send_d),
-          cudaMemcpyHostToDevice, stream[bid]);
+      error("We shouldn't be here");
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
@@ -671,9 +628,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     /* Launch the kernel */
     if (task_subtype == task_subtype_gpu_density) {
 
-      gpu_launch_self_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a,
-                              d_H, stream[bid], numBlocks_x, numBlocks_y,
-                              first_task, buf->d_self_task_first_last_part);
+      error("We shouldn't be here");
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
@@ -703,10 +658,7 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     /* Copy back */
     if (task_subtype == task_subtype_gpu_density) {
 
-      cu_error = cudaMemcpyAsync(
-          &buf->parts_recv_d[first_part], &buf->d_parts_recv_d[first_part],
-          bundle_n_parts * sizeof(struct gpu_part_recv_d),
-          cudaMemcpyDeviceToHost, stream[bid]);
+      error("We shouldn't be here");
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
@@ -1603,6 +1555,9 @@ static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
                                       struct task *t, cudaStream_t *stream,
                                       const float d_a, const float d_H) {
 
+  /* Reset leaf cell counter for this task before we recurse down */
+  buf->md.task_n_leaves = 0;
+
   /* Collect cell interaction data recursively*/
   runner_doself_gpu_recurse(r, s, buf, t->ci, /*depth=*/0, /*timer=*/1);
 
@@ -1640,6 +1595,9 @@ static void runner_dopair_gpu_density(const struct runner *r,
                                       struct task *t, cudaStream_t *stream,
                                       const float d_a, const float d_H) {
 
+  /* Reset leaf cell counter for this task before we recurse down */
+  buf->md.task_n_leaves = 0;
+
   /* Collect cell interaction data recursively*/
   runner_dopair_gpu_recurse(r, s, buf, ci, cj, /*depth=*/0, /*timer=*/1);
 
@@ -1675,7 +1633,10 @@ static void runner_dopair_gpu_gradient(const struct runner *r,
                                        struct task *t, cudaStream_t *stream,
                                        const float d_a, const float d_H) {
 
-  /* Collect cell interaction data recursively*/
+  /* Reset leaf cell counter for this task before we recurse down */
+  buf->md.task_n_leaves = 0;
+
+  /* Collect cell interaction data recursively */
   runner_dopair_gpu_recurse(r, s, buf, ci, cj, /*depth=*/0, /*timer=*/1);
 
   /* A. Nasar: Check to see if this is the last task in the queue.
@@ -1709,6 +1670,9 @@ static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
                                     struct gpu_offload_data *restrict buf,
                                     struct task *t, cudaStream_t *stream,
                                     const float d_a, const float d_H) {
+
+  /* Reset leaf cell counter for this task before we recurse down */
+  buf->md.task_n_leaves = 0;
 
   /* Collect cell interaction data recursively*/
   runner_dopair_gpu_recurse(r, s, buf, ci, cj, /*depth=*/0, /*timer=*/1);
