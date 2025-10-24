@@ -185,7 +185,7 @@ void *runner_main_cuda(void *data) {
 
   gpu_data_buffers_init(&gpu_buf_self_dens, &gpu_pack_params,
                         sizeof(struct gpu_part_send_d),
-                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/0);
+                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
   gpu_data_buffers_init(&gpu_buf_self_grad, &gpu_pack_params,
                         sizeof(struct gpu_part_send_g),
                         sizeof(struct gpu_part_recv_g), /*is_pair_task=*/0);

@@ -138,7 +138,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_self_force(
 __attribute__((always_inline)) INLINE static void gpu_unpack_density(
     const struct runner *r, struct cell *ci, struct cell *cj,
     const struct gpu_part_recv_d *parts_aos_buffer, int pack_ind,
-    int count_max_parts) {
+    int parts_buffer_size) {
 
   const struct engine *e = r->e;
 
@@ -151,12 +151,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_density(
   int count_cj = cj->hydro.count;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  int last_ind = *pack_;
-  if (*pack_ind + count_ci + count_cj >= count_max_parts) {
+  int last_ind = pack_ind + count_ci;
+  if (ci != cj) last_ind += count_cj;
+
+  if (last_ind >= parts_buffer_size) {
     error(
-        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind is "
-        "%d, counts are %d %d, max is %d",
-        *pack_ind, count_ci, count_cj, count_max_parts);
+        "Exceeded particle buffer size. Increase Scheduler:gpu_part_buffer_size."
+        "ind=%d, counts=%d %d, buffer_size=%d, is self task?=%d",
+        pack_ind, count_ci, count_cj, parts_buffer_size, ci==cj);
   }
 #endif
 
@@ -165,8 +167,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_density(
     gpu_unpack_part_density(ci, parts_aos_buffer, pack_ind, count_ci);
   }
 
-  if (ci != cj && cell_is_active_hydro(cj, e)) {
-    /* We have a pair interaction. Get the other cell too */
+  if ((ci != cj) && cell_is_active_hydro(cj, e)) {
+    /* We have a pair interaction. Get the other cell too. */
     gpu_unpack_part_density(cj, parts_aos_buffer, pack_ind + count_ci, count_cj);
   }
 }
@@ -191,11 +193,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_gradient(
   int count_cj = cj->hydro.count;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (*pack_ind + count_ci + count_cj >= count_max_parts) {
+  int last_ind = *pack_ind + count_ci;
+  if (ci != cj) last_ind += count_cj;
+
+  if (last_ind >= count_max_parts) {
     error(
-        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind is "
-        "%d, counts are %d %d, max is %d",
-        *pack_ind, count_ci, count_cj, count_max_parts);
+        "Exceeded particle buffer size. Increase Scheduler:gpu_part_buffer_size."
+        "ind=%d, counts=%d %d, buffer_size=%d, is self task?=%d",
+        *pack_ind, count_ci, count_cj, count_max_parts, ci==cj);
   }
 #endif
 
@@ -235,11 +240,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_force(
   int count_cj = cj->hydro.count;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (*pack_ind + count_ci + count_cj >= count_max_parts) {
+  int last_ind = *pack_ind + count_ci;
+  if (ci != cj) last_ind += count_cj;
+
+  if (last_ind >= count_max_parts) {
     error(
-        "Exceeded count_max_parts_tmp. Make arrays bigger! pack_ind is "
-        "%d, counts are %d %d, max is %d",
-        *pack_ind, count_ci, count_cj, count_max_parts);
+        "Exceeded particle buffer size. Increase Scheduler:gpu_part_buffer_size."
+        "ind=%d, counts=%d %d, buffer_size=%d, is self task?=%d",
+        *pack_ind, count_ci, count_cj, count_max_parts, ci==cj);
   }
 #endif
 
@@ -293,9 +301,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_density(
   if (ci != cj) last_ind += count_cj;
   if (last_ind >= md->params.part_buffer_size) {
     error(
-        "Exceeded part_buffer_size. Make arrays bigger! pack_ind=%d"
-        "ci=%i cj=%i self_interaction=%d part_buffer_size=%d",
-        pack_ind, count_ci, count_cj, ci==cj, md->params.part_buffer_size);
+        "Exceeded particle buffer size. Increase Scheduler:gpu_part_buffer_size."
+        "ind=%d, counts=%d %d, buffer_size=%d, is self task?=%d",
+        pack_ind, count_ci, count_cj, md->params.part_buffer_size, ci==cj);
   }
 #endif
 
@@ -303,11 +311,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_density(
   const int cis = pack_ind;
   const int cie = pack_ind + count_ci;
 
-  if (ci == cj) {
-    /* Self interaction. */
-    const double shift_i[3] = {0., 0., 0.};
-    gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift_i, cis, cie);
-    TIMER_TOC(timer_doself_gpu_pack_d);
+  if (ci == cj) { /* Self interaction. */
+
+    gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift, cis, cie);
 
   } else { /* Pair interaction. */
 
