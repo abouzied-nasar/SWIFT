@@ -60,8 +60,8 @@ __global__ void cuda_launch_density(
     const int cj_end = pi.cjs_cje.y;
 
     /* Start calculations for particles in cell i */
-    cuda_kernel_density(pi, d_parts_send, d_parts_recv, pid, cj_start,
-                             cj_end, d_a, d_H);
+    cuda_kernel_density(pi, d_parts_send, d_parts_recv, pid, cj_start, cj_end,
+                        d_a, d_H);
   }
 }
 
@@ -115,12 +115,11 @@ __global__ void cuda_launch_pair_force(
  * @brief Launch the density computation on the GPU.
  * TODO: Parameter documentation
  */
-void gpu_launch_density(
-    const struct gpu_part_send_d *restrict d_parts_send,
-    struct gpu_part_recv_d *restrict d_parts_recv, const float d_a,
-    const float d_H, cudaStream_t stream, const int num_blocks_x,
-    const int num_blocks_y, const int bundle_first_part,
-    const int bundle_n_parts) {
+void gpu_launch_density(const struct gpu_part_send_d *restrict d_parts_send,
+                        struct gpu_part_recv_d *restrict d_parts_recv,
+                        const float d_a, const float d_H, cudaStream_t stream,
+                        const int num_blocks_x, const int num_blocks_y,
+                        const int bundle_first_part, const int bundle_n_parts) {
 
   /* TODO: do we want shared memory allocations here? */
   cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(

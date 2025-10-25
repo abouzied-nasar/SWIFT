@@ -128,7 +128,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_self_force(
   gpu_unpack_part_self_force(c, parts_buffer, pack_position, count, e);
 }
 
- /**
+/**
  * @brief Unpacks the density data from GPU buffers into cell particle arrays.
  * TODO: We'll need to distinguish between SPH flavours in the future here by
  * including the correct corresponding header file.
@@ -161,9 +161,10 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_density(
 
   if (last_ind >= parts_buffer_size) {
     error(
-        "Exceeded particle buffer size. Increase Scheduler:gpu_part_buffer_size."
+        "Exceeded particle buffer size. Increase "
+        "Scheduler:gpu_part_buffer_size."
         "ind=%d, counts=%d %d, buffer_size=%d, is self task?=%d",
-        pack_ind, count_ci, count_cj, parts_buffer_size, ci==cj);
+        pack_ind, count_ci, count_cj, parts_buffer_size, ci == cj);
   }
 #endif
 
@@ -203,9 +204,10 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_gradient(
 
   if (last_ind >= count_max_parts) {
     error(
-        "Exceeded particle buffer size. Increase Scheduler:gpu_part_buffer_size."
+        "Exceeded particle buffer size. Increase "
+        "Scheduler:gpu_part_buffer_size."
         "ind=%d, counts=%d %d, buffer_size=%d, is self task?=%d",
-        *pack_ind, count_ci, count_cj, count_max_parts, ci==cj);
+        *pack_ind, count_ci, count_cj, count_max_parts, ci == cj);
   }
 #endif
 
@@ -250,9 +252,10 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_force(
 
   if (last_ind >= count_max_parts) {
     error(
-        "Exceeded particle buffer size. Increase Scheduler:gpu_part_buffer_size."
+        "Exceeded particle buffer size. Increase "
+        "Scheduler:gpu_part_buffer_size."
         "ind=%d, counts=%d %d, buffer_size=%d, is self task?=%d",
-        *pack_ind, count_ci, count_cj, count_max_parts, ci==cj);
+        *pack_ind, count_ci, count_cj, count_max_parts, ci == cj);
   }
 #endif
 
@@ -279,13 +282,13 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_pair_force(
  *
  * @param buf the offload buffer struct
  * @param ci a #cell to pack and interact with cj
- * @param cj a #cell to pack and interact with ci. May be ci for self-interactions.
+ * @param cj a #cell to pack and interact with ci. May be ci for
+ * self-interactions.
  * @param shift shift cell/particle coordinates to apply periodic boundary
  * wrapping, if needed
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_density(
-    const struct cell *ci, const struct cell *cj,
-    const double shift[3],
+    const struct cell *ci, const struct cell *cj, const double shift[3],
     struct gpu_offload_data *buf) {
 
   const int count_ci = ci->hydro.count;
@@ -306,9 +309,10 @@ __attribute__((always_inline)) INLINE static void gpu_pack_density(
   if (ci != cj) last_ind += count_cj;
   if (last_ind >= md->params.part_buffer_size) {
     error(
-        "Exceeded particle buffer size. Increase Scheduler:gpu_part_buffer_size."
+        "Exceeded particle buffer size. Increase "
+        "Scheduler:gpu_part_buffer_size."
         "ind=%d, counts=%d %d, buffer_size=%d, is self task?=%d",
-        pack_ind, count_ci, count_cj, md->params.part_buffer_size, ci==cj);
+        pack_ind, count_ci, count_cj, md->params.part_buffer_size, ci == cj);
   }
 #endif
 
@@ -322,8 +326,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_density(
 
   } else { /* Pair interaction. */
 
-    /* Pack the particle data into CPU-side buffers. Start by assigning the shifts
-     * (if positions shifts are required)*/
+    /* Pack the particle data into CPU-side buffers. Start by assigning the
+     * shifts (if positions shifts are required)*/
     const double shift_i[3] = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
                                shift[2] + cj->loc[2]};
 
@@ -356,8 +360,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_density(
  * wrapping, if needed
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
-    const struct cell *ci, const struct cell *cj,
-    const double shift[3], struct gpu_offload_data *buf) {
+    const struct cell *ci, const struct cell *cj, const double shift[3],
+    struct gpu_offload_data *buf) {
 
   /* Anything to do here? */
   const int count_ci = ci->hydro.count;
@@ -416,8 +420,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
  * wrapping, if needed
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(
-    const struct cell *ci, const struct cell *cj,
-    const double shift[3], struct gpu_offload_data *buf) {
+    const struct cell *ci, const struct cell *cj, const double shift[3],
+    struct gpu_offload_data *buf) {
 
   TIMER_TIC;
 

@@ -101,7 +101,8 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack(
     /* This re-arranges the particle data from cell->hydro->parts into a long
      * array of part structs */
     if (task_subtype == task_subtype_gpu_density) {
-      // Temporary hack to make things compile while I still need the gradient and force bits
+      // Temporary hack to make things compile while I still need the gradient
+      // and force bits
       double shift[3] = {0., 0., 0.};
       gpu_pack_density(ci, ci, shift, buf);
       error("This shouldn't be called.");
@@ -210,7 +211,6 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_pack_force(
   TIMER_TOC(timer_doself_gpu_pack_f);
 }
 
-
 /**
  * @brief recurse into a (sub-)pair task and identify all cell-cell
  * interactions.
@@ -245,7 +245,6 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
   /* Arrays for leaf cells */
   struct cell **ci_leaves = md->ci_leaves;
   struct cell **cj_leaves = md->cj_leaves;
-
 
   /* Get the type of pair and flip ci/cj if needed. */
   double shift[3];
@@ -304,8 +303,8 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
 static void runner_doself_gpu_recurse(const struct runner *r,
                                       const struct scheduler *s,
                                       struct gpu_offload_data *restrict buf,
-                                      struct cell *ci,
-                                      const int depth, const char timer) {
+                                      struct cell *ci, const int depth,
+                                      const char timer) {
 
   /* Note: Can't inline a recursive function... */
 
@@ -325,14 +324,16 @@ static void runner_doself_gpu_recurse(const struct runner *r,
   struct cell **cj_leaves = md->cj_leaves;
 
   /* Recurse? */
-  if (cell_can_recurse_in_self_hydro_task(ci)){
+  if (cell_can_recurse_in_self_hydro_task(ci)) {
 
     for (int k = 0; k < 8; k++) {
       if (ci->progeny[k] != NULL) {
-        runner_doself_gpu_recurse(r, s, buf, ci->progeny[k], depth+1, /*timer=*/0);
+        runner_doself_gpu_recurse(r, s, buf, ci->progeny[k], depth + 1,
+                                  /*timer=*/0);
         for (int j = k + 1; j < 8; j++) {
           if (ci->progeny[j] != NULL) {
-            runner_dopair_gpu_recurse(r, s, buf, ci->progeny[k], ci->progeny[j], depth+1, /*timer=*/0);
+            runner_dopair_gpu_recurse(r, s, buf, ci->progeny[k], ci->progeny[j],
+                                      depth + 1, /*timer=*/0);
           }
         }
       }
@@ -363,7 +364,6 @@ static void runner_doself_gpu_recurse(const struct runner *r,
 
   if (timer) TIMER_TOC(timer_doself_gpu_recurse);
 }
-
 
 /**
  * @brief Generic function to pack data into CPU-side buffers destined for GPU
@@ -457,16 +457,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
 /**
  * @brief Wrapper to pack data for density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE static void
-runner_gpu_pack_density(const struct runner *r,
-                       struct gpu_offload_data *restrict buf,
-                       const struct cell *ci, const struct cell *cj) {
+__attribute__((always_inline)) INLINE static void runner_gpu_pack_density(
+    const struct runner *r, struct gpu_offload_data *restrict buf,
+    const struct cell *ci, const struct cell *cj) {
 
   TIMER_TIC;
 
   runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_density);
 
-  if (ci==cj) {
+  if (ci == cj) {
     TIMER_TOC(timer_doself_gpu_pack_d);
   } else {
     TIMER_TOC(timer_dopair_gpu_pack_d);
@@ -805,9 +804,6 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
   gpu_data_buffers_reset(buf);
 }
 
-
-
-
 /**
  * @brief Run the hydro gradient self tasks on GPU
  */
@@ -977,9 +973,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     /* Launch the kernel for ci using data for ci and cj */
     if (task_subtype == task_subtype_gpu_density) {
 
-      gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a,
-                              d_H, stream[bid], num_blocks_x, num_blocks_y,
-                              first_part_i, bundle_n_parts);
+      gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
+                         stream[bid], num_blocks_x, num_blocks_y, first_part_i,
+                         bundle_n_parts);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
@@ -1070,11 +1066,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 /**
  * @brief Wrapper to launch density pair tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE static void
-runner_gpu_launch_density(const struct runner *r,
-                                 struct gpu_offload_data *restrict buf,
-                                 cudaStream_t *stream, const float d_a,
-                                 const float d_H) {
+__attribute__((always_inline)) INLINE static void runner_gpu_launch_density(
+    const struct runner *r, struct gpu_offload_data *restrict buf,
+    cudaStream_t *stream, const float d_a, const float d_H) {
 
   TIMER_TIC;
 
@@ -1152,11 +1146,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
       /* Anything to do here? */
       if (task_unpacked[tid]) continue;
 
-      const struct task* t = md->task_list[tid];
+      const struct task *t = md->task_list[tid];
 
       /* Can we get the locks? */
       if (cell_locktree(t->ci) != 0) continue;
-      if (t->cj != NULL){
+      if (t->cj != NULL) {
         /* This was a pair task, get other cell too */
         /* TODO: skip MPI proxy cells ? */
         if (cell_locktree(t->cj) != 0) {
@@ -1181,7 +1175,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
 
         if (task_subtype == task_subtype_gpu_density) {
 
-          gpu_unpack_density(r, cii_l, cjj_l, buf->parts_recv_d, unpack_index, md->params.part_buffer_size);
+          gpu_unpack_density(r, cii_l, cjj_l, buf->parts_recv_d, unpack_index,
+                             md->params.part_buffer_size);
           // TODO: MOVE THIS OUTSIDE LATER WHEN ADDING GRADIENT AND FORCE
           if (cii_l == cjj_l) {
             unpack_index += cii_l->hydro.count;
@@ -1204,8 +1199,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
           error("Unknown task subtype %s", subtaskID_names[task_subtype]);
         }
 #endif
-
-
       }
 
       /* Release the cells */
@@ -1248,10 +1241,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
  * pair task offloading call. May differ from the total number of packed leaf
  * cell pairs if there have been leftover leaf cell pairs from a previous task.
  */
-__attribute__((always_inline)) INLINE static void
-runner_gpu_unpack_density(const struct runner *r, struct scheduler *s,
-                          struct gpu_offload_data *restrict buf,
-                          const int npacked) {
+__attribute__((always_inline)) INLINE static void runner_gpu_unpack_density(
+    const struct runner *r, struct scheduler *s,
+    struct gpu_offload_data *restrict buf, const int npacked) {
 
   TIMER_TIC;
 
@@ -1318,11 +1310,10 @@ runner_dopair_gpu_unpack_force(const struct runner *r, struct scheduler *s,
  * @param d_a current expansion scale factor
  * @param d_H current Hubble constant
  */
-__attribute__((always_inline)) INLINE static void
-runner_gpu_pack_and_launch(const struct runner *r, struct scheduler *s,
-                                  struct gpu_offload_data *restrict buf,
-                                  struct task *t, cudaStream_t *stream,
-                                  const float d_a, const float d_H) {
+__attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
+    const struct runner *r, struct scheduler *s,
+    struct gpu_offload_data *restrict buf, struct task *t, cudaStream_t *stream,
+    const float d_a, const float d_H) {
 
   /* Grab handles */
   struct gpu_pack_metadata *md = &buf->md;
@@ -1571,9 +1562,7 @@ static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
 
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
-
 }
-
 
 /**
  * @brief Top level runner function to solve hydro density pair tasks on GPU.
