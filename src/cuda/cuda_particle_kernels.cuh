@@ -482,9 +482,10 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     const float yij = x_pi.y - x_p_h_j.y;
     const float zij = x_pi.z - x_p_h_j.z;
     const float r2 = xij * xij + yij * yij + zij * zij;
-    /*Small & constant distance to ensure we don't interact a particle with itself*/
-    const float epsilon = 1e-8;
-    if (r2 < hig2 && r2 > epsilon) {
+
+    if ((r2 < hig2) && (j != pid)) {
+      /* j != pid: Exclude self contribution. This happens at a later step. */
+
       /* Recover some data */
       const float mj = ux_m_j.w;
       const float r = sqrt(r2);
