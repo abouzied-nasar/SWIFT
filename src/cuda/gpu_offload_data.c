@@ -65,6 +65,7 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   gpu_pack_metadata_init(md, params);
 
   /* Now allocate arrays */
+  /* TODO: Do these still need to be cudaMallocHost'd?*/
   cudaError_t cu_error;
   cu_error =
       cudaMallocHost((void **)&md->bundle_first_part, n_bundles * sizeof(int));
@@ -80,30 +81,8 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
 
   md->count_parts = 0;
 
-  if (is_pair_task) {
-    md->ci_list = NULL;
-    md->task_first_part = malloc(pack_size * sizeof(int));
-  } else {
-    md->ci_list = (struct cell **)malloc(pack_size * sizeof(struct cell *));
-    md->task_first_part = NULL;
-  }
+  md->task_first_packed_part = malloc(pack_size * sizeof(int));
   md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
-
-  /* Keep track of first and last particles for each self task (particle data
-   * is arranged in long arrays containing particles from all the tasks we will
-   * work with) Needed for offloading self tasks as we use these to sort
-   * through which parts need to interact with which */
-  if (is_pair_task) {
-    buf->self_task_first_last_part = NULL;
-    buf->d_self_task_first_last_part = NULL;
-  } else {
-    cu_error = cudaMallocHost((void **)&buf->self_task_first_last_part,
-                              pack_size * sizeof(int2));
-    swift_assert(cu_error == cudaSuccess);
-    cu_error = cudaMalloc((void **)&buf->d_self_task_first_last_part,
-                          pack_size * sizeof(int2));
-    swift_assert(cu_error == cudaSuccess);
-  }
 
   /* Now allocate memory for Buffer and GPU particle arrays */
   cu_error = cudaMalloc((void **)&buf->d_parts_send_d,
@@ -122,23 +101,10 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                             part_buffer_size * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
-  if (is_pair_task) {
-
-    md->ci_leaves =
-        (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
-    md->cj_leaves =
-        (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
-    md->task_first_last_packed_leaf_pair =
-        (int **)malloc(pack_size * sizeof(int *));
-    for (size_t i = 0; i < pack_size; i++) {
-      md->task_first_last_packed_leaf_pair[i] = (int *)malloc(2 * sizeof(int));
-    }
-
-  } else {
-    md->ci_leaves = NULL;
-    md->cj_leaves = NULL;
-    md->task_first_last_packed_leaf_pair = NULL;
-  }
+  md->ci_leaves = (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
+  md->cj_leaves = (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
+  md->task_first_packed_leaf = (int *)malloc(pack_size * sizeof(int));
+  md->task_last_packed_leaf = (int *)malloc(pack_size * sizeof(int));
 
   /* Create space for cuda events */
   buf->event_end = (cudaEvent_t *)malloc(n_bundles * sizeof(cudaEvent_t));
@@ -178,19 +144,6 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
 
   const struct gpu_global_pack_params pars = buf->md.params;
   const struct gpu_pack_metadata md = buf->md;
-
-  if (!md.is_pair_task) {
-    for (int i = 0; i < pars.pack_size; i++) {
-      buf->self_task_first_last_part[i].x = 0;
-      buf->self_task_first_last_part[i].y = 0;
-    }
-  }
-
-  /* Can't do this from the host side */
-  /* for (int i = 0; i < pars.pack_size; i++) { */
-  /*   buf->d_self_task_first_last_part[i].x = 0; */
-  /*   buf->d_self_task_first_last_part[i].y = 0; */
-  /* } */
 
   memset(buf->parts_send_d, 0, pars.part_buffer_size * md.send_struct_size);
   memset(buf->parts_recv_d, 0, pars.part_buffer_size * md.recv_struct_size);
@@ -233,28 +186,14 @@ void gpu_free_data_buffers(struct gpu_offload_data *buf,
 
   free((void *)buf->event_end);
 
-  if (is_pair_task) {
-    free((void *)md->task_list);
+  free((void *)md->task_list);
 
-    for (int i = 0; i < md->params.pack_size_pair; i++) {
-      free(md->task_first_last_packed_leaf_pair[i]);
-    }
-    free((void *)md->task_first_last_packed_leaf_pair);
-    free((void *)md->ci_leaves);
-    free((void *)md->cj_leaves);
-    free((void *)md->task_first_part);
+  free(md->task_first_packed_leaf);
+  free(md->task_last_packed_leaf);
+  free((void *)md->ci_leaves);
+  free((void *)md->cj_leaves);
+  free((void *)md->task_first_packed_part);
 
-  } else {
-
-    free((void *)md->task_list);
-    free((void *)md->ci_list);
-
-    cu_error = cudaFreeHost(buf->self_task_first_last_part);
-    swift_assert(cu_error == cudaSuccess);
-
-    cu_error = cudaFree(buf->d_self_task_first_last_part);
-    swift_assert(cu_error == cudaSuccess);
-  }
 }
 
 #ifdef __cplusplus

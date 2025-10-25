@@ -17,16 +17,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include "gpu_pack_metadata.h"
 
 /**
  * @file gpu_pack_metadata.c
  * @brief functions related to GPU packing data and meta-data
  */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "gpu_pack_metadata.h"
 
 /**
  * @brief Initialise empty gpu_pack_metadata struct
@@ -40,11 +41,8 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
   md->task_list = NULL;
   md->tasks_in_list = 0;
 
-  md->ci_list = NULL;
-
   md->count_parts = 0;
-  md->self_tasks_packed = 0;
-  md->leaf_pairs_packed = 0;
+  md->n_leaves_packed = 0;
 
   md->launch = 0;
   md->launch_leftovers = 0;
@@ -59,7 +57,8 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
 
   md->ci_leaves = NULL;
   md->cj_leaves = NULL;
-  md->task_first_last_packed_leaf_pair = NULL;
+  md->task_first_packed_leaf = NULL;
+  md->task_last_packed_leaf = NULL;
 
   gpu_pack_params_copy(params, &md->params);
 
@@ -92,51 +91,38 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata* md,
 
   /* Self tasks */
   md->count_parts = 0;
-  md->self_tasks_packed = 0;
   md->n_bundles_unpack = 0;
+
 
   /* Pair tasks */
   md->n_leaves = 0;
   md->tasks_in_list = 0;
-  md->leaf_pairs_packed = 0;
+  md->n_leaves_packed = 0;
 
 #ifdef SWIFT_DEBUG_CHECKS
   const struct gpu_global_pack_params pars = md->params;
-  size_t n_bundles = pars.n_bundles;
-  size_t pack_size = pars.pack_size;
+  int n_bundles = pars.n_bundles;
+  int pack_size = pars.pack_size;
   if (md->is_pair_task) {
     n_bundles = pars.n_bundles_pair;
     pack_size = pars.pack_size_pair;
   }
 
-  for (size_t i = 0; i < n_bundles; i++) md->bundle_first_part[i] = 0;
-  for (size_t i = 0; i < n_bundles; i++) md->bundle_last_part[i] = 0;
-  for (size_t i = 0; i < n_bundles; i++) md->bundle_first_leaf[i] = 0;
+  for (int i = 0; i < n_bundles; i++) md->bundle_first_part[i] = 0;
+  for (int i = 0; i < n_bundles; i++) md->bundle_last_part[i] = 0;
+  for (int i = 0; i < n_bundles; i++) md->bundle_first_leaf[i] = 0;
 
-  for (size_t i = 0; i < pack_size; i++) md->task_list[i] = NULL;
+  for (int i = 0; i < pack_size; i++) md->task_list[i] = NULL;
 
-  if (md->is_pair_task) {
-    for (size_t i = 0; i < pack_size; i++) {
-      md->task_first_last_packed_leaf_pair[i][0] = 0;
-      md->task_first_last_packed_leaf_pair[i][1] = 0;
-    }
+  for (int i = 0; i < pack_size; i++) md->task_first_packed_leaf[i] = 0;
+  for (int i = 0; i < pack_size; i++) md->task_last_packed_leaf[i] = 0;
 
-    for (size_t i = 0; i < pack_size; i++) md->task_first_part[i] = 0;
+  for (int i = 0; i < pack_size; i++) md->task_first_packed_part[i] = 0;
 
-    if (reset_leaves_lists) {
-      for (int i = 0; i < pars.leaf_buffer_size; i++) {
-        md->ci_leaves[i] = NULL;
-      }
-      for (int i = 0; i < pars.leaf_buffer_size; i++) {
-        md->cj_leaves[i] = NULL;
-      }
-    }
-
-  } else { /* self task */
-
-    for (size_t i = 0; i < pack_size; i++) md->ci_list[i] = NULL;
+  if (reset_leaves_lists) {
+    for (int i = 0; i < pars.leaf_buffer_size; i++) md->ci_leaves[i] = NULL;
+    for (int i = 0; i < pars.leaf_buffer_size; i++) md->cj_leaves[i] = NULL;
   }
-
 #endif
 }
 

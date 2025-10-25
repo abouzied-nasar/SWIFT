@@ -34,162 +34,160 @@ extern "C" {
 #include "cuda_config.h"
 #include "cuda_particle_kernels.cuh"
 #include "gpu_launch.h"
-#include "gpu_part_structs.h"
 
 #include <config.h>
 #include <cuda.h>
-#include <cuda_device_runtime_api.h>
-#include <cuda_profiler_api.h>
-#include <cuda_runtime.h>
+/* #include <cuda_device_runtime_api.h> */
+/* #include <cuda_profiler_api.h> */
+/* #include <cuda_runtime.h> */
 
-/**
- * Launch the density computations on the GPU
- * TODO: Parameter documentation
+ /**
+ * @brief Call the particle SPH density kernel.
+ *
+ * @param d_parts_send array on device containing particle data
+ * @param d_parts_recv array on device to write results into
+ * @param d_a current cosmological scale factor
+ * @param d_H current Hubble constant
+ * @param bundle_first_part index of first particle of this bundle in the
+ * d_parts_* arrays
+ * @param bundle_n_parts nr of particles in this bundle
  */
 __global__ void cuda_launch_density(
-    const struct gpu_part_send_d *restrict d_parts_send,
-    struct gpu_part_recv_d *restrict d_parts_recv, const float d_a,
+    const struct gpu_part_send_d *__restrict__ d_parts_send,
+    struct gpu_part_recv_d *__restrict__ d_parts_recv, const float d_a,
     const float d_H, const int bundle_first_part, const int bundle_n_parts) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int pid = bundle_first_part + threadid;
 
   if (pid < bundle_first_part + bundle_n_parts) {
-    const struct gpu_part_send_d pi = d_parts_send[pid];
-    const int cj_start = pi.cjs_cje.x;
-    const int cj_end = pi.cjs_cje.y;
-
-    /* Start calculations for particles in cell i */
-    cuda_kernel_density(pi, d_parts_send, d_parts_recv, pid, cj_start, cj_end,
-                        d_a, d_H);
+    cuda_kernel_density(pid, d_parts_send, d_parts_recv, d_a, d_H);
   }
 }
 
-/**
- * Launch the pair gradient computations on the GPU
- * TODO: Parameter documentation
+ /**
+ * @brief Call the particle SPH gradient kernel.
+ *
+ * @param d_parts_send array on device containing particle data
+ * @param d_parts_recv array on device to write results into
+ * @param d_a current cosmological scale factor
+ * @param d_H current Hubble constant
+ * @param bundle_first_part index of first particle of this bundle in the
+ * d_parts_* arrays
+ * @param bundle_n_parts nr of particles in this bundle
  */
-__global__ void cuda_launch_pair_gradient(
-    const struct gpu_part_send_g *restrict d_parts_send,
-    struct gpu_part_recv_g *restrict d_parts_recv, float d_a, float d_H,
+__global__ void cuda_launch_gradient(
+    const struct gpu_part_send_g *__restrict__ d_parts_send,
+    struct gpu_part_recv_g *__restrict__ d_parts_recv, float d_a, float d_H,
     int bundle_first_part, int bundle_n_parts) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int pid = bundle_first_part + threadid;
 
   if (pid < bundle_first_part + bundle_n_parts) {
-    const struct gpu_part_send_g pi = d_parts_send[pid];
-    const int cj_start = pi.cjs_cje.x;
-    const int cj_end = pi.cjs_cje.y;
-
-    /* Start calculations for particles in cell i*/
-    cuda_kernel_pair_gradient(pi, d_parts_send, d_parts_recv, pid, cj_start,
-                              cj_end, d_a, d_H);
+    cuda_kernel_gradient(pid, d_parts_send, d_parts_recv, d_a, d_H);
   }
 }
 
 /**
- * Launch the pair force computations on the GPU
- * TODO: Parameter documentation
+ * @brief Call the particle SPH force kernel.
+ *
+ * @param d_parts_send array on device containing particle data
+ * @param d_parts_recv array on device to write results into
+ * @param d_a current cosmological scale factor
+ * @param d_H current Hubble constant
+ * @param bundle_first_part index of first particle of this bundle in the
+ * d_parts_* arrays
+ * @param bundle_n_parts nr of particles in this bundle
  */
-__global__ void cuda_launch_pair_force(
-    const struct gpu_part_send_f *restrict d_parts_send,
-    struct gpu_part_recv_f *restrict d_parts_recv, float d_a, float d_H,
+__global__ void cuda_launch_force(
+    const struct gpu_part_send_f *__restrict__ d_parts_send,
+    struct gpu_part_recv_f *__restrict__ d_parts_recv, float d_a, float d_H,
     int bundle_first_part, int bundle_n_parts) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int pid = bundle_first_part + threadid;
 
   if (pid < bundle_first_part + bundle_n_parts) {
-    const struct gpu_part_send_f pi = d_parts_send[pid];
-    const int cj_start = pi.cjs_cje.x;
-    const int cj_end = pi.cjs_cje.y;
-
-    /* Start calculations for particles in cell i */
-    cuda_kernel_pair_force(pi, d_parts_send, d_parts_recv, pid, cj_start,
-                           cj_end, d_a, d_H);
+    cuda_kernel_force(pid, d_parts_send, d_parts_recv, d_a, d_H);
   }
 }
 
 /**
- * @brief Launch the density computation on the GPU.
- * TODO: Parameter documentation
+ * @brief Launch the density computation on the GPU for a bundle of leaf cells.
+ *
+ * @param d_parts_send array on device containing particle data
+ * @param d_parts_recv array on device to write results into
+ * @param d_a current cosmological scale factor
+ * @param d_H current Hubble constant
+ * @param stream cuda stream to use
+ * @param num_blockx_x number of thread blocks to use in x-dimension
+ * @param num_blockx_y number of thread blocks to use in y-dimension
+ * @param bundle_first_part index of first particle of this bundle in the
+ * d_parts_* arrays
+ * @param bundle_n_parts nr of particles in this bundle
  */
-void gpu_launch_density(const struct gpu_part_send_d *restrict d_parts_send,
-                        struct gpu_part_recv_d *restrict d_parts_recv,
+void gpu_launch_density(const struct gpu_part_send_d *__restrict__ d_parts_send,
+                        struct gpu_part_recv_d *__restrict__ d_parts_recv,
                         const float d_a, const float d_H, cudaStream_t stream,
                         const int num_blocks_x, const int num_blocks_y,
                         const int bundle_first_part, const int bundle_n_parts) {
 
-  /* TODO: do we want shared memory allocations here? */
+  /* TODO: Do we want to allocate shared memory here? */
   cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
 /**
- * @brief Launch the pair gradient computation on the GPU.
+ * @brief Launch the gradient computation on the GPU for a bundle of leaf cells.
+ *
+ * @param d_parts_send array on device containing particle data
+ * @param d_parts_recv array on device to write results into
+ * @param d_a current cosmological scale factor
+ * @param d_H current Hubble constant
+ * @param stream cuda stream to use
+ * @param num_blockx_x number of thread blocks to use in x-dimension
+ * @param num_blockx_y number of thread blocks to use in y-dimension
+ * @param bundle_first_part index of first particle of this bundle in the
+ * d_parts_* arrays
+ * @param bundle_n_parts nr of particles in this bundle
  */
-void gpu_launch_pair_gradient(
-    const struct gpu_part_send_g *restrict d_parts_send,
-    struct gpu_part_recv_g *restrict d_parts_recv, const float d_a,
+void gpu_launch_gradient(
+    const struct gpu_part_send_g *__restrict__ d_parts_send,
+    struct gpu_part_recv_g *__restrict__ d_parts_recv, const float d_a,
     const float d_H, cudaStream_t stream, const int num_blocks_x,
     const int num_blocks_y, const int bundle_first_part,
     const int bundle_n_parts) {
 
-  cuda_launch_pair_gradient<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
+  /* TODO: Do we want to allocate shared memory here? */
+  cuda_launch_gradient<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
 /**
- * @brief Launch the pair force computation on the GPU.
- * TODO: Parameter documentation
+ * @brief Launch the force computation on the GPU for a bundle of leaf cells.
+ *
+ * @param d_parts_send array on device containing particle data
+ * @param d_parts_recv array on device to write results into
+ * @param d_a current cosmological scale factor
+ * @param d_H current Hubble constant
+ * @param stream cuda stream to use
+ * @param num_blockx_x number of thread blocks to use in x-dimension
+ * @param num_blockx_y number of thread blocks to use in y-dimension
+ * @param bundle_first_part index of first particle of this bundle in the
+ * d_parts_* arrays
+ * @param bundle_n_parts nr of particles in this bundle
  */
-void gpu_launch_pair_force(const struct gpu_part_send_f *restrict d_parts_send,
-                           struct gpu_part_recv_f *restrict d_parts_recv,
-                           const float d_a, const float d_H,
-                           cudaStream_t stream, const int num_blocks_x,
-                           const int num_blocks_y, const int bundle_first_part,
-                           const int bundle_n_parts) {
+void gpu_launch_force(const struct gpu_part_send_f *__restrict__ d_parts_send,
+                      struct gpu_part_recv_f *__restrict__ d_parts_recv,
+                      const float d_a, const float d_H,
+                      cudaStream_t stream, const int num_blocks_x,
+                      const int num_blocks_y, const int bundle_first_part,
+                      const int bundle_n_parts) {
 
-  cuda_launch_pair_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
+  /* TODO: Do we want to allocate shared memory here? */
+  cuda_launch_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
-}
-
-/**
- * @brief Launch the self gradient computation on the GPU.
- */
-void gpu_launch_self_gradient(
-    const struct gpu_part_send_g *restrict d_parts_send,
-    struct gpu_part_recv_g *restrict d_parts_recv, const float d_a,
-    const float d_H, cudaStream_t stream, const int num_blocks_x,
-    const int num_blocks_y, const int bundle_first_task,
-    int2 *d_task_first_part_f4) {
-
-  const dim3 gridShape = dim3(num_blocks_x, num_blocks_y);
-  const size_t bsize = GPU_THREAD_BLOCK_SIZE;
-  const size_t shmem_size = 3ul * bsize * sizeof(float4);
-  cuda_kernel_self_gradient<<<gridShape, bsize, shmem_size, stream>>>(
-      d_parts_send, d_parts_recv, d_a, d_H, bundle_first_task,
-      d_task_first_part_f4);
-}
-
-/**
- * @brief Launch the self force computation on the GPU.
- */
-void gpu_launch_self_force(const struct gpu_part_send_f *restrict d_parts_send,
-                           struct gpu_part_recv_f *restrict d_parts_recv,
-                           const float d_a, const float d_H,
-                           cudaStream_t stream, const int num_blocks_x,
-                           const int num_blocks_y, const int bundle_first_task,
-                           int2 *d_task_first_part_f4) {
-
-  const dim3 gridShape = dim3(num_blocks_x, num_blocks_y);
-  const size_t bsize = GPU_THREAD_BLOCK_SIZE;
-  const size_t shmem_size =
-      4ul * bsize * sizeof(float4) + bsize * sizeof(float3);
-  cuda_kernel_self_force<<<gridShape, bsize, shmem_size, stream>>>(
-      d_parts_send, d_parts_recv, d_a, d_H, bundle_first_task,
-      d_task_first_part_f4);
 }
 
 #ifdef __cplusplus

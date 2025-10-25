@@ -188,10 +188,10 @@ void *runner_main_cuda(void *data) {
                         sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
   gpu_data_buffers_init(&gpu_buf_self_grad, &gpu_pack_params,
                         sizeof(struct gpu_part_send_g),
-                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/0);
+                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/1);
   gpu_data_buffers_init(&gpu_buf_self_forc, &gpu_pack_params,
                         sizeof(struct gpu_part_send_f),
-                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/0);
+                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
   gpu_data_buffers_init(&gpu_buf_pair_dens, &gpu_pack_params,
                         sizeof(struct gpu_part_send_d),
                         sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
@@ -735,9 +735,9 @@ void *runner_main_cuda(void *data) {
   } /* main loop. */
 
   /* Release the bytes back into the wilderness */
-  gpu_free_data_buffers(&gpu_buf_self_dens, /*is_pair_task=*/0);
-  gpu_free_data_buffers(&gpu_buf_self_grad, /*is_pair_task=*/0);
-  gpu_free_data_buffers(&gpu_buf_self_forc, /*is_pair_task=*/0);
+  gpu_free_data_buffers(&gpu_buf_self_dens, /*is_pair_task=*/1);
+  gpu_free_data_buffers(&gpu_buf_self_grad, /*is_pair_task=*/1);
+  gpu_free_data_buffers(&gpu_buf_self_forc, /*is_pair_task=*/1);
   gpu_free_data_buffers(&gpu_buf_pair_dens, /*is_pair_task=*/1);
   gpu_free_data_buffers(&gpu_buf_pair_grad, /*is_pair_task=*/1);
   gpu_free_data_buffers(&gpu_buf_pair_forc, /*is_pair_task=*/1);

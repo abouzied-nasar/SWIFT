@@ -45,22 +45,12 @@ struct gpu_pack_metadata {
   /*! Count how many (super-level) tasks we've identified for packing */
   int tasks_in_list;
 
-  /*! List of super level cells to be packed in self tasks */
-  /* TODO: Use ci_super instead, as for pair tasks. We don't need this
-   * to be separate. */
-  struct cell **ci_list;
-
   /*! How many particles have been packed */
   int count_parts;
 
-  /*! How many self tasks we have already packed (their particle data copied)
-   * into the buffers */
-  /* TODO: to be replaced by leaf_pairs_packed */
-  int self_tasks_packed;
-
-  /*! How man pairs of leaf cells for pair interactions we have alread packed
-   * (their particle data copied) into the buffers */
-  int leaf_pairs_packed;
+  /*! How many (pairs of) leaf cells we have alread packed (their particle data
+   * copied) into the buffers */
+  int n_leaves_packed;
 
   /*! Are these buffers ready to trigger launch on GPU? */
   char launch;
@@ -74,21 +64,20 @@ struct gpu_pack_metadata {
   /*! Index of the last particle of a bundle in the buffer arrays */
   int *bundle_last_part;
 
-  /*! For self-tasks: The index of the first leaf cell (pair) of a bundle as it
-   * is stored in the task_list. For pair-tasks: The index of the first leaf
-   * cell of a bundle in the ci_leaves, cj_leaves arrays.*/
+  /*! The index of the first leaf cell of a bundle in the ci_leaves, cj_leaves
+   * arrays.*/
   int *bundle_first_leaf;
 
   /*! Number of bundles to use unpack. May differ from target_n_bundles if
    * we're launching leftovers. */
   int n_bundles_unpack;
 
-  /*! Number of leaf cells which require interactions found during a recursive
-   * search */
+  /*! Total number of leaf cells which require interactions found during
+   * recursive searches since last offload cycle */
   int n_leaves;
 
-  /*! How many leaves have been identified for a single (pair) task during
-   * recursion */
+  /*! Number of leaf cells which require interactions found during recursive
+   * search for a single task */
   int task_n_leaves;
 
   /*! Lists of leaf cell pairs (ci, cj) which are to be interacted. May contain
@@ -96,13 +85,17 @@ struct gpu_pack_metadata {
   struct cell **ci_leaves;
   struct cell **cj_leaves;
 
-  /*! The indexes of the first and last leaf cell pairs packed into the
-   * particle buffer per super-level (pair) task. The first index of this array
-   * corresponds to the super-level task stored in `task_list`.*/
-  int **task_first_last_packed_leaf_pair;
+  /*! Index of the first (pair of) leaf cell(s) packed into the particle buffer
+   * of tasks stored in task_list. */
+  int* task_first_packed_leaf;
 
-  /*! The index of the first particle of this task in the buffer arrays. */
-  int *task_first_part;
+  /*! Index of the last (pair of) leaf cell(s) packed into the particle buffer
+   * of tasks stored in task_list. */
+  int* task_last_packed_leaf;
+
+  /*! The index of the first particle in the buffer arrays of tasks stored in
+   * task_list. */
+  int *task_first_packed_part;
 
   /*! Global (fixed) packing parameters */
   struct gpu_global_pack_params params;
