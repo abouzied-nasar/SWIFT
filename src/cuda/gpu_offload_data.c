@@ -53,36 +53,15 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const char is_pair_task) {
 
   /* Grab some handles */
-  const size_t pack_size =
-      is_pair_task ? params->pack_size_pair : params->pack_size;
-  const size_t n_bundles =
-      is_pair_task ? params->n_bundles_pair : params->n_bundles;
+  const size_t n_bundles = is_pair_task ? params->n_bundles_pair : params->n_bundles;
   const size_t part_buffer_size = params->part_buffer_size;
-  const size_t leaf_buffer_size = params->leaf_buffer_size;
 
   /* Initialise and set up metadata */
   struct gpu_pack_metadata *md = &(buf->md);
-  gpu_pack_metadata_init(md, params);
+  gpu_pack_metadata_init(md, params, is_pair_task);
 
   /* Now allocate arrays */
-  /* TODO: Do these still need to be cudaMallocHost'd?*/
   cudaError_t cu_error;
-  cu_error =
-      cudaMallocHost((void **)&md->bundle_first_part, n_bundles * sizeof(int));
-  swift_assert(cu_error == cudaSuccess);
-
-  cu_error =
-      cudaMallocHost((void **)&md->bundle_last_part, n_bundles * sizeof(int));
-  swift_assert(cu_error == cudaSuccess);
-
-  cu_error =
-      cudaMallocHost((void **)&md->bundle_first_leaf, n_bundles * sizeof(int));
-  swift_assert(cu_error == cudaSuccess);
-
-  md->count_parts = 0;
-
-  md->task_first_packed_part = malloc(pack_size * sizeof(int));
-  md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
 
   /* Now allocate memory for Buffer and GPU particle arrays */
   cu_error = cudaMalloc((void **)&buf->d_parts_send_d,
@@ -100,11 +79,6 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   cu_error = cudaMallocHost((void **)&buf->parts_recv_d,
                             part_buffer_size * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
-
-  md->ci_leaves = (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
-  md->cj_leaves = (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
-  md->task_first_packed_leaf = (int *)malloc(pack_size * sizeof(int));
-  md->task_last_packed_leaf = (int *)malloc(pack_size * sizeof(int));
 
   /* Create space for cuda events */
   buf->event_end = (cudaEvent_t *)malloc(n_bundles * sizeof(cudaEvent_t));
@@ -148,7 +122,7 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
   memset(buf->parts_send_d, 0, pars.part_buffer_size * md.send_struct_size);
   memset(buf->parts_recv_d, 0, pars.part_buffer_size * md.recv_struct_size);
 
-  /* Can't do this from the host side */
+  /* Can't do this from the host side, would need to launch cuda kernel */
   /* bzero(buf->d_parts_recv_d, pars.part_buffer_size *
    * sizeof(md.send_struct_size)); */
   /* bzero(buf->d_parts_send_d, pars.part_buffer_size) *
@@ -158,19 +132,14 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
 }
 
 /**
- * Free everything you allocated.
+ * @brief Free everything you allocated.
  */
-void gpu_free_data_buffers(struct gpu_offload_data *buf,
-                           const char is_pair_task) {
+void gpu_data_buffers_free(struct gpu_offload_data *buf) {
 
   struct gpu_pack_metadata *md = &(buf->md);
+  gpu_pack_metadata_free(md);
 
   cudaError_t cu_error = cudaErrorMemoryAllocation;
-  cu_error = cudaFreeHost(md->bundle_first_part);
-  swift_assert(cu_error == cudaSuccess);
-
-  cu_error = cudaFreeHost(md->bundle_last_part);
-  swift_assert(cu_error == cudaSuccess);
 
   cu_error = cudaFree(buf->d_parts_send_d);
   swift_assert(cu_error == cudaSuccess);
@@ -185,15 +154,6 @@ void gpu_free_data_buffers(struct gpu_offload_data *buf,
   swift_assert(cu_error == cudaSuccess);
 
   free((void *)buf->event_end);
-
-  free((void *)md->task_list);
-
-  free(md->task_first_packed_leaf);
-  free(md->task_last_packed_leaf);
-  free((void *)md->ci_leaves);
-  free((void *)md->cj_leaves);
-  free((void *)md->task_first_packed_part);
-
 }
 
 #ifdef __cplusplus

@@ -39,8 +39,32 @@ extern "C" {
  * does not depend on cuda/hip et al. */
 struct gpu_pack_metadata {
 
+  /*! Lists of leaf cell pairs (ci, cj) which are to be interacted. May contain
+   * entries of multiple tasks' leaf cells. */
+  struct cell **ci_leaves;
+  struct cell **cj_leaves;
+
+  /*! Number of leaf cells which require interactions found during recursive
+   * search for a single task */
+  int task_n_leaves;
+
   /*! List of tasks cells to be packed */
   struct task **task_list;
+
+  /*! Index of the first (pair of) leaf cell(s) packed into the particle buffer
+   * of tasks stored in task_list. */
+  int *task_first_packed_leaf;
+
+  /*! Index of the last (pair of) leaf cell(s) packed into the particle buffer
+   * of tasks stored in task_list. */
+  int *task_last_packed_leaf;
+
+  /*! The index of the first particle in the buffer arrays of tasks stored in
+   * task_list. */
+  int *task_first_packed_part;
+
+  /*! Index of the first particle of a bundle in the buffer arrays */
+  int *bundle_first_part;
 
   /*! Count how many (super-level) tasks we've identified for packing */
   int tasks_in_list;
@@ -52,50 +76,15 @@ struct gpu_pack_metadata {
    * copied) into the buffers */
   int n_leaves_packed;
 
+  /*! Total number of leaf cells which require interactions found during
+   * recursive searches since last offload cycle */
+  int n_leaves;
+
   /*! Are these buffers ready to trigger launch on GPU? */
   char launch;
 
   /*! Are we launching leftovers (fewer than target offload size)? */
   char launch_leftovers;
-
-  /*! Index of the first particle of a bundle in the buffer arrays */
-  int *bundle_first_part;
-
-  /*! Index of the last particle of a bundle in the buffer arrays */
-  int *bundle_last_part;
-
-  /*! The index of the first leaf cell of a bundle in the ci_leaves, cj_leaves
-   * arrays.*/
-  int *bundle_first_leaf;
-
-  /*! Number of bundles to use unpack. May differ from target_n_bundles if
-   * we're launching leftovers. */
-  int n_bundles_unpack;
-
-  /*! Total number of leaf cells which require interactions found during
-   * recursive searches since last offload cycle */
-  int n_leaves;
-
-  /*! Number of leaf cells which require interactions found during recursive
-   * search for a single task */
-  int task_n_leaves;
-
-  /*! Lists of leaf cell pairs (ci, cj) which are to be interacted. May contain
-   * entries of multiple tasks' leaf cells. */
-  struct cell **ci_leaves;
-  struct cell **cj_leaves;
-
-  /*! Index of the first (pair of) leaf cell(s) packed into the particle buffer
-   * of tasks stored in task_list. */
-  int* task_first_packed_leaf;
-
-  /*! Index of the last (pair of) leaf cell(s) packed into the particle buffer
-   * of tasks stored in task_list. */
-  int* task_last_packed_leaf;
-
-  /*! The index of the first particle in the buffer arrays of tasks stored in
-   * task_list. */
-  int *task_first_packed_part;
 
   /*! Global (fixed) packing parameters */
   struct gpu_global_pack_params params;
@@ -113,10 +102,12 @@ struct gpu_pack_metadata {
 };
 
 void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
-                            const struct gpu_global_pack_params *params);
+                            const struct gpu_global_pack_params *params,
+                            const char is_pair_task);
 void gpu_pack_metadata_init_step(struct gpu_pack_metadata *md);
 void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
                              int reset_leaves_lists);
+void gpu_pack_metadata_free(struct gpu_pack_metadata* md);
 
 #ifdef __cplusplus
 }

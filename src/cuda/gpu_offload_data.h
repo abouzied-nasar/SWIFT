@@ -89,13 +89,9 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const size_t send_struct_size,
                            const size_t recv_struct_size,
                            const char is_pair_task);
-
 void gpu_data_buffers_init_step(struct gpu_offload_data *buf);
-
 void gpu_data_buffers_reset(struct gpu_offload_data *buf);
-
-void gpu_free_data_buffers(struct gpu_offload_data *buf,
-                           const char is_pair_task);
+void gpu_data_buffers_free(struct gpu_offload_data *buf);
 
 #ifdef __cplusplus
 }

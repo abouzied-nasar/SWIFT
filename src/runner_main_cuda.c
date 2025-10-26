@@ -735,12 +735,12 @@ void *runner_main_cuda(void *data) {
   } /* main loop. */
 
   /* Release the bytes back into the wilderness */
-  gpu_free_data_buffers(&gpu_buf_self_dens, /*is_pair_task=*/1);
-  gpu_free_data_buffers(&gpu_buf_self_grad, /*is_pair_task=*/1);
-  gpu_free_data_buffers(&gpu_buf_self_forc, /*is_pair_task=*/1);
-  gpu_free_data_buffers(&gpu_buf_pair_dens, /*is_pair_task=*/1);
-  gpu_free_data_buffers(&gpu_buf_pair_grad, /*is_pair_task=*/1);
-  gpu_free_data_buffers(&gpu_buf_pair_forc, /*is_pair_task=*/1);
+  gpu_data_buffers_free(&gpu_buf_self_dens);
+  gpu_data_buffers_free(&gpu_buf_self_grad);
+  gpu_data_buffers_free(&gpu_buf_self_forc);
+  gpu_data_buffers_free(&gpu_buf_pair_dens);
+  gpu_data_buffers_free(&gpu_buf_pair_grad);
+  gpu_data_buffers_free(&gpu_buf_pair_forc);
 
   for (int i = 0; i < gpu_pack_params.n_bundles; i++)
     cudaStreamDestroy(stream[i]);
