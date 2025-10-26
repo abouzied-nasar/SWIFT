@@ -144,8 +144,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
     float h_dt = pr.udt_hdt_minngbtb.y + part_get_h_dt(p);
     part_set_h_dt(p, h_dt);
 
-    timebin_t tbin = (timebin_t)(pr.udt_hdt_minngbtb.z + 0.5f);
-    part_set_timestep_limiter_min_ngb_time_bin(p, tbin);
+    timebin_t mintbin = (timebin_t)(pr.udt_hdt_minngbtb.z + 0.5f);
+    part_set_timestep_limiter_min_ngb_time_bin(p, mintbin);
   }
 }
 

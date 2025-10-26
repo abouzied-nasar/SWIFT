@@ -39,8 +39,13 @@ extern "C" {
 
 
 /**
- * @brief Naive kernel computing density interaction
- * TODO: parameter documentation
+ * @brief Naive kernel computing the density interactions of a single particle
+ *
+ * @param pid index of particle to compute density for in the data arrays
+ * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_recv array of particle data to write results into
+ * @param d_a current cosmological expansion factor
+ * @param d_H current Hubble constant
  */
 __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     int pid, const struct gpu_part_send_d *__restrict__ d_parts_send,
@@ -139,8 +144,13 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
 }
 
 /**
- * Naive kernel computing gradient interaction
- * TODO: parameter documentation
+ * @brief Naive kernel computing the gradient interactions of a single particle
+ *
+ * @param pid index of particle to compute density for in the data arrays
+ * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_recv array of particle data to write results into
+ * @param d_a current cosmological expansion factor
+ * @param d_H current Hubble constant
  */
 __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
     int pid, const struct gpu_part_send_g *__restrict__ d_parts_send,
@@ -261,8 +271,13 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
 }
 
 /**
- * @brief Naive kernel computing force interaction
- * TODO: parameter documentation
+ * @brief Naive kernel computing the force interactions of a single particle
+ *
+ * @param pid index of particle to compute density for in the data arrays
+ * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_recv array of particle data to write results into
+ * @param d_a current cosmological expansion factor
+ * @param d_H current Hubble constant
  */
 __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
     int pid, const struct gpu_part_send_f *__restrict__ d_parts_send,
@@ -305,9 +320,9 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
   const float rhoi_inv2 = rhoi_inv * rhoi_inv;
 
   /* Prep output */
-  float3 ahydro = {0.f, 0.f, 0.f};
-  float3 udt_hdt_minngbtb = {0.f, 0.f, 0.f};
-  unsigned int min_ngb_timebin = min_ngb_tbi;
+  float3 res_ahydro = {0.f, 0.f, 0.f};
+  float2 res_udt_hdt = {0.f, 0.f};
+  int res_min_ngb_timebin = min_ngb_tbi;
 
   /* Start the neighbour interactions */
   for (int j = pj_start; j < pj_end; j++) {
@@ -415,9 +430,9 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
       const float acc = sph_acc_term + visc_acc_term;
 
       /* Use the force Luke ! */
-      ahydro.x -= mj * acc * xij;
-      ahydro.y -= mj * acc * yij;
-      ahydro.z -= mj * acc * zij;
+      res_ahydro.x -= mj * acc * xij;
+      res_ahydro.y -= mj * acc * yij;
+      res_ahydro.z -= mj * acc * zij;
 
       /* Get the time derivative for u. */
       const float sph_du_term_i = P_over_rho2_i * dvdr * r_inv * wi_dr;
@@ -447,18 +462,17 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
       const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
 
       /* Internal energy time derivative */
-      udt_hdt_minngbtb.x += du_dt_i * mj;
+      res_udt_hdt.x += du_dt_i * mj;
 
       /* Get the time derivative for h. */
-      udt_hdt_minngbtb.y -= mj * dvdr * r_inv * rhoj_inv * wi_dr;
+      res_udt_hdt.y -= mj * dvdr * r_inv * rhoj_inv * wi_dr;
 
-      min_ngb_timebin = min(min_ngb_timebin, tbj);
+      if (tbj > 0) res_min_ngb_timebin = min(res_min_ngb_timebin, tbj);
     }
   } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
-  udt_hdt_minngbtb.z = (float) min_ngb_timebin;
-  d_parts_recv[pid].udt_hdt_minngbtb = udt_hdt_minngbtb;
-  d_parts_recv[pid].a_hydro = ahydro;
+  d_parts_recv[pid].udt_hdt_minngbtb = {res_udt_hdt.x, res_udt_hdt.y, (float) res_min_ngb_timebin};
+  d_parts_recv[pid].a_hydro = res_ahydro;
 }
 
 #ifdef __cplusplus
