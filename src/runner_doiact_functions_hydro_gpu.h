@@ -1643,4 +1643,3 @@ static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
 #endif
 
 #endif /* RUNNER_GPU_PACK_FUNCTIONS_H */
-

@@ -213,7 +213,7 @@ void *runner_main_cuda(void *data) {
   for (int i = 0; i < gpu_pack_params.n_bundles_pair; i++)
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
-  /* Declare some global variables */
+    /* Declare some global variables */
 #ifdef CUDA_PROFILER
   int step = 0;
 #endif

@@ -2534,7 +2534,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
     }
 
     /* Otherwise, self interaction? */
-    else if (t_type == task_type_self && t_subtype == task_subtype_gpu_density) {
+    else if (t_type == task_type_self &&
+             t_subtype == task_subtype_gpu_density) {
 
       const int bcount_i = ci->black_holes.count;
 
@@ -2650,8 +2651,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 #ifdef EXTRA_HYDRO_LOOP
 
       /* Start by constructing the task for the second and third hydro loop */
-      t_gradient = scheduler_addtask(sched, task_type_self,
-                                     task_subtype_gpu_gradient, flags, 0, ci, NULL);
+      t_gradient = scheduler_addtask(
+          sched, task_type_self, task_subtype_gpu_gradient, flags, 0, ci, NULL);
 
       /* Add the link between the new loop and the cell */
       engine_addlink(e, &ci->hydro.gradient, t_gradient);
@@ -2808,7 +2809,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
     }
 
     /* Otherwise, pair interaction? */
-    else if (t_type == task_type_pair && t_subtype == task_subtype_gpu_density) {
+    else if (t_type == task_type_pair &&
+             t_subtype == task_subtype_gpu_density) {
 
       const int bcount_i = ci->black_holes.count;
       const int bcount_j = cj->black_holes.count;
@@ -2980,8 +2982,8 @@ void engine_make_extra_hydroloop_tasks_mapper(void *map_data, int num_elements,
 #ifdef EXTRA_HYDRO_LOOP
 
       /* Start by constructing the task for the second and third hydro loop */
-      t_gradient = scheduler_addtask(sched, task_type_pair,
-                                     task_subtype_gpu_gradient, flags, 0, ci, cj);
+      t_gradient = scheduler_addtask(
+          sched, task_type_pair, task_subtype_gpu_gradient, flags, 0, ci, cj);
 
       /* Add the link between the new loop and both cells */
       engine_addlink(e, &ci->hydro.gradient, t_gradient);
@@ -3410,8 +3412,8 @@ void engine_make_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
     /* If the cell is local build a self-interaction */
     if (ci->nodeID == nodeID) {
-      scheduler_addtask(sched, task_type_self, task_subtype_gpu_density, 0, 0, ci,
-                        NULL);
+      scheduler_addtask(sched, task_type_self, task_subtype_gpu_density, 0, 0,
+                        ci, NULL);
     }
 
     /* Now loop over all the neighbours of this cell */
@@ -3443,8 +3445,8 @@ void engine_make_hydroloop_tasks_mapper(void *map_data, int num_elements,
 
           /* Construct the pair task */
           const int sid = sortlistID[(kk + 1) + 3 * ((jj + 1) + 3 * (ii + 1))];
-          scheduler_addtask(sched, task_type_pair, task_subtype_gpu_density, sid, 0,
-                            ci, cj);
+          scheduler_addtask(sched, task_type_pair, task_subtype_gpu_density,
+                            sid, 0, ci, cj);
 
 #ifdef SWIFT_DEBUG_CHECKS
 #ifdef WITH_MPI

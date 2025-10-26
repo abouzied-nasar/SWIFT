@@ -177,8 +177,8 @@ const char *task_category_names[task_category_count] = {
     "black holes", "cooling", "star formation",
     "limiter",     "sync",    "time integration",
     "mpi",         "pack",    "gpu",
-    "fof",     "others", "neutrino",    "sink",    "RT",
-    "CSDS"};
+    "fof",         "others",  "neutrino",
+    "sink",        "RT",      "CSDS"};
 
 #ifdef WITH_MPI
 /* MPI communicators for the subtypes. */

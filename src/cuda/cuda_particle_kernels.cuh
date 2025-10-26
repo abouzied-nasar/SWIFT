@@ -325,7 +325,8 @@ __global__ void cuda_kernel_self_force(
         const float hj = x_h_j.w;
         const float hjg2 = hj * hj * kernel_gamma2;
         const float r2 = xij * xij + yij * yij + zij * zij;
-        if ((r2 < hig2 || r2 < hjg2) && r2 > (0.01f / 128.f) * (0.01f / 128.f)) {
+        if ((r2 < hig2 || r2 < hjg2) &&
+            r2 > (0.01f / 128.f) * (0.01f / 128.f)) {
           //          /* Cosmology terms for the signal velocity */
           const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
           const float a2_Hubble = d_a * d_a * d_H;
