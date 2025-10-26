@@ -169,9 +169,6 @@ const char *subtaskID_names[task_subtype_count] = {
     "gpu_density",
     "gpu_gradient",
     "gpu_force",
-    "gpu_unpack_d",
-    "gpu_unpack_g",
-    "gpu_unpack_f",
 };
 
 const char *task_category_names[task_category_count] = {
@@ -180,8 +177,7 @@ const char *task_category_names[task_category_count] = {
     "black holes", "cooling", "star formation",
     "limiter",     "sync",    "time integration",
     "mpi",         "pack",    "gpu",
-    "gpu_unpack",  "fof",     "others",
-    "neutrino",    "sink",    "RT",
+    "fof",     "others", "neutrino",    "sink",    "RT",
     "CSDS"};
 
 #ifdef WITH_MPI
@@ -608,16 +604,6 @@ void task_unlock(struct task *t) {
 #ifdef SWIFT_TASKS_WITHOUT_ATOMICS
         cell_unlocktree(ci);
 #endif
-      } else if (subtype == task_subtype_gpu_unpack_d) {
-        //        for(int pp = 0; pp < 128 /*should be sched->pack_size*/;
-        //        pp++){
-        //		  cell_unlocktree(t->ci_unpack[pp]);
-        //	    }
-        /*Do nothing and be on your way*/
-      } else if (subtype == task_subtype_gpu_unpack_f) {
-        /*Do nothing and be on your way*/
-      } else if (subtype == task_subtype_gpu_unpack_g) {
-        /*Do nothing and be on your way*/
       } else if (subtype == task_subtype_gpu_density) {
         cell_unlocktree(ci);
       } else if (subtype == task_subtype_gpu_gradient) {
@@ -680,12 +666,6 @@ void task_unlock(struct task *t) {
       } else if (subtype == task_subtype_gpu_force) {
         cell_unlocktree(ci);
         cell_unlocktree(cj);
-      } else if (subtype == task_subtype_gpu_unpack_d) {
-        /* Nothing to do */
-      } else if (subtype == task_subtype_gpu_unpack_f) {
-        /* Nothing to do */
-      } else if (subtype == task_subtype_gpu_unpack_g) {
-        /* Nothing to do */
       } else { /* hydro */
         cell_unlocktree(ci);
         cell_unlocktree(cj);
@@ -901,15 +881,6 @@ int task_lock(struct task *t) {
         /* Attempt to lock the cell */
         if (ci->hydro.hold) return 0;
         if (cell_locktree(ci) != 0) return 0;
-      } else if (subtype == task_subtype_gpu_unpack_d) {
-        /* Nothing to do here */
-        return 1;
-      } else if (subtype == task_subtype_gpu_unpack_f) {
-        /* Nothing to do here */
-        return 1;
-      } else if (subtype == task_subtype_gpu_unpack_g) {
-        /* Nothing to do here */
-        return 1;
       } else { /* subtype == hydro */
         if (ci->hydro.hold) return 0;
         if (cell_locktree(ci) != 0) return 0;
@@ -1050,15 +1021,6 @@ int task_lock(struct task *t) {
           cell_unlocktree(ci);
           return 0;
         }
-      } else if (subtype == task_subtype_gpu_unpack_d) {
-        /* Nothing to do here. */
-        return 1;
-      } else if (subtype == task_subtype_gpu_unpack_f) {
-        /* Nothing to do here. */
-        return 1;
-      } else if (subtype == task_subtype_gpu_unpack_g) {
-        /* Nothing to do here. */
-        return 1;
       } else { /* subtype == hydro */
         /* Lock the parts in both cells */
         if (ci->hydro.hold || cj->hydro.hold) return 0;
@@ -1224,15 +1186,12 @@ void task_get_group_name(int type, int subtype, char *cluster) {
   switch (subtype) {
     /* A. Nasar */
     case task_subtype_gpu_density:
-    case task_subtype_gpu_unpack_d:
       strcpy(cluster, "Density");
       break;
     case task_subtype_gpu_force:
-    case task_subtype_gpu_unpack_f:
       strcpy(cluster, "Force");
       break;
     case task_subtype_gpu_gradient:
-    case task_subtype_gpu_unpack_g:
       strcpy(cluster, "Gradient");
       break;
     case task_subtype_density:
@@ -1740,16 +1699,8 @@ void task_dump_active(struct engine *e) {
 
       /* Get destination rank of MPI requests. */
       int paired = (t->cj != NULL);
-      int otherrank = 0;
-      // A. N.: Mods requied to stop code crashing when debugging GPU tasks
-      if (t->subtype != task_subtype_gpu_unpack_d &&
-          t->subtype != task_subtype_gpu_unpack_f &&
-          t->subtype != task_subtype_gpu_unpack_g)
-        otherrank = t->ci->nodeID;
-      if (paired && t->subtype != task_subtype_gpu_unpack_d &&
-          t->subtype != task_subtype_gpu_unpack_f &&
-          t->subtype != task_subtype_gpu_unpack_g)
-        otherrank = t->cj->nodeID;
+      int otherrank = t->ci->nodeID;
+      if (paired) otherrank = t->cj->nodeID;
 
       fprintf(file_thread, "%i %i %s %s %i %i %lli %lli %i %i %i %i %lli\n",
               engine_rank, otherrank, taskID_names[t->type],
@@ -1879,10 +1830,6 @@ enum task_categories task_get_category(const struct task *t) {
         case task_subtype_gpu_gradient:
         case task_subtype_gpu_force:
           return task_category_gpu;
-        case task_subtype_gpu_unpack_d:
-        case task_subtype_gpu_unpack_f:
-        case task_subtype_gpu_unpack_g:
-          return task_category_gpu_unpack;
 
         case task_subtype_limiter:
           return task_category_limiter;

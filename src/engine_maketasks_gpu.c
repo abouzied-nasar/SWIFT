@@ -4140,7 +4140,7 @@ void engine_maketasks(struct engine *e) {
             clocks_from_ticks(getticks() - tic2), clocks_getunit());
 
   /* Weight the tasks. */
-  scheduler_reweight(sched, &e->gpu_pack_params, e->verbose);
+  scheduler_reweight(sched, e->verbose);
 
   /* Set the tasks age. */
   e->tasks_age = 0;

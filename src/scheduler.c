@@ -948,6 +948,7 @@ void scheduler_write_cell_dependencies(struct scheduler *s, int verbose,
     /* and their dependencies */
     for (int j = 0; j < ta->nr_unlock_tasks; j++) {
       const struct task *tb = ta->unlock_tasks[j];
+
       /* Are we using this task?
        * For the 0-step, we wish to show all the tasks (even the inactive). */
       if (step != 0 && tb->skip) continue;
@@ -1637,7 +1638,7 @@ void scheduler_splittasks_mapper(void *map_data, int num_elements,
     struct task *t = &tasks[ind];
 
     /* Invoke the correct splitting strategy */
-#ifdef WITH_CUDA
+#if defined(WITH_CUDA) || defined(WITH_HIP)
     if (t->subtype == task_subtype_gpu_density) {
       scheduler_splittask_hydro(t, s);
     } else if (t->subtype == task_subtype_external_grav) {
@@ -1771,7 +1772,9 @@ struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
     }
   }
   /* Add an index for it. */
+  // lock_lock( &s->lock );
   s->tasks_ind[atomic_inc(&s->nr_tasks)] = ind;
+  // lock_unlock_blind( &s->lock );
 
   /* Return a pointer to the new task. */
   return t;
@@ -2043,9 +2046,7 @@ void scheduler_reset(struct scheduler *s, int size) {
  * @param s The #scheduler.
  * @param verbose Are we talkative?
  */
-void scheduler_reweight(struct scheduler *s,
-                        const struct gpu_global_pack_params *gpu_pack_params,
-                        int verbose) {
+void scheduler_reweight(struct scheduler *s, int verbose) {
   const int nr_tasks = s->nr_tasks;
   int *tid = s->tasks_ind;
   struct task *tasks = s->tasks;
@@ -2243,10 +2244,10 @@ void scheduler_reweight(struct scheduler *s,
         break;
 
       case task_type_ghost:
-        if (t->ci == t->ci->hydro.super) cost = wscale * count_i * count_i;
+        if (t->ci == t->ci->hydro.super) cost = wscale * count_i;
         break;
       case task_type_extra_ghost:
-        if (t->ci == t->ci->hydro.super) cost = wscale * count_i * count_i;
+        if (t->ci == t->ci->hydro.super) cost = wscale * count_i;
         break;
       case task_type_stars_ghost:
         if (t->ci == t->ci->hydro.super) cost = wscale * scount_i;
@@ -2261,7 +2262,7 @@ void scheduler_reweight(struct scheduler *s,
         if (t->ci == t->ci->hydro.super) cost = wscale * sink_count_i;
         break;
       case task_type_drift_part:
-        cost = wscale * count_i * count_i;
+        cost = wscale * count_i;
         break;
       case task_type_drift_gpart:
         cost = wscale * gcount_i;
@@ -2288,7 +2289,7 @@ void scheduler_reweight(struct scheduler *s,
         cost = wscale * (gcount_i + gcount_j);
         break;
       case task_type_end_hydro_force:
-        cost = wscale * count_i * count_i;
+        cost = wscale * count_i;
         break;
       case task_type_end_grav_force:
         cost = wscale * gcount_i;
@@ -2565,12 +2566,11 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
         owner = &t->ci->super->owner;
         break;
       case task_type_pair:
-
         qid = t->ci->super->owner;
         owner = &t->ci->super->owner;
         if ((qid < 0) ||
             ((t->cj->super->owner > -1) &&
-                (s->queues[qid].count > s->queues[t->cj->super->owner].count))) {
+             (s->queues[qid].count > s->queues[t->cj->super->owner].count))) {
           qid = t->cj->super->owner;
           owner = &t->cj->super->owner;
         }
@@ -2807,8 +2807,10 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
 
     /* Save qid as owner for next time a task accesses this cell. */
     if (owner != NULL) *owner = qid;
+
     /* Increase the waiting counter. */
     atomic_inc(&s->waiting);
+
     /* Insert the task into that queue. */
     queue_insert(&s->queues[qid], t);
     /* A. Nasar: Increment counters required for the pack tasks */

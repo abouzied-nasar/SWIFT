@@ -367,8 +367,6 @@ enum cell_flags {
  */
 struct cell {
 
-  /*Marks a cell for GPU execution A. Nasar */
-
   /*! The cell location on the grid (corner nearest to the origin). */
   double loc[3];
 

@@ -1888,52 +1888,19 @@ int cell_unskip_hydro_tasks(struct cell *c, struct scheduler *s) {
 #endif
     }
   }
+
   /* Unskip all the other task types. */
   int c_active = cell_is_active_hydro(c, e);
   if (c->nodeID == nodeID && c_active) {
-    for (struct link *l = c->hydro.density_pack; l != NULL;
-         l = l->next) { /* A. Nasar */
-      if (l->t->type == task_type_self && l->t->ci->hydro.count > 0)
-        scheduler_activate(s, l->t);
-      else if (l->t->type == task_type_pair && l->t->ci->hydro.count > 0 &&
-               l->t->cj->hydro.count > 0)
-        scheduler_activate(s, l->t);
-    }
-    for (struct link *l = c->hydro.density_unpack; l != NULL; l = l->next) {
-      scheduler_activate(s, l->t);
-    }
     for (struct link *l = c->hydro.gradient; l != NULL; l = l->next) {
       scheduler_activate(s, l->t);
     }
     for (struct link *l = c->hydro.force; l != NULL; l = l->next) {
       scheduler_activate(s, l->t);
     }
+
     for (struct link *l = c->hydro.limiter; l != NULL; l = l->next)
       scheduler_activate(s, l->t);
-    // A. Nasar activate force and gradient packing tasks
-    for (struct link *l = c->hydro.force_pack; l != NULL; l = l->next) {
-      if (l->t->type == task_type_self && l->t->ci->hydro.count > 0)
-        scheduler_activate(s, l->t);
-      else if (l->t->type == task_type_pair && l->t->ci->hydro.count > 0 &&
-               l->t->cj->hydro.count > 0)
-        scheduler_activate(s, l->t);
-    }
-    for (struct link *l = c->hydro.force_unpack; l != NULL; l = l->next) {
-      scheduler_activate(s, l->t);
-    }
-
-#ifdef EXTRA_HYDRO_LOOP
-    for (struct link *l = c->hydro.gradient_pack; l != NULL; l = l->next) {
-      if (l->t->type == task_type_self && l->t->ci->hydro.count > 0)
-        scheduler_activate(s, l->t);
-      else if (l->t->type == task_type_pair && l->t->ci->hydro.count > 0 &&
-               l->t->cj->hydro.count > 0)
-        scheduler_activate(s, l->t);
-    }
-    for (struct link *l = c->hydro.gradient_unpack; l != NULL; l = l->next) {
-      scheduler_activate(s, l->t);
-    }
-#endif
 
     if (c->hydro.extra_ghost != NULL)
       scheduler_activate(s, c->hydro.extra_ghost);

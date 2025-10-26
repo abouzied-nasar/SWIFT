@@ -214,7 +214,9 @@ void *runner_main_cuda(void *data) {
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
   /* Declare some global variables */
+#ifdef CUDA_PROFILER
   int step = 0;
+#endif
 
   /* Tell me how much memory we're using. */
   gpu_print_free_mem(e, r->cpuid);
@@ -246,8 +248,8 @@ void *runner_main_cuda(void *data) {
     /* TODO: DO WE STILL NEED THIS?? */
 #ifdef CUDA_PROFILER
     if (step == 0) cudaProfilerStart();
-#endif
     step++;
+#endif
 
     /* Loop while there are tasks... */
     while (1) {
@@ -266,9 +268,9 @@ void *runner_main_cuda(void *data) {
       /* Get the cells. */
       struct cell *ci = t->ci;
       struct cell *cj = t->cj;
-
-      if (ci == NULL)
-        error("This cannot be");
+#ifdef SWIFT_DEBUG_CHECKS
+      if (ci == NULL) error("This cannot be");
+#endif
 
 #ifdef SWIFT_DEBUG_TASKS
       /* Mark the thread we run on */
@@ -698,7 +700,7 @@ void *runner_main_cuda(void *data) {
       prev = t;
       if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
-        /* Don't enqueue unpacks yet. Just signal the runners */
+        /* Don't enqueue dependencies yet. Just signal the runners */
         t->skip = 1;
         t->toc = getticks();
         t->total_ticks += t->toc - t->tic;
@@ -708,7 +710,7 @@ void *runner_main_cuda(void *data) {
 #endif
       } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-        /* Don't enqueue unpacks yet. Just signal the runners */
+        /* Don't enqueue dependencies yet. Just signal the runners */
         t->skip = 1;
         t->toc = getticks();
         t->total_ticks += t->toc - t->tic;
@@ -718,7 +720,7 @@ void *runner_main_cuda(void *data) {
 #endif
       } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-        /* Don't enqueue unpacks yet. Just signal the runners */
+        /* Don't enqueue dependencies yet. Just signal the runners */
         t->skip = 1;
         t->toc = getticks();
         t->total_ticks += t->toc - t->tic;
