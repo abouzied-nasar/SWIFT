@@ -108,7 +108,7 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
 void gpu_pack_metadata_init_step(struct gpu_pack_metadata *md);
 void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
                              int reset_leaves_lists);
-void gpu_pack_metadata_free(struct gpu_pack_metadata* md);
+void gpu_pack_metadata_free(struct gpu_pack_metadata *md);
 
 #ifdef __cplusplus
 }

@@ -30,7 +30,6 @@
 #include "cell.h"
 #include "gpu_offload_data.h"
 
-
 /**
  * @brief Unpacks the density data from GPU buffers into cell's particle arrays
  *
@@ -41,8 +40,9 @@
  * @param e the #engine
  */
 __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
-    struct cell *restrict c, const struct gpu_part_recv_d *restrict
-    parts_buffer, const int unpack_ind, const int count, const struct engine *e) {
+    struct cell *restrict c,
+    const struct gpu_part_recv_d *restrict parts_buffer, const int unpack_ind,
+    const int count, const struct engine *e) {
 
   const struct gpu_part_recv_d *parts_recv = &parts_buffer[unpack_ind];
 
@@ -87,7 +87,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
 __attribute__((always_inline)) INLINE static void gpu_unpack_part_gradient(
     struct cell *restrict c,
     const struct gpu_part_recv_g *restrict parts_buffer, const int unpack_ind,
-    const int count, const struct engine* e) {
+    const int count, const struct engine *e) {
 
   const struct gpu_part_recv_g *parts_recv = &parts_buffer[unpack_ind];
 
@@ -122,7 +122,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_gradient(
 __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
     struct cell *restrict c,
     const struct gpu_part_recv_f *restrict parts_buffer, const int unpack_ind,
-    const int count, const struct engine* e) {
+    const int count, const struct engine *e) {
 
   const struct gpu_part_recv_f *parts_recv = &parts_buffer[unpack_ind];
 
@@ -164,9 +164,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     const struct cell *restrict c,
-    struct gpu_part_send_d *restrict parts_buffer,
-    const int pack_ind, const double shift[3], const int cjstart,
-    const int cjend) {
+    struct gpu_part_send_d *restrict parts_buffer, const int pack_ind,
+    const double shift[3], const int cjstart, const int cjend) {
 
   /* Grab handles */
   const int count = c->hydro.count;
@@ -209,9 +208,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     const struct cell *restrict ci,
-    struct gpu_part_send_g *restrict parts_buffer,
-    const int pack_ind, const double shift[3], const int cjstart,
-    const int cjend) {
+    struct gpu_part_send_g *restrict parts_buffer, const int pack_ind,
+    const double shift[3], const int cjstart, const int cjend) {
 
   /* Grab handles */
   const int count = ci->hydro.count;
@@ -259,9 +257,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     const struct cell *restrict ci,
-    struct gpu_part_send_f *restrict parts_buffer,
-    const int pack_ind, const double shift[3], const int cjstart,
-    const int cjend) {
+    struct gpu_part_send_f *restrict parts_buffer, const int pack_ind,
+    const double shift[3], const int cjstart, const int cjend) {
 
   const int count = ci->hydro.count;
   const struct part *parts = ci->hydro.parts;
@@ -294,7 +291,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     ps[i].c_u_avisc_adiff.w = part_get_alpha_diff(p);
 
     ps[i].timebin_minngbtimebin_pjs_pje.x = (int)part_get_time_bin(p);
-    int mintbin = (int) part_get_timestep_limiter_min_ngb_time_bin(p);
+    int mintbin = (int)part_get_timestep_limiter_min_ngb_time_bin(p);
     ps[i].timebin_minngbtimebin_pjs_pje.y = mintbin;
     ps[i].timebin_minngbtimebin_pjs_pje.z = cjstart;
     ps[i].timebin_minngbtimebin_pjs_pje.w = cjend;

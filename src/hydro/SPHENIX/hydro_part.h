@@ -790,7 +790,6 @@ static __attribute__((always_inline)) INLINE const float *part_get_const_rot_v(
   return p->density._rot_v;
 }
 
-
 /**
  * @brief get particle velocity curl by index
  */

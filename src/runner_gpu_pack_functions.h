@@ -86,9 +86,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     error(
         "Exceeded particle buffer size. Increase "
         "Scheduler:gpu_part_buffer_size."
-        "ind=%d, counts=%d %d, buffer_size=%d, task_subtype=%s, is self task?=%d",
+        "ind=%d, counts=%d %d, buffer_size=%d, task_subtype=%s, is self "
+        "task?=%d",
         pack_ind, count_ci, count_cj, md->params.part_buffer_size,
-        subtaskID_names[task_subtype], ci == cj); }
+        subtaskID_names[task_subtype], ci == cj);
+  }
 #endif
 
   /* Get first and last particles of cell i */
@@ -138,7 +140,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     if (task_subtype == task_subtype_gpu_density) {
       gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs, cje);
     } else if (task_subtype == task_subtype_gpu_gradient) {
-      gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift_i, cjs, cje);
+      gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift_i, cjs,
+                             cje);
     } else if (task_subtype == task_subtype_gpu_force) {
       gpu_pack_part_force(ci, buf->parts_send_f, pack_ind, shift_i, cjs, cje);
     }
@@ -158,7 +161,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     if (task_subtype == task_subtype_gpu_density) {
       gpu_pack_part_density(cj, buf->parts_send_d, pack_ind, shift_j, cis, cie);
     } else if (task_subtype == task_subtype_gpu_gradient) {
-      gpu_pack_part_gradient(cj, buf->parts_send_g, pack_ind, shift_j, cis, cie);
+      gpu_pack_part_gradient(cj, buf->parts_send_g, pack_ind, shift_j, cis,
+                             cie);
     } else if (task_subtype == task_subtype_gpu_force) {
       gpu_pack_part_force(cj, buf->parts_send_f, pack_ind, shift_j, cis, cie);
     }
@@ -175,7 +179,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
   const int lid = md->n_leaves_packed;
 
   /* Identify first particle for each bundle of tasks */
-  const int bundle_size = md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
+  const int bundle_size =
+      md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
   if (lid % bundle_size == 0) {
     int bid = lid / bundle_size;
     /* Store this before we increment md->count_parts */
@@ -195,8 +200,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
    * of leaf cell pairs to offload */
   md->n_leaves_packed++;
 };
-
-
 
 /**
  * @brief Generic function to unpack data received from the GPU depending on
@@ -221,8 +224,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
 
   struct cell **ci_leaves = md->ci_leaves;
   struct cell **cj_leaves = md->cj_leaves;
-  int* task_fp = md->task_first_packed_leaf;
-  int* task_lp = md->task_last_packed_leaf;
+  int *task_fp = md->task_first_packed_leaf;
+  int *task_lp = md->task_last_packed_leaf;
 
   /* Keep track which tasks in our list we've unpacked already */
   char *task_unpacked = malloc(md->tasks_in_list * sizeof(char));
@@ -266,7 +269,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
 
         if (!cell_is_active_hydro(cii, e) && !cell_is_active_hydro(cjj, e)) {
           /* To be fixed and double-checked later */
-          error("In unpack, subtype %s: Inactive cell", subtaskID_names[task_subtype]);
+          error("In unpack, subtype %s: Inactive cell",
+                subtaskID_names[task_subtype]);
           return;
         }
 
@@ -287,15 +291,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
         }
 #endif
 
-
         /* Get the particle data into CPU-side buffers. */
         if (cell_is_active_hydro(cii, e)) {
           if (task_subtype == task_subtype_gpu_density) {
-            gpu_unpack_part_density(cii, buf->parts_recv_d, unpack_index, count_ci, e);
+            gpu_unpack_part_density(cii, buf->parts_recv_d, unpack_index,
+                                    count_ci, e);
           } else if (task_subtype == task_subtype_gpu_gradient) {
-            gpu_unpack_part_gradient(cii, buf->parts_recv_g, unpack_index, count_ci, e);
+            gpu_unpack_part_gradient(cii, buf->parts_recv_g, unpack_index,
+                                     count_ci, e);
           } else if (task_subtype == task_subtype_gpu_force) {
-            gpu_unpack_part_force(cii, buf->parts_recv_f, unpack_index, count_ci, e);
+            gpu_unpack_part_force(cii, buf->parts_recv_f, unpack_index,
+                                  count_ci, e);
           }
 #ifdef SWIFT_DEBUG_CHECKS
           else {
@@ -309,11 +315,14 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
           /* We have a pair interaction. Get the other cell too. */
           if (cell_is_active_hydro(cjj, e)) {
             if (task_subtype == task_subtype_gpu_density) {
-              gpu_unpack_part_density(cjj, buf->parts_recv_d, unpack_index, count_cj, e);
+              gpu_unpack_part_density(cjj, buf->parts_recv_d, unpack_index,
+                                      count_cj, e);
             } else if (task_subtype == task_subtype_gpu_gradient) {
-              gpu_unpack_part_gradient(cjj, buf->parts_recv_g, unpack_index, count_cj, e);
+              gpu_unpack_part_gradient(cjj, buf->parts_recv_g, unpack_index,
+                                       count_cj, e);
             } else if (task_subtype == task_subtype_gpu_force) {
-              gpu_unpack_part_force(cjj, buf->parts_recv_f, unpack_index, count_cj, e);
+              gpu_unpack_part_force(cjj, buf->parts_recv_f, unpack_index,
+                                    count_cj, e);
             }
 #ifdef SWIFT_DEBUG_CHECKS
             else {
@@ -331,8 +340,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
       if (t->cj != NULL) cell_unlocktree(t->cj);
 
       /* If we haven't finished packing the currently handled task's leaf cells,
-       * we mustn't unlock its dependencies yet. ("Currently handled task" is the
-       * one for which the offloading cycle is currently underway in
+       * we mustn't unlock its dependencies yet. ("Currently handled task" is
+       * the one for which the offloading cycle is currently underway in
        * runner_gpu_pack_and_launch) */
       if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves)) {
         continue;
@@ -361,8 +370,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
   free(task_unpacked);
 }
 
-
-
 /**
  * @brief Wrapper to pack data for density tasks on the GPU.
  */
@@ -383,10 +390,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_density(
 /**
  * @brief Wrapper to pack data for gradient tasks on the GPU.
  */
-__attribute__((always_inline)) INLINE static void
-runner_gpu_pack_gradient(const struct runner *r,
-                         struct gpu_offload_data *restrict buf,
-                         const struct cell *ci, const struct cell *cj) {
+__attribute__((always_inline)) INLINE static void runner_gpu_pack_gradient(
+    const struct runner *r, struct gpu_offload_data *restrict buf,
+    const struct cell *ci, const struct cell *cj) {
 
   TIMER_TIC;
 
@@ -414,7 +420,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_force(
   else
     TIMER_TOC(timer_doself_gpu_pack_f);
 }
-
 
 /**
  * @brief Wrapper to unpack the density data.
@@ -450,10 +455,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_density(
  * pair task offloading call. May differ from the total number of packed leaf
  * cell pairs if there have been leftover leaf cell pairs from a previous task.
  */
-__attribute__((always_inline)) INLINE static void
-runner_gpu_unpack_gradient(const struct runner *r, struct scheduler *s,
-                                  struct gpu_offload_data *restrict buf,
-                                  const int npacked) {
+__attribute__((always_inline)) INLINE static void runner_gpu_unpack_gradient(
+    const struct runner *r, struct scheduler *s,
+    struct gpu_offload_data *restrict buf, const int npacked) {
 
   TIMER_TIC;
 

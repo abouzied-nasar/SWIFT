@@ -96,7 +96,6 @@ struct gpu_part_recv_g {
 #endif
 };
 
-
 /*! Container for particle data required for force calcs */
 struct gpu_part_send_f {
 #ifdef WITH_CUDA

@@ -27,9 +27,21 @@ extern "C" {
 
 #include <cuda_runtime.h>
 
-void gpu_launch_density(const struct gpu_part_send_d *restrict d_parts_send, struct gpu_part_recv_d *restrict d_parts_recv, const float d_a, const float d_H, cudaStream_t stream, const int num_blocks_x, const int num_blocks_y, const int bundle_first_part, const int bundle_n_parts);
-void gpu_launch_gradient(const struct gpu_part_send_g *restrict d_parts_send, struct gpu_part_recv_g *restrict d_parts_recv, const float d_a, const float d_H, cudaStream_t stream, const int num_blocks_x, const int num_blocks_y, const int bundle_first_part, const int bundle_n_parts);
-void gpu_launch_force(const struct gpu_part_send_f *restrict d_parts_send, struct gpu_part_recv_f *restrict d_parts_recv, const float d_a, const float d_H, cudaStream_t stream, const int num_blocks_x, const int num_blocks_y, const int bundle_first_part, const int bundle_n_parts);
+void gpu_launch_density(const struct gpu_part_send_d *restrict d_parts_send,
+                        struct gpu_part_recv_d *restrict d_parts_recv,
+                        const float d_a, const float d_H, cudaStream_t stream,
+                        const int num_blocks_x, const int num_blocks_y,
+                        const int bundle_first_part, const int bundle_n_parts);
+void gpu_launch_gradient(const struct gpu_part_send_g *restrict d_parts_send,
+                         struct gpu_part_recv_g *restrict d_parts_recv,
+                         const float d_a, const float d_H, cudaStream_t stream,
+                         const int num_blocks_x, const int num_blocks_y,
+                         const int bundle_first_part, const int bundle_n_parts);
+void gpu_launch_force(const struct gpu_part_send_f *restrict d_parts_send,
+                      struct gpu_part_recv_f *restrict d_parts_recv,
+                      const float d_a, const float d_H, cudaStream_t stream,
+                      const int num_blocks_x, const int num_blocks_y,
+                      const int bundle_first_part, const int bundle_n_parts);
 
 #ifdef __cplusplus
 }

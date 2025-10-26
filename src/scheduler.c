@@ -3334,7 +3334,6 @@ void scheduler_clean(struct scheduler *s) {
   free(s->p_g_left);
   free(s->p_f_left);
 #endif
-
 }
 
 /**

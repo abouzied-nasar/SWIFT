@@ -227,10 +227,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   const int leaves_packed = md->n_leaves_packed;
 
   /* How many leaves should be in a bundle? */
-  const int bundle_size = md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
+  const int bundle_size =
+      md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
 
   /* Identify the number of GPU bundles to run in ideal case */
-  int n_bundles = md->is_pair_task ? md->params.n_bundles_pair : md->params.n_bundles;
+  int n_bundles =
+      md->is_pair_task ? md->params.n_bundles_pair : md->params.n_bundles;
 
   /* Special case for incomplete bundles (when having not enough leftover leafs
    * to fill a bundle) */
@@ -239,7 +241,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     n_bundles = (leaves_packed + bundle_size - 1) / bundle_size;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    int n_bundles_max = md->is_pair_task ? md->params.n_bundles_pair : md->params.n_bundles;
+    int n_bundles_max =
+        md->is_pair_task ? md->params.n_bundles_pair : md->params.n_bundles;
 
     if (n_bundles > n_bundles_max) {
       error("Launching leftovers with too many bundles? Target size=%d, got=%d",
@@ -258,7 +261,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
     /* Get the particle count for this bundle */
     const int bundle_first_part = md->bundle_first_part[bid];
-    const int bundle_last_part = bid < (n_bundles - 1) ? md->bundle_first_part[bid+1] : md->count_parts;
+    const int bundle_last_part = bid < (n_bundles - 1)
+                                     ? md->bundle_first_part[bid + 1]
+                                     : md->count_parts;
     const int bundle_n_parts = bundle_last_part - bundle_first_part;
 
     /* initialise to just some meaningless value to silence the compiler */
@@ -267,24 +272,27 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     /* Transfer memory to device */
     if (task_subtype == task_subtype_gpu_density) {
 
-      cu_error = cudaMemcpyAsync(
-          &buf->d_parts_send_d[bundle_first_part], &buf->parts_send_d[bundle_first_part],
-          bundle_n_parts * sizeof(struct gpu_part_send_d),
-          cudaMemcpyHostToDevice, stream[bid]);
+      cu_error =
+          cudaMemcpyAsync(&buf->d_parts_send_d[bundle_first_part],
+                          &buf->parts_send_d[bundle_first_part],
+                          bundle_n_parts * sizeof(struct gpu_part_send_d),
+                          cudaMemcpyHostToDevice, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
-      cu_error = cudaMemcpyAsync(
-          &buf->d_parts_send_g[bundle_first_part], &buf->parts_send_g[bundle_first_part],
-          bundle_n_parts * sizeof(struct gpu_part_send_g),
-          cudaMemcpyHostToDevice, stream[bid]);
+      cu_error =
+          cudaMemcpyAsync(&buf->d_parts_send_g[bundle_first_part],
+                          &buf->parts_send_g[bundle_first_part],
+                          bundle_n_parts * sizeof(struct gpu_part_send_g),
+                          cudaMemcpyHostToDevice, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_force) {
 
-      cu_error = cudaMemcpyAsync(
-          &buf->d_parts_send_f[bundle_first_part], &buf->parts_send_f[bundle_first_part],
-          bundle_n_parts * sizeof(struct gpu_part_send_f),
-          cudaMemcpyHostToDevice, stream[bid]);
+      cu_error =
+          cudaMemcpyAsync(&buf->d_parts_send_f[bundle_first_part],
+                          &buf->parts_send_f[bundle_first_part],
+                          bundle_n_parts * sizeof(struct gpu_part_send_f),
+                          cudaMemcpyHostToDevice, stream[bid]);
     }
 #ifdef SWIFT_DEBUG_CHECKS
     else {
@@ -312,13 +320,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     if (task_subtype == task_subtype_gpu_density) {
 
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
-                         stream[bid], num_blocks_x, num_blocks_y, bundle_first_part,
-                         bundle_n_parts);
+                         stream[bid], num_blocks_x, num_blocks_y,
+                         bundle_first_part, bundle_n_parts);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
-      gpu_launch_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a,
-                          d_H, stream[bid], num_blocks_x, num_blocks_y,
+      gpu_launch_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H,
+                          stream[bid], num_blocks_x, num_blocks_y,
                           bundle_first_part, bundle_n_parts);
 
     } else if (task_subtype == task_subtype_gpu_force) {
@@ -347,24 +355,27 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     /* Copy results back to CPU BUFFERS */
     if (task_subtype == task_subtype_gpu_density) {
 
-      cu_error = cudaMemcpyAsync(
-          &buf->parts_recv_d[bundle_first_part], &buf->d_parts_recv_d[bundle_first_part],
-          bundle_n_parts * sizeof(struct gpu_part_recv_d),
-          cudaMemcpyDeviceToHost, stream[bid]);
+      cu_error =
+          cudaMemcpyAsync(&buf->parts_recv_d[bundle_first_part],
+                          &buf->d_parts_recv_d[bundle_first_part],
+                          bundle_n_parts * sizeof(struct gpu_part_recv_d),
+                          cudaMemcpyDeviceToHost, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
-      cu_error = cudaMemcpyAsync(
-          &buf->parts_recv_g[bundle_first_part], &buf->d_parts_recv_g[bundle_first_part],
-          bundle_n_parts * sizeof(struct gpu_part_recv_g),
-          cudaMemcpyDeviceToHost, stream[bid]);
+      cu_error =
+          cudaMemcpyAsync(&buf->parts_recv_g[bundle_first_part],
+                          &buf->d_parts_recv_g[bundle_first_part],
+                          bundle_n_parts * sizeof(struct gpu_part_recv_g),
+                          cudaMemcpyDeviceToHost, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_force) {
 
-      cu_error = cudaMemcpyAsync(
-          &buf->parts_recv_f[bundle_first_part], &buf->d_parts_recv_f[bundle_first_part],
-          bundle_n_parts * sizeof(struct gpu_part_recv_f),
-          cudaMemcpyDeviceToHost, stream[bid]);
+      cu_error =
+          cudaMemcpyAsync(&buf->parts_recv_f[bundle_first_part],
+                          &buf->d_parts_recv_f[bundle_first_part],
+                          bundle_n_parts * sizeof(struct gpu_part_recv_f),
+                          cudaMemcpyDeviceToHost, stream[bid]);
     }
 #ifdef SWIFT_DEBUG_CHECKS
     else {
@@ -433,11 +444,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_density(
  * @param d_a the current expansion scale factor
  * @param d_H the current Hubble constant
  */
-__attribute__((always_inline)) INLINE static void
-runner_gpu_launch_gradient(const struct runner *r,
-                           struct gpu_offload_data *restrict buf,
-                           cudaStream_t *stream, const float d_a,
-                           const float d_H) {
+__attribute__((always_inline)) INLINE static void runner_gpu_launch_gradient(
+    const struct runner *r, struct gpu_offload_data *restrict buf,
+    cudaStream_t *stream, const float d_a, const float d_H) {
 
   TIMER_TIC;
 
@@ -458,11 +467,9 @@ runner_gpu_launch_gradient(const struct runner *r,
  * @param d_a the current expansion scale factor
  * @param d_H the current Hubble constant
  */
-__attribute__((always_inline)) INLINE static void
-runner_gpu_launch_force(const struct runner *r,
-                        struct gpu_offload_data *restrict buf,
-                        cudaStream_t *stream, const float d_a,
-                        const float d_H) {
+__attribute__((always_inline)) INLINE static void runner_gpu_launch_force(
+    const struct runner *r, struct gpu_offload_data *restrict buf,
+    cudaStream_t *stream, const float d_a, const float d_H) {
 
   TIMER_TIC;
 
@@ -493,17 +500,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
   /* Grab handles */
   struct gpu_pack_metadata *md = &buf->md;
-  int* task_first_packed_leaf = md->task_first_packed_leaf;
-  int* task_last_packed_leaf = md->task_last_packed_leaf;
+  int *task_first_packed_leaf = md->task_first_packed_leaf;
+  int *task_last_packed_leaf = md->task_last_packed_leaf;
 
   /* Nr of super-level tasks we've accounted for in the meda-data arrays. */
   int tind = md->tasks_in_list;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  int pack_size = md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
+  int pack_size =
+      md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
   if (tind >= pack_size)
     error("Writing out of task_list array bounds: %d/%d, is pair task?=%d",
-        tind, pack_size, md->is_pair_task);
+          tind, pack_size, md->is_pair_task);
 #endif
 
   /* Keep track of index of first leaf cell pairs in lists per super-level pair
@@ -534,7 +542,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   md->n_leaves += md->task_n_leaves;
 
   /* How many leaf cell interactions do we want to offload at once? */
-  const int target_n_leaves = md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
+  const int target_n_leaves =
+      md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
 
   /* Counter for how many leaf cell pairs of this task we've packed */
   int npacked = 0;
@@ -695,7 +704,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Whatever the remaining leaf cells are, they will belong to the
          * current task. Any previous task will already have been offloaded. */
         task_first_packed_leaf[0] = 0; /* First index is now 0 */
-        task_last_packed_leaf[0] = 0; /* Nothing's packed yet. */
+        task_last_packed_leaf[0] = 0;  /* Nothing's packed yet. */
         /* Same for first particle index of task */
         md->task_first_packed_part[0] = 0;
 
@@ -808,8 +817,6 @@ static void runner_doself_gpu_force(struct runner *r, struct scheduler *s,
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
 }
-
-
 
 /**
  * @brief Top level runner function to solve hydro density pair tasks on GPU.

@@ -213,7 +213,7 @@ void *runner_main_cuda(void *data) {
   for (int i = 0; i < gpu_pack_params.n_bundles_pair; i++)
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
-  /* Declare some global variables */
+    /* Declare some global variables */
 #ifdef CUDA_PROFILER
   int step = 0;
 #endif
@@ -310,8 +310,7 @@ void *runner_main_cuda(void *data) {
             runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream,
                                       d_a, d_H);
 #endif
-          }
-          else if (t->subtype == task_subtype_gpu_gradient) {
+          } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
             runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream,
                                        d_a, d_H);

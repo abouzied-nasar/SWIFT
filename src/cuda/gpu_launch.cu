@@ -41,7 +41,7 @@ extern "C" {
 /* #include <cuda_profiler_api.h> */
 /* #include <cuda_runtime.h> */
 
- /**
+/**
  * @brief Call the particle SPH density kernel.
  *
  * @param d_parts_send array on device containing particle data
@@ -65,7 +65,7 @@ __global__ void cuda_launch_density(
   }
 }
 
- /**
+/**
  * @brief Call the particle SPH gradient kernel.
  *
  * @param d_parts_send array on device containing particle data
@@ -180,10 +180,9 @@ void gpu_launch_gradient(
  */
 void gpu_launch_force(const struct gpu_part_send_f *__restrict__ d_parts_send,
                       struct gpu_part_recv_f *__restrict__ d_parts_recv,
-                      const float d_a, const float d_H,
-                      cudaStream_t stream, const int num_blocks_x,
-                      const int num_blocks_y, const int bundle_first_part,
-                      const int bundle_n_parts) {
+                      const float d_a, const float d_H, cudaStream_t stream,
+                      const int num_blocks_x, const int num_blocks_y,
+                      const int bundle_first_part, const int bundle_n_parts) {
 
   /* TODO: Do we want to allocate shared memory here? */
   cuda_launch_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(

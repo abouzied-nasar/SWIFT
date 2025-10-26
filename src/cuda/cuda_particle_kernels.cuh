@@ -37,7 +37,6 @@ extern "C" {
 
 #include <config.h>
 
-
 /**
  * @brief Naive kernel computing the density interactions of a single particle
  *
@@ -410,7 +409,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
       const float rhoij = rhoi + rhoj;
       const float rhoij_inv = 1.f / rhoij;
       const float alpha = avisci + aviscj;
-      const float visc = -0.25f * alpha * v_sig * mu_ij * (balsi + balsj) * rhoij_inv;
+      const float visc =
+          -0.25f * alpha * v_sig * mu_ij * (balsi + balsj) * rhoij_inv;
 
       /* Convolve with the kernel */
       const float visc_acc_term =
@@ -420,7 +420,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
       const float rhoj2 = rhoj * rhoj;
       const float rhoj_inv = 1.f / rhoj;
       const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
-      const float P_over_rho2_j = pressurej / (rhoj2) * f_ji;
+      const float P_over_rho2_j = pressurej / (rhoj2)*f_ji;
 
       /* SPH acceleration term */
       const float sph_acc_term =
@@ -446,16 +446,17 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
        * diffusion limited particles always take precedence - another trick to
        * allow the scheme to work with thermal feedback. */
       float alpha_diff =
-          (pressurei * adiffi + pressurej * adiffj) /
-          (pressurei + pressurej);
+          (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
       /* if (fabsf(pressurei + pressurej) < 1e-10) alpha_diff = 0.f; */
 
-      const float v_diff = alpha_diff * 0.5f *
-                           (sqrtf(2.f * fabsf(pressurei - pressurej) * rhoij_inv) +
-                            fabsf(fac_mu * r_inv * dvdr_Hubble));
+      const float v_diff =
+          alpha_diff * 0.5f *
+          (sqrtf(2.f * fabsf(pressurei - pressurej) * rhoij_inv) +
+           fabsf(fac_mu * r_inv * dvdr_Hubble));
 
       /* wi_dx + wj_dx / 2 is F_ij */
-      const float diff_du_term = v_diff * (energyi - energyj) *
+      const float diff_du_term =
+          v_diff * (energyi - energyj) *
           (f_ij * wi_dr * rhoi_inv + f_ji * wj_dr * rhoj_inv);
 
       /* Assemble the energy equation term */
@@ -471,7 +472,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
     }
   } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
-  d_parts_recv[pid].udt_hdt_minngbtb = {res_udt_hdt.x, res_udt_hdt.y, (float) res_min_ngb_timebin};
+  d_parts_recv[pid].udt_hdt_minngbtb = {res_udt_hdt.x, res_udt_hdt.y,
+                                        (float)res_min_ngb_timebin};
   d_parts_recv[pid].a_hydro = res_ahydro;
 }
 

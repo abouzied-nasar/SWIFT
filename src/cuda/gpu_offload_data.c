@@ -53,7 +53,8 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const char is_pair_task) {
 
   /* Grab some handles */
-  const size_t n_bundles = is_pair_task ? params->n_bundles_pair : params->n_bundles;
+  const size_t n_bundles =
+      is_pair_task ? params->n_bundles_pair : params->n_bundles;
   const size_t part_buffer_size = params->part_buffer_size;
 
   /* Initialise and set up metadata */

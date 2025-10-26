@@ -27,9 +27,9 @@
 extern "C" {
 #endif
 
-#include <stdlib.h>
-
 #include "gpu_pack_metadata.h"
+
+#include <stdlib.h>
 
 /**
  * @brief Initialise empty gpu_pack_metadata struct
@@ -37,19 +37,23 @@ extern "C" {
  * @param md medata struct to be initialised
  * @param params gpu_global_pack_params struct containing valid parameters
  */
-void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
-                            const struct gpu_global_pack_params* params,
+void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
+                            const struct gpu_global_pack_params *params,
                             const char is_pair_task) {
 
   /* Grab some handles */
-  const size_t pack_size = is_pair_task ? params->pack_size_pair : params->pack_size;
-  const size_t n_bundles = is_pair_task ? params->n_bundles_pair : params->n_bundles;
+  const size_t pack_size =
+      is_pair_task ? params->pack_size_pair : params->pack_size;
+  const size_t n_bundles =
+      is_pair_task ? params->n_bundles_pair : params->n_bundles;
   const size_t leaf_buffer_size = params->leaf_buffer_size;
 
-  md->ci_leaves = (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
+  md->ci_leaves =
+      (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
   for (size_t i = 0; i < leaf_buffer_size; i++) md->ci_leaves[i] = 0;
 
-  md->cj_leaves = (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
+  md->cj_leaves =
+      (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
   for (size_t i = 0; i < leaf_buffer_size; i++) md->cj_leaves[i] = 0;
 
   md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
@@ -64,7 +68,7 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
   md->task_first_packed_part = malloc(pack_size * sizeof(int));
   for (size_t i = 0; i < pack_size; i++) md->task_first_packed_part[i] = 0;
 
-  md->bundle_first_part = (int*) malloc(n_bundles * sizeof(int));
+  md->bundle_first_part = (int *)malloc(n_bundles * sizeof(int));
   for (size_t i = 0; i < n_bundles; i++) md->bundle_first_part[i] = 0;
 
   md->task_n_leaves = 0;
@@ -88,7 +92,7 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
 /**
  * @brief perform the initialisations required at the start of each step
  */
-void gpu_pack_metadata_init_step(struct gpu_pack_metadata* md) {
+void gpu_pack_metadata_init_step(struct gpu_pack_metadata *md) {
 
   gpu_pack_metadata_reset(md, /*reset_leaves_lists=*/1);
 }
@@ -99,7 +103,7 @@ void gpu_pack_metadata_init_step(struct gpu_pack_metadata* md) {
  *
  * @param reset_leaves_lists if 1, also reset lists containing leaves.
  */
-void gpu_pack_metadata_reset(struct gpu_pack_metadata* md,
+void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
                              int reset_leaves_lists) {
 
   /* md->task_n_leaves = 0;  */ /* Don't reset this! */
@@ -135,7 +139,7 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata* md,
 /**
  * @brief Free the allocations.
  */
-void gpu_pack_metadata_free(struct gpu_pack_metadata* md){
+void gpu_pack_metadata_free(struct gpu_pack_metadata *md) {
 
   free((void *)md->ci_leaves);
   free((void *)md->cj_leaves);
