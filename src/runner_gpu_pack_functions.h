@@ -20,7 +20,6 @@
 #ifndef RUNNER_GPU_PACK_FUNCTIONS_H
 #define RUNNER_GPU_PACK_FUNCTIONS_H
 
-/* TODO MLADEN: CHeck which of these are still necessary */
 #include "../config.h"
 #include "active.h"
 #include "engine.h"
@@ -196,8 +195,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     md->count_parts += count_ci + count_cj;
   }
 
-  /* Record that we have now done a pair pack leaf cell pair & increment number
-   * of leaf cell pairs to offload */
+  /* Record that we have now packed a new leaf cell (pair) & increment number
+   * of leaf cells to offload */
   md->n_leaves_packed++;
 };
 
@@ -208,9 +207,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
  * @param r the #runner
  * @param s the #scheduler
  * @param buf the particle data buffers
- * @param npacked how many leaf cell pairs have been packed during the current
- * pair task offloading call. May differ from the total number of packed leaf
- * cell pairs if there have been leftover leaf cell pairs from a previous task.
+ * @param npacked how many (pairs of) leaf cells have been packed during the
+ * current pair task offloading call. May differ from the total number of
+ * packed leaf cell pairs if there have been leftover leaf cell pairs from a
+ * previous task.
  * @param task_subtype this task's subtype
  */
 __attribute__((always_inline)) INLINE static void runner_gpu_unpack(

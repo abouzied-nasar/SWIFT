@@ -128,13 +128,13 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
 }
 
 /**
- * @brief recurse into a (sub-)self task and identify all leaf cell
+ * @brief recurse into a cell and recursively identify all leaf cell
  * interactions needed in this step.
  *
  * @param r The #runner
  * @param s The #scheduler
  * @param buf the data buffers
- * @param ci the #cell associated with this task
+ * @param ci the #cell to be interacted recursively
  * @param depth current recursion depth
  * @param timer are we timing this?
  */
@@ -413,7 +413,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 }
 
 /**
- * @brief Wrapper to launch density pair tasks on the GPU.
+ * @brief Wrapper to launch density tasks on the GPU.
  *
  * @param r the #runner
  * @param buf struct holding buffer arrays
@@ -482,7 +482,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_force(
 }
 
 /**
- * @brief Generic function to pack pair tasks and launch them on the device
+ * @brief Generic function to pack tasks's data and launch them on the device
  * depending on the task subtype.
  *
  * @param r the #runner
@@ -537,7 +537,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           md->n_leaves);
 #endif
 
-  /* Update the total number of leaf pair interactions we found through the
+  /* Update the total number of leaf interactions we found through the
    * recursion. */
   md->n_leaves += md->task_n_leaves;
 
@@ -545,7 +545,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   const int target_n_leaves =
       md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
 
-  /* Counter for how many leaf cell pairs of this task we've packed */
+  /* Counter for how many leaf cells  of this task we've packed */
   int npacked = 0;
 
   /* TODO: @Abouzied Please document what is happening here, this looks very
