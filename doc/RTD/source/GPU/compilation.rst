@@ -51,7 +51,7 @@ Example usage (note the line break escape characters ``\\``):
 .. code-block:: bash
 
    CUDA_CFLAGS="-I/path/to/cuda/include" \ 
-   NVCC_FLAGS=" -allow-unsupported-compiler -diag-suppress 177 -diag-suppress 550" \
+   NVCC_FLAGS="-allow-unsupported-compiler -diag-suppress 177 -diag-suppress 550" \
    ./configure --with-cuda=/path/to/your/cuda/installation
 
 Similar to how ``--enable-debug`` enables debug symbols in the executable for
@@ -64,7 +64,8 @@ To disable optimization (on both host and device code, simultaneously), use the
 If you want to compile device code for a specific GPU hardware architecture, use
 the ``--with-cuda-arch=XX`` flag. The default is ``native``, which you can use
 if you compile on a system where the GPU you want to use for your runs is
-available. Check the `CUDA Documentation <https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html#gpu-feature-list>`_ 
+available on the node you're compiling at. Check the 
+`CUDA Documentation <https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html#gpu-feature-list>`_ 
 for options, e.g. ``sm_90``.
 
 
@@ -78,7 +79,7 @@ other compilers. We found the following solution:
 * Background: In a CPU only build, the build system creates two main convenience
   libraries, ``libswiftsim.la`` (without MPI) and ``libswisim_mpi.la`` (with
   MPI), which are ultimately linked against the 'main' object to create the
-  execuables. (There are also 2 more convenience libraries for gravity, but
+  executables. (There are also 2 more convenience libraries for gravity, but
   let's ignore that here.) 
 
 * We build two additional convenience libraries, ``libswiftsim_cuda.la`` and
@@ -107,7 +108,7 @@ So if you intend on adding new files, please follow this convention:
   * should be ``.cu`` files. Add them to the ``AM_CUDA_DEVICE_SOURCES``,
     ``AM_CUDA_DEVICE_OBJECTS``, and ``AM_CUDA_DEVICE_DLINK_OBJECTS`` variables
     in ``src/Makefile.am``.
-  * Corresponding header files should be ``.h`` files. Add them to the
+  * Corresponding header files should be ``.cuh`` files. Add them to the
     ``include_HEADERS`` variable.
 
 * Headers without a corresponding base file (whether ``.c`` or ``.cu``):
@@ -146,7 +147,7 @@ For cuda, we mainly use two vaguely related macros:
 On Cosma
 ---------------
 
-The following set of modules work:
+The following set of modules work with gcc-13 as base compiler:
 
 .. code-block:: 
 
@@ -175,11 +176,55 @@ To use sanitizer configure with
 
    ./configure --enable-compiler-warnings --with-cuda LDFLAGS="-fsanitize=address" --enable-sanitizer 
 
-N.B CUDA and ASAN don't like each other so WHEN RUNNING CODE COMPILED WITH SANITIZER YOU MUST USE
+
+
+Alternately, to use the intel oneAPI 2024 compiler:
+
+.. code-block:: bash
+
+    Currently Loaded Modulefiles:
+
+    1) cosma/2024(default)
+    2) intel_comp/2024.2.0(default)
+    3) compiler-rt/latest
+    4) tbb/latest
+    5) compiler/latest
+    6) mpi/latest
+    7) metis/5.1.0-64bit
+    8) parmetis/4.0.3(default)
+    9) hdf5/1.14.4(default)
+    10) fftw/3.3.10(default)
+    11) gsl/2.8(default)
+    12) nvhpc-byo-compiler/24.5
+
+Then, to configure:
+
+.. code-block:: bash
+
+   CFLAGS="-flto=auto" LDFLAGS="-flto=auto" NVCC_FLAGS="-allow-unsupported-compiler" ./configure --with-cuda
+
+If the link time optimization (LTO) takes too long for your taste during
+development work, you may want to consider using ``-flto=no`` for ``CFLAGS`` and
+``LDFLAGS`` instead. 
+
+
+Cuda and sanitizers
+---------------------
+
+CUDA and ASAN don't like each other so WHEN RUNNING CODE COMPILED WITH SANITIZER YOU MUST USE
 
 .. code-block:: bash
 
    ASAN_OPTIONS=protect_shadow_gap=0 ../../../swift_cuda {runtime args here}
+
+
+
+
+
+
+
+
+
 
 
 
