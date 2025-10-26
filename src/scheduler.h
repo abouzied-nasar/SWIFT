@@ -57,13 +57,15 @@
 /* Data of a scheduler. */
 struct scheduler {
 
-  /* TODO: DOCUMENT THIS. */
-  volatile int *s_d_left;
-  volatile int *s_g_left;
-  volatile int *s_f_left;
-  volatile int *p_d_left;
-  volatile int *p_g_left;
-  volatile int *p_f_left;
+  /* Count how many self/pair density/gradient/force tasks are left in each
+   * queue */
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+  int *s_d_left;
+  int *s_g_left;
+  int *s_f_left;
+  int *p_d_left;
+  int *p_g_left;
+  int *p_f_left;
 
   /* TODO: (@Abouzied) please be more specific with documentation here.
    * Is this total number of tasks of that type? Or active ones during a
@@ -77,6 +79,7 @@ struct scheduler {
   int nr_self_pack_tasks_f, nr_pair_pack_tasks_f;
   /* Actual number of gradient pack tasks. */
   int nr_self_pack_tasks_g, nr_pair_pack_tasks_g;
+#endif
 
   /* Scheduler flags. */
   unsigned int flags;

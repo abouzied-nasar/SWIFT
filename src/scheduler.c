@@ -1752,6 +1752,7 @@ struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
   if (ci != NULL) cell_set_flag(ci, cell_flag_has_tasks);
   if (cj != NULL) cell_set_flag(cj, cell_flag_has_tasks);
 
+#if defined(WITH_CUDA) || defined(WITH_HIP)
   if (t->subtype == task_subtype_gpu_density) {
     if (t->type == task_type_self) {
       atomic_inc(&s->nr_self_pack_tasks_d);
@@ -1771,6 +1772,7 @@ struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
       atomic_inc(&s->nr_pair_pack_tasks_g);
     }
   }
+#endif
   /* Add an index for it. */
   // lock_lock( &s->lock );
   s->tasks_ind[atomic_inc(&s->nr_tasks)] = ind;
@@ -2023,18 +2025,20 @@ void scheduler_reset(struct scheduler *s, int size) {
   /* Reset the counters. */
   s->size = size;
   s->nr_tasks = 0;
-  s->nr_self_pack_tasks_d = 0;  // A. Nasar
-  s->nr_pair_pack_tasks_d = 0;
-  s->nr_self_pack_tasks_f = 0;
-  s->nr_pair_pack_tasks_f = 0;
-  s->nr_self_pack_tasks_g = 0;
-  s->nr_pair_pack_tasks_g = 0;
   s->tasks_next = 0;
   s->waiting = 0;
   s->nr_unlocks = 0;
   s->completed_unlock_writes = 0;
   s->active_count = 0;
   s->total_ticks = 0;
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+  s->nr_self_pack_tasks_d = 0;
+  s->nr_pair_pack_tasks_d = 0;
+  s->nr_self_pack_tasks_f = 0;
+  s->nr_pair_pack_tasks_f = 0;
+  s->nr_self_pack_tasks_g = 0;
+  s->nr_pair_pack_tasks_g = 0;
+#endif
 
   /* Set the task pointers in the queues. */
   for (int k = 0; k < s->nr_queues; k++) s->queues[k].tasks = s->tasks;
@@ -2438,19 +2442,15 @@ void scheduler_enqueue_mapper(void *map_data, int num_elements,
  * @param s The #scheduler.
  */
 void scheduler_start(struct scheduler *s) {
-  for (int i = 0; i < s->nr_queues; i++) {  // A. Nasar
+
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+  for (int i = 0; i < s->nr_queues; i++) {
     s->queues[i].n_packs_self_left_d = 0;
     s->queues[i].n_packs_pair_left_d = 0;
     s->queues[i].n_packs_self_left_f = 0;
     s->queues[i].n_packs_pair_left_f = 0;
     s->queues[i].n_packs_self_left_g = 0;
     s->queues[i].n_packs_pair_left_g = 0;
-    s->queues[i].n_packs_self_stolen_d = 0;
-    s->queues[i].n_packs_pair_stolen_d = 0;
-    s->queues[i].n_packs_self_stolen_f = 0;
-    s->queues[i].n_packs_pair_stolen_f = 0;
-    s->queues[i].n_packs_self_stolen_g = 0;
-    s->queues[i].n_packs_pair_stolen_g = 0;
     s->s_d_left[i] = 0;
     s->s_g_left[i] = 0;
     s->s_f_left[i] = 0;
@@ -2458,6 +2458,8 @@ void scheduler_start(struct scheduler *s) {
     s->p_g_left[i] = 0;
     s->p_f_left[i] = 0;
   }
+#endif
+
   /* Re-wait the tasks. */
   if (s->active_count > 1000) {
     threadpool_map(s->threadpool, scheduler_rewait_mapper, s->tid_active,
@@ -2813,6 +2815,8 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
 
     /* Insert the task into that queue. */
     queue_insert(&s->queues[qid], t);
+
+#if defined(WITH_CUDA) || defined(WITH_HIP)
     /* A. Nasar: Increment counters required for the pack tasks */
     if (t->type == task_type_self) {
       if (t->subtype == task_subtype_gpu_density && t->ci->hydro.count > 0) {
@@ -2863,6 +2867,7 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
         atomic_inc(&s->p_g_left[qid]);
       }
     }
+#endif
   }
 }
 
@@ -3241,6 +3246,7 @@ void scheduler_init(struct scheduler *s, struct space *space, int nr_tasks,
   /* Initialize each queue. */
   for (int k = 0; k < nr_queues; k++) queue_init(&s->queues[k], NULL);
 
+#if defined(WITH_CUDA) || defined(WITH_HIP)
   /* Initialize each queue's counters. */
   s->s_d_left = (int *)malloc(sizeof(int) * nr_queues);
   s->s_g_left = (int *)malloc(sizeof(int) * nr_queues);
@@ -3248,6 +3254,7 @@ void scheduler_init(struct scheduler *s, struct space *space, int nr_tasks,
   s->p_d_left = (int *)malloc(sizeof(int) * nr_queues);
   s->p_g_left = (int *)malloc(sizeof(int) * nr_queues);
   s->p_f_left = (int *)malloc(sizeof(int) * nr_queues);
+#endif
 
   /* Init the sleep mutex and cond. */
   if (pthread_cond_init(&s->sleep_cond, NULL) != 0 ||
@@ -3317,6 +3324,17 @@ void scheduler_clean(struct scheduler *s) {
   swift_free("unlock_ind", s->unlock_ind);
   for (int i = 0; i < s->nr_queues; ++i) queue_clean(&s->queues[i]);
   swift_free("queues", s->queues);
+
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+  /* Free each queue's counters. */
+  free(s->s_d_left);
+  free(s->s_g_left);
+  free(s->s_f_left);
+  free(s->p_d_left);
+  free(s->p_g_left);
+  free(s->p_f_left);
+#endif
+
 }
 
 /**
@@ -3337,13 +3355,16 @@ void scheduler_free_tasks(struct scheduler *s) {
   }
   s->size = 0;
   s->nr_tasks = 0;
-  // reset GPU task counters too
+
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+  /* reset GPU task counters too */
   s->nr_self_pack_tasks_d = 0;
   s->nr_self_pack_tasks_f = 0;
   s->nr_self_pack_tasks_g = 0;
   s->nr_pair_pack_tasks_d = 0;
   s->nr_pair_pack_tasks_f = 0;
   s->nr_pair_pack_tasks_g = 0;
+#endif
 }
 
 /**

@@ -75,27 +75,18 @@ struct queue {
   int *tid_incoming;
   volatile unsigned int first_incoming, last_incoming, count_incoming;
 
-  /*Number of pack tasks left in queue A. Nasar */
-  volatile int
-      n_packs_self_left_d; /*Number of density pack tasks left in queue*/
-  volatile int n_packs_self_left_f; /*Number of force pack tasks left in queue*/
-  volatile int
-      n_packs_self_left_g; /*Number of gradient pack tasks left in queue*/
-
+  /*! Number of density self tasks left in queue */
+  volatile int n_packs_self_left_d;
+  /*! Number of force self tasks left in queue*/
+  volatile int n_packs_self_left_f;
+  /*! Number of gradient pack tasks left in queue*/
+  volatile int n_packs_self_left_g;
+  /*! Number of density pair tasks left in queue */
   volatile int n_packs_pair_left_d;
+  /*! Number of force pair tasks left in queue */
   volatile int n_packs_pair_left_f;
+  /*! Number of gradient pair tasks left in queue */
   volatile int n_packs_pair_left_g;
-
-  volatile int
-      n_packs_self_stolen_d; /*Number of density pack tasks left in queue*/
-  volatile int
-      n_packs_self_stolen_f; /*Number of force pack tasks left in queue*/
-  volatile int
-      n_packs_self_stolen_g; /*Number of gradient pack tasks left in queue*/
-
-  volatile int n_packs_pair_stolen_d;
-  volatile int n_packs_pair_stolen_f;
-  volatile int n_packs_pair_stolen_g;
 
 } __attribute__((aligned(queue_struct_align)));
 
