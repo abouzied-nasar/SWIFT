@@ -64,9 +64,8 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
   md->task_first_packed_part = malloc(pack_size * sizeof(int));
   for (size_t i = 0; i < pack_size; i++) md->task_first_packed_part[i] = 0;
 
-  md->bundle_first_part = (int*) malloc(n_bundles*sizeof(int));
+  md->bundle_first_part = (int*) malloc(n_bundles * sizeof(int));
   for (size_t i = 0; i < n_bundles; i++) md->bundle_first_part[i] = 0;
-
 
   md->task_n_leaves = 0;
   md->tasks_in_list = 0;
@@ -78,9 +77,9 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata* md,
 
   gpu_pack_params_copy(params, &md->params);
 
-#ifdef SWIFT_DEBUG_CHECKS
-  /* To be overwritten in gpu_data_buffers_init */
   md->is_pair_task = is_pair_task;
+
+#ifdef SWIFT_DEBUG_CHECKS
   md->send_struct_size = 0;
   md->recv_struct_size = 0;
 #endif

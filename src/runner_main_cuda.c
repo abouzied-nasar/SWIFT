@@ -185,13 +185,13 @@ void *runner_main_cuda(void *data) {
 
   gpu_data_buffers_init(&gpu_buf_self_dens, &gpu_pack_params,
                         sizeof(struct gpu_part_send_d),
-                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
+                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/0);
   gpu_data_buffers_init(&gpu_buf_self_grad, &gpu_pack_params,
                         sizeof(struct gpu_part_send_g),
-                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/1);
+                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/0);
   gpu_data_buffers_init(&gpu_buf_self_forc, &gpu_pack_params,
                         sizeof(struct gpu_part_send_f),
-                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
+                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/0);
   gpu_data_buffers_init(&gpu_buf_pair_dens, &gpu_pack_params,
                         sizeof(struct gpu_part_send_d),
                         sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
@@ -310,12 +310,12 @@ void *runner_main_cuda(void *data) {
             runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream,
                                       d_a, d_H);
 #endif
-          } /* self / pack */
+          }
           else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
             runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream,
                                        d_a, d_H);
-#endif  // GPUGRADSELF
+#endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
             runner_doself_gpu_force(r, sched, &gpu_buf_self_forc, t, stream,

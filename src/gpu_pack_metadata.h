@@ -89,6 +89,9 @@ struct gpu_pack_metadata {
   /*! Global (fixed) packing parameters */
   struct gpu_global_pack_params params;
 
+  /*! Is this metadata for a pair task? */
+  char is_pair_task;
+
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Size of the send_part struct used */
   size_t send_struct_size;
@@ -96,8 +99,6 @@ struct gpu_pack_metadata {
   /*! Size of the recv_part struct used */
   size_t recv_struct_size;
 
-  /*! Is this metadata for a pair task? */
-  char is_pair_task;
 #endif
 };
 

@@ -91,7 +91,6 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
 #ifdef SWIFT_DEBUG_CHECKS
   md->send_struct_size = send_struct_size;
   md->recv_struct_size = recv_struct_size;
-  md->is_pair_task = is_pair_task;
 #endif
 }
 
