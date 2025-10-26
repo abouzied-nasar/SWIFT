@@ -50,14 +50,14 @@ extern "C" {
 #endif
 
 /**
- * @brief recurse into a (sub-)pair task and identify all cell-cell
+ * @brief recurse into a pair of cells and recusrively identify all cell-cell
  * interactions.
  *
  * @param r The #runner
  * @param s The #scheduler
  * @param buf the data buffers
- * @param ci the first #cell associated with this pair task
- * @param cj the second #cell associated with this pair task
+ * @param ci the first #cell to be interacted recursively
+ * @param cj the second #cell to be interacted recursively
  * @param depth current recursion depth
  * @param timer are we timing this?
  */
