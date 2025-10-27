@@ -28,26 +28,18 @@ provided in your ``parameters.yml`` file:
 
    # Parameters for the task scheduling
    Scheduler:
-     gpu_self_pack_size:               0
-     gpu_self_bundle_size:             0
-     gpu_pair_pack_size:               0
-     gpu_pair_bundle_size:             0
+     gpu_pack_size:               1024
+     gpu_bundle_size:             256
 
 
-* ``gpu_self_pack_size``: Sets how many leaf cells and pairs of leaf cells of
-  ``self`` tasks to pack for offloading. 
+* ``gpu_pack_size``: Sets how many leaf cells and pairs of leaf cells of to pack
+  for a single offloading cycle. Offloading cycles are repeated until there are
+  no more tasks left.
 
-* ``gpu_self_bundle_size``: Sets how many leaf cells and pairs of leaf cells of
-  ``self`` tasks to pack into a bundle while offloading. ``gpu_self_pack_size``
-  total cells will be offloaded per cycle, in bundles of size
-  ``gpu_self_bundle_size``. 
+* ``gpu_bundle_size``: Sets how many leaf cells and pairs of leaf cells of
+  to pack into a bundle while offloading. ``gpu_pack_size`` total cells will be
+  offloaded per cycle, in bundles of size ``gpu_bundle_size``. 
 
-* ``gpu_pair_pack_size``:  Sets how many pairs of leaf cells of ``pair`` tasks
-  to pack for offloading. 
-
-* ``gpu_pair_bundle_size``: Sets how many leaf cell pairs of ``pair`` tasks to
-  pack into a bundle while offloading. ``gpu_pair_pack_size`` total cells will
-  be offloaded per cycle, in bundles of size ``gpu_pair_bundle_size``.
 
 
 See ``examples/HydroTests/GreshoVortex_3D/greshoGPU256.yml`` for an example.
