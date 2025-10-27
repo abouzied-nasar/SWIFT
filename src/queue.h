@@ -75,18 +75,10 @@ struct queue {
   int *tid_incoming;
   volatile unsigned int first_incoming, last_incoming, count_incoming;
 
-  /*! Number of density self tasks left in queue */
-  volatile int n_packs_self_left_d;
-  /*! Number of force self tasks left in queue*/
-  volatile int n_packs_self_left_f;
-  /*! Number of gradient pack tasks left in queue*/
-  volatile int n_packs_self_left_g;
-  /*! Number of density pair tasks left in queue */
-  volatile int n_packs_pair_left_d;
-  /*! Number of force pair tasks left in queue */
-  volatile int n_packs_pair_left_f;
-  /*! Number of gradient pair tasks left in queue */
-  volatile int n_packs_pair_left_g;
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+  /*! Number of gpu task left in queue */
+  int gpu_tasks_left[gpu_task_type_count];
+#endif
 
 } __attribute__((aligned(queue_struct_align)));
 

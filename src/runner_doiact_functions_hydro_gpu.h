@@ -730,8 +730,9 @@ static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_self_left_d--;
-  if (s->queues[qid].n_packs_self_left_d < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
@@ -764,8 +765,8 @@ static void runner_doself_gpu_gradient(struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_self_left_g--;
-  if (s->queues[qid].n_packs_self_left_g < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient] < 1) buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
@@ -798,8 +799,8 @@ static void runner_doself_gpu_force(struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_self_left_f--;
-  if (s->queues[qid].n_packs_self_left_f < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force] < 1) buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
@@ -836,8 +837,9 @@ static void runner_dopair_gpu_density(const struct runner *r,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_pair_left_d--;
-  if (s->queues[qid].n_packs_pair_left_d < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
@@ -874,8 +876,9 @@ static void runner_dopair_gpu_gradient(const struct runner *r,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_pair_left_g--;
-  if (s->queues[qid].n_packs_pair_left_g < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
@@ -911,8 +914,9 @@ static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_pair_left_f--;
-  if (s->queues[qid].n_packs_pair_left_f < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */

@@ -57,30 +57,6 @@
 /* Data of a scheduler. */
 struct scheduler {
 
-  /* Count how many self/pair density/gradient/force tasks are left in each
-   * queue */
-#if defined(WITH_CUDA) || defined(WITH_HIP)
-  int *s_d_left;
-  int *s_g_left;
-  int *s_f_left;
-  int *p_d_left;
-  int *p_g_left;
-  int *p_f_left;
-
-  /* TODO: (@Abouzied) please be more specific with documentation here.
-   * Is this total number of tasks of that type? Or active ones during a
-   * step? */
-  /* TODO: (@Abouzied) Do we still need this? I only see it being reset,
-   * incremented, and used for a debug check. If this is intended to stay,
-   * it should be within a DEBUG_CHECK + WITH_GPU macro guard. */
-  /* Actual number of density pack tasks. */
-  int nr_self_pack_tasks_d, nr_pair_pack_tasks_d;
-  /* Actual number of force pack tasks. */
-  int nr_self_pack_tasks_f, nr_pair_pack_tasks_f;
-  /* Actual number of gradient pack tasks. */
-  int nr_self_pack_tasks_g, nr_pair_pack_tasks_g;
-#endif
-
   /* Scheduler flags. */
   unsigned int flags;
 
