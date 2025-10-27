@@ -289,18 +289,18 @@ void *runner_main_cuda(void *data) {
 #endif
           } else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
-            runner_doself_gpu_density(r, sched, &gpu_buf_dens, t, stream,
-                                      d_a, d_H);
+            runner_doself_gpu_density(r, sched, &gpu_buf_dens, t, stream, d_a,
+                                      d_H);
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-            runner_doself_gpu_gradient(r, sched, &gpu_buf_grad, t, stream,
-                                       d_a, d_H);
+            runner_doself_gpu_gradient(r, sched, &gpu_buf_grad, t, stream, d_a,
+                                       d_H);
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-            runner_doself_gpu_force(r, sched, &gpu_buf_forc, t, stream,
-                                    d_a, d_H);
+            runner_doself_gpu_force(r, sched, &gpu_buf_forc, t, stream, d_a,
+                                    d_H);
 #endif
           }
 #ifdef EXTRA_HYDRO_LOOP
@@ -378,8 +378,8 @@ void *runner_main_cuda(void *data) {
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-            runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_forc, t,
-                                    stream, d_a, d_H);
+            runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_forc, t, stream,
+                                    d_a, d_H);
 #endif
           }
 

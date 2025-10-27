@@ -766,7 +766,8 @@ static void runner_doself_gpu_gradient(struct runner *r, struct scheduler *s,
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]--;
-  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient] < 1) buf->md.launch_leftovers = 1;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
@@ -800,7 +801,8 @@ static void runner_doself_gpu_force(struct runner *r, struct scheduler *s,
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
   s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]--;
-  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force] < 1) buf->md.launch_leftovers = 1;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */

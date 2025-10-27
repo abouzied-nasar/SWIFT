@@ -38,7 +38,7 @@ extern "C" {
  * @param params gpu_global_pack_params struct containing valid parameters
  */
 void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
-                            const struct gpu_global_pack_params *params){
+                            const struct gpu_global_pack_params *params) {
 
   /* Grab some handles */
   const size_t pack_size = params->pack_size;

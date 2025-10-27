@@ -214,12 +214,12 @@ enum task_categories {
 /**
  * @brief types (rather: subtypes) of tasks that will be offloaded to the GPU.
  */
- enum gpu_task_type {
-   gpu_task_type_hydro_density,
-   gpu_task_type_hydro_gradient,
-   gpu_task_type_hydro_force,
-   gpu_task_type_count,
- };
+enum gpu_task_type {
+  gpu_task_type_hydro_density,
+  gpu_task_type_hydro_gradient,
+  gpu_task_type_hydro_force,
+  gpu_task_type_count,
+};
 
 /**
  * @brief Names of the task types.

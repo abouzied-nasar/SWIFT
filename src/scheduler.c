@@ -3258,7 +3258,6 @@ void scheduler_clean(struct scheduler *s) {
   swift_free("unlock_ind", s->unlock_ind);
   for (int i = 0; i < s->nr_queues; ++i) queue_clean(&s->queues[i]);
   swift_free("queues", s->queues);
-
 }
 
 /**
@@ -3279,7 +3278,6 @@ void scheduler_free_tasks(struct scheduler *s) {
   }
   s->size = 0;
   s->nr_tasks = 0;
-
 }
 
 /**
