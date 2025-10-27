@@ -98,43 +98,44 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     const float zij = zi - zj;
     const float r2 = xij * xij + yij * yij + zij * zij;
 
-    if ((r2 < hig2) && (j != pid)) {
-      /* j != pid: Exclude self contribution. This happens at a later step. */
+    /* j != pid: Exclude self contribution. This happens at a later step. */
+    const float mask = (r2 < hig2) && (j != pid) ? 1.f : 0.f;
 
-      /* Recover some data */
-      const float r = sqrtf(r2);
+    /* Recover some data */
+    const float r = sqrtf(r2);
 
-      /* Get the kernel for hi. */
-      const float ui = r * hi_inv;
-      float wi;
-      float wi_dx;
-      d_kernel_deval(ui, &wi, &wi_dx);
+    /* Get the kernel for hi. */
+    const float ui = r * hi_inv;
+    float wi;
+    float wi_dx;
+    d_kernel_deval(ui, &wi, &wi_dx);
 
-      /* Add to sums of rho, rho_dh, wcount and wcount_dh */
-      res_rho.x += mj * wi;
-      res_rho.y -= mj * (hydro_dimension * wi + ui * wi_dx);
-      res_rho.z += wi;
-      res_rho.w -= (hydro_dimension * wi + ui * wi_dx);
+    /* Add to sums of rho, rho_dh, wcount and wcount_dh */
+    res_rho.x += mj * wi * mask;
+    res_rho.y -= mj * (hydro_dimension * wi + ui * wi_dx) * mask;
+    res_rho.z += wi * mask;
+    res_rho.w -= (hydro_dimension * wi + ui * wi_dx) * mask;
 
-      const float r_inv = 1.f / r;
-      const float faci = mj * wi_dx * r_inv;
+    /* r == 0 can happen for self-interaction, which we're masking out,
+     * but it'll produce NaNs through division by zero, so handle that. */
+    const float r_inv = r > 0.f ? 1.f / r : 1.f;
+    const float faci = mj * wi_dx * r_inv;
 
-      /* Compute dv dot r */
-      const float dvx = vxi - vxj;
-      const float dvy = vyi - vyj;
-      const float dvz = vzi - vzj;
-      const float dvdr = dvx * xij + dvy * yij + dvz * zij;
+    /* Compute dv dot r */
+    const float dvx = vxi - vxj;
+    const float dvy = vyi - vyj;
+    const float dvz = vzi - vzj;
+    const float dvdr = dvx * xij + dvy * yij + dvz * zij;
 
-      /* Compute dv cross r */
-      const float curlvrx = dvy * zij - dvz * yij;
-      const float curlvry = dvz * xij - dvx * zij;
-      const float curlvrz = dvx * yij - dvy * xij;
+    /* Compute dv cross r */
+    const float curlvrx = dvy * zij - dvz * yij;
+    const float curlvry = dvz * xij - dvx * zij;
+    const float curlvrz = dvx * yij - dvy * xij;
 
-      res_rot.x += faci * curlvrx;
-      res_rot.y += faci * curlvry;
-      res_rot.z += faci * curlvrz;
-      res_rot.w -= faci * dvdr;
-    }
+    res_rot.x += faci * curlvrx * mask;
+    res_rot.y += faci * curlvry * mask;
+    res_rot.z += faci * curlvrz * mask;
+    res_rot.w -= faci * dvdr * mask;
   } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
   /* Write results. */
@@ -220,49 +221,50 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
 
     const float r2 = xij * xij + yij * yij + zij * zij;
 
-    if ((r2 < hig2) && (j != pid)) {
-      /* (j != pid): Exclude self contribution. This happens at a later step. */
+    /* (j != pid): Exclude self contribution. This happens at a later step. */
+    const float mask = (r2 < hig2) && (j != pid) ? 1.f : 0.f;
 
-      const float r = sqrtf(r2);
-      const float r_inv = 1.f / r;
+    const float r = sqrtf(r2);
+    /* r == 0 can happen for self-interaction, which we're masking out,
+     * but it'll produce NaNs through division by zero, so handle that. */
+    const float r_inv = r > 0.f ? 1.f / r : 1.f;
 
-      /* Cosmology terms for the signal velocity */
-      const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
-      const float a2_Hubble = d_a * d_a * d_H;
+    /* Cosmology terms for the signal velocity */
+    const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
+    const float a2_Hubble = d_a * d_a * d_H;
 
-      /* Compute dv dot r */
-      float dvx = vxi - vxj;
-      float dvy = vyi - vyj;
-      float dvz = vzi - vzj;
-      const float dvdr = dvx * xij + dvy * yij + dvz * zij;
+    /* Compute dv dot r */
+    float dvx = vxi - vxj;
+    float dvy = vyi - vyj;
+    float dvz = vzi - vzj;
+    const float dvdr = dvx * xij + dvy * yij + dvz * zij;
 
-      /* Add Hubble flow */
-      const float dvdr_Hubble = dvdr + a2_Hubble * r2;
+    /* Add Hubble flow */
+    const float dvdr_Hubble = dvdr + a2_Hubble * r2;
 
-      /* Are the particles moving towards each others ? */
-      const float omega_ij = fminf(dvdr_Hubble, 0.f);
-      const float mu_ij = fac_mu * r_inv * omega_ij; /* This is 0 or negative */
+    /* Are the particles moving towards each others ? */
+    const float omega_ij = fminf(dvdr_Hubble, 0.f);
+    const float mu_ij = fac_mu * r_inv * omega_ij; /* This is 0 or negative */
 
-      /* Signal velocity */
-      const float new_v_sig = ci + cj - const_viscosity_beta * mu_ij;
+    /* Signal velocity */
+    const float new_v_sig = ci + cj - const_viscosity_beta * mu_ij;
 
-      /* Update if we need to */
-      res_vsig_lapu_avisci.x = fmaxf(vsigi, new_v_sig);
+    /* Update if we need to */
+    res_vsig_lapu_avisci.x = fmaxf(vsigi, new_v_sig * mask);
 
-      /* Calculate Del^2 u for the thermal diffusion coefficient. */
-      /* Need to get some kernel values F_ij = wi_dx */
-      float wi;
-      float wi_dx;
-      const float ui = r * hi_inv;
-      d_kernel_deval(ui, &wi, &wi_dx);
+    /* Calculate Del^2 u for the thermal diffusion coefficient. */
+    /* Need to get some kernel values F_ij = wi_dx */
+    float wi;
+    float wi_dx;
+    const float ui = r * hi_inv;
+    d_kernel_deval(ui, &wi, &wi_dx);
 
-      const float delta_u_factor = (energyi - energyj) * r_inv;
-      res_vsig_lapu_avisci.y += mj * delta_u_factor * wi_dx / rhoj;
+    const float delta_u_factor = (energyi - energyj) * r_inv;
+    res_vsig_lapu_avisci.y += mj * delta_u_factor * wi_dx / rhoj * mask;
 
-      /* Set the maximal alpha from the previous step over the neighbours
-       * (this is used to limit the diffusion in hydro_prepare_force) */
-      res_vsig_lapu_avisci.z = fmaxf(res_vsig_lapu_avisci.z, aviscj);
-    }
+    /* Set the maximal alpha from the previous step over the neighbours
+     * (this is used to limit the diffusion in hydro_prepare_force) */
+    res_vsig_lapu_avisci.z = fmaxf(res_vsig_lapu_avisci.z, aviscj * mask);
   } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
   /* Write results. */
@@ -359,118 +361,122 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
     const float r2 = xij * xij + yij * yij + zij * zij;
     const float hjg2 = hj * hj * kernel_gamma2;
 
-    if (((r2 < hig2) || (r2 < hjg2)) && (j != pid)) {
-      /* (j != pid): Exclude self contribution. This happens at a later step. */
+    /* (j != pid): Exclude self contribution. This happens at a later step. */
+    const bool iact_condition = ((r2 < hig2) || (r2 < hjg2)) && (j != pid);
+    const float mask = iact_condition ? 1.f : 0.f;
+    const int tbj_masked = iact_condition && (tbj > 0) ? tbj : res_min_ngb_timebin;
 
-      /* Cosmology terms for the signal velocity */
-      const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
-      const float a2_Hubble = d_a * d_a * d_H;
+    /* Cosmology terms for the signal velocity */
+    const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
+    const float a2_Hubble = d_a * d_a * d_H;
 
-      const float r = sqrt(r2);
-      const float r_inv = 1.f / r;
+    const float r = sqrtf(r2);
+    /* r == 0 can happen for self-interaction, which we're masking out,
+     * but it'll produce NaNs through division by zero, so handle that. */
+    const float r_inv = r > 0.f ? 1.f / r : 1.f;
 
-      /* Get the kernel for hi. */
-      const float xi = r * hi_inv;
-      float wi;
-      float wi_dx;
-      d_kernel_deval(xi, &wi, &wi_dx);
-      const float wi_dr = hid_inv * wi_dx;
+    /* Get the kernel for hi. */
+    const float qi = r * hi_inv;
+    float wi;
+    float wi_dx;
+    d_kernel_deval(qi, &wi, &wi_dx);
+    const float wi_dr = hid_inv * wi_dx;
 
-      /* Get the kernel for hj. */
-      const float hj_inv = 1.0f / hj;
-      const float hjd_inv = d_pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
-      const float xj = r * hj_inv;
-      float wj;
-      float wj_dx;
-      d_kernel_deval(xj, &wj, &wj_dx);
-      const float wj_dr = hjd_inv * wj_dx;
+    /* Get the kernel for hj. */
+    const float hj_inv = 1.0f / hj;
+    const float hjd_inv = d_pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
+    const float qj = r * hj_inv;
+    float wj;
+    float wj_dx;
+    d_kernel_deval(qj, &wj, &wj_dx);
+    const float wj_dr = hjd_inv * wj_dx;
 
-      /* Compute dv dot r */
-      float dvx = vxi - vxj;
-      float dvy = vyi - vyj;
-      float dvz = vzi - vzj;
-      const float dvdr = dvx * xij + dvy * yij + dvz * zij;
+    /* Compute dv dot r */
+    float dvx = vxi - vxj;
+    float dvy = vyi - vyj;
+    float dvz = vzi - vzj;
+    const float dvdr = dvx * xij + dvy * yij + dvz * zij;
 
-      /* Add Hubble flow; not used for du/dt */
-      const float dvdr_Hubble = dvdr + a2_Hubble * r2;
+    /* Add Hubble flow; not used for du/dt */
+    const float dvdr_Hubble = dvdr + a2_Hubble * r2;
 
-      /* Are the particles moving towards each others ? */
-      const float omega_ij = min(dvdr_Hubble, 0.f);
-      const float mu_ij = fac_mu * r_inv * omega_ij; /* This is 0 or negative */
+    /* Are the particles moving towards each others ? */
+    const float omega_ij = min(dvdr_Hubble, 0.f);
+    const float mu_ij = fac_mu * r_inv * omega_ij; /* This is 0 or negative */
 
-      /* Signal velocity */
-      const float v_sig = ci + cj - const_viscosity_beta * mu_ij;
+    /* Signal velocity */
+    const float v_sig = ci + cj - const_viscosity_beta * mu_ij;
 
-      /* Variable smoothing length term */
-      const float f_ij = 1.f - fi / mj;
-      const float f_ji = 1.f - fj * mi_inv;
+    /* Variable smoothing length term */
+    const float f_ij = 1.f - fi / mj;
+    const float f_ji = 1.f - fj * mi_inv;
 
-      /* Construct the full viscosity term */
-      const float rhoij = rhoi + rhoj;
-      const float rhoij_inv = 1.f / rhoij;
-      const float alpha = avisci + aviscj;
-      const float visc =
-          -0.25f * alpha * v_sig * mu_ij * (balsi + balsj) * rhoij_inv;
+    /* Construct the full viscosity term */
+    const float rhoij = rhoi + rhoj;
+    const float rhoij_inv = 1.f / rhoij;
+    const float alpha = avisci + aviscj;
+    const float visc =
+        -0.25f * alpha * v_sig * mu_ij * (balsi + balsj) * rhoij_inv;
 
-      /* Convolve with the kernel */
-      const float visc_acc_term =
-          0.5f * visc * (wi_dr * f_ij + wj_dr * f_ji) * r_inv;
+    /* Convolve with the kernel */
+    const float visc_acc_term =
+        0.5f * visc * (wi_dr * f_ij + wj_dr * f_ji) * r_inv;
 
-      /* Compute gradient terms */
-      const float rhoj2 = rhoj * rhoj;
-      const float rhoj_inv = 1.f / rhoj;
-      const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
-      const float P_over_rho2_j = pressurej / (rhoj2)*f_ji;
+    /* Compute gradient terms */
+    const float rhoj2 = rhoj * rhoj;
+    const float rhoj_inv = 1.f / rhoj;
+    const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
+    const float P_over_rho2_j = pressurej / (rhoj2)*f_ji;
 
-      /* SPH acceleration term */
-      const float sph_acc_term =
-          (P_over_rho2_i * wi_dr + P_over_rho2_j * wj_dr) * r_inv;
+    /* SPH acceleration term */
+    const float sph_acc_term =
+        (P_over_rho2_i * wi_dr + P_over_rho2_j * wj_dr) * r_inv;
 
-      /* Assemble the acceleration */
-      const float acc = sph_acc_term + visc_acc_term;
+    /* Assemble the acceleration */
+    const float acc = sph_acc_term + visc_acc_term;
 
-      /* Use the force Luke ! */
-      res_ahydro.x -= mj * acc * xij;
-      res_ahydro.y -= mj * acc * yij;
-      res_ahydro.z -= mj * acc * zij;
+    /* Use the force Luke ! */
+    res_ahydro.x -= mj * acc * xij * mask;
+    res_ahydro.y -= mj * acc * yij * mask;
+    res_ahydro.z -= mj * acc * zij * mask;
 
-      /* Get the time derivative for u. */
-      const float sph_du_term_i = P_over_rho2_i * dvdr * r_inv * wi_dr;
+    /* Get the time derivative for u. */
+    const float sph_du_term_i = P_over_rho2_i * dvdr * r_inv * wi_dr;
 
-      /* Viscosity term */
-      const float visc_du_term = 0.5f * visc_acc_term * dvdr_Hubble;
+    /* Viscosity term */
+    const float visc_du_term = 0.5f * visc_acc_term * dvdr_Hubble;
 
-      /* Diffusion term */
-      /* Combine the alpha_diff into a pressure-based switch -- this allows the
-       * alpha from the highest pressure particle to dominate, so that the
-       * diffusion limited particles always take precedence - another trick to
-       * allow the scheme to work with thermal feedback. */
-      float alpha_diff =
-          (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
-      /* if (fabsf(pressurei + pressurej) < 1e-10) alpha_diff = 0.f; */
+    /* Diffusion term */
+    /* Combine the alpha_diff into a pressure-based switch -- this allows the
+     * alpha from the highest pressure particle to dominate, so that the
+     * diffusion limited particles always take precedence - another trick to
+     * allow the scheme to work with thermal feedback. */
+    float alpha_diff =
+        (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
+    /* if (fabsf(pressurei + pressurej) < 1e-10) alpha_diff = 0.f; */
 
-      const float v_diff =
-          alpha_diff * 0.5f *
-          (sqrtf(2.f * fabsf(pressurei - pressurej) * rhoij_inv) +
-           fabsf(fac_mu * r_inv * dvdr_Hubble));
+    const float v_diff =
+        alpha_diff * 0.5f *
+        (sqrtf(2.f * fabsf(pressurei - pressurej) * rhoij_inv) +
+         fabsf(fac_mu * r_inv * dvdr_Hubble));
 
-      /* wi_dx + wj_dx / 2 is F_ij */
-      const float diff_du_term =
-          v_diff * (energyi - energyj) *
-          (f_ij * wi_dr * rhoi_inv + f_ji * wj_dr * rhoj_inv);
+    /* wi_dx + wj_dx / 2 is F_ij */
+    const float diff_du_term =
+        v_diff * (energyi - energyj) *
+        (f_ij * wi_dr * rhoi_inv + f_ji * wj_dr * rhoj_inv);
 
-      /* Assemble the energy equation term */
-      const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
+    /* Assemble the energy equation term */
+    const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
 
-      /* Internal energy time derivative */
-      res_udt_hdt.x += du_dt_i * mj;
+    /* Internal energy time derivative */
+    res_udt_hdt.x += du_dt_i * mj * mask;
 
-      /* Get the time derivative for h. */
-      res_udt_hdt.y -= mj * dvdr * r_inv * rhoj_inv * wi_dr;
+    /* Get the time derivative for h. */
+    res_udt_hdt.y -= mj * dvdr * r_inv * rhoj_inv * wi_dr * mask;
 
-      if (tbj > 0) res_min_ngb_timebin = min(res_min_ngb_timebin, tbj);
-    }
-  } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
+    /* tbj > 0 check is included in mask */
+    res_min_ngb_timebin = min(res_min_ngb_timebin, tbj_masked);
+  }
 
   d_parts_recv[pid].udt_hdt_minngbtb = {res_udt_hdt.x, res_udt_hdt.y,
                                         (float)res_min_ngb_timebin};
