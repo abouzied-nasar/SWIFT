@@ -158,6 +158,7 @@ enum {
   timer_doself_gpu_launch_d,
   timer_doself_gpu_launch_g,
   timer_doself_gpu_launch_f,
+  timer_doself_gpu_recurse,
   timer_dopair_gpu_pack_d,
   timer_dopair_gpu_pack_g,
   timer_dopair_gpu_pack_f,

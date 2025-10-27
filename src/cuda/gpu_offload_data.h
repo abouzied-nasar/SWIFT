@@ -48,11 +48,6 @@ struct gpu_offload_data {
   /*! bookkeeping meta-data for offloading */
   struct gpu_pack_metadata md;
 
-  /*! First and last particles for self interactions */
-  /* TODO: This should be cuda-independent and moved into gpu_pack_metadata */
-  int2 *self_task_first_last_part;
-  int2 *d_self_task_first_last_part;
-
   /*! Arrays used to send particle data from device to host. A single struct
    * gpu_offload_data will only hold data for either density, gradient, or
    * force task, so we hide them behind a union. */
@@ -94,13 +89,9 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const size_t send_struct_size,
                            const size_t recv_struct_size,
                            const char is_pair_task);
-
 void gpu_data_buffers_init_step(struct gpu_offload_data *buf);
-
 void gpu_data_buffers_reset(struct gpu_offload_data *buf);
-
-void gpu_free_data_buffers(struct gpu_offload_data *buf,
-                           const char is_pair_task);
+void gpu_data_buffers_free(struct gpu_offload_data *buf);
 
 #ifdef __cplusplus
 }

@@ -380,7 +380,7 @@ static __attribute__((always_inline)) INLINE const double *part_get_const_x(
 }
 
 /**
- * @brief get particle position
+ * @brief get particle position by index
  */
 static __attribute__((always_inline)) INLINE double part_get_x_ind(
     const struct part *restrict p, const size_t ind) {
@@ -782,6 +782,17 @@ static __attribute__((always_inline)) INLINE float *part_get_rot_v(
   return p->density._rot_v;
 }
 
+/**
+ * @brief get particle velocity curl for read-only access
+ */
+static __attribute__((always_inline)) INLINE const float *part_get_const_rot_v(
+    const struct part *restrict p) {
+  return p->density._rot_v;
+}
+
+/**
+ * @brief get particle velocity curl by index
+ */
 static __attribute__((always_inline)) INLINE float part_get_rot_v_ind(
     const struct part *restrict p, size_t ind) {
   return p->density._rot_v[ind];
