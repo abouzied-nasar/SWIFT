@@ -87,8 +87,7 @@ struct gpu_offload_data {
 void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const struct gpu_global_pack_params *params,
                            const size_t send_struct_size,
-                           const size_t recv_struct_size,
-                           const char is_pair_task);
+                           const size_t recv_struct_size);
 void gpu_data_buffers_init_step(struct gpu_offload_data *buf);
 void gpu_data_buffers_reset(struct gpu_offload_data *buf);
 void gpu_data_buffers_free(struct gpu_offload_data *buf);

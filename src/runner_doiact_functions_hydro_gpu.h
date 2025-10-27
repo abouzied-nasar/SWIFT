@@ -227,12 +227,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   const int leaves_packed = md->n_leaves_packed;
 
   /* How many leaves should be in a bundle? */
-  const int bundle_size =
-      md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
+  const int bundle_size = md->params.bundle_size;
 
   /* Identify the number of GPU bundles to run in ideal case */
-  int n_bundles =
-      md->is_pair_task ? md->params.n_bundles_pair : md->params.n_bundles;
+  int n_bundles = md->params.n_bundles;
 
   /* Special case for incomplete bundles (when having not enough leftover leafs
    * to fill a bundle) */
@@ -429,10 +427,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_density(
 
   runner_gpu_launch(r, buf, stream, d_a, d_H, task_subtype_gpu_density);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_launch_d);
-  else
-    TIMER_TOC(timer_doself_gpu_launch_d);
+  TIMER_TOC(timer_gpu_launch_d);
 }
 
 /**
@@ -452,10 +447,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_gradient(
 
   runner_gpu_launch(r, buf, stream, d_a, d_H, task_subtype_gpu_gradient);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_launch_g);
-  else
-    TIMER_TOC(timer_doself_gpu_launch_g);
+  TIMER_TOC(timer_gpu_launch_g);
 }
 
 /**
@@ -475,10 +467,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_force(
 
   runner_gpu_launch(r, buf, stream, d_a, d_H, task_subtype_gpu_force);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_launch_f);
-  else
-    TIMER_TOC(timer_doself_gpu_launch_f);
+  TIMER_TOC(timer_gpu_launch_f);
 }
 
 /**
@@ -542,8 +531,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   md->n_leaves += md->task_n_leaves;
 
   /* How many leaf cell interactions do we want to offload at once? */
-  const int target_n_leaves =
-      md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
+  const int target_n_leaves = md->params.pack_size;
 
   /* Counter for how many leaf cells  of this task we've packed */
   int npacked = 0;

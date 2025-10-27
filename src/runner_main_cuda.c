@@ -176,42 +176,27 @@ void *runner_main_cuda(void *data) {
 
   /* Declare and allocate GPU launch control data structures which need to be in
    * scope */
-  struct gpu_offload_data gpu_buf_self_dens;
-  struct gpu_offload_data gpu_buf_self_grad;
-  struct gpu_offload_data gpu_buf_self_forc;
-  struct gpu_offload_data gpu_buf_pair_dens;
-  struct gpu_offload_data gpu_buf_pair_grad;
-  struct gpu_offload_data gpu_buf_pair_forc;
+  struct gpu_offload_data gpu_buf_dens;
+  struct gpu_offload_data gpu_buf_grad;
+  struct gpu_offload_data gpu_buf_forc;
 
-  gpu_data_buffers_init(&gpu_buf_self_dens, &gpu_pack_params,
+  gpu_data_buffers_init(&gpu_buf_dens, &gpu_pack_params,
                         sizeof(struct gpu_part_send_d),
-                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/0);
-  gpu_data_buffers_init(&gpu_buf_self_grad, &gpu_pack_params,
+                        sizeof(struct gpu_part_recv_d));
+  gpu_data_buffers_init(&gpu_buf_grad, &gpu_pack_params,
                         sizeof(struct gpu_part_send_g),
-                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/0);
-  gpu_data_buffers_init(&gpu_buf_self_forc, &gpu_pack_params,
+                        sizeof(struct gpu_part_recv_g));
+  gpu_data_buffers_init(&gpu_buf_forc, &gpu_pack_params,
                         sizeof(struct gpu_part_send_f),
-                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/0);
-  gpu_data_buffers_init(&gpu_buf_pair_dens, &gpu_pack_params,
-                        sizeof(struct gpu_part_send_d),
-                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
-  gpu_data_buffers_init(&gpu_buf_pair_grad, &gpu_pack_params,
-                        sizeof(struct gpu_part_send_g),
-                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/1);
-  gpu_data_buffers_init(&gpu_buf_pair_forc, &gpu_pack_params,
-                        sizeof(struct gpu_part_send_f),
-                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
+                        sizeof(struct gpu_part_recv_f));
 
   /* Create streams so that we can off-load different batches of work in
    * different streams and get some con-CURRENCY! Events used to maximise
    * asynchrony further*/
   cudaStream_t stream[gpu_pack_params.n_bundles];
-  cudaStream_t stream_pairs[gpu_pack_params.n_bundles_pair];
 
   for (int i = 0; i < gpu_pack_params.n_bundles; i++)
     cudaStreamCreateWithFlags(&stream[i], cudaStreamNonBlocking);
-  for (int i = 0; i < gpu_pack_params.n_bundles_pair; i++)
-    cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
     /* Declare some global variables */
 #ifdef CUDA_PROFILER
@@ -229,12 +214,9 @@ void *runner_main_cuda(void *data) {
     /* Can we go home yet? */
     if (e->step_props & engine_step_prop_done) break;
 
-    gpu_data_buffers_init_step(&gpu_buf_self_dens);
-    gpu_data_buffers_init_step(&gpu_buf_self_grad);
-    gpu_data_buffers_init_step(&gpu_buf_self_forc);
-    gpu_data_buffers_init_step(&gpu_buf_pair_dens);
-    gpu_data_buffers_init_step(&gpu_buf_pair_grad);
-    gpu_data_buffers_init_step(&gpu_buf_pair_forc);
+    gpu_data_buffers_init_step(&gpu_buf_dens);
+    gpu_data_buffers_init_step(&gpu_buf_grad);
+    gpu_data_buffers_init_step(&gpu_buf_forc);
 
     /* Get some global variables' values for this step */
     const float d_a = e->cosmology->a;
@@ -307,17 +289,17 @@ void *runner_main_cuda(void *data) {
 #endif
           } else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
-            runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream,
+            runner_doself_gpu_density(r, sched, &gpu_buf_dens, t, stream,
                                       d_a, d_H);
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-            runner_doself_gpu_gradient(r, sched, &gpu_buf_self_grad, t, stream,
+            runner_doself_gpu_gradient(r, sched, &gpu_buf_grad, t, stream,
                                        d_a, d_H);
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-            runner_doself_gpu_force(r, sched, &gpu_buf_self_forc, t, stream,
+            runner_doself_gpu_force(r, sched, &gpu_buf_forc, t, stream,
                                     d_a, d_H);
 #endif
           }
@@ -386,18 +368,18 @@ void *runner_main_cuda(void *data) {
           /* GPU WORK */
           else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
-            runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_pair_dens, t,
-                                      stream_pairs, d_a, d_H);
+            runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_dens, t,
+                                      stream, d_a, d_H);
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-            runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_pair_grad, t,
-                                       stream_pairs, d_a, d_H);
+            runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_grad, t,
+                                       stream, d_a, d_H);
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-            runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_pair_forc, t,
-                                    stream_pairs, d_a, d_H);
+            runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_forc, t,
+                                    stream, d_a, d_H);
 #endif
           }
 
@@ -734,17 +716,12 @@ void *runner_main_cuda(void *data) {
   } /* main loop. */
 
   /* Release the bytes back into the wilderness */
-  gpu_data_buffers_free(&gpu_buf_self_dens);
-  gpu_data_buffers_free(&gpu_buf_self_grad);
-  gpu_data_buffers_free(&gpu_buf_self_forc);
-  gpu_data_buffers_free(&gpu_buf_pair_dens);
-  gpu_data_buffers_free(&gpu_buf_pair_grad);
-  gpu_data_buffers_free(&gpu_buf_pair_forc);
+  gpu_data_buffers_free(&gpu_buf_dens);
+  gpu_data_buffers_free(&gpu_buf_grad);
+  gpu_data_buffers_free(&gpu_buf_forc);
 
   for (int i = 0; i < gpu_pack_params.n_bundles; i++)
     cudaStreamDestroy(stream[i]);
-  for (int i = 0; i < gpu_pack_params.n_bundles_pair; i++)
-    cudaStreamDestroy(stream_pairs[i]);
   /* Be kind, rewind. */
   return NULL;
 }

@@ -178,8 +178,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
   const int lid = md->n_leaves_packed;
 
   /* Identify first particle for each bundle of tasks */
-  const int bundle_size =
-      md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
+  const int bundle_size = md->params.bundle_size;
   if (lid % bundle_size == 0) {
     int bid = lid / bundle_size;
     /* Store this before we increment md->count_parts */
@@ -381,10 +380,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_density(
 
   runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_density);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_pack_d);
-  else
-    TIMER_TOC(timer_doself_gpu_pack_d);
+  TIMER_TOC(timer_gpu_pack_d);
 }
 
 /**
@@ -398,10 +394,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_gradient(
 
   runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_gradient);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_pack_g);
-  else
-    TIMER_TOC(timer_doself_gpu_pack_g);
+  TIMER_TOC(timer_gpu_pack_g);
 }
 
 /**
@@ -415,10 +408,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_force(
 
   runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_force);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_pack_f);
-  else
-    TIMER_TOC(timer_doself_gpu_pack_f);
+  TIMER_TOC(timer_gpu_pack_f);
 }
 
 /**
@@ -439,10 +429,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_density(
 
   runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_density);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_unpack_d);
-  else
-    TIMER_TOC(timer_doself_gpu_unpack_d);
+  TIMER_TOC(timer_gpu_unpack_d);
 }
 
 /**
@@ -463,10 +450,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_gradient(
 
   runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_gradient);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_unpack_g);
-  else
-    TIMER_TOC(timer_doself_gpu_unpack_g);
+  TIMER_TOC(timer_gpu_unpack_g);
 }
 
 /**
@@ -488,10 +472,7 @@ runner_dopair_gpu_unpack_force(const struct runner *r, struct scheduler *s,
 
   runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_force);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_unpack_f);
-  else
-    TIMER_TOC(timer_doself_gpu_unpack_f);
+  TIMER_TOC(timer_gpu_unpack_f);
 }
 
 #endif /* RUNNER_GPU_PACK_FUNCTIONS_H */

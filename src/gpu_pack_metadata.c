@@ -38,14 +38,11 @@ extern "C" {
  * @param params gpu_global_pack_params struct containing valid parameters
  */
 void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
-                            const struct gpu_global_pack_params *params,
-                            const char is_pair_task) {
+                            const struct gpu_global_pack_params *params){
 
   /* Grab some handles */
-  const size_t pack_size =
-      is_pair_task ? params->pack_size_pair : params->pack_size;
-  const size_t n_bundles =
-      is_pair_task ? params->n_bundles_pair : params->n_bundles;
+  const size_t pack_size = params->pack_size;
+  const size_t n_bundles = params->n_bundles;
   const size_t leaf_buffer_size = params->leaf_buffer_size;
 
   md->ci_leaves =
@@ -80,8 +77,6 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
   md->launch_leftovers = 0;
 
   gpu_pack_params_copy(params, &md->params);
-
-  md->is_pair_task = is_pair_task;
 
 #ifdef SWIFT_DEBUG_CHECKS
   md->send_struct_size = 0;
