@@ -364,7 +364,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
     /* (j != pid): Exclude self contribution. This happens at a later step. */
     const bool iact_condition = ((r2 < hig2) || (r2 < hjg2)) && (j != pid);
     const float mask = iact_condition ? 1.f : 0.f;
-    const int tbj_masked = iact_condition && (tbj > 0) ? tbj : res_min_ngb_timebin;
+    const int tbj_masked =
+        iact_condition && (tbj > 0) ? tbj : res_min_ngb_timebin;
 
     /* Cosmology terms for the signal velocity */
     const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
