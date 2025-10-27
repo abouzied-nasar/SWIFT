@@ -165,9 +165,6 @@ enum task_subtypes {
   task_subtype_gpu_density,
   task_subtype_gpu_gradient,
   task_subtype_gpu_force,
-  task_subtype_gpu_unpack_d,
-  task_subtype_gpu_unpack_g,
-  task_subtype_gpu_unpack_f,
   task_subtype_count
 } __attribute__((packed));
 
@@ -205,7 +202,6 @@ enum task_categories {
   task_category_mpi,
   task_category_pack,
   task_category_gpu,
-  task_category_gpu_unpack,
   task_category_fof,
   task_category_others,
   task_category_neutrino,
@@ -245,10 +241,8 @@ struct task {
   /*! Pointers to the cells this task acts upon */
   struct cell *ci, *cj;
 
-  int done;  // A. Nasar
-
-  /*! Pointers to the cells this task acts upon */
-  struct cell **ci_unpack;  //, **cj;
+  /* TODO: Do we still need this? */
+  int done;
 
   /*! List of tasks unlocked by this one */
   struct task **unlock_tasks;

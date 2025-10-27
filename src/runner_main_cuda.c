@@ -213,8 +213,10 @@ void *runner_main_cuda(void *data) {
   for (int i = 0; i < gpu_pack_params.n_bundles_pair; i++)
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
-  /* Declare some global variables */
+    /* Declare some global variables */
+#ifdef CUDA_PROFILER
   int step = 0;
+#endif
 
   /* Tell me how much memory we're using. */
   gpu_print_free_mem(e, r->cpuid);
@@ -246,8 +248,8 @@ void *runner_main_cuda(void *data) {
     /* TODO: DO WE STILL NEED THIS?? */
 #ifdef CUDA_PROFILER
     if (step == 0) cudaProfilerStart();
-#endif
     step++;
+#endif
 
     /* Loop while there are tasks... */
     while (1) {
@@ -266,11 +268,9 @@ void *runner_main_cuda(void *data) {
       /* Get the cells. */
       struct cell *ci = t->ci;
       struct cell *cj = t->cj;
-
-      if (ci == NULL && (t->subtype != task_subtype_gpu_unpack_d &&
-                         t->subtype != task_subtype_gpu_unpack_g &&
-                         t->subtype != task_subtype_gpu_unpack_f))
-        error("This cannot be");
+#ifdef SWIFT_DEBUG_CHECKS
+      if (ci == NULL) error("This cannot be");
+#endif
 
 #ifdef SWIFT_DEBUG_TASKS
       /* Mark the thread we run on */
@@ -281,12 +281,7 @@ void *runner_main_cuda(void *data) {
         struct cell *ci_temp = ci;
         struct cell *cj_temp = cj;
         double shift[3];
-        if (t->subtype != task_subtype_gpu_unpack_d &&
-            t->subtype != task_subtype_gpu_unpack_g &&
-            t->subtype != task_subtype_gpu_unpack_f)
-          t->sid = space_getsid_and_swap_cells(e->s, &ci_temp, &cj_temp, shift);
-      } else {
-        t->sid = -1;
+        t->sid = space_getsid_and_swap_cells(e->s, &ci_temp, &cj_temp, shift);
       }
 #endif
 
@@ -306,11 +301,7 @@ void *runner_main_cuda(void *data) {
             runner_doself_recursive_grav(r, ci, 1);
           else if (t->subtype == task_subtype_external_grav)
             runner_do_grav_external(r, ci, 1);
-          else if (t->subtype == task_subtype_gpu_unpack_d) {
-            /* TODO: WHY ARE THESE EMPTY? WHY DO WE HAVE THEM HERE THEN? */
-          } else if (t->subtype == task_subtype_gpu_unpack_g) {
-          } else if (t->subtype == task_subtype_gpu_unpack_f) {
-          } else if (t->subtype == task_subtype_density) {
+          else if (t->subtype == task_subtype_density) {
 #ifndef GPUOFFLOAD_DENSITY
             runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
 #endif
@@ -409,9 +400,6 @@ void *runner_main_cuda(void *data) {
             runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_pair_forc, t,
                                     stream_pairs, d_a, d_H);
 #endif
-          } else if (t->subtype == task_subtype_gpu_unpack_d) {
-          } else if (t->subtype == task_subtype_gpu_unpack_g) {
-          } else if (t->subtype == task_subtype_gpu_unpack_f) {
           }
 
 #ifdef EXTRA_HYDRO_LOOP
@@ -712,7 +700,7 @@ void *runner_main_cuda(void *data) {
       prev = t;
       if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
-        /* Don't enqueue unpacks yet. Just signal the runners */
+        /* Don't enqueue dependencies yet. Just signal the runners */
         t->skip = 1;
         t->toc = getticks();
         t->total_ticks += t->toc - t->tic;
@@ -722,7 +710,7 @@ void *runner_main_cuda(void *data) {
 #endif
       } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-        /* Don't enqueue unpacks yet. Just signal the runners */
+        /* Don't enqueue dependencies yet. Just signal the runners */
         t->skip = 1;
         t->toc = getticks();
         t->total_ticks += t->toc - t->tic;
@@ -732,7 +720,7 @@ void *runner_main_cuda(void *data) {
 #endif
       } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-        /* Don't enqueue unpacks yet. Just signal the runners */
+        /* Don't enqueue dependencies yet. Just signal the runners */
         t->skip = 1;
         t->toc = getticks();
         t->total_ticks += t->toc - t->tic;

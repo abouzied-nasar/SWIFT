@@ -13,7 +13,7 @@ then
 fi
 
 # Run SWIFT
-../../../swift_cuda --pin --hydro --threads=32 sedovGPU.yml 2>&1 | tee outputGPU.log
+../../../swift_cuda --pin --hydro --threads=8 sedovGPU.yml 2>&1 | tee outputGPU.log
 
 # Plot the solution
 python3 plotSolution.py 5
