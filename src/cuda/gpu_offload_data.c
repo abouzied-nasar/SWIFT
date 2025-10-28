@@ -81,6 +81,20 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                             part_buffer_size * recv_struct_size);
   swift_assert(cu_error == cudaSuccess);
 
+  int pack_size =
+      md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
+
+  int size_of_cell_start_end = 2 * sizeof(int) * pack_size;
+  /*Allocate memory for cell start and end data on host*/
+  cu_error = cudaMallocHost((void **)&buf->cell_i_j_start_end,
+                            size_of_cell_start_end);
+  swift_assert(cu_error == cudaSuccess);
+
+  /*Allocate memory for cell start and end data on device*/
+  cu_error = cudaMalloc((void **)&buf->d_cell_i_j_start_end,
+                            size_of_cell_start_end);
+  swift_assert(cu_error == cudaSuccess);
+
   /* Create space for cuda events */
   buf->event_end = (cudaEvent_t *)malloc(n_bundles * sizeof(cudaEvent_t));
 

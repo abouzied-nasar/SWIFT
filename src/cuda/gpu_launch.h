@@ -31,7 +31,8 @@ void gpu_launch_density(const struct gpu_part_send_d *restrict d_parts_send,
                         struct gpu_part_recv_d *restrict d_parts_recv,
                         const float d_a, const float d_H, cudaStream_t stream,
                         const int num_blocks_x, const int num_blocks_y,
-                        const int bundle_first_part, const int bundle_n_parts);
+                        const int bundle_first_part, const int bundle_n_parts,
+                        const int4 *restrict d_cell_i_j_start_end);
 void gpu_launch_gradient(const struct gpu_part_send_g *restrict d_parts_send,
                          struct gpu_part_recv_g *restrict d_parts_recv,
                          const float d_a, const float d_H, cudaStream_t stream,

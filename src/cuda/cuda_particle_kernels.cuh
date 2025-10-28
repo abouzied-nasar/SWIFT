@@ -48,7 +48,8 @@ extern "C" {
  */
 __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     int pid, const struct gpu_part_send_d *__restrict__ d_parts_send,
-    struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H) {
+    struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H,
+    const int4 *__restrict__ d_cell_i_j_start_end) {
 
   /* First, grab handles. */
   const struct gpu_part_send_d pi = d_parts_send[pid];

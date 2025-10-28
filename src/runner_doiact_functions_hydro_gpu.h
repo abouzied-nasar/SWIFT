@@ -255,6 +255,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 #endif
   }
 
+  /*Copy the tasks cell start/end metadata to the GPU. Send it via default stream for now
+   * TODO: Make this asynchronous via events to stop kernel launch before this happens*/
+  cudaError_t cu_error =
+      cudaMemcpy(&buf->d_cell_i_j_start_end[0],
+                      &buf->cell_i_j_start_end[0],
+                      leaves_packed * sizeof(int4),
+                      cudaMemcpyHostToDevice);
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
    * its own stream. */
   for (int bid = 0; bid < n_bundles; bid++) {
@@ -266,10 +273,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
                                      : md->count_parts;
     const int bundle_n_parts = bundle_last_part - bundle_first_part;
 
-    /* initialise to just some meaningless value to silence the compiler */
-    cudaError_t cu_error = cudaErrorMemoryAllocation;
-
-    /* Transfer memory to device */
+    /* Transfer particle data to device */
     if (task_subtype == task_subtype_gpu_density) {
 
       cu_error =
@@ -321,7 +325,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
                          stream[bid], num_blocks_x, num_blocks_y,
-                         bundle_first_part, bundle_n_parts);
+                         bundle_first_part, bundle_n_parts, buf->d_cell_i_j_start_end);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
@@ -401,7 +405,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
    * this way with unpacking done separately */
   /* TODO Abouzied: Is the comment above still appropriate? */
   for (int bid = 0; bid < n_bundles; bid++) {
-    cudaError_t cu_error = cudaEventSynchronize(event_end[bid]);
+    cu_error = cudaEventSynchronize(event_end[bid]);
     if (cu_error != cudaSuccess) {
       error(
           "cudaEventSynchronize failed: '%s' for task subtype %s,"
@@ -576,6 +580,22 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     struct cell *cii = md->ci_leaves[md->n_leaves_packed];
     struct cell *cjj = md->cj_leaves[md->n_leaves_packed];
 
+    int cii_count = cii->hydro.count;
+    int cjj_count = cjj->hydro.count;
+
+    //Figure out where cells start for controlling GPU computations
+    if(md->is_pair_task){
+      //Where does ci start?
+      buf->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts;
+      //Where does cj start?
+      buf->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts + cii_count;
+    }
+    else{
+      //Same as above but ci is cj
+      buf->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts;
+      buf->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts;
+    }
+
 #ifdef SWIFT_DEBUG_CHECKS
     if (cii->hydro.count == 0)
       error(
@@ -596,10 +616,24 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     } else if (t->subtype == task_subtype_gpu_force) {
       runner_gpu_pack_force(r, buf, cii, cjj);
     }
-#ifdef SWIFT_DEBUG_CHECKS
-    else {
-      error("Unknown task subtype %s", subtaskID_names[t->subtype]);
+
+    //Figure out where cells end for controlling GPU computations
+    if(md->is_pair_task){
+      //Where does ci end?
+      buf->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts - cjj_count;
+      //Where does cj end?
+      buf->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts;
     }
+    else{
+      //Same as above but ci is cj
+      buf->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts - cii_count;
+      buf->cell_i_j_start_end[md->n_leaves_packed].w = buf->cell_i_j_start_end[md->n_leaves_packed].y;
+    }
+
+#ifdef SWIFT_DEBUG_CHECKS
+//    else {
+//      error("Unknown task subtype %s", subtaskID_names[t->subtype]);
+//    }
 #endif
 
     /* record how many leaves we've packed in total during this while loop */

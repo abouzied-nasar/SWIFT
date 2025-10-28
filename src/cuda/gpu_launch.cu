@@ -55,13 +55,14 @@ extern "C" {
 __global__ void cuda_launch_density(
     const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv, const float d_a,
-    const float d_H, const int bundle_first_part, const int bundle_n_parts) {
+    const float d_H, const int bundle_first_part, const int bundle_n_parts,
+    const int4 *__restrict__ d_cell_i_j_start_end) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int pid = bundle_first_part + threadid;
 
   if (pid < bundle_first_part + bundle_n_parts) {
-    cuda_kernel_density(pid, d_parts_send, d_parts_recv, d_a, d_H);
+    cuda_kernel_density(pid, d_parts_send, d_parts_recv, d_a, d_H, d_cell_i_j_start_end);
   }
 }
 
@@ -131,11 +132,12 @@ void gpu_launch_density(const struct gpu_part_send_d *__restrict__ d_parts_send,
                         struct gpu_part_recv_d *__restrict__ d_parts_recv,
                         const float d_a, const float d_H, cudaStream_t stream,
                         const int num_blocks_x, const int num_blocks_y,
-                        const int bundle_first_part, const int bundle_n_parts) {
+                        const int bundle_first_part, const int bundle_n_parts,
+                        const int4 *__restrict__ d_cell_i_j_start_end) {
 
   /* TODO: Do we want to allocate shared memory here? */
   cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
-      d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
+      d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts, d_cell_i_j_start_end);
 }
 
 /**
