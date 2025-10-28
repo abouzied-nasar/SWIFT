@@ -84,7 +84,7 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   int pack_size =
       md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
 
-  int size_of_cell_start_end = 2 * sizeof(int) * pack_size;
+  int size_of_cell_start_end = 2 * sizeof(int4) * pack_size;
   /*Allocate memory for cell start and end data on host*/
   cu_error = cudaMallocHost((void **)&buf->cell_i_j_start_end,
                             size_of_cell_start_end);
