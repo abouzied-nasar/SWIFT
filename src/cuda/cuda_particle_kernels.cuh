@@ -66,8 +66,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     const float vzi = pi.vx_m.z;
     /* const float mi = pi.vx_m.w; */
 
-    const int pj_start = pi.pjs_pje.x;
-    const int pj_end = pi.pjs_pje.y;
+    const int pj_start = cell_starts_ends.z;
+    const int pj_end = cell_starts_ends.w;
 
     /* Do some auxiliary computations */
     const float hig2 = hi * hi * kernel_gamma2;

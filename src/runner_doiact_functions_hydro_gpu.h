@@ -325,7 +325,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     const int num_blocks_x =
         (bundle_n_parts + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
     const int num_blocks_x_cells =
-        (bundle_n_cells + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+        (bundle_n_cells + 4 - 1) / 4;
     const int num_blocks_y = 0;
 
     /* Launch the kernel for ci using data for ci and cj */
