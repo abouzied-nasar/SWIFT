@@ -260,7 +260,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   cudaError_t cu_error =
       cudaMemcpy(&buf->d_cell_i_j_start_end[0],
                       &buf->cell_i_j_start_end[0],
-                      leaves_packed * sizeof(int4),
+                      sizeof(int4),
                       cudaMemcpyHostToDevice);
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
    * its own stream. */
