@@ -44,6 +44,12 @@ struct gpu_pack_metadata {
   struct cell **ci_leaves;
   struct cell **cj_leaves;
 
+  /*list of unique cells we find in the leaves lists above*/
+  struct cell ** unique_cells;
+
+  /*number of unique cells we find*/
+  int n_unique;
+
   /*! Number of leaf cells which require interactions found during recursive
    * search for a single task */
   int task_n_leaves;

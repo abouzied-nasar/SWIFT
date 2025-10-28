@@ -74,6 +74,11 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
   md->bundle_first_cell = (int *)malloc(n_bundles * sizeof(int));
   for (size_t i = 0; i < n_bundles; i++) md->bundle_first_cell[i] = 0;
 
+  /*Allocate memory for unique cells*/
+  md->unique_cells =
+      (struct cell **)malloc(2 * pack_size * sizeof(struct cell *));
+  for (size_t i = 0; i < pack_size; i++) md->unique_cells[i] = NULL;
+
   md->task_n_leaves = 0;
   md->tasks_in_list = 0;
   md->count_parts = 0;

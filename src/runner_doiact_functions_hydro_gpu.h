@@ -203,6 +203,82 @@ static void runner_doself_gpu_recurse(const struct runner *r,
   if (timer) TIMER_TOC(timer_doself_gpu_recurse);
 }
 
+bool is_unique(const struct cell *cii, struct cell *unique[], int unique_count) {
+    for (int i = 0; i < unique_count; i++) {
+        if (unique[i] == cii) {
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * @brief recurse into a cell and recursively identify all leaf cell
+ * interactions needed in this step.
+ *
+ * @param r The #runner
+ * @param s The #scheduler
+ * @param buf the data buffers
+ * @param ci the #cell to be interacted recursively
+ * @param depth current recursion depth
+ * @param timer are we timing this?
+ */
+static void runner_gpu_filter_data(const struct runner *r,
+                                      const struct scheduler *s,
+                                      struct gpu_offload_data *buf,
+                                      const char timer) {
+
+  /* Note: Can't inline a recursive function... */
+
+  TIMER_TIC;
+
+  /* Grab some handles. */
+  /* packing data and metadata */
+  struct gpu_pack_metadata *md = &buf->md;
+  /* Arrays for leaf cells */
+  struct cell **ci_leaves = md->ci_leaves;
+  struct cell **cj_leaves = md->cj_leaves;
+
+  int unique_count = 1;
+
+
+  if(md->n_leaves == 0)
+    return;
+
+  for(int i = 0; i < md->n_leaves; i++){
+    struct cell *cii = ci_leaves[i];
+    struct cell *cjj = cj_leaves[i];
+    if(cii == NULL || cjj == NULL)
+      error("working on NULL cells");
+    int j = 0;
+    while(j < unique_count){
+      if(md->unique_cells[j] == cii) {
+        buf->my_index[i].x = j;
+      }
+      else{
+        md->unique_cells[unique_count] = cii;
+        buf->my_index[i].x = unique_count;
+        unique_count++;
+      }
+    }
+    for(j = 0; j < unique_count; j++) {
+      if(md->unique_cells[j] == cjj) {
+        buf->my_index[i].y = j;
+      }
+      else{
+        md->unique_cells[unique_count] = cii;
+        buf->my_index[i].y = unique_count;
+        unique_count++;
+      }
+    }
+  }
+//
+  md->n_unique = unique_count;
+  message("found %i unique cells in %i leaf computations", unique_count, md->n_leaves);
+//
+//  if (timer) TIMER_TOC(timer_doself_gpu_recurse);
+}
+
 /**
  * @brief Generic function to launch GPU computations: Copies CPU buffer data
  * asynchronously over to the GPU, calls the solver, then copies data back.
@@ -255,13 +331,21 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 #endif
   }
 
-  /*Copy the tasks cell start/end metadata to the GPU. Send it via default stream for now
-   * TODO: Make this asynchronous via events to stop kernel launch before this happens*/
-  cudaError_t cu_error =
-      cudaMemcpy(&buf->d_cell_i_j_start_end[0],
-                      &buf->cell_i_j_start_end[0],
-                      leaves_packed * sizeof(int4),
-                      cudaMemcpyHostToDevice);
+  cudaError_t cu_error = cudaSuccess;
+//  cudaEvent_t metadata_copied;
+  /*Copy the tasks cell start/end metadata to the GPU. Send it using regular streams for now.
+   * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
+   * instead of n_bundle copies */
+//  cu_error =
+//      cudaMemcpyAsync(&buf->d_cell_i_j_start_end[0],
+//                      &buf->cell_i_j_start_end[0],
+//                      leaves_packed * sizeof(int4),
+//                      cudaMemcpyHostToDevice, stream[0]);
+//  if (task_subtype == task_subtype_gpu_density){
+//    /*Create an event to say we have issue a send of this data to GPU*/
+//    cudaEventCreateWithFlags(&metadata_copied, cudaEventDisableTiming);
+//    cudaEventRecord(metadata_copied, stream[0]);
+//  }
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
    * its own stream. */
   for (int bid = 0; bid < n_bundles; bid++) {
@@ -279,9 +363,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
                                      : leaves_packed;
     const int bundle_n_cells = bundle_last_cell - bundle_first_cell;
 
-    /* Transfer particle data to device */
     if (task_subtype == task_subtype_gpu_density) {
+      /*Copy the tasks cell start/end metadata to the GPU. Send it using regular streams for now.
+       * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
+       * instead of n_bundle copies */
+      cu_error =
+          cudaMemcpyAsync(&buf->d_cell_i_j_start_end[bundle_first_cell],
+                          &buf->cell_i_j_start_end[bundle_first_cell],
+                          bundle_n_cells * sizeof(int4),
+                          cudaMemcpyHostToDevice, stream[bid]);
 
+      /* Transfer particle data to device */
       cu_error =
           cudaMemcpyAsync(&buf->d_parts_send_d[bundle_first_part],
                           &buf->parts_send_d[bundle_first_part],
@@ -325,16 +417,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     const int num_blocks_x =
         (bundle_n_parts + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
     const int num_blocks_x_cells =
-        (bundle_n_cells + 4 - 1) / 4;
+        (bundle_n_cells + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
     const int num_blocks_y = 0;
 
     /* Launch the kernel for ci using data for ci and cj */
     if (task_subtype == task_subtype_gpu_density) {
-
+      /*Tell the kernel to wait untim metadata copied*/
+//      cudaStreamWaitEvent(stream[bid], metadata_copied, cudaEventWaitDefault);
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
                          stream[bid], num_blocks_x_cells, num_blocks_y,
                          bundle_first_part, bundle_n_parts, buf->d_cell_i_j_start_end,
                          bundle_first_cell, bundle_n_cells);
+//      cudaEventDestroy(metadata_copied);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
@@ -511,7 +605,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     struct gpu_offload_data *restrict buf, struct task *t, cudaStream_t *stream,
     const float d_a, const float d_H) {
 
-  /* Grab handles */
+  /* Grab handles*/
   struct gpu_pack_metadata *md = &buf->md;
   int *task_first_packed_leaf = md->task_first_packed_leaf;
   int *task_last_packed_leaf = md->task_last_packed_leaf;
@@ -780,6 +874,8 @@ static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
   /* Collect cell interaction data recursively*/
   runner_doself_gpu_recurse(r, s, buf, t->ci, /*depth=*/0, /*timer=*/1);
 
+  /* Find unique cells*/
+  runner_gpu_filter_data(r, s, buf, /*timer=*/1);
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
