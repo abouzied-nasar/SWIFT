@@ -66,6 +66,9 @@ struct gpu_pack_metadata {
   /*! Index of the first particle of a bundle in the buffer arrays */
   int *bundle_first_part;
 
+  /*! Index of the first particle of a bundle in the buffer arrays */
+  int *bundle_first_cell;
+
   /*! Count how many (super-level) tasks we've identified for packing */
   int tasks_in_list;
 

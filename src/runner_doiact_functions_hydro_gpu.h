@@ -266,12 +266,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
    * its own stream. */
   for (int bid = 0; bid < n_bundles; bid++) {
 
-    /* Get the particle count for this bundle */
+//    /* Get the particle count for this bundle */
     const int bundle_first_part = md->bundle_first_part[bid];
     const int bundle_last_part = bid < (n_bundles - 1)
                                      ? md->bundle_first_part[bid + 1]
                                      : md->count_parts;
     const int bundle_n_parts = bundle_last_part - bundle_first_part;
+    /* Get the particle count for this bundle */
+    const int bundle_first_cell = md->bundle_first_cell[bid];
+    const int bundle_last_cell = bid < (n_bundles - 1)
+                                     ? md->bundle_first_cell[bid + 1]
+                                     : leaves_packed;
+    const int bundle_n_cells = bundle_last_cell - bundle_first_cell;
 
     /* Transfer particle data to device */
     if (task_subtype == task_subtype_gpu_density) {
@@ -318,14 +324,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     /* TODO: num_blocks_y is not used anymore. Purge it. */
     const int num_blocks_x =
         (bundle_n_parts + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+    const int num_blocks_x_cells =
+        (bundle_n_cells + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
     const int num_blocks_y = 0;
 
     /* Launch the kernel for ci using data for ci and cj */
     if (task_subtype == task_subtype_gpu_density) {
 
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
-                         stream[bid], num_blocks_x, num_blocks_y,
-                         bundle_first_part, bundle_n_parts, buf->d_cell_i_j_start_end);
+                         stream[bid], num_blocks_x_cells, num_blocks_y,
+                         bundle_first_part, bundle_n_parts, buf->d_cell_i_j_start_end,
+                         bundle_first_cell, bundle_n_cells);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
@@ -552,9 +561,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   /* Counter for how many leaf cells  of this task we've packed */
   int npacked = 0;
 
-  /* TODO: @Abouzied Please document what is happening here, this looks very
-   * important and scary. Why does this need to happen here, and not
-   * earlier/later? */
+  /* We do not need the lock on this cell as we are packing read-only data
+   * unlock here but lock when unpacking ;)*/
   cell_unlocktree(t->ci);
   if (t->cj != NULL) cell_unlocktree(t->cj);
 

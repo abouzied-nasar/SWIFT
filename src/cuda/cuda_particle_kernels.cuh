@@ -47,100 +47,103 @@ extern "C" {
  * @param d_H current Hubble constant
  */
 __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
-    int pid, const struct gpu_part_send_d *__restrict__ d_parts_send,
+    int cid, const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H,
     const int4 *__restrict__ d_cell_i_j_start_end) {
 
-  /* First, grab handles. */
-  const struct gpu_part_send_d pi = d_parts_send[pid];
+  /* First, grab handles for where cells start and end */
+  const int4 cell_starts_ends = d_cell_i_j_start_end[cid];
+  /*Now loop over the particles in cell i*/
+  for(int i = cell_starts_ends.x; i < cell_starts_ends.y; i++){
+    const struct gpu_part_send_d pi = d_parts_send[i];
+    const float xi = pi.x_h.x;
+    const float yi = pi.x_h.y;
+    const float zi = pi.x_h.z;
+    const float hi = pi.x_h.w;
 
-  const float xi = pi.x_h.x;
-  const float yi = pi.x_h.y;
-  const float zi = pi.x_h.z;
-  const float hi = pi.x_h.w;
+    const float vxi = pi.vx_m.x;
+    const float vyi = pi.vx_m.y;
+    const float vzi = pi.vx_m.z;
+    /* const float mi = pi.vx_m.w; */
 
-  const float vxi = pi.vx_m.x;
-  const float vyi = pi.vx_m.y;
-  const float vzi = pi.vx_m.z;
-  /* const float mi = pi.vx_m.w; */
+    const int pj_start = pi.pjs_pje.x;
+    const int pj_end = pi.pjs_pje.y;
 
-  const int pj_start = pi.pjs_pje.x;
-  const int pj_end = pi.pjs_pje.y;
+    /* Do some auxiliary computations */
+    const float hig2 = hi * hi * kernel_gamma2;
+    const float hi_inv = 1.f / hi;
 
-  /* Do some auxiliary computations */
-  const float hig2 = hi * hi * kernel_gamma2;
-  const float hi_inv = 1.f / hi;
+    /* Prep output */
+    /* rho, rho_dh, wcount, wcount_dh */
+    float4 res_rho = {0.0, 0.0, 0.0, 0.0};
+    /* curl of velocity (3 coordinates), velocity divergence */
+    float4 res_rot = {0.0, 0.0, 0.0, 0.0};
 
-  /* Prep output */
-  /* rho, rho_dh, wcount, wcount_dh */
-  float4 res_rho = {0.0, 0.0, 0.0, 0.0};
-  /* curl of velocity (3 coordinates), velocity divergence */
-  float4 res_rot = {0.0, 0.0, 0.0, 0.0};
+    /* Start the neighbour interactions */
+    for (int j = pj_start; j < pj_end; j++) {
 
-  /* Start the neighbour interactions */
-  for (int j = pj_start; j < pj_end; j++) {
+      /* First, grab handles. */
+      const struct gpu_part_send_d pj = d_parts_send[j];
 
-    /* First, grab handles. */
-    const struct gpu_part_send_d pj = d_parts_send[j];
+      const float xj = pj.x_h.x;
+      const float yj = pj.x_h.y;
+      const float zj = pj.x_h.z;
+      /* const float hj = pj.x_p_h.w; */
 
-    const float xj = pj.x_h.x;
-    const float yj = pj.x_h.y;
-    const float zj = pj.x_h.z;
-    /* const float hj = pj.x_p_h.w; */
+      const float vxj = pj.vx_m.x;
+      const float vyj = pj.vx_m.y;
+      const float vzj = pj.vx_m.z;
+      const float mj = pj.vx_m.w;
 
-    const float vxj = pj.vx_m.x;
-    const float vyj = pj.vx_m.y;
-    const float vzj = pj.vx_m.z;
-    const float mj = pj.vx_m.w;
+      /* Now get stuff done. */
+      const float xij = xi - xj;
+      const float yij = yi - yj;
+      const float zij = zi - zj;
+      const float r2 = xij * xij + yij * yij + zij * zij;
 
-    /* Now get stuff done. */
-    const float xij = xi - xj;
-    const float yij = yi - yj;
-    const float zij = zi - zj;
-    const float r2 = xij * xij + yij * yij + zij * zij;
+      if ((r2 < hig2) && (j != i)) {
+        /* j != pid: Exclude self contribution. This happens at a later step. */
 
-    if ((r2 < hig2) && (j != pid)) {
-      /* j != pid: Exclude self contribution. This happens at a later step. */
+        /* Recover some data */
+        const float r = sqrtf(r2);
 
-      /* Recover some data */
-      const float r = sqrtf(r2);
+        /* Get the kernel for hi. */
+        const float ui = r * hi_inv;
+        float wi;
+        float wi_dx;
+        d_kernel_deval(ui, &wi, &wi_dx);
 
-      /* Get the kernel for hi. */
-      const float ui = r * hi_inv;
-      float wi;
-      float wi_dx;
-      d_kernel_deval(ui, &wi, &wi_dx);
+        /* Add to sums of rho, rho_dh, wcount and wcount_dh */
+        res_rho.x += mj * wi;
+        res_rho.y -= mj * (hydro_dimension * wi + ui * wi_dx);
+        res_rho.z += wi;
+        res_rho.w -= (hydro_dimension * wi + ui * wi_dx);
 
-      /* Add to sums of rho, rho_dh, wcount and wcount_dh */
-      res_rho.x += mj * wi;
-      res_rho.y -= mj * (hydro_dimension * wi + ui * wi_dx);
-      res_rho.z += wi;
-      res_rho.w -= (hydro_dimension * wi + ui * wi_dx);
+        const float r_inv = 1.f / r;
+        const float faci = mj * wi_dx * r_inv;
 
-      const float r_inv = 1.f / r;
-      const float faci = mj * wi_dx * r_inv;
+        /* Compute dv dot r */
+        const float dvx = vxi - vxj;
+        const float dvy = vyi - vyj;
+        const float dvz = vzi - vzj;
+        const float dvdr = dvx * xij + dvy * yij + dvz * zij;
 
-      /* Compute dv dot r */
-      const float dvx = vxi - vxj;
-      const float dvy = vyi - vyj;
-      const float dvz = vzi - vzj;
-      const float dvdr = dvx * xij + dvy * yij + dvz * zij;
+        /* Compute dv cross r */
+        const float curlvrx = dvy * zij - dvz * yij;
+        const float curlvry = dvz * xij - dvx * zij;
+        const float curlvrz = dvx * yij - dvy * xij;
 
-      /* Compute dv cross r */
-      const float curlvrx = dvy * zij - dvz * yij;
-      const float curlvry = dvz * xij - dvx * zij;
-      const float curlvrz = dvx * yij - dvy * xij;
+        res_rot.x += faci * curlvrx;
+        res_rot.y += faci * curlvry;
+        res_rot.z += faci * curlvrz;
+        res_rot.w -= faci * dvdr;
+      }
+    } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
-      res_rot.x += faci * curlvrx;
-      res_rot.y += faci * curlvry;
-      res_rot.z += faci * curlvrz;
-      res_rot.w -= faci * dvdr;
-    }
-  } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
-
-  /* Write results. */
-  d_parts_recv[pid].rho_rhodh_wcount_wcount_dh = res_rho;
-  d_parts_recv[pid].rot_vx_div_v = res_rot;
+    /* Write results. */
+    d_parts_recv[i].rho_rhodh_wcount_wcount_dh = res_rho;
+    d_parts_recv[i].rot_vx_div_v = res_rot;
+  }
 }
 
 /**

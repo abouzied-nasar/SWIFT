@@ -184,6 +184,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     int bid = lid / bundle_size;
     /* Store this before we increment md->count_parts */
     md->bundle_first_part[bid] = md->count_parts;
+    /* Store this before we increment md->count_parts */
+    md->bundle_first_cell[bid] = lid;
   }
 
   /* Update incremented pack length accordingly */
