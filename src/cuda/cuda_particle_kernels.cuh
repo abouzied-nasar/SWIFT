@@ -46,6 +46,7 @@ extern "C" {
  * @param d_a current cosmological expansion factor
  * @param d_H current Hubble constant
  */
+//TODO: When changing the file cuda_particle_kernels.cuh and then recompiling the compiler doesn't realise the file has changed
 __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     int cid, const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H,
@@ -57,7 +58,9 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   const int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[cid];
   /*Now loop over the particles in cell i*/
 
-  for(int i = cell_starts_ends.x; i < cell_starts_ends.y; i++){
+  int k = 0;
+  for(int i = cell_starts_ends_read.x; i < cell_starts_ends_read.y; i++){
+    k++;
     const struct gpu_part_send_d pi = d_parts_send[i];
     const float xi = pi.x_h.x;
     const float yi = pi.x_h.y;
@@ -69,8 +72,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     const float vzi = pi.vx_m.z;
     /* const float mi = pi.vx_m.w; */
 
-    const int pj_start = cell_starts_ends.z;
-    const int pj_end = cell_starts_ends.w;
+    const int pj_start = cell_starts_ends_read.z;
+    const int pj_end = cell_starts_ends_read.w;
 
     /* Do some auxiliary computations */
     const float hig2 = hi * hi * kernel_gamma2;
@@ -145,8 +148,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
 
     /* Write results. */
     //Write to i + non_compact_start_of_cell
-    d_parts_recv[i].rho_rhodh_wcount_wcount_dh = res_rho;
-    d_parts_recv[i].rot_vx_div_v = res_rot;
+    d_parts_recv[k + cell_starts_ends_read.x].rho_rhodh_wcount_wcount_dh = res_rho;
+    d_parts_recv[k + cell_starts_ends_read.x].rot_vx_div_v = res_rot;
   }
 }
 
