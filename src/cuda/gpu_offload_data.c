@@ -64,6 +64,37 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   /* Now allocate arrays */
   cudaError_t cu_error;
 
+  /*Data required for unique sorting*/
+  int size_of_cell_start_end = sizeof(int4) * params->pack_size_pair;
+
+  /*Allocate memory for cell start and end data on host*/
+  cu_error = cudaMallocHost((void **)&buf->cell_i_j_start_end,
+                            size_of_cell_start_end);
+  swift_assert(cu_error == cudaSuccess);
+
+  /*Allocate memory for cell start and end data on host to work on unique cells. Size is half cell_i_j_start_end as this is an int2*/
+  cu_error = cudaMallocHost((void **)&buf->cell_i_start_end_compact,
+                            size_of_cell_start_end/2);
+  swift_assert(cu_error == cudaSuccess);
+
+  /*This is used to tell each cell in a pair where it's index is in the uniquely sorted array*/
+  cu_error = cudaMallocHost((void **)&buf->my_index,
+                            size_of_cell_start_end/2);
+
+  /*Allocate memory for cell start and end data on device*/
+  cu_error = cudaMalloc((void **)&buf->d_cell_i_j_start_end,
+                            size_of_cell_start_end);
+  swift_assert(cu_error == cudaSuccess);
+
+  /*Allocate memory for cell start and end data on host*/
+  cu_error = cudaMalloc((void **)&buf->d_cell_i_start_end_compact,
+                            size_of_cell_start_end/2);
+  swift_assert(cu_error == cudaSuccess);
+
+
+
+
+
   /* Now allocate memory for Buffer and GPU particle arrays */
   cu_error = cudaMalloc((void **)&buf->d_parts_send_d,
                         part_buffer_size * send_struct_size);
@@ -79,34 +110,6 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
 
   cu_error = cudaMallocHost((void **)&buf->parts_recv_d,
                             part_buffer_size * recv_struct_size);
-  swift_assert(cu_error == cudaSuccess);
-
-  int pack_size =
-      md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
-
-  int size_of_cell_start_end = 2 * sizeof(int4) * pack_size;
-  /*Allocate memory for cell start and end data on host*/
-  cu_error = cudaMallocHost((void **)&buf->cell_i_j_start_end,
-                            size_of_cell_start_end);
-  swift_assert(cu_error == cudaSuccess);
-
-  /*Allocate memory for cell start and end data on host to work on unique cells*/
-  cu_error = cudaMallocHost((void **)&buf->cell_i_start_end_compact,
-                            size_of_cell_start_end/2);
-  swift_assert(cu_error == cudaSuccess);
-
-  /*Allocate memory for cell start and end data on host*/
-  cu_error = cudaMallocHost((void **)&buf->my_index,
-                            size_of_cell_start_end/2);
-
-  /*Allocate memory for cell start and end data on device*/
-  cu_error = cudaMalloc((void **)&buf->d_cell_i_j_start_end,
-                            size_of_cell_start_end);
-  swift_assert(cu_error == cudaSuccess);
-
-  /*Allocate memory for cell start and end data on host*/
-  cu_error = cudaMalloc((void **)&buf->d_cell_i_start_end_compact,
-                            size_of_cell_start_end/4);
   swift_assert(cu_error == cudaSuccess);
 
   /* Create space for cuda events */

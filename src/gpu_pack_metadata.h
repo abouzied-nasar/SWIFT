@@ -33,6 +33,8 @@ extern "C" {
 #include "config.h"
 #include "gpu_pack_params.h"
 
+#include <cuda_runtime.h>
+
 #include <stddef.h>
 
 /*! struct holding bookkeeping meta-data required for offloading;
@@ -44,9 +46,11 @@ struct gpu_pack_metadata {
   struct cell **ci_leaves;
   struct cell **cj_leaves;
 
+
+  /*Data required for unique sorting*/
   /*list of unique cells we find in the leaves lists above*/
   struct cell ** unique_cells;
-
+  int2 * pack_flags;
   /*number of unique cells we find*/
   int n_unique;
 
@@ -80,6 +84,9 @@ struct gpu_pack_metadata {
 
   /*! How many particles have been packed */
   int count_parts;
+
+  /*! How many particles have been packed */
+  int count_parts_unique;
 
   /*! How many (pairs of) leaf cells we have alread packed (their particle data
    * copied) into the buffers */

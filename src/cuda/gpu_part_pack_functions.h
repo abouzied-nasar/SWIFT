@@ -164,8 +164,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     const struct cell *restrict c,
-    struct gpu_part_send_d *restrict parts_buffer, const int pack_ind,
-    const double shift[3], const int cjstart, const int cjend) {
+    struct gpu_part_send_d *restrict parts_buffer, const int pack_ind) {
 
   /* Grab handles */
   const int count = c->hydro.count;
@@ -177,9 +176,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0] - shift[0];
-    ps[i].x_h.y = x[1] - shift[1];
-    ps[i].x_h.z = x[2] - shift[2];
+    ps[i].x_h.x = x[0];
+    ps[i].x_h.y = x[1];
+    ps[i].x_h.z = x[2];
     ps[i].x_h.w = part_get_h(p);
 
     const float *v = part_get_const_v(p);
@@ -187,9 +186,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     ps[i].vx_m.y = v[1];
     ps[i].vx_m.z = v[2];
     ps[i].vx_m.w = part_get_mass(p);
-
-    ps[i].pjs_pje.x = cjstart;
-    ps[i].pjs_pje.y = cjend;
   }
 }
 

@@ -76,8 +76,17 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
 
   /*Allocate memory for unique cells*/
   md->unique_cells =
-      (struct cell **)malloc(2 * pack_size * sizeof(struct cell *));
-  for (size_t i = 0; i < pack_size; i++) md->unique_cells[i] = NULL;
+      (struct cell **)malloc(2 * leaf_buffer_size * sizeof(struct cell *));
+  for (size_t i = 0; i < leaf_buffer_size; i++) md->unique_cells[i] = NULL;
+
+  /*Allocate memory for packed flags*/
+  md->pack_flags =
+      (int2 *)malloc(2 * leaf_buffer_size * sizeof(int2));
+  for (size_t i = 0; i < leaf_buffer_size; i++){
+    md->pack_flags[i].x = 0;
+    md->pack_flags[i].y = 0;
+  }
+
 
   md->task_n_leaves = 0;
   md->tasks_in_list = 0;

@@ -239,44 +239,63 @@ static void runner_gpu_filter_data(const struct runner *r,
   struct cell **ci_leaves = md->ci_leaves;
   struct cell **cj_leaves = md->cj_leaves;
 
-  int unique_count = 1;
+  int unique_count = 0;
 
 
   if(md->n_leaves == 0)
     return;
 
-  for(int i = 0; i < md->n_leaves; i++){
+  /*TODO: Crude loop for now just to quickly bash something in to work.
+   * Come back to this and optimise so we only loop to
+   * uniqe_count not n_leaves in inner loop*/
+  for(int i = 0; i < md->n_leaves; i++) {
     struct cell *cii = ci_leaves[i];
     struct cell *cjj = cj_leaves[i];
-    if(cii == NULL || cjj == NULL)
+    md->pack_flags[i].x = 0;
+    md->pack_flags[i].y = 0;
+    if (cii == NULL || cjj == NULL)
       error("working on NULL cells");
-    int j = 0;
-    while(j < unique_count){
-      if(md->unique_cells[j] == cii) {
+
+    /*Test for ci*/
+    int unique = 1;
+    for (int j = 0; j < md->n_leaves; j++) {
+      if (md->unique_cells[j] == cii) {
         buf->my_index[i].x = j;
-      }
-      else{
-        md->unique_cells[unique_count] = cii;
-        buf->my_index[i].x = unique_count;
-        unique_count++;
+        unique = 0;
+        break;
       }
     }
-    for(j = 0; j < unique_count; j++) {
-      if(md->unique_cells[j] == cjj) {
+    if (unique) {
+      md->unique_cells[unique_count] = cii;
+      buf->my_index[i].x = unique_count;
+      md->pack_flags[i].x = 1;
+      unique_count++;
+    }
+    /*Test for cj*/
+    unique = 1;
+    for (int j = 0; j < md->n_leaves; j++) {
+      if (md->unique_cells[j] == cjj) {
         buf->my_index[i].y = j;
+        unique = 0;
+        break;
       }
-      else{
-        md->unique_cells[unique_count] = cii;
-        buf->my_index[i].y = unique_count;
-        unique_count++;
-      }
+    }
+    if (unique) {
+      md->unique_cells[unique_count] = cjj;
+      buf->my_index[i].y = unique_count;
+      md->pack_flags[i].y = 1;
+      unique_count++;
     }
   }
-//
+//  for(int i = 0; i < md->n_leaves; i++){
+//    message("cell i %i unique position is %i", i, buf->my_index[i].x);
+//  }
+
+
   md->n_unique = unique_count;
-  message("found %i unique cells in %i leaf computations", unique_count, md->n_leaves);
-//
-//  if (timer) TIMER_TOC(timer_doself_gpu_recurse);
+//  message("found %i unique cells in %i leaf computations", unique_count, md->n_leaves);
+
+  if (timer) TIMER_TOC(timer_doself_gpu_recurse);
 }
 
 /**
@@ -685,7 +704,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     int cii_count = cii->hydro.count;
     int cjj_count = cjj->hydro.count;
 
-    //Figure out where cells start for controlling GPU computations
+    /*Figure out where cells start for controlling GPU computations*/
     if(md->is_pair_task){
       //Where does ci start?
       buf->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts;

@@ -77,6 +77,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
 
   /* Get how many particles we've packed until now */
   int pack_ind = md->count_parts;
+  int pack_ind_unique = md->count_parts_unique;
 
 #ifdef SWIFT_DEBUG_CHECKS
   int last_ind = pack_ind + count_ci;
@@ -95,14 +96,19 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
   /* Get first and last particles of cell i */
   const int cis = pack_ind;
   const int cie = pack_ind + count_ci;
-
+  const int n_leaves_packed = md->n_leaves_packed;
   if (ci == cj) { /* This is a self interaction. */
 
     const double shift[3] = {0.0, 0.0, 0.0};
 
     /* Pack the data into the CPU-side buffers for offloading. */
     if (task_subtype == task_subtype_gpu_density) {
-      gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift, cis, cie);
+      /*Check to see if the cell is unique and we should pack it*/
+      if(md->pack_flags[n_leaves_packed].x==1){
+        gpu_pack_part_density(ci, buf->parts_send_d, pack_ind_unique);
+        /* Update incremented pack length accordingly */
+        md->count_parts_unique += count_ci;
+      }
     } else if (task_subtype == task_subtype_gpu_gradient) {
       gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift, cis, cie);
     } else if (task_subtype == task_subtype_gpu_force) {
@@ -137,7 +143,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
 
     /* Pack cell i */
     if (task_subtype == task_subtype_gpu_density) {
-      gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs, cje);
+      if(md->pack_flags[n_leaves_packed].x==1){
+        /*Check to see if cell i is unique and we should pack it*/
+        gpu_pack_part_density(ci, buf->parts_send_d, pack_ind_unique);
+        /* Update incremented pack length accordingly */
+        md->count_parts_unique += count_ci;
+      }
     } else if (task_subtype == task_subtype_gpu_gradient) {
       gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift_i, cjs,
                              cje);
@@ -158,7 +169,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
 
     if (task_subtype == task_subtype_gpu_density) {
-      gpu_pack_part_density(cj, buf->parts_send_d, pack_ind, shift_j, cis, cie);
+      /*Check to see if cell j is unique and we should pack it*/
+      if(md->pack_flags[n_leaves_packed].y==1){
+        gpu_pack_part_density(cj, buf->parts_send_d, pack_ind);
+        /* Update incremented pack length accordingly */
+        md->count_parts_unique += count_cj;
+      }
     } else if (task_subtype == task_subtype_gpu_gradient) {
       gpu_pack_part_gradient(cj, buf->parts_send_g, pack_ind, shift_j, cis,
                              cie);
@@ -177,6 +193,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
   /* Get the index for the leaf cell */
   const int lid = md->n_leaves_packed;
 
+  /*TODO: Do we still need this? We're now working with cells not particles*/
   /* Identify first particle for each bundle of tasks */
   const int bundle_size =
       md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
