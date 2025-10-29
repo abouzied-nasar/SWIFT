@@ -258,7 +258,7 @@ static void runner_gpu_filter_data(const struct runner *r,
 
     /*Test for ci*/
     int unique = 1;
-    for (int j = 0; j < md->n_leaves; j++) {
+    for (int j = 0; j < i; j++) {
       if (md->unique_cells[j] == cii) {
         buf->my_index[i].x = j;
         unique = 0;
@@ -273,7 +273,7 @@ static void runner_gpu_filter_data(const struct runner *r,
     }
     /*Test for cj*/
     unique = 1;
-    for (int j = 0; j < md->n_leaves; j++) {
+    for (int j = 0; j < i; j++) {
       if (md->unique_cells[j] == cjj) {
         buf->my_index[i].y = j;
         unique = 0;
@@ -291,6 +291,7 @@ static void runner_gpu_filter_data(const struct runner *r,
 //    message("cell i %i unique position is %i", i, buf->my_index[i].x);
 //  }
 
+//TODO: Add a debug check that the list is unique
 
   md->n_unique = unique_count;
 //  message("found %i unique cells in %i leaf computations", unique_count, md->n_leaves);
@@ -446,7 +447,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
                          stream[bid], num_blocks_x_cells, num_blocks_y,
                          bundle_first_part, bundle_n_parts, buf->d_cell_i_j_start_end,
-                         bundle_first_cell, bundle_n_cells);
+                         buf->d_cell_i_j_start_end, bundle_first_cell, bundle_n_cells);
 //      cudaEventDestroy(metadata_copied);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
@@ -684,6 +685,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
    * pairs to pack after the launch, we pack those too after the launch and
    * unpacking is complete. By the end, all data will have been packed and some
    * of it (possibly all of it) will have been solved on the GPU already. */
+  //TODO: Look into getting rid of the while and replacing with a for loop
   while (npacked < md->task_n_leaves) {
 
     /* Inside this loop, we're always working on the last task in our list. But
@@ -705,16 +707,107 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     int cjj_count = cjj->hydro.count;
 
     /*Figure out where cells start for controlling GPU computations*/
-    if(md->is_pair_task){
-      //Where does ci start?
-      buf->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts;
-      //Where does cj start?
-      buf->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts + cii_count;
-    }
-    else{
-      //Same as above but ci is cj
-      buf->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts;
-      buf->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts;
+    if(t->subtype == task_subtype_gpu_density){
+      if(md->is_pair_task){
+        /*Get indices for where we unpack to*/
+        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].x = md->count_parts;
+        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].y = md->count_parts + cii_count;
+        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = md->count_parts + cii_count;
+        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
+
+        /*Now figure out where to start from in the unique particle buffer*/
+        /*Don't count my count. this is the start pos*/
+        if(md->pack_flags[md->n_leaves_packed].x == 1){
+          /*Store where ci starts*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts_unique;
+          /*Store where ci ends*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
+          gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
+          md->count_parts_unique += cii_count;
+        }
+        else{
+          /*Get the cell's index in the unique cell list*/
+          int my_index_i = buf->my_index[md->n_leaves_packed].x;
+          /*Store where ci starts in unique list*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].x = buf->cell_i_j_start_end[my_index_i].x;
+          /*Store where ci ends in unique list*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].y = buf->cell_i_j_start_end[my_index_i].y;
+        }
+        if(md->pack_flags[md->n_leaves_packed].y == 1){
+          /*Store where cj starts*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts_unique;
+          /*Store where cj ends*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts_unique + cjj_count;
+          gpu_pack_part_density(cjj, buf->parts_send_d, md->count_parts_unique);
+          md->count_parts_unique += cjj_count;
+        }
+        else{
+          /*Get the cell's index in the unique cell list*/
+          int my_index_j = buf->my_index[md->n_leaves_packed].y;
+          /*Store where cj starts*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].z = buf->cell_i_j_start_end[my_index_j].z;
+          /*Store where ci starts*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].w = buf->cell_i_j_start_end[my_index_j].w;
+        }
+      }
+      /*This is a self task but need to check that it is density*/
+      else{
+        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].x = md->count_parts;
+        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].y = md->count_parts + cii_count;
+        //TODO: Add a debug check in unpacking to make sure we never touch this!
+        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = -1;
+        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = -1;
+        /*Now figure out where to start from in the unique particle buffer*/
+        /*Don't count my count. this is the start pos*/
+        if(md->pack_flags[md->n_leaves_packed].x == 1){
+          /*Store where ci starts*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts_unique;
+          /*Store where ci ends*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
+          /*Store where ci starts*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts_unique;
+          /*Store where ci ends*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts_unique + cii_count;
+          gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
+          md->count_parts_unique += cii_count;
+        }
+        else{
+          /*Get the cell's index in the unique cell list*/
+          int my_index_i = buf->my_index[md->n_leaves_packed].x;
+          /*Store where ci starts in unique list*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].x = buf->cell_i_j_start_end[my_index_i].x;
+          /*Store where ci ends in unique list*/
+          buf->cell_i_j_start_end[md->n_leaves_packed].y = buf->cell_i_j_start_end[my_index_i].y;
+        }
+      }
+      /* Now finish up the bookkeeping. */
+
+      /* Get the index for the leaf cell */
+      const int lid = md->n_leaves_packed;
+
+      /*TODO: Do we still need this? We're now working with cells not particles*/
+      /* Identify first particle for each bundle of tasks */
+      const int bundle_size =
+          md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
+      if (lid % bundle_size == 0) {
+        int bid = lid / bundle_size;
+        /* Store this before we increment md->count_parts */
+        md->bundle_first_part[bid] = md->count_parts;
+        /* Store this before we increment md->count_parts */
+        md->bundle_first_cell[bid] = lid;
+      }
+
+      /* Update incremented pack length accordingly */
+      if (cii == cjj) {
+        /* We packed a self interaction */
+        md->count_parts += cii_count;
+      } else {
+        /* We packed a pair interaction */
+        md->count_parts += cii_count + cjj_count;
+      }
+      /* Record that we have now packed a new leaf cell (pair) & increment number
+       * of leaf cells to offload */
+      md->n_leaves_packed++;
     }
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -730,25 +823,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
     /* Pack the particle data */
     /* Note that this increments md->count_parts and md->n_leaves_packed */
-    if (t->subtype == task_subtype_gpu_density) {
-      runner_gpu_pack_density(r, buf, cii, cjj);
-    } else if (t->subtype == task_subtype_gpu_gradient) {
+    if (t->subtype == task_subtype_gpu_gradient) {
       runner_gpu_pack_gradient(r, buf, cii, cjj);
     } else if (t->subtype == task_subtype_gpu_force) {
       runner_gpu_pack_force(r, buf, cii, cjj);
-    }
-
-    //Figure out where cells end for controlling GPU computations
-    if(md->is_pair_task){
-      //Where does ci end?
-      buf->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts - cjj_count;
-      //Where does cj end?
-      buf->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts;
-    }
-    else{
-      //Same as above but ci is cj
-      buf->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts - cii_count;
-      buf->cell_i_j_start_end[md->n_leaves_packed].w = buf->cell_i_j_start_end[md->n_leaves_packed].y;
     }
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -895,6 +973,7 @@ static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
 
   /* Find unique cells*/
   runner_gpu_filter_data(r, s, buf, /*timer=*/1);
+
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;

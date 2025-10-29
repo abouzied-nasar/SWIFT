@@ -49,11 +49,13 @@ extern "C" {
 __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     int cid, const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H,
-    const int4 *__restrict__ d_cell_i_j_start_end) {
+    const int4 *__restrict__ d_cell_i_j_start_end,
+    const int4 *__restrict__ d_cell_i_j_start_end_non_compact) {
 
   /* First, grab handles for where cells start and end */
   const int4 cell_starts_ends = d_cell_i_j_start_end[cid];
   /*Now loop over the particles in cell i*/
+
   for(int i = cell_starts_ends.x; i < cell_starts_ends.y; i++){
     const struct gpu_part_send_d pi = d_parts_send[i];
     const float xi = pi.x_h.x;
@@ -141,6 +143,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
     /* Write results. */
+    //Write to i + non_compact_start_of_cell
     d_parts_recv[i].rho_rhodh_wcount_wcount_dh = res_rho;
     d_parts_recv[i].rot_vx_div_v = res_rot;
   }

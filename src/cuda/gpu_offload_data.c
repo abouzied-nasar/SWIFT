@@ -73,8 +73,8 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   swift_assert(cu_error == cudaSuccess);
 
   /*Allocate memory for cell start and end data on host to work on unique cells. Size is half cell_i_j_start_end as this is an int2*/
-  cu_error = cudaMallocHost((void **)&buf->cell_i_start_end_compact,
-                            size_of_cell_start_end/2);
+  cu_error = cudaMallocHost((void **)&buf->cell_i_j_start_end_non_compact,
+                            size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
   /*This is used to tell each cell in a pair where it's index is in the uniquely sorted array*/
@@ -87,8 +87,8 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   swift_assert(cu_error == cudaSuccess);
 
   /*Allocate memory for cell start and end data on host*/
-  cu_error = cudaMalloc((void **)&buf->d_cell_i_start_end_compact,
-                            size_of_cell_start_end/2);
+  cu_error = cudaMalloc((void **)&buf->d_cell_i_j_start_end_non_compact,
+                            size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
 
@@ -178,7 +178,7 @@ void gpu_data_buffers_free(struct gpu_offload_data *buf) {
   cu_error = cudaFree(buf->d_parts_recv_d);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaFree(buf->d_cell_i_start_end_compact);
+  cu_error = cudaFree(buf->d_cell_i_j_start_end_non_compact);
   swift_assert(cu_error == cudaSuccess);
 
   cu_error = cudaFreeHost(buf->parts_send_d);
@@ -187,7 +187,7 @@ void gpu_data_buffers_free(struct gpu_offload_data *buf) {
   cu_error = cudaFreeHost(buf->parts_recv_d);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaFreeHost(buf->cell_i_start_end_compact);
+  cu_error = cudaFreeHost(buf->cell_i_j_start_end_non_compact);
   swift_assert(cu_error == cudaSuccess);
 
   cu_error = cudaFreeHost(buf->my_index);

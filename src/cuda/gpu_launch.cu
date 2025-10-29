@@ -56,14 +56,14 @@ __global__ void cuda_launch_density(
     const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv, const float d_a,
     const float d_H, const int bundle_first_part, const int bundle_n_parts,
-    const int4 *__restrict__ d_cell_i_j_start_end, const int bundle_first_cell,
-    const int bundle_n_cells) {
+    const int4 *__restrict__ d_cell_i_j_start_end, const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
+    const int bundle_first_cell, const int bundle_n_cells) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int cid = bundle_first_cell + threadid;
 
   if (cid < bundle_first_cell + bundle_n_cells) {
-    cuda_kernel_density(cid, d_parts_send, d_parts_recv, d_a, d_H, d_cell_i_j_start_end);
+    cuda_kernel_density(cid, d_parts_send, d_parts_recv, d_a, d_H, d_cell_i_j_start_end, d_cell_i_j_start_end_non_compact);
   }
 }
 
@@ -135,12 +135,13 @@ void gpu_launch_density(const struct gpu_part_send_d *__restrict__ d_parts_send,
                         const int num_blocks_x, const int num_blocks_y,
                         const int bundle_first_part, const int bundle_n_parts,
                         const int4 *__restrict__ d_cell_i_j_start_end,
+                        const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
                         const int bundle_first_cell, const int bundle_n_cells) {
 
   /* TODO: Do we want to allocate shared memory here? */
   cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts,
-      d_cell_i_j_start_end, bundle_first_cell, bundle_n_cells);
+      d_cell_i_j_start_end, d_cell_i_j_start_end_non_compact, bundle_first_cell, bundle_n_cells);
 }
 
 /**
