@@ -53,7 +53,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     const int4 *__restrict__ d_cell_i_j_start_end_non_compact) {
 
   /* First, grab handles for where cells start and end */
-  const int4 cell_starts_ends = d_cell_i_j_start_end[cid];
+  const int4 cell_starts_ends_read = d_cell_i_j_start_end[cid];
+  const int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[cid];
   /*Now loop over the particles in cell i*/
 
   for(int i = cell_starts_ends.x; i < cell_starts_ends.y; i++){
