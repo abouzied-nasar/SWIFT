@@ -68,12 +68,12 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   int size_of_cell_start_end = sizeof(int4) * params->pack_size_pair;
 
   /*Allocate memory for cell start and end data on host*/
-  cu_error = cudaMallocHost((void **)&buf->cell_i_j_start_end,
+  cu_error = cudaMallocHost((void **)&buf->gpu_md_and_cell_positions.cell_i_j_start_end,
                             size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
   /*Allocate memory for cell start and end data on host to work on unique cells. Size is half cell_i_j_start_end as this is an int2*/
-  cu_error = cudaMallocHost((void **)&buf->cell_i_j_start_end_non_compact,
+  cu_error = cudaMallocHost((void **)&buf->gpu_md_and_cell_positions.cell_i_j_start_end_non_compact,
                             size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
@@ -82,12 +82,12 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                             size_of_cell_start_end/2);
 
   /*Allocate memory for cell start and end data on device*/
-  cu_error = cudaMalloc((void **)&buf->d_cell_i_j_start_end,
+  cu_error = cudaMalloc((void **)&buf->gpu_md_and_cell_positions.d_cell_i_j_start_end,
                             size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
   /*Allocate memory for cell start and end data on host*/
-  cu_error = cudaMalloc((void **)&buf->d_cell_i_j_start_end_non_compact,
+  cu_error = cudaMalloc((void **)&buf->gpu_md_and_cell_positions.d_cell_i_j_start_end_non_compact,
                             size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
@@ -178,7 +178,10 @@ void gpu_data_buffers_free(struct gpu_offload_data *buf) {
   cu_error = cudaFree(buf->d_parts_recv_d);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaFree(buf->d_cell_i_j_start_end_non_compact);
+  cu_error = cudaFree(buf->gpu_md_and_cell_positions.d_cell_i_j_start_end_non_compact);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaFree(buf->gpu_md_and_cell_positions.d_cell_i_j_start_end);
   swift_assert(cu_error == cudaSuccess);
 
   cu_error = cudaFreeHost(buf->parts_send_d);
@@ -187,7 +190,10 @@ void gpu_data_buffers_free(struct gpu_offload_data *buf) {
   cu_error = cudaFreeHost(buf->parts_recv_d);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaFreeHost(buf->cell_i_j_start_end_non_compact);
+  cu_error = cudaFreeHost(buf->gpu_md_and_cell_positions.cell_i_j_start_end_non_compact);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaFreeHost(buf->gpu_md_and_cell_positions.cell_i_j_start_end);
   swift_assert(cu_error == cudaSuccess);
 
   cu_error = cudaFreeHost(buf->my_index);

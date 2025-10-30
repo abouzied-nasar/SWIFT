@@ -59,6 +59,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   /*Now loop over the particles in cell i*/
 
   int k = 0;
+  const int pj_start = cell_starts_ends_read.z;
+  const int pj_end = cell_starts_ends_read.w;
   for(int i = cell_starts_ends_read.x; i < cell_starts_ends_read.y; i++){
     const struct gpu_part_send_d pi = d_parts_send[i];
     const float xi = pi.x_h.x;
@@ -71,8 +73,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     const float vzi = pi.vx_m.z;
     /* const float mi = pi.vx_m.w; */
 
-    const int pj_start = cell_starts_ends_read.z;
-    const int pj_end = cell_starts_ends_read.w;
+
 
     /* Do some auxiliary computations */
     const float hig2 = hi * hi * kernel_gamma2;

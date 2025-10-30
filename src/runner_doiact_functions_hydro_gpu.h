@@ -368,6 +368,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 //  }
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
    * its own stream. */
+  const struct gpu_md_and_cell_positions *gpu_md_cp = &buf->gpu_md_and_cell_positions;
   for (int bid = 0; bid < n_bundles; bid++) {
 
 //    /* Get the particle count for this bundle */
@@ -388,13 +389,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
        * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
        * instead of n_bundle copies */
       cu_error =
-          cudaMemcpyAsync(&buf->d_cell_i_j_start_end_non_compact[bundle_first_cell],
-                          &buf->cell_i_j_start_end_non_compact[bundle_first_cell],
+          cudaMemcpyAsync(&gpu_md_cp->d_cell_i_j_start_end_non_compact[bundle_first_cell],
+                          &gpu_md_cp->cell_i_j_start_end_non_compact[bundle_first_cell],
                           bundle_n_cells * sizeof(int4),
                           cudaMemcpyHostToDevice, stream[bid]);
       cu_error =
-          cudaMemcpyAsync(&buf->d_cell_i_j_start_end[bundle_first_cell],
-                          &buf->cell_i_j_start_end[bundle_first_cell],
+          cudaMemcpyAsync(&gpu_md_cp->d_cell_i_j_start_end[bundle_first_cell],
+                          &gpu_md_cp->cell_i_j_start_end[bundle_first_cell],
                           bundle_n_cells * sizeof(int4),
                           cudaMemcpyHostToDevice, stream[bid]);
 
@@ -436,7 +437,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
           cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
           bundle_first_part, bundle_n_parts);
     }
-
     /* Launch the GPU kernels for ci & cj as a 1D grid */
     /* TODO: num_blocks_y is not used anymore. Purge it. */
     const int num_blocks_x =
@@ -451,8 +451,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 //      cudaStreamWaitEvent(stream[bid], metadata_copied, cudaEventWaitDefault);
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
                          stream[bid], num_blocks_x_cells, num_blocks_y,
-                         bundle_first_part, bundle_n_parts, buf->d_cell_i_j_start_end,
-                         buf->d_cell_i_j_start_end, bundle_first_cell, bundle_n_cells);
+                         bundle_first_part, bundle_n_parts, gpu_md_cp->d_cell_i_j_start_end,
+                         gpu_md_cp->d_cell_i_j_start_end, bundle_first_cell, bundle_n_cells);
 //      cudaEventDestroy(metadata_copied);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {

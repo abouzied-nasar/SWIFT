@@ -43,10 +43,6 @@ struct gpu_part_send_d {
   /*! Particle predicted velocity and mass -> ux, uy, uz, m */
   float4 vx_m;
 
-  /*! Start and end index of particles to be interacted with in particle
-   * buffer arrays */
-  int2 pjs_pje;
-
 #endif
 };
 
