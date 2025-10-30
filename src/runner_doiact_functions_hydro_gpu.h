@@ -388,6 +388,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
        * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
        * instead of n_bundle copies */
       cu_error =
+          cudaMemcpyAsync(&buf->d_cell_i_j_start_end_non_compact[bundle_first_cell],
+                          &buf->cell_i_j_start_end_non_compact[bundle_first_cell],
+                          bundle_n_cells * sizeof(int4),
+                          cudaMemcpyHostToDevice, stream[bid]);
+      cu_error =
           cudaMemcpyAsync(&buf->d_cell_i_j_start_end[bundle_first_cell],
                           &buf->cell_i_j_start_end[bundle_first_cell],
                           bundle_n_cells * sizeof(int4),

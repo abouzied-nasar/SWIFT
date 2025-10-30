@@ -60,7 +60,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
 
   int k = 0;
   for(int i = cell_starts_ends_read.x; i < cell_starts_ends_read.y; i++){
-    k++;
     const struct gpu_part_send_d pi = d_parts_send[i];
     const float xi = pi.x_h.x;
     const float yi = pi.x_h.y;
@@ -150,6 +149,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     //Write to i + non_compact_start_of_cell
     d_parts_recv[k + cell_starts_ends_read.x].rho_rhodh_wcount_wcount_dh = res_rho;
     d_parts_recv[k + cell_starts_ends_read.x].rot_vx_div_v = res_rot;
+    k++;
   }
 }
 

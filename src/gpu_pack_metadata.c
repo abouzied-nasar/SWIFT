@@ -130,6 +130,8 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
   md->n_leaves = 0;
   md->launch = 0;
   md->launch_leftovers = 0;
+  md->count_parts_unique = 0;
+  md->n_unique = 0;
 
 #ifdef SWIFT_DEBUG_CHECKS
   const struct gpu_global_pack_params pars = md->params;
