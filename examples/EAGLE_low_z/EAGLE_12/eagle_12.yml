@@ -22,8 +22,8 @@ Cosmology:
 TimeIntegration:
   time_begin: 0.    # The starting time of the simulation (in internal units).
   time_end:   1e-2  # The end time of the simulation (in internal units).
-  dt_min:     1e-10 # The minimal time-step size of the simulation (in internal units).
-  dt_max:     1e-2  # The maximal time-step size of the simulation (in internal units).
+  dt_min:     1e-12 # The minimal time-step size of the simulation (in internal units).
+  dt_max:     1e-9  # The maximal time-step size of the simulation (in internal units).
   
 # Parameters governing the snapshots
 Snapshots:
@@ -36,7 +36,13 @@ Snapshots:
   recording_triggers_bpart: [1.0227e-4, 1.0227e-5]  # Recording starts 100M and 10M years before a snapshot
 
 Scheduler:
-  links_per_tasks: 500
+  gpu_self_pack_size:        64
+  gpu_self_bundle_size:      16
+  gpu_pair_pack_size:        64
+  gpu_pair_bundle_size:      16
+  gpu_recursion_max_depth:   7
+  max_top_level_cells:       12
+  gpu_part_buffer_size:      500000
 
 # Parameters governing the conserved quantities statistics
 Statistics:

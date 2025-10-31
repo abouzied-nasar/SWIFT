@@ -102,7 +102,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_gradient(
     part_set_v_sig(p, vsig);
 
     float lu = pr.vsig_lapu_aviscmax.y + part_get_laplace_u(p);
-    part_set_laplace_u(p, lu);
+    part_set_laplace_u(p, lu);// TODO: FIGURE OUT WHY I AM WRONG
 
     float avisc_old = part_get_alpha_visc_max_ngb(p);
     float avisc = fmaxf(avisc_old, pr.vsig_lapu_aviscmax.z);
