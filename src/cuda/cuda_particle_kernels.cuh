@@ -125,7 +125,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
         res_rho.z += wi;
         res_rho.w -= (hydro_dimension * wi + ui * wi_dx);
 
-        const float r_inv = 1.f / r;
+        const float r_inv = r ? 1.0f/r : 0.0f;
         const float faci = mj * wi_dx * r_inv;
 
         /* Compute dv dot r */
@@ -236,7 +236,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
       /* (j != pid): Exclude self contribution. This happens at a later step. */
 
       const float r = sqrtf(r2);
-      const float r_inv = 1.f / r;
+      const float r_inv = r ? 1.0f/r : 0.0f;
 
       /* Cosmology terms for the signal velocity */
       const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
@@ -379,7 +379,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
       const float a2_Hubble = d_a * d_a * d_H;
 
       const float r = sqrt(r2);
-      const float r_inv = 1.f / r;
+      const float r_inv = r ? 1.0f/r : 0.0f;
 
       /* Get the kernel for hi. */
       const float xi = r * hi_inv;
