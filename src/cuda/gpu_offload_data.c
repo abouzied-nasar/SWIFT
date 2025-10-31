@@ -77,6 +77,11 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                             size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
+  /*Allocate memory for cell positions on device*/
+  cu_error = cudaMallocHost((void **)&buf->gpu_md_and_cell_positions.cell_positions,
+                            sizeof(double3) * params->pack_size_pair);
+  swift_assert(cu_error == cudaSuccess);
+
   /*This is used to tell each cell in a pair where it's index is in the uniquely sorted array*/
   cu_error = cudaMallocHost((void **)&buf->my_index,
                             size_of_cell_start_end/2);
@@ -86,12 +91,15 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                             size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
-  /*Allocate memory for cell start and end data on host*/
+  /*Allocate memory for cell start and end data on device*/
   cu_error = cudaMalloc((void **)&buf->gpu_md_and_cell_positions.d_cell_i_j_start_end_non_compact,
                             size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
-
+  /*Allocate memory for cell positions on device*/
+  cu_error = cudaMalloc((void **)&buf->gpu_md_and_cell_positions.d_cell_positions,
+                            sizeof(double3) * params->pack_size_pair);
+  swift_assert(cu_error == cudaSuccess);
 
 
 

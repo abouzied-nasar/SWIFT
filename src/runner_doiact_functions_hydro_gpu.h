@@ -690,6 +690,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
    * pairs to pack after the launch, we pack those too after the launch and
    * unpacking is complete. By the end, all data will have been packed and some
    * of it (possibly all of it) will have been solved on the GPU already. */
+  const struct gpu_md_and_cell_positions *gpu_md_cp = &buf->gpu_md_and_cell_positions;
   //TODO: Look into getting rid of the while and replacing with a for loop
   while (npacked < md->task_n_leaves) {
 
@@ -715,18 +716,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     if(t->subtype == task_subtype_gpu_density){
       if(md->is_pair_task){
         /*Get indices for where we unpack to*/
-        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].x = md->count_parts;
-        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].y = md->count_parts + cii_count;
-        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = md->count_parts + cii_count;
-        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
+        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].x = md->count_parts;
+        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].y = md->count_parts + cii_count;
+        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = md->count_parts + cii_count;
+        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
 
         /*Now figure out where to start from in the unique particle buffer*/
         /*Don't count my count. this is the start pos*/
         if(md->pack_flags[md->n_leaves_packed].x == 1){
           /*Store where ci starts*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts_unique;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts_unique;
           /*Store where ci ends*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
           gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
           md->count_parts_unique += cii_count;
         }
@@ -734,15 +735,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           /*Get the cell's index in the unique cell list*/
           int my_index_i = buf->my_index[md->n_leaves_packed].x;
           /*Store where ci starts in unique list*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].x = buf->cell_i_j_start_end[my_index_i].x;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].x = gpu_md_cp->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].y = buf->cell_i_j_start_end[my_index_i].y;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].y = gpu_md_cp->cell_i_j_start_end[my_index_i].y;
         }
         if(md->pack_flags[md->n_leaves_packed].y == 1){
           /*Store where cj starts*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts_unique;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts_unique;
           /*Store where cj ends*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts_unique + cjj_count;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts_unique + cjj_count;
           gpu_pack_part_density(cjj, buf->parts_send_d, md->count_parts_unique);
           md->count_parts_unique += cjj_count;
         }
@@ -750,29 +751,29 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           /*Get the cell's index in the unique cell list*/
           int my_index_j = buf->my_index[md->n_leaves_packed].y;
           /*Store where cj starts*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].z = buf->cell_i_j_start_end[my_index_j].z;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].z = gpu_md_cp->cell_i_j_start_end[my_index_j].z;
           /*Store where ci starts*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].w = buf->cell_i_j_start_end[my_index_j].w;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].w = gpu_md_cp->cell_i_j_start_end[my_index_j].w;
         }
       }
       /*This is a self task but need to check that it is density*/
       else{
-        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].x = md->count_parts;
-        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].y = md->count_parts + cii_count;
+        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].x = md->count_parts;
+        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].y = md->count_parts + cii_count;
         //TODO: Add a debug check in unpacking to make sure we never touch this!
-        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = -1;
-        buf->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = -1;
+        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = -1;
+        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = -1;
         /*Now figure out where to start from in the unique particle buffer*/
         /*Don't count my count. this is the start pos*/
         if(md->pack_flags[md->n_leaves_packed].x == 1){
           /*Store where ci starts*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts_unique;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts_unique;
           /*Store where ci ends*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
           /*Store where ci starts*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts_unique;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts_unique;
           /*Store where ci ends*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts_unique + cii_count;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts_unique + cii_count;
           gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
           md->count_parts_unique += cii_count;
         }
@@ -780,9 +781,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           /*Get the cell's index in the unique cell list*/
           int my_index_i = buf->my_index[md->n_leaves_packed].x;
           /*Store where ci starts in unique list*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].x = buf->cell_i_j_start_end[my_index_i].x;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].x = gpu_md_cp->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
-          buf->cell_i_j_start_end[md->n_leaves_packed].y = buf->cell_i_j_start_end[my_index_i].y;
+          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].y = gpu_md_cp->cell_i_j_start_end[my_index_i].y;
         }
       }
       /* Now finish up the bookkeeping. */
