@@ -399,6 +399,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
                           bundle_n_cells * sizeof(int4),
                           cudaMemcpyHostToDevice, stream[bid]);
 
+      cu_error =
+          cudaMemcpyAsync(&gpu_md_cp->d_cell_positions[bundle_first_cell],
+                          &gpu_md_cp->cell_positions[bundle_first_cell],
+                          bundle_n_cells * sizeof(double3),
+                          cudaMemcpyHostToDevice, stream[bid]);
+
       /* Transfer particle data to device */
       cu_error =
           cudaMemcpyAsync(&buf->d_parts_send_d[bundle_first_part],
