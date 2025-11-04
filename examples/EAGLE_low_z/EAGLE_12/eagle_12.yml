@@ -43,6 +43,7 @@ Scheduler:
   gpu_recursion_max_depth:   7
   max_top_level_cells:       12
   gpu_part_buffer_size:      500000
+  tasks_per_cell:            300
 
 # Parameters governing the conserved quantities statistics
 Statistics:
