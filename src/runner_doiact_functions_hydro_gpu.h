@@ -458,7 +458,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
                          stream[bid], num_blocks_x_cells, num_blocks_y,
                          bundle_first_part, bundle_n_parts, gpu_md_cp->d_cell_i_j_start_end,
-                         gpu_md_cp->d_cell_i_j_start_end, bundle_first_cell, bundle_n_cells);
+                         gpu_md_cp->d_cell_i_j_start_end, gpu_md_cp->d_cell_positions,
+                         bundle_first_cell, bundle_n_cells);
 //      cudaEventDestroy(metadata_copied);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {

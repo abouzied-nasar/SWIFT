@@ -51,7 +51,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     int cid, const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H,
     const int4 *__restrict__ d_cell_i_j_start_end,
-    const int4 *__restrict__ d_cell_i_j_start_end_non_compact) {
+    const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
+    const double3 *__restrict__ d_cell_positions) {
 
   /* First, grab handles for where cells start and end */
   const int4 cell_starts_ends_read = d_cell_i_j_start_end[cid];
