@@ -552,7 +552,7 @@ void *runner_main_cuda(void *data) {
           } else if (t->subtype == task_subtype_gpart) {
             free(t->buff);
           } else if (t->subtype == task_subtype_fof) {
-            free(t->buff);	    
+            free(t->buff);
           }
           break;
         case task_type_recv:
@@ -589,7 +589,7 @@ void *runner_main_cuda(void *data) {
           } else if (t->subtype == task_subtype_gpart) {
             runner_do_recv_gpart(r, ci, 1);
           } else if (t->subtype == task_subtype_fof) {
-            /* Nothing to do here. */	    
+            /* Nothing to do here. */
           } else if (t->subtype == task_subtype_spart_density) {
             runner_do_recv_spart(r, ci, 1, 1);
           } else if (t->subtype == task_subtype_part_prep1) {
@@ -617,15 +617,15 @@ void *runner_main_cuda(void *data) {
             task_get_unique_dependent(t)->buff = t->buff;
           } else {
             error("Unknown/invalid task subtype (%d).", t->subtype);
-          }          
-	  break;
+          }
+          break;
         case task_type_unpack:
           if (t->subtype == task_subtype_limiter) {
             runner_do_unpack_limiter(r, ci, t->buff, 1);
           } else {
             error("Unknown/invalid task subtype (%d).", t->subtype);
           }
-	  break;
+          break;
 #endif
         case task_type_grav_down:
           runner_do_grav_down(r, t->ci, 1);
