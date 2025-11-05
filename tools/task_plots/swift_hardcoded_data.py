@@ -138,7 +138,6 @@ SUBTYPES = [
     "gpu_unpack_d",
     "gpu_unpack_g",
     "gpu_unpack_f",
-
     #  "count",
 ]
 
