@@ -87,8 +87,8 @@ struct gpu_offload_data {
     int4 *cell_i_j_start_end_non_compact;
     int4 *d_cell_i_j_start_end;
     int4 *d_cell_i_j_start_end_non_compact;
-    double3 *cell_positions;
-    double3 *d_cell_positions;
+    double *cell_positions[6];
+    double *d_cell_positions[6];
   } gpu_md_and_cell_positions;
 
 //  int4 *cell_i_j_start_end;

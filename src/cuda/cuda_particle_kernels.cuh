@@ -57,6 +57,33 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   /* First, grab handles for where cells start and end */
   const int4 cell_starts_ends_read = d_cell_i_j_start_end[cid];
   const int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[cid];
+  const double3 ci_pos = d_cell_positions[cid];
+  const double3 cj_pos = d_cell_positions[cjd];
+  const double distx = cj_pos.x - ci_pos.x;
+  const double disty = cj_pos.y - ci_pos.y;
+  const double distz = cj_pos.z - ci_pos.z;
+  double3 shift;
+  if(distx < -space_dim.x)
+    shift.x = space_dim.x;
+  else
+    shift.x = -space_dim.x;
+
+  if(disty < -space_dim.y)
+    shift.y = space_dim.y;
+  else
+    shift.y = -space_dim.y;
+
+  if(distz < -space_dim.z)
+    shift.z = space_dim.z;
+  else
+    shift.z = -space_dim.z;
+
+  const double shift_ix = shift.x + cj_pos.x;
+  const double shift_iy = shift.y + cj_pos.y;
+  const double shift_iz = shift.z + cj_pos.z;
+  const double shift_jx = cj_pos.x;
+  const double shift_jy = cj_pos.y;
+  const double shift_jz = cj_pos.z;
   /*Now loop over the particles in cell i*/
 
   int k = 0;
@@ -65,19 +92,19 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
 
   /* Get the relative distance between the pairs and apply wrapping in case
    * of periodic boundary conditions */
-  double3 shift = {0., 0., 0.};
-  for (int k = 0; k < 3; k++) {
-    if (cj->loc[k] - ci->loc[k] < -e->s->dim[k] * 0.5) {
-      shift[k] = e->s->dim[k];
-    } else if (cj->loc[k] - ci->loc[k] > e->s->dim[k] * 0.5) {
-      shift[k] = -e->s->dim[k];
-    }
-  }
-  const double3 shift_i = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
-                             shift[2] + cj->loc[2]};
-  /* Do the same for cj */
-  const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
-  /* Get the shift for cell i */
+//  double3 shift = {0., 0., 0.};
+//  for (int k = 0; k < 3; k++) {
+//    if (cj->loc[k] - ci->loc[k] < -e->s->dim[k] * 0.5) {
+//      shift[k] = e->s->dim[k];
+//    } else if (cj->loc[k] - ci->loc[k] > e->s->dim[k] * 0.5) {
+//      shift[k] = -e->s->dim[k];
+//    }
+//  }
+//  const double3 shift_i = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
+//                             shift[2] + cj->loc[2]};
+//  /* Do the same for cj */
+//  const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
+//  /* Get the shift for cell i */
 
   for(int i = cell_starts_ends_read.x; i < cell_starts_ends_read.y; i++){
     const struct gpu_part_send_d pi = d_parts_send[i];

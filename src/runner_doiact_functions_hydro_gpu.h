@@ -451,6 +451,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
         (bundle_n_cells + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
     const int num_blocks_y = 0;
 
+    const double3 space_dim;
+    space_dim.x = e->s->dim[0];
+    space_dim.y = e->s->dim[1];
+    space_dim.z = e->s->dim[2];
     /* Launch the kernel for ci using data for ci and cj */
     if (task_subtype == task_subtype_gpu_density) {
       /*Tell the kernel to wait untim metadata copied*/
@@ -459,7 +463,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
                          stream[bid], num_blocks_x_cells, num_blocks_y,
                          bundle_first_part, bundle_n_parts, gpu_md_cp->d_cell_i_j_start_end,
                          gpu_md_cp->d_cell_i_j_start_end, gpu_md_cp->d_cell_positions,
-                         bundle_first_cell, bundle_n_cells);
+                         bundle_first_cell, bundle_n_cells, space_dim);
 //      cudaEventDestroy(metadata_copied);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
