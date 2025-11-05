@@ -52,7 +52,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H,
     const int4 *__restrict__ d_cell_i_j_start_end,
     const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
-    const double3 *__restrict__ d_cell_positions) {
+	const double3 *__restrict__ d_cell_positions, const double3 __restrict__ space_dim) {
 
   /* First, grab handles for where cells start and end */
   const int4 cell_starts_ends_read = d_cell_i_j_start_end[cid];
@@ -62,6 +62,23 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   int k = 0;
   const int pj_start = cell_starts_ends_read.z;
   const int pj_end = cell_starts_ends_read.w;
+
+  /* Get the relative distance between the pairs and apply wrapping in case
+   * of periodic boundary conditions */
+  double3 shift = {0., 0., 0.};
+  for (int k = 0; k < 3; k++) {
+    if (cj->loc[k] - ci->loc[k] < -e->s->dim[k] * 0.5) {
+      shift[k] = e->s->dim[k];
+    } else if (cj->loc[k] - ci->loc[k] > e->s->dim[k] * 0.5) {
+      shift[k] = -e->s->dim[k];
+    }
+  }
+  const double3 shift_i = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
+                             shift[2] + cj->loc[2]};
+  /* Do the same for cj */
+  const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
+  /* Get the shift for cell i */
+
   for(int i = cell_starts_ends_read.x; i < cell_starts_ends_read.y; i++){
     const struct gpu_part_send_d pi = d_parts_send[i];
     const float xi = pi.x_h.x;
