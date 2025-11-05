@@ -113,10 +113,6 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
   const struct gpu_global_pack_params pars = md->params;
   int n_bundles = pars.n_bundles;
   int pack_size = pars.pack_size;
-  if (md->is_pair_task) {
-    n_bundles = pars.n_bundles_pair;
-    pack_size = pars.pack_size_pair;
-  }
 
   if (reset_leaves_lists) {
     for (int i = 0; i < pars.leaf_buffer_size; i++) md->ci_leaves[i] = NULL;

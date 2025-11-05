@@ -239,12 +239,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     n_bundles = (leaves_packed + bundle_size - 1) / bundle_size;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    int n_bundles_max =
-        md->is_pair_task ? md->params.n_bundles_pair : md->params.n_bundles;
-
-    if (n_bundles > n_bundles_max) {
+    if (n_bundles > md->params.n_bundles) {
       error("Launching leftovers with too many bundles? Target size=%d, got=%d",
-            n_bundles_max, n_bundles);
+            md->params.n_bundles, n_bundles);
     }
     if (n_bundles == 0) {
       error("Got 0 bundles. leaves_packed=%d, bundle_size=%d", leaves_packed,
@@ -496,11 +493,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   int tind = md->tasks_in_list;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  int pack_size =
-      md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
-  if (tind >= pack_size)
-    error("Writing out of task_list array bounds: %d/%d, is pair task?=%d",
-          tind, pack_size, md->is_pair_task);
+  if (tind >= md->params.pack_size)
+    error("Writing out of task_list array bounds: %d/%d",
+          tind, md->params.pack_size);
 #endif
 
   /* Keep track of index of first leaf cell pairs in lists per super-level pair
