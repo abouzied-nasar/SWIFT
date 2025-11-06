@@ -35,10 +35,7 @@
  *
  * @param pars (return): the gpu global pack parameter struct to be filled out
  * @param pack_size: Packing size (nr of leaf cells) for self tasks
- * @param pack_size_pair: Packing size (nr of leaf cell pairs) for pair tasks
  * @param bundle_size: Size of a bundle (nr of leaf cells) for self tasks
- * @param bundle_size_pair: Size of a bundle (nr of leaf cell pairs) for pair
- * tasks
  * @param gpu_recursion_max_depth Max depth we expect to reach while recursing
  * down from task's super level to reach leaf cells
  * @param part_buffer_size Size of particle buffer arrays. If -1, will be
@@ -49,8 +46,7 @@
  * @param nthreads how many threads we're running on
  */
 void gpu_pack_params_set(struct gpu_global_pack_params *pars,
-                         const int pack_size, const int pack_size_pair,
-                         const int bundle_size, const int bundle_size_pair,
+                         const int pack_size, const int bundle_size,
                          const int gpu_recursion_max_depth,
                          const int part_buffer_size, const float eta_neighbours,
                          const int nparts_hydro, const int n_top_level_cells,
@@ -58,28 +54,20 @@ void gpu_pack_params_set(struct gpu_global_pack_params *pars,
 
   /* Store quantities we'll need directly */
   pars->pack_size = pack_size;
-  pars->pack_size_pair = pack_size_pair;
   pars->bundle_size = bundle_size;
-  pars->bundle_size_pair = bundle_size_pair;
 
   swift_assert(pars->pack_size > 0);
-  swift_assert(pars->pack_size_pair > 0);
   swift_assert(pars->bundle_size > 0);
-  swift_assert(pars->bundle_size_pair > 0);
 
   /* bundles need to be smaller than packs */
   swift_assert(pars->pack_size >= pars->bundle_size);
-  swift_assert(pars->pack_size_pair >= pars->bundle_size_pair);
 
   /* n_bundles is the number of task bundles each thread has. Used to
    * loop through bundles */
   pars->n_bundles =
       (pars->pack_size + pars->bundle_size - 1) / pars->bundle_size;
-  pars->n_bundles_pair = (pars->pack_size_pair + pars->bundle_size_pair - 1) /
-                         pars->bundle_size_pair;
 
   swift_assert(pars->n_bundles > 0);
-  swift_assert(pars->n_bundles_pair > 0);
 
   /* Try to estimate array sizes containing leaf cells */
   int leafcount = 1;
@@ -133,11 +121,8 @@ void gpu_pack_params_copy(const struct gpu_global_pack_params *src,
                           struct gpu_global_pack_params *dest) {
 
   dest->pack_size = src->pack_size;
-  dest->pack_size_pair = src->pack_size_pair;
   dest->bundle_size = src->bundle_size;
-  dest->bundle_size_pair = src->bundle_size_pair;
   dest->n_bundles = src->n_bundles;
-  dest->n_bundles_pair = src->n_bundles_pair;
   dest->leaf_buffer_size = src->leaf_buffer_size;
   dest->part_buffer_size = src->part_buffer_size;
 }

@@ -32,23 +32,23 @@ struct gpu_global_pack_params {
 
   /*! How many tasks we target to offload in total, per offload cycle */
   int pack_size;
-  int pack_size_pair;
 
   /*! An offload cycle offloads `pack_size` tasks in total over several bundles
    * of `bundle_size` tasks per bundle. */
   int bundle_size;
-  int bundle_size_pair;
 
+  /*! How many bundles we expect to offload each cycle. */
   int n_bundles;
-  int n_bundles_pair;
 
+  /*! Size of the particle data buffers for offloading */
   int part_buffer_size;
+
+  /*! Size of the cell list buffers for offloading. */
   int leaf_buffer_size;
 };
 
 void gpu_pack_params_set(struct gpu_global_pack_params *pars,
-                         const int pack_size, const int pack_size_pair,
-                         const int bundle_size, const int bundle_size_pair,
+                         const int pack_size, const int bundle_size,
                          const int gpu_recursion_max_depth,
                          const int part_buffer_size, const float eta_neighbours,
                          const int nparts_hydro, const int n_top_level_cells,

@@ -44,22 +44,19 @@ extern "C" {
  * device)
  * @param recv_struct_size: size of struct used for recv arrays (both host and
  * device)
- * @param is_pair_task: if 1, we allocate arrays used for pair tasks
  */
 void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const struct gpu_global_pack_params *params,
                            const size_t send_struct_size,
-                           const size_t recv_struct_size,
-                           const char is_pair_task) {
+                           const size_t recv_struct_size) {
 
   /* Grab some handles */
-  const size_t n_bundles =
-      is_pair_task ? params->n_bundles_pair : params->n_bundles;
+  const size_t n_bundles = params->n_bundles;
   const size_t part_buffer_size = params->part_buffer_size;
 
   /* Initialise and set up metadata */
   struct gpu_pack_metadata *md = &(buf->md);
-  gpu_pack_metadata_init(md, params, is_pair_task);
+  gpu_pack_metadata_init(md, params);
 
   /* Now allocate arrays */
   cudaError_t cu_error;

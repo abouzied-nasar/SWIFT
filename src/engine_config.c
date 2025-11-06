@@ -937,13 +937,8 @@ void engine_config(int restart, int fof, struct engine *e,
 
   /* Setup GPU packing parameters. */
 #if defined(WITH_CUDA) || defined(WITH_HIP)
-  int pack_size = parser_get_param_int(params, "Scheduler:gpu_self_pack_size");
-  int bundle_size =
-      parser_get_param_int(params, "Scheduler:gpu_self_bundle_size");
-  int pack_size_pair =
-      parser_get_param_int(params, "Scheduler:gpu_pair_pack_size");
-  int bundle_size_pair =
-      parser_get_param_int(params, "Scheduler:gpu_pair_bundle_size");
+  int pack_size = parser_get_param_int(params, "Scheduler:gpu_pack_size");
+  int bundle_size = parser_get_param_int(params, "Scheduler:gpu_bundle_size");
   int gpu_recursion_max_depth =
       parser_get_opt_param_int(params, "Scheduler:gpu_recursion_max_depth", 4);
   int gpu_part_buffer_size =
@@ -959,8 +954,6 @@ void engine_config(int restart, int fof, struct engine *e,
 #else
   int pack_size = 1;
   int bundle_size = 1;
-  int pack_size_pair = 1;
-  int bundle_size_pair = 1;
   int gpu_recursion_max_depth = 1;
   int gpu_part_buffer_size = 1;
   int nparts_hydro = 1;
@@ -968,10 +961,10 @@ void engine_config(int restart, int fof, struct engine *e,
   int n_top_level_cells = 1;
 #endif
 
-  gpu_pack_params_set(&e->gpu_pack_params, pack_size, pack_size_pair,
-                      bundle_size, bundle_size_pair, gpu_recursion_max_depth,
-                      gpu_part_buffer_size, e->s->eta_neighbours, nparts_hydro,
-                      n_top_level_cells, nthreads);
+  gpu_pack_params_set(&e->gpu_pack_params, pack_size, bundle_size,
+                      gpu_recursion_max_depth, gpu_part_buffer_size,
+                      e->s->eta_neighbours, nparts_hydro, n_top_level_cells,
+                      nthreads);
 
   if (restart) {
 

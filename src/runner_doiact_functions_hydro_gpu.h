@@ -227,12 +227,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   const int leaves_packed = md->n_leaves_packed;
 
   /* How many leaves should be in a bundle? */
-  const int bundle_size =
-      md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
+  const int bundle_size = md->params.bundle_size;
 
   /* Identify the number of GPU bundles to run in ideal case */
-  int n_bundles =
-      md->is_pair_task ? md->params.n_bundles_pair : md->params.n_bundles;
+  int n_bundles = md->params.n_bundles;
 
   /* Special case for incomplete bundles (when having not enough leftover leafs
    * to fill a bundle) */
@@ -241,12 +239,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     n_bundles = (leaves_packed + bundle_size - 1) / bundle_size;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    int n_bundles_max =
-        md->is_pair_task ? md->params.n_bundles_pair : md->params.n_bundles;
-
-    if (n_bundles > n_bundles_max) {
+    if (n_bundles > md->params.n_bundles) {
       error("Launching leftovers with too many bundles? Target size=%d, got=%d",
-            n_bundles_max, n_bundles);
+            md->params.n_bundles, n_bundles);
     }
     if (n_bundles == 0) {
       error("Got 0 bundles. leaves_packed=%d, bundle_size=%d", leaves_packed,
@@ -429,10 +424,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_density(
 
   runner_gpu_launch(r, buf, stream, d_a, d_H, task_subtype_gpu_density);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_launch_d);
-  else
-    TIMER_TOC(timer_doself_gpu_launch_d);
+  TIMER_TOC(timer_gpu_launch_d);
 }
 
 /**
@@ -452,10 +444,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_gradient(
 
   runner_gpu_launch(r, buf, stream, d_a, d_H, task_subtype_gpu_gradient);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_launch_g);
-  else
-    TIMER_TOC(timer_doself_gpu_launch_g);
+  TIMER_TOC(timer_gpu_launch_g);
 }
 
 /**
@@ -475,10 +464,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_force(
 
   runner_gpu_launch(r, buf, stream, d_a, d_H, task_subtype_gpu_force);
 
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_launch_f);
-  else
-    TIMER_TOC(timer_doself_gpu_launch_f);
+  TIMER_TOC(timer_gpu_launch_f);
 }
 
 /**
@@ -507,11 +493,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   int tind = md->tasks_in_list;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  int pack_size =
-      md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
-  if (tind >= pack_size)
-    error("Writing out of task_list array bounds: %d/%d, is pair task?=%d",
-          tind, pack_size, md->is_pair_task);
+  if (tind >= md->params.pack_size)
+    error("Writing out of task_list array bounds: %d/%d",
+          tind, md->params.pack_size);
 #endif
 
   /* Keep track of index of first leaf cell pairs in lists per super-level pair
@@ -542,8 +526,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   md->n_leaves += md->task_n_leaves;
 
   /* How many leaf cell interactions do we want to offload at once? */
-  const int target_n_leaves =
-      md->is_pair_task ? md->params.pack_size_pair : md->params.pack_size;
+  const int target_n_leaves = md->params.pack_size;
 
   /* Counter for how many leaf cells  of this task we've packed */
   int npacked = 0;
@@ -742,8 +725,9 @@ static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_self_left_d--;
-  if (s->queues[qid].n_packs_self_left_d < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
@@ -776,8 +760,9 @@ static void runner_doself_gpu_gradient(struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_self_left_g--;
-  if (s->queues[qid].n_packs_self_left_g < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
@@ -810,8 +795,9 @@ static void runner_doself_gpu_force(struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_self_left_f--;
-  if (s->queues[qid].n_packs_self_left_f < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
@@ -848,8 +834,9 @@ static void runner_dopair_gpu_density(const struct runner *r,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_pair_left_d--;
-  if (s->queues[qid].n_packs_pair_left_d < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
@@ -886,8 +873,9 @@ static void runner_dopair_gpu_gradient(const struct runner *r,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_pair_left_g--;
-  if (s->queues[qid].n_packs_pair_left_g < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
@@ -923,8 +911,9 @@ static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   lock_lock(&s->queues[qid].lock);
-  s->queues[qid].n_packs_pair_left_f--;
-  if (s->queues[qid].n_packs_pair_left_f < 1) buf->md.launch_leftovers = 1;
+  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]--;
+  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force] < 1)
+    buf->md.launch_leftovers = 1;
   (void)lock_unlock(&s->queues[qid].lock);
 
   /* pack the data and run, if enough data has been gathered */
