@@ -53,7 +53,7 @@ struct gpu_cell_pos_d {
   /*! Cell position. This is set as the last entry in the
    * range of particles contained within a cell (i.e
    * N+1 contains info for cell position)*/
-  double3 x_h;
+  double3 x;
   /*! Dummy container to ensure data is same size as gpu_part_data_d*/
   float2 vx_m;
 
@@ -66,7 +66,7 @@ struct gpu_part_send_d{
 	/*! Container for particle data required for density calcs */
     struct gpu_part_data_d p_data;
     /*! Container for cell positions for density calcs */
-	struct gpu_cell_pos_d c_pos;
+	struct gpu_cell_pos_d c_loc;
   };
 };
 /*! Container for particle data sent back to CPU for density calcs */

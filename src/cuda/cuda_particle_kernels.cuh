@@ -63,12 +63,12 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   const int cj_end = cell_starts_ends_read.w;
 
   /*Now get the cell positions*/
-  const struct gpu_cell_pos_d ci_pos = d_parts_send[ci_end].c_pos;
-  const struct gpu_cell_pos_d cj_pos = d_parts_send[cj_end].c_pos;
+  const struct gpu_cell_pos_d ci_loc = d_parts_send[ci_end].c_loc;
+  const struct gpu_cell_pos_d cj_loc = d_parts_send[cj_end].c_loc;
 
-  const double distx = cj_pos.x_h.x - ci_pos.x_h.x;
-  const double disty = cj_pos.x_h.y - ci_pos.x_h.y;
-  const double distz = cj_pos.x_h.z - ci_pos.x_h.z;
+  const double distx = cj_loc.x.x - ci_loc.x.x;
+  const double disty = cj_loc.x.y - ci_loc.x.y;
+  const double distz = cj_loc.x.z - ci_loc.x.z;
   double3 shift;
   if(distx < -space_dim.x)
     shift.x = space_dim.x;
@@ -85,12 +85,12 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   else
     shift.z = -space_dim.z;
 
-  const double shift_ix = shift.x + cj_pos.x_h.x;
-  const double shift_iy = shift.y + cj_pos.x_h.y;
-  const double shift_iz = shift.z + cj_pos.x_h.z;
-  const double shift_jx = cj_pos.x_h.x;
-  const double shift_jy = cj_pos.x_h.y;
-  const double shift_jz = cj_pos.x_h.z;
+  const double shift_ix = shift.x + cj_loc.x.x;
+  const double shift_iy = shift.y + cj_loc.x.y;
+  const double shift_iz = shift.z + cj_loc.x.z;
+  const double shift_jx = cj_loc.x.x;
+  const double shift_jy = cj_loc.x.y;
+  const double shift_jz = cj_loc.x.z;
   /*Now loop over the particles in cell i*/
 
   int k = 0;

@@ -187,6 +187,10 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     ps[i].vx_m.z = v[2];
     ps[i].vx_m.w = part_get_mass(p);
   }
+  /*We've packed all the particles. Now insert the cell position into the count index*/
+  parts_buffer[pack_ind + count].c_loc.x.x = c->loc[0];
+  parts_buffer[pack_ind + count].c_loc.x.y = c->loc[1];
+  parts_buffer[pack_ind + count].c_loc.x.z = c->loc[2];
 }
 
 /**

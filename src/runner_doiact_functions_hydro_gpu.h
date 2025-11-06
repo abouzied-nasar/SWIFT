@@ -366,9 +366,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 //    cudaEventCreateWithFlags(&metadata_copied, cudaEventDisableTiming);
 //    cudaEventRecord(metadata_copied, stream[0]);
 //  }
+  /* Transfer particle data to device */
+  cu_error =
+      cudaMemcpy(&buf->d_parts_send_d[0],
+                      &buf->parts_send_d[0],
+                      md->count_parts_unique * sizeof(struct gpu_part_send_d),
+                      cudaMemcpyHostToDevice);
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
    * its own stream. */
-  const struct gpu_md_and_cell_positions *gpu_md_cp = &buf->gpu_md_and_cell_positions;
+  const struct gpu_md *gpu_md = &buf->gpu_md;
   for (int bid = 0; bid < n_bundles; bid++) {
 
 //    /* Get the particle count for this bundle */
@@ -389,28 +395,23 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
        * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
        * instead of n_bundle copies */
       cu_error =
-          cudaMemcpyAsync(&gpu_md_cp->d_cell_i_j_start_end_non_compact[bundle_first_cell],
-                          &gpu_md_cp->cell_i_j_start_end_non_compact[bundle_first_cell],
+          cudaMemcpyAsync(&gpu_md->d_cell_i_j_start_end_non_compact[bundle_first_cell],
+                          &gpu_md->cell_i_j_start_end_non_compact[bundle_first_cell],
                           bundle_n_cells * sizeof(int4),
                           cudaMemcpyHostToDevice, stream[bid]);
       cu_error =
-          cudaMemcpyAsync(&gpu_md_cp->d_cell_i_j_start_end[bundle_first_cell],
-                          &gpu_md_cp->cell_i_j_start_end[bundle_first_cell],
+          cudaMemcpyAsync(&gpu_md->d_cell_i_j_start_end[bundle_first_cell],
+                          &gpu_md->cell_i_j_start_end[bundle_first_cell],
                           bundle_n_cells * sizeof(int4),
                           cudaMemcpyHostToDevice, stream[bid]);
 
-      cu_error =
-          cudaMemcpyAsync(&gpu_md_cp->d_cell_positions[bundle_first_cell],
-                          &gpu_md_cp->cell_positions[bundle_first_cell],
-                          bundle_n_cells * sizeof(double3),
-                          cudaMemcpyHostToDevice, stream[bid]);
-
-      /* Transfer particle data to device */
-      cu_error =
-          cudaMemcpyAsync(&buf->d_parts_send_d[bundle_first_part],
-                          &buf->parts_send_d[bundle_first_part],
-                          bundle_n_parts * sizeof(struct gpu_part_send_d),
-                          cudaMemcpyHostToDevice, stream[bid]);
+//      /* Transfer particle data to device */
+//      cu_error =
+//          cudaMemcpyAsync(&buf->d_parts_send_d[bundle_first_part],
+//                          &buf->parts_send_d[bundle_first_part],
+//                          bundle_n_parts * sizeof(struct gpu_part_send_d),
+//                          cudaMemcpyHostToDevice, stream[bid]);
+//        message("n bundle %i n compact %i", bundle_n_parts, md->count_parts_unique);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
@@ -461,8 +462,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 //      cudaStreamWaitEvent(stream[bid], metadata_copied, cudaEventWaitDefault);
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
                          stream[bid], num_blocks_x_cells, num_blocks_y,
-                         bundle_first_part, bundle_n_parts, gpu_md_cp->d_cell_i_j_start_end,
-                         gpu_md_cp->d_cell_i_j_start_end,
+                         bundle_first_part, bundle_n_parts, gpu_md->d_cell_i_j_start_end,
+                         gpu_md->d_cell_i_j_start_end,
                          bundle_first_cell, bundle_n_cells, space_dim);
 //      cudaEventDestroy(metadata_copied);
 
@@ -701,7 +702,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
    * pairs to pack after the launch, we pack those too after the launch and
    * unpacking is complete. By the end, all data will have been packed and some
    * of it (possibly all of it) will have been solved on the GPU already. */
-  const struct gpu_md_and_cell_positions *gpu_md_cp = &buf->gpu_md_and_cell_positions;
+  const struct gpu_md *gpu_md = &buf->gpu_md;
   //TODO: Look into getting rid of the while and replacing with a for loop
   while (npacked < md->task_n_leaves) {
 
@@ -727,74 +728,77 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     if(t->subtype == task_subtype_gpu_density){
       if(md->is_pair_task){
         /*Get indices for where we unpack to*/
-        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].x = md->count_parts;
-        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].y = md->count_parts + cii_count;
-        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = md->count_parts + cii_count;
-        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
+        gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].x = md->count_parts;
+        gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].y = md->count_parts + cii_count;
+        gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = md->count_parts + cii_count;
+        gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
 
         /*Now figure out where to start from in the unique particle buffer*/
         /*Don't count my count. this is the start pos*/
         if(md->pack_flags[md->n_leaves_packed].x == 1){
           /*Store where ci starts*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts_unique;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts_unique;
           /*Store where ci ends*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
           gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
-          md->count_parts_unique += cii_count;
+          /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
+          md->count_parts_unique += cii_count + 1;
         }
         else{
           /*Get the cell's index in the unique cell list*/
           int my_index_i = buf->my_index[md->n_leaves_packed].x;
           /*Store where ci starts in unique list*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].x = gpu_md_cp->cell_i_j_start_end[my_index_i].x;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].y = gpu_md_cp->cell_i_j_start_end[my_index_i].y;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].y = gpu_md->cell_i_j_start_end[my_index_i].y;
         }
         if(md->pack_flags[md->n_leaves_packed].y == 1){
           /*Store where cj starts*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts_unique;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts_unique;
           /*Store where cj ends*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts_unique + cjj_count;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts_unique + cjj_count;
           gpu_pack_part_density(cjj, buf->parts_send_d, md->count_parts_unique);
-          md->count_parts_unique += cjj_count;
+          /*Add one as we have packed the cells position in index count_parts_unique + cjj_count*/
+          md->count_parts_unique += cjj_count + 1;
         }
         else{
           /*Get the cell's index in the unique cell list*/
           int my_index_j = buf->my_index[md->n_leaves_packed].y;
           /*Store where cj starts*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].z = gpu_md_cp->cell_i_j_start_end[my_index_j].z;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_j].z;
           /*Store where ci starts*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].w = gpu_md_cp->cell_i_j_start_end[my_index_j].w;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].w = gpu_md->cell_i_j_start_end[my_index_j].w;
         }
       }
       /*This is a self task but need to check that it is density*/
       else{
-        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].x = md->count_parts;
-        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].y = md->count_parts + cii_count;
+        gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].x = md->count_parts;
+        gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].y = md->count_parts + cii_count;
         //TODO: Add a debug check in unpacking to make sure we never touch this!
-        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = -1;
-        gpu_md_cp->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = -1;
+        gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = -1;
+        gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = -1;
         /*Now figure out where to start from in the unique particle buffer*/
         /*Don't count my count. this is the start pos*/
         if(md->pack_flags[md->n_leaves_packed].x == 1){
           /*Store where ci starts*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts_unique;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts_unique;
           /*Store where ci ends*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
           /*Store where ci starts*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts_unique;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].z = md->count_parts_unique;
           /*Store where ci ends*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts_unique + cii_count;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].w = md->count_parts_unique + cii_count;
           gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
-          md->count_parts_unique += cii_count;
+          /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
+          md->count_parts_unique += cii_count + 1;
         }
         else{
           /*Get the cell's index in the unique cell list*/
           int my_index_i = buf->my_index[md->n_leaves_packed].x;
           /*Store where ci starts in unique list*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].x = gpu_md_cp->cell_i_j_start_end[my_index_i].x;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
-          gpu_md_cp->cell_i_j_start_end[md->n_leaves_packed].y = gpu_md_cp->cell_i_j_start_end[my_index_i].y;
+          gpu_md->cell_i_j_start_end[md->n_leaves_packed].y = gpu_md->cell_i_j_start_end[my_index_i].y;
         }
       }
       /* Now finish up the bookkeeping. */

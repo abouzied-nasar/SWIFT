@@ -81,15 +81,22 @@ struct gpu_offload_data {
   /*! Arrays used to receive positions of first/last particle in cells in the particle arrays above
    * from device to host. cell_i_j_start_end.x is ci_start, y is ci_end, z is cj_start, w is cj_end*/
 
-//  TODO: STICK ARRAYS INTO THIS STRUCT
-  struct gpu_md_and_cell_positions {
+  /*GPU metadata for controlling which particles
+   * interact with which and currently where to write
+   * results to*/
+  struct gpu_md {
+	/*This contains the indices of where GPU threads should
+	 * read from in the compact particle buffer (with no
+	 * duplicate data)*/
     int4 *cell_i_j_start_end;
+    /*This contains the indices of where GPU threads should
+	 * write to to avoid race conditions on the GPU
+	 * TODO: Do reduction on GPU to avoid sending back lots
+	 *  of data to CPU*/
     int4 *cell_i_j_start_end_non_compact;
     int4 *d_cell_i_j_start_end;
     int4 *d_cell_i_j_start_end_non_compact;
-    double3 *cell_positions;
-    double3 *d_cell_positions;
-  } gpu_md_and_cell_positions;
+  } gpu_md;
 
 //  int4 *cell_i_j_start_end;
 //  int4 *cell_i_j_start_end_non_compact;
