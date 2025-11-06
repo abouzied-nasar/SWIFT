@@ -52,13 +52,11 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H,
     const int4 *__restrict__ d_cell_i_j_start_end,
     const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
-	const double3 *__restrict__ d_cell_positions, const double3 __restrict__ space_dim) {
+	const double3 space_dim) {
 
   /* First, grab handles for where cells start and end */
   const int4 cell_starts_ends_read = d_cell_i_j_start_end[cid];
   const int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[cid];
-  const double3 ci_pos = d_cell_positions[cid];
-  const double3 cj_pos = d_cell_positions[cjd];
   const double distx = cj_pos.x - ci_pos.x;
   const double disty = cj_pos.y - ci_pos.y;
   const double distz = cj_pos.z - ci_pos.z;
@@ -89,6 +87,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   int k = 0;
   const int pj_start = cell_starts_ends_read.z;
   const int pj_end = cell_starts_ends_read.w;
+  const struct gpu_cell_pos_d c_pos = d_parts_send[cell_starts_ends_read.y].c_pos;
 
   /* Get the relative distance between the pairs and apply wrapping in case
    * of periodic boundary conditions */
@@ -107,7 +106,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
 //  /* Get the shift for cell i */
 
   for(int i = cell_starts_ends_read.x; i < cell_starts_ends_read.y; i++){
-    const struct gpu_part_send_d pi = d_parts_send[i];
+    const struct gpu_part_data_d pi = d_parts_send[i].p_data;
     const float xi = pi.x_h.x;
     const float yi = pi.x_h.y;
     const float zi = pi.x_h.z;
@@ -134,7 +133,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     for (int j = pj_start; j < pj_end; j++) {
 
       /* First, grab handles. */
-      const struct gpu_part_send_d pj = d_parts_send[j];
+      const struct gpu_part_data_d pj = d_parts_send[j].p_data;
 
       const float xj = pj.x_h.x;
       const float yj = pj.x_h.y;

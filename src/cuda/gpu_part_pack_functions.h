@@ -169,7 +169,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
   /* Grab handles */
   const int count = c->hydro.count;
   const struct part *parts = c->hydro.parts;
-  struct gpu_part_send_d *ps = &parts_buffer[pack_ind];
+  struct gpu_part_data_d *ps = &parts_buffer[pack_ind].p_data;
 
   for (int i = 0; i < count; i++) {
 
