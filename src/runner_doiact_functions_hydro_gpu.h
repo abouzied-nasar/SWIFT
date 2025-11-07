@@ -247,7 +247,7 @@ static void runner_gpu_filter_data(const struct runner *r,
 
   /*TODO: Crude loop for now just to quickly bash something in to work.
    * Come back to this and optimise so we only loop to
-   * uniqe_count not n_leaves in inner loop*/
+   * uniqe_count not i in inner loop(s)*/
   for(int i = 0; i < md->n_leaves; i++) {
     struct cell *cii = ci_leaves[i];
     struct cell *cjj = cj_leaves[i];
@@ -693,7 +693,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   int npacked = 0;
 
   /* We do not need the lock on this cell as we are packing read-only data
-   * unlock here but lock when unpacking ;)*/
+   * unlock here but lock when unpacking to prevent race ;)*/
   cell_unlocktree(t->ci);
   if (t->cj != NULL) cell_unlocktree(t->cj);
 
@@ -1100,6 +1100,9 @@ static void runner_dopair_gpu_density(const struct runner *r,
 
   /* Collect cell interaction data recursively*/
   runner_dopair_gpu_recurse(r, s, buf, ci, cj, /*depth=*/0, /*timer=*/1);
+
+  /* Find unique cells*/
+  runner_gpu_filter_data(r, s, buf, /*timer=*/1);
 
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 to pack and launch on GPU */

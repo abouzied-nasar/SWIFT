@@ -34,7 +34,7 @@ extern "C" {
 #include "device_functions.cuh"
 #include "gpu_part_structs.h"
 #include "inline.h"
-
+#include <stdio.h>
 #include <config.h>
 
 /**
@@ -62,6 +62,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   const int cj_start = cell_starts_ends_read.z;
   const int cj_end = cell_starts_ends_read.w;
 
+  const int ci_write_start = cell_starts_ends_write.x;
+
   /*Now get the cell positions*/
   const struct gpu_cell_pos_d ci_loc = d_parts_send[ci_end].c_loc;
   const struct gpu_cell_pos_d cj_loc = d_parts_send[cj_end].c_loc;
@@ -69,55 +71,58 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   const double distx = cj_loc.x.x - ci_loc.x.x;
   const double disty = cj_loc.x.y - ci_loc.x.y;
   const double distz = cj_loc.x.z - ci_loc.x.z;
-  double3 shift;
-  if(distx < -space_dim.x)
+
+//  if(cid == 0){
+//	  printf("distx %f ci_posx %f cjposx %f\n", distx, ci_loc.x.x, cj_loc.x.x);
+//	  printf("disty %f ci_posy %f cjposy %f\n", disty, ci_loc.x.y, cj_loc.x.y);
+//	  printf("distz %f ci_posz %f cjposz %f\n", distz, ci_loc.x.z, cj_loc.x.z);
+//  }
+  double3 shift = {0.0, 0.0, 0.0};
+
+  /*Fine for now as thread divergence
+   * will be one line of code*/
+  if(distx < -space_dim.x * 0.5)
     shift.x = space_dim.x;
-  else
+  else if(distx > space_dim.x * 0.5)
     shift.x = -space_dim.x;
 
-  if(disty < -space_dim.y)
+  if(disty < -space_dim.y * 0.5)
     shift.y = space_dim.y;
-  else
+  else if(disty > space_dim.y * 0.5)
     shift.y = -space_dim.y;
 
-  if(distz < -space_dim.z)
+  if(distz < -space_dim.z * 0.5)
     shift.z = space_dim.z;
-  else
+  else if (distz > space_dim.z * 0.5)
     shift.z = -space_dim.z;
 
-  const double shift_ix = shift.x + cj_loc.x.x;
-  const double shift_iy = shift.y + cj_loc.x.y;
-  const double shift_iz = shift.z + cj_loc.x.z;
+  const double cell_dist = sqrt(distx*distx + disty*disty + distz*distz);
+  const double c_pos_mask = cell_dist ? 1.0 : 0.0;
+
+  const double shift_ix = c_pos_mask * shift.x + cj_loc.x.x;
+  const double shift_iy = c_pos_mask * shift.y + cj_loc.x.y;
+  const double shift_iz = c_pos_mask * shift.z + cj_loc.x.z;
   const double shift_jx = cj_loc.x.x;
   const double shift_jy = cj_loc.x.y;
   const double shift_jz = cj_loc.x.z;
+
+
+//  if(cid == 0){
+//	  printf("distx %f shiftx %f ci_posx %f cjposx %f\n", shift_ix, distx, ci_loc.x.x, cj_loc.x.x);
+//	  printf("disty %f shifty %f ci_posy %f cjposy %f\n", shift_iy, disty, ci_loc.x.y, cj_loc.x.y);
+//	  printf("distz %f shiftz %f ci_posz %f cjposz %f\n", shift_iz, distz, ci_loc.x.z, cj_loc.x.z);
+//  }
   /*Now loop over the particles in cell i*/
 
   int k = 0;
   const int pj_start = cell_starts_ends_read.z;
   const int pj_end = cell_starts_ends_read.w;
 
-  /* Get the relative distance between the pairs and apply wrapping in case
-   * of periodic boundary conditions */
-//  double3 shift = {0., 0., 0.};
-//  for (int k = 0; k < 3; k++) {
-//    if (cj->loc[k] - ci->loc[k] < -e->s->dim[k] * 0.5) {
-//      shift[k] = e->s->dim[k];
-//    } else if (cj->loc[k] - ci->loc[k] > e->s->dim[k] * 0.5) {
-//      shift[k] = -e->s->dim[k];
-//    }
-//  }
-//  const double3 shift_i = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
-//                             shift[2] + cj->loc[2]};
-//  /* Do the same for cj */
-//  const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
-//  /* Get the shift for cell i */
-
   for(int i = cell_starts_ends_read.x; i < cell_starts_ends_read.y; i++){
     const struct gpu_part_data_d pi = d_parts_send[i].p_data;
-    const float xi = pi.x_h.x;
-    const float yi = pi.x_h.y;
-    const float zi = pi.x_h.z;
+    const float xi = pi.x_h.x - shift_ix;
+    const float yi = pi.x_h.y - shift_iy;
+    const float zi = pi.x_h.z - shift_iz;
     const float hi = pi.x_h.w;
 
     const float vxi = pi.vx_m.x;
@@ -131,6 +136,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     const float hig2 = hi * hi * kernel_gamma2;
     const float hi_inv = 1.f / hi;
 
+    int n_neighbours = 0;
+
     /* Prep output */
     /* rho, rho_dh, wcount, wcount_dh */
     float4 res_rho = {0.0, 0.0, 0.0, 0.0};
@@ -143,9 +150,9 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
       /* First, grab handles. */
       const struct gpu_part_data_d pj = d_parts_send[j].p_data;
 
-      const float xj = pj.x_h.x;
-      const float yj = pj.x_h.y;
-      const float zj = pj.x_h.z;
+      const float xj = pj.x_h.x - shift_jx;
+      const float yj = pj.x_h.y - shift_jy;
+      const float zj = pj.x_h.z - shift_jz;
       /* const float hj = pj.x_p_h.w; */
 
       const float vxj = pj.vx_m.x;
@@ -162,6 +169,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
       if ((r2 < hig2) && (j != i)) {
         /* j != pid: Exclude self contribution. This happens at a later step. */
 
+    	n_neighbours++;
         /* Recover some data */
         const float r = sqrtf(r2);
 
@@ -200,8 +208,9 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
 
     /* Write results. */
     //Write to i + non_compact_start_of_cell
-    d_parts_recv[k + cell_starts_ends_read.x].rho_rhodh_wcount_wcount_dh = res_rho;
-    d_parts_recv[k + cell_starts_ends_read.x].rot_vx_div_v = res_rot;
+    d_parts_recv[k + ci_write_start].rho_rhodh_wcount_wcount_dh = res_rho;
+    d_parts_recv[k + ci_write_start].rot_vx_div_v = res_rot;
+    d_parts_recv[k + ci_write_start].n_neighbours = n_neighbours;
     k++;
   }
 }

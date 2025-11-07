@@ -72,6 +72,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
 
     float div_v = part_get_div_v(p) + pr.rot_vx_div_v.w;
     part_set_div_v(p, div_v);
+
+    p->N_density += pr.n_neighbours;
   }
 }
 

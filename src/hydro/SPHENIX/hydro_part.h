@@ -260,6 +260,9 @@ struct part {
   /*! Time-step limiter information */
   struct timestep_limiter_data _limiter_data;
 
+  /* Integer number of neighbours in the density loop */
+  int N_density;
+
 #ifdef SWIFT_DEBUG_CHECKS
 
   /* Time of the last drift */

@@ -221,6 +221,7 @@ void *runner_main_cuda(void *data) {
   /* Tell me how much memory we're using. */
   gpu_print_free_mem(e, r->cpuid);
 
+  int step = 0;
   /* Main loop. */
   while (1) {
     /* Wait at the barrier. */
@@ -245,6 +246,11 @@ void *runner_main_cuda(void *data) {
     struct task *prev = NULL;
     /*Some bits for output in case of debug*/
 
+    /*Some bits for output in case of debug*/
+    char buf5[20];
+    snprintf(buf5, sizeof(buf5), "t%dr%dstep%d", r->cpuid, engine_rank, step);
+    FILE *fgpu_steps;
+    fgpu_steps = fopen(buf5, "w");
     /* TODO: DO WE STILL NEED THIS?? */
 #ifdef CUDA_PROFILER
     if (step == 0) cudaProfilerStart();
@@ -731,6 +737,18 @@ void *runner_main_cuda(void *data) {
         t = scheduler_done(sched, t);
       }
     } /* Loop while there are tasks */
+    for (int tid = 0; tid < e->s->nr_local_cells; tid++) {
+    	struct cell *ctemp = &(e->s->cells_top[tid]);
+    	for(int i = 0; i < ctemp->hydro.count; i++){
+        	struct part *pi = &ctemp->hydro.parts[i];
+        	const double *x = part_get_const_x(pi);
+    		fprintf(fgpu_steps, "%f, %f, %f, %i\n", x[0], x[1], x[2], pi->N_density);
+    		pi->N_density = 0;
+    	}
+    }
+    step++;
+    fflush(fgpu_steps);
+    fclose(fgpu_steps);
   } /* main loop. */
 
   /* Release the bytes back into the wilderness */
