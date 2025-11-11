@@ -89,6 +89,7 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
 
 
   md->task_n_leaves = 0;
+  md->n_unique = 0;
   md->tasks_in_list = 0;
   md->count_parts = 0;
   md->n_leaves_packed = 0;
