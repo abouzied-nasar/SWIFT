@@ -1006,6 +1006,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_density(r, s, buf, npacked);
 
+        message("n_unique %i count parts %i", md->n_unique, md->count_parts_unique);
+
       } else if (t->subtype == task_subtype_gpu_gradient) {
 
         /* Launch the GPU offload */
