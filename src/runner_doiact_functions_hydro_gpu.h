@@ -294,7 +294,7 @@ static void runner_gpu_filter_data(const struct runner *r,
 //TODO: Add a debug check that the list is unique
 
   md->n_unique = unique_count;
-//  message("found %i unique cells in %i leaf computations", unique_count, md->n_leaves);
+  message("found %i unique cells in %i leaf computations", unique_count, md->n_leaves);
 
   if (timer) TIMER_TOC(timer_doself_gpu_recurse);
 }
