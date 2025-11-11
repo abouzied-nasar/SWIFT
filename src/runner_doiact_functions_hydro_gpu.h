@@ -999,14 +999,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         (md->launch_leftovers && (npacked == md->task_n_leaves))) {
 
       if (t->subtype == task_subtype_gpu_density) {
-
+        int n_particles = 0;
+        for(int i = 0; i < md->n_unique; i++){
+          n_particles += md->unique_cells[i]->hydro.count;
+        }
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
 
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_density(r, s, buf, npacked);
 
-        message("n_unique %i count parts %i", md->n_unique, md->count_parts_unique);
+        message("n_unique %i count parts %i n_leaves_packed %i n_in_uniques %i",
+            md->n_unique, md->count_parts_unique, md->n_leaves_packed, n_particles);
 
       } else if (t->subtype == task_subtype_gpu_gradient) {
 
