@@ -37,6 +37,16 @@ extern "C" {
 
 #include <stddef.h>
 
+/* Hash table entry. TODO: Move declaration to a separate file maybe?
+ * Used to construct a hash table to find unique cells */
+struct hash_entry {
+	/*We use the cell pointer as the key for the hash*/
+	struct cell *c;
+	/*This cell's index in the array of unique_cells*/
+	int index;
+	int occupied;
+};
+
 /*! struct holding bookkeeping meta-data required for offloading;
  * does not depend on cuda/hip et al. */
 struct gpu_pack_metadata {
@@ -107,6 +117,10 @@ struct gpu_pack_metadata {
 
   /*! Is this metadata for a pair task? */
   char is_pair_task;
+
+  int hash_size;
+
+  struct hash_entry * hash_table;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Size of the send_part struct used */

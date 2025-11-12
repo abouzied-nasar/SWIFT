@@ -212,115 +212,110 @@ bool is_unique(const struct cell *cii, struct cell *unique[], int unique_count) 
     return true;
 }
 
-
-// Simple hash map for pointer keys
-typedef struct HashEntry {
-    struct cell *key;
-    int index;
-    struct HashEntry *next;
-} HashEntry;
-
-typedef struct HashMap {
-    HashEntry **buckets;
-    int size;
-} HashMap;
-
-#define HASH_SIZE 1024  // Adjust based on expected unique cells
-
-// Hash function for pointers
-unsigned long hash_ptr(void *ptr) {
-    return ((unsigned long)ptr) >> 3; // Shift to reduce alignment bias
+// Simple hash function for pointers
+static inline int hash_func(const struct cell *ptr, const int hash_size) {
+    return ((uintptr_t)ptr) % hash_size;
 }
 
-// Create hash map
-HashMap *create_hashmap(int size) {
-    HashMap *map = malloc(sizeof(HashMap));
-    map->size = size;
-    map->buckets = calloc(size, sizeof(HashEntry *));
-    return map;
-}
-
-// Insert or find key in hash map
-int hashmap_get_or_insert(HashMap *map, struct cell *key, int *is_new, int next_index) {
-    unsigned long h = hash_ptr(key) % map->size;
-    HashEntry *entry = map->buckets[h];
-
-    while (entry) {
-    	const double distx = entry->key->loc[0] - key->loc[0];
-    	const double disty = entry->key->loc[1] - key->loc[1];
-    	const double distz = entry->key->loc[2] - key->loc[2];
-    	const double cell_dist = sqrt(distx*distx + disty*disty + distz*distz);
-//    	if (entry->key == key) {
-        if (cell_dist != 0.0) {
-            *is_new = 0;
-            return entry->index;
-        }
-        entry = entry->next;
+// Lookup in hash table
+int hash_lookup(const struct cell *c, const int hash_size, const struct hash_entry * hash_table) {
+	/*Get the hash using the cell's pointer address*/
+    int h_id = hash_func(c, hash_size);
+    int start = h_id;
+    /*Do a linear probe of hash table*/
+    while(hash_table[h_id].occupied){
+      /*If we already have a cell hashed to h_id.
+       * Return it's index in the array of
+       * unique cells*/
+      if (hash_table[h_id].c == c)
+        return hash_table[h_id].index;
+      h_id = (h_id + 1) % hash_size;
+      if(h_id == start)
+        error("hash table full");
     }
-
-    // Not found, insert new
-    HashEntry *new_entry = malloc(sizeof(HashEntry));
-    new_entry->key = key;
-    new_entry->index = next_index;
-    new_entry->next = map->buckets[h];
-    map->buckets[h] = new_entry;
-
-    *is_new = 1;
-    return next_index;
+    /*Otherwise return -1 to indicate we've found a unique cell*/
+    return -1; // Not found
 }
 
-// Free hash map
-void free_hashmap(HashMap *map) {
-    for (int i = 0; i < map->size; i++) {
-        HashEntry *entry = map->buckets[i];
-        while (entry) {
-            HashEntry *tmp = entry;
-            entry = entry->next;
-            free(tmp);
-        }
+/* Insert into hash table. No need for probing as we will
+ * only store one cell in each index of hash table*/
+void hash_insert(struct cell *c, int unique_index, const int hash_size, struct hash_entry * hash_table) {
+    int h_id = hash_func(c, hash_size);
+    int start = h_id;
+    /*Do a linear probe of hash table*/
+    while(hash_table[h_id].occupied){
+//    while(hash_table[h_id].c)
+      h_id = (h_id + 1) % hash_size;
+      /*If we reach the start of the
+       * has table it means we've over-filled it.
+       * Nothing to do but crash*/
+      if(h_id == start)
+    	error("hash table full");
     }
-    free(map->buckets);
-    free(map);
+    /*If we exited h_id is the next empty
+     * index. Stuff our cell hash here*/
+    hash_table[h_id].c = c;
+    hash_table[h_id].index = unique_index;
+    hash_table[h_id].occupied = 1;
 }
 
 
-// Main loop
-void process_cells(struct cell **ci_leaves, struct cell **cj_leaves, int n_leaves,
-                   struct gpu_pack_metadata *md, struct gpu_offload_data *buf) {
-    int unique_count = 0;
-    HashMap *map = create_hashmap(HASH_SIZE);
+// Main function to process leaves
+void filter_leaves(struct gpu_pack_metadata *md, struct gpu_offload_data *buf,
+                    struct cell **ci_leaves, struct cell **cj_leaves) {
+  int unique_count = md->n_unique;
 
-    for (int i = 0; i < n_leaves; i++) {
-        struct cell *cii = ci_leaves[i];
-        struct cell *cjj = cj_leaves[i];
+  struct hash_entry * hash_table = md->hash_table;
+  const int hash_size = md->hash_size;
+  for(int i = 0; i < hash_size; i++)
+	  hash_table[i].occupied = 0;
+  /*Start from where we left off in previous task.
+   * If we do not have previous non-offloaded leaf comps
+   * then n_leaves = 0. Otherwise, start from index of
+   * last packed leaf comp to however many leaves we
+   * have found in current task*/
+  for (int i = md->n_leaves; i < md->n_leaves + md->task_n_leaves; i++) {
+//	message("hashing cell %i\n", i);
+	struct cell *cii = ci_leaves[i];
+	struct cell *cjj = cj_leaves[i];
 
-        md->pack_flags[i].x = 0;
-        md->pack_flags[i].y = 0;
+	if (cii == NULL || cjj == NULL)
+	  error("Error: working on NULL cells");
 
-        if (cii == NULL || cjj == NULL)
-            error("working on NULL cells");
+	md->pack_flags[i].x = 0;
+	md->pack_flags[i].y = 0;
 
-        // Check uniqueness for ci
-        int is_new;
-        int idx = hashmap_get_or_insert(map, cii, &is_new, unique_count);
-        buf->my_index[i].x = idx;
-        if (is_new) {
-            md->unique_cells[unique_count++] = cii;
-            md->pack_flags[i].x = 1;
-        }
+	/*Check if ci has already been found*/
+	int u_index = hash_lookup(cii, hash_size, hash_table);
+	if (u_index >= 0)
+	  /*We found this cell's hash value exists -> Not unique*/
+	  buf->my_index[i].x = u_index;
+	else {
+	  /*This cell has not been found yet.
+	   * Add to hash table and store it's index*/
+	  buf->my_index[i].x = unique_count;
+	  md->unique_cells[unique_count] = cii;
+	  md->pack_flags[i].x = 1;
+	  hash_insert(cii, unique_count, hash_size, hash_table);
+	  unique_count++;
+	}
 
-        // Check uniqueness for cj
-        idx = hashmap_get_or_insert(map, cjj, &is_new, unique_count);
-        buf->my_index[i].y = idx;
-        if (is_new) {
-            md->unique_cells[unique_count++] = cjj;
-            md->pack_flags[i].y = 1;
-        }
-    }
-    md->n_unique = unique_count;
+	/*Same for cj*/
+	u_index = hash_lookup(cjj, hash_size, hash_table);
+	if (u_index >= 0)
+      buf->my_index[i].y = u_index;
+	else {
+	  buf->my_index[i].y = unique_count;
+	  md->unique_cells[unique_count] = cjj;
+	  md->pack_flags[i].y = 1;
+	  hash_insert(cjj, unique_count, hash_size, hash_table);
+	  unique_count++;
+	}
+  }
 
-    free_hashmap(map);
+  md->n_unique += unique_count;
 }
+
 
 
 /**
@@ -337,7 +332,8 @@ void process_cells(struct cell **ci_leaves, struct cell **cj_leaves, int n_leave
 static void runner_gpu_filter_data(const struct runner *r,
                                       const struct scheduler *s,
                                       struct gpu_offload_data *buf,
-                                      const char timer, const struct task * t) {
+                                      const char timer, const struct task * t,
+									  const int index_2_check) {
 
   /* Note: Can't inline a recursive function... */
 
@@ -346,68 +342,121 @@ static void runner_gpu_filter_data(const struct runner *r,
   /* Grab some handles. */
   /* packing data and metadata */
   struct gpu_pack_metadata *md = &buf->md;
+ /* TODO: Use this to replace array when checking as we no longer need to track this for the entire list of cells*/
+//  int2 pack = {0, 0};
+
+  /**TODO: Check if this needs to be here*/
+//  if(md->task_n_leaves == 0)
+//    return;
+
+  int unique_count = md->n_unique;
+
+  struct hash_entry * hash_table = md->hash_table;
+  const int hash_size = md->hash_size;
+
+  /*Start from n_leaves_packed index*/
+//  message("hashing cell %i\n", index_2_check);
+
   /* Arrays for leaf cells */
-  struct cell **ci_leaves = md->ci_leaves;
-  struct cell **cj_leaves = md->cj_leaves;
+  struct cell *cii = md->ci_leaves[index_2_check];
+  struct cell *cjj = md->cj_leaves[index_2_check];
 
-  int unique_count = 0;
+  if (cii == NULL || cjj == NULL)
+	  error("Error: working on NULL cells");
 
+  md->pack_flags[index_2_check].x = 0;
+  md->pack_flags[index_2_check].y = 0;
 
-  if(md->n_leaves == 0)
-    return;
-
-  /*TODO: Crude loop for now just to quickly bash something in to work.
-   * Come back to this and optimise so we only loop to
-   * uniqe_count not i in inner loop(s)*/
-  for(int i = 0; i < md->n_leaves; i++) {
-    struct cell *cii = ci_leaves[i];
-    struct cell *cjj = cj_leaves[i];
-    md->pack_flags[i].x = 0;
-    md->pack_flags[i].y = 0;
-    if (cii == NULL || cjj == NULL)
-      error("working on NULL cells");
-
-    /*Test for ci*/
-    int unique = 1;
-    for (int j = 0; j < i; j++) {
-//      const double distx = md->unique_cells[j]->loc[0] - cii->loc[0];
-//      const double disty = md->unique_cells[j]->loc[1] - cii->loc[1];
-//      const double distz = md->unique_cells[j]->loc[2] - cii->loc[2];
-//      const double cell_dist = sqrt(distx*distx + disty*disty + distz*distz);
-      if (md->unique_cells[j] == cii) {
-//      if (cell_dist == 0.0) {
-        buf->my_index[i].x = j;
-        unique = 0;
-        break;
-      }
-    }
-    if (unique) {
-      md->unique_cells[unique_count] = cii;
-      buf->my_index[i].x = unique_count;
-      md->pack_flags[i].x = 1;
-      unique_count++;
-    }
-    /*Test for cj*/
-    unique = 1;
-    for (int j = 0; j < i; j++) {
-//      const double distx = md->unique_cells[j]->loc[0] - cjj->loc[0];
-//      const double disty = md->unique_cells[j]->loc[1] - cjj->loc[1];
-//      const double distz = md->unique_cells[j]->loc[2] - cjj->loc[2];
-//      const double cell_dist = sqrt(distx*distx + disty*disty + distz*distz);
-      if (md->unique_cells[j] == cjj) {
-//      if (cell_dist == 0.0) {
-        buf->my_index[i].y = j;
-        unique = 0;
-        break;
-      }
-    }
-    if (unique) {
-      md->unique_cells[unique_count] = cjj;
-      buf->my_index[i].y = unique_count;
-      md->pack_flags[i].y = 1;
-      unique_count++;
-    }
+  /*Check if ci has already been found*/
+  int u_index = hash_lookup(cii, hash_size, hash_table);
+  if (u_index >= 0)
+	  /*We found this cell's hash value exists -> Not unique*/
+	  buf->my_index[index_2_check].x = u_index;
+  else {
+	  /*This cell has not been found yet.
+	   * Add to hash table and store it's index*/
+	  buf->my_index[index_2_check].x = unique_count;
+	  md->unique_cells[unique_count] = cii;
+	  md->pack_flags[index_2_check].x = 1;
+	  hash_insert(cii, unique_count, hash_size, hash_table);
+	  unique_count++;
   }
+
+  /*Same for cj*/
+  u_index = hash_lookup(cjj, hash_size, hash_table);
+  if (u_index >= 0)
+	  buf->my_index[index_2_check].y = u_index;
+  else {
+	  buf->my_index[index_2_check].y = unique_count;
+	  md->unique_cells[unique_count] = cjj;
+	  md->pack_flags[index_2_check].y = 1;
+	  hash_insert(cjj, unique_count, hash_size, hash_table);
+	  unique_count++;
+  }
+
+  md->n_unique = unique_count;
+
+//  filter_leaves(md, buf, ci_leaves, cj_leaves);
+
+
+//  /*TODO: Crude loop for now just to quickly bash something in to work.
+//   * Come back to this and optimise so we only loop to
+//   * uniqe_count not i in inner loop(s)*/
+//  for(int i = 0; i < md->n_leaves; i++) {
+//    struct cell *cii = ci_leaves[i];
+//    struct cell *cjj = cj_leaves[i];
+//    md->pack_flags[i].x = 0;
+//    md->pack_flags[i].y = 0;
+//    if (cii == NULL || cjj == NULL)
+//      error("working on NULL cells");
+//
+//    /*Test for ci by looping through all other leaves
+//     * found so far to see if ci has already been added to list*/
+//    int unique = 1;
+//    for (int j = 0; j < i; j++) {
+////      const double distx = md->unique_cells[j]->loc[0] - cii->loc[0];
+////      const double disty = md->unique_cells[j]->loc[1] - cii->loc[1];
+////      const double distz = md->unique_cells[j]->loc[2] - cii->loc[2];
+////      const double cell_dist = sqrt(distx*distx + disty*disty + distz*distz);
+//      /*If ci is already in the list, store that
+//       * this cell is already listed in index j
+//       * and move onto next leaf cell*/
+//      if (md->unique_cells[j] == cii) {
+////      if (cell_dist == 0.0) {
+//        buf->my_index[i].x = j;
+//        unique = 0;
+//        break;
+//      }
+//    }
+//    /*ci is not in the list, add it and save
+//     * that we want to pack this cell later (set pack_flag to 1)*/
+//    if (unique) {
+//      md->unique_cells[unique_count] = cii;
+//      buf->my_index[i].x = unique_count;
+//      md->pack_flags[i].x = 1;
+//      unique_count++;
+//    }
+//    /*Test for cj*/
+//    unique = 1;
+//    for (int j = 0; j < i; j++) {
+////      const double distx = md->unique_cells[j]->loc[0] - cjj->loc[0];
+////      const double disty = md->unique_cells[j]->loc[1] - cjj->loc[1];
+////      const double distz = md->unique_cells[j]->loc[2] - cjj->loc[2];
+////      const double cell_dist = sqrt(distx*distx + disty*disty + distz*distz);
+//      if (md->unique_cells[j] == cjj) {
+////      if (cell_dist == 0.0) {
+//        buf->my_index[i].y = j;
+//        unique = 0;
+//        break;
+//      }
+//    }
+//    if (unique) {
+//      md->unique_cells[unique_count] = cjj;
+//      buf->my_index[i].y = unique_count;
+//      md->pack_flags[i].y = 1;
+//      unique_count++;
+//    }
+//  }
 //    process_cells(ci_leaves, cj_leaves, md->n_leaves,
 //                     md, buf);
 //  for(int i = 0; i < md->n_leaves; i++){
@@ -416,11 +465,11 @@ static void runner_gpu_filter_data(const struct runner *r,
 
 //TODO: Add a debug check that the list is unique
 
-  md->n_unique = unique_count;
-  if(md->n_unique > md->n_leaves * 2)
-	  message("We have more unique cells (%i) "
-			  "than we have leaf computations (%i). "
-			  "Some thing is not right! Task is %s", md->n_unique, md->n_leaves, taskID_names[t->type]);
+//  md->n_unique = unique_count;
+//  if(md->n_unique > md->n_leaves * 2)
+//	  message("We have more unique cells (%i) "
+//			  "than we have leaf computations (%i). "
+//			  "Some thing is not right! Task is %s", md->n_unique, md->n_leaves, taskID_names[t->type]);
 //  message("found %i unique cells in %i leaf computations", unique_count, md->n_leaves);
 
   if (timer) TIMER_TOC(timer_doself_gpu_recurse);
@@ -843,7 +892,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       error("Writing out of ci_leaves array bounds: %d/%d", md->n_leaves_packed,
             md->params.leaf_buffer_size);
 #endif
-
     /* Grab handles. */
     struct cell *cii = md->ci_leaves[md->n_leaves_packed];
     struct cell *cjj = md->cj_leaves[md->n_leaves_packed];
@@ -860,6 +908,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = md->count_parts + cii_count;
         gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
 
+        /* Test to see if cells i and j have already been packed*/
+        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, md->n_leaves_packed);
         /*Now figure out where to start from in the unique particle buffer*/
         /*Don't count my count. this is the start pos*/
         if(md->pack_flags[md->n_leaves_packed].x == 1){
@@ -904,6 +954,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         //TODO: Add a debug check in unpacking to make sure we never touch this!
         gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].z = -1;
         gpu_md->cell_i_j_start_end_non_compact[md->n_leaves_packed].w = -1;
+        /* Test to see if cells i and j have already been packed
+         * cells i and j are the same cell here but use the same
+         * function as for the pairs*/
+        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, md->n_leaves_packed);
         /*Now figure out where to start from in the unique particle buffer*/
         /*Don't count my count. this is the start pos*/
         if(md->pack_flags[md->n_leaves_packed].x == 1){
@@ -1009,7 +1063,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_density(r, s, buf, npacked);
 
-        message("n_unique %i count parts %i n_leaves_packed %i n_in_uniques %i",
+        message("n_unique %i count parts unique %i n_leaves_packed %i n_expected in uniques %i",
             md->n_unique, md->count_parts_unique, md->n_leaves_packed, n_particles);
 
       } else if (t->subtype == task_subtype_gpu_gradient) {
@@ -1068,6 +1122,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           const int shift_ind = i - md->n_leaves_packed;
           md->ci_leaves[shift_ind] = md->ci_leaves[i];
           md->cj_leaves[shift_ind] = md->cj_leaves[i];
+          gpu_md->cell_i_j_start_end[shift_ind] = gpu_md->cell_i_j_start_end[i];
+          gpu_md->cell_i_j_start_end_non_compact[shift_ind] = gpu_md->cell_i_j_start_end_non_compact[i];
+
+          /*TODO: Check if this would work as-is. Do we need to shift the entries in md->unique_cells[]*/
+          buf->my_index[shift_ind] = buf->my_index[i];
+          buf->my_index[shift_ind] = buf->my_index[i];
+
 #ifdef SWIFT_DEBUG_CHECKS
           md->ci_leaves[i] = NULL;
           md->cj_leaves[i] = NULL;
@@ -1124,9 +1185,6 @@ static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
 
   /* Collect cell interaction data recursively*/
   runner_doself_gpu_recurse(r, s, buf, t->ci, /*depth=*/0, /*timer=*/1);
-
-  /* Find unique cells*/
-  runner_gpu_filter_data(r, s, buf, /*timer=*/1, t);
 
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 and pack and launch on GPU */
@@ -1233,9 +1291,6 @@ static void runner_dopair_gpu_density(const struct runner *r,
 
   /* Collect cell interaction data recursively*/
   runner_dopair_gpu_recurse(r, s, buf, ci, cj, /*depth=*/0, /*timer=*/1);
-
-  /* Find unique cells*/
-  runner_gpu_filter_data(r, s, buf, /*timer=*/1, t);
 
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 to pack and launch on GPU */

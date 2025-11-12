@@ -79,6 +79,11 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
       (struct cell **)malloc(2 * leaf_buffer_size * sizeof(struct cell *));
   for (size_t i = 0; i < leaf_buffer_size; i++) md->unique_cells[i] = NULL;
 
+  /* Allocate hash table. For now using 4096=8^4 assuming we recurse four times */
+  int hash_size = 4096;
+  md->hash_table = malloc(hash_size * sizeof(struct hash_entry));
+  md->hash_size = hash_size;
+
   /*Allocate memory for packed flags*/
   md->pack_flags =
       (int2 *)malloc(2 * leaf_buffer_size * sizeof(int2));
@@ -133,6 +138,8 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
   md->launch_leftovers = 0;
   md->count_parts_unique = 0;
   md->n_unique = 0;
+  for(int i = 0; i < md->hash_size; i++)
+	  md->hash_table[i].occupied = 0;
 
 #ifdef SWIFT_DEBUG_CHECKS
   const struct gpu_global_pack_params pars = md->params;
