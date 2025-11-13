@@ -79,7 +79,7 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
 
   /*This is used to tell each cell in a pair where it's index is in the uniquely sorted array*/
   cu_error = cudaMallocHost((void **)&buf->my_index,
-                            size_of_cell_start_end/2);
+                            sizeof(int2) * params->pack_size_pair);
 
   /*Allocate memory for cell start and end data on device*/
   cu_error = cudaMalloc((void **)&buf->gpu_md.d_cell_i_j_start_end,

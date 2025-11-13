@@ -56,11 +56,13 @@ struct gpu_pack_metadata {
   struct cell **ci_leaves;
   struct cell **cj_leaves;
 
-
   /*Data required for unique sorting*/
   /*list of unique cells we find in the leaves lists above*/
-  struct cell ** unique_cells;
-  int2 * pack_flags;
+  struct cell **unique_cells;
+  /*Is this cell unique? If so let the CPU know to pack it*/
+  int2 *pack_flags;
+  /*Hash table used to find unique cells*/
+  struct hash_entry *hash_table;
   /*number of unique cells we find*/
   int n_unique;
 
@@ -119,8 +121,6 @@ struct gpu_pack_metadata {
   char is_pair_task;
 
   int hash_size;
-
-  struct hash_entry * hash_table;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Size of the send_part struct used */

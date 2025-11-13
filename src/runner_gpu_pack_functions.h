@@ -106,8 +106,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
       /*Check to see if the cell is unique and we should pack it*/
       if(md->pack_flags[n_leaves_packed].x==1){
         gpu_pack_part_density(ci, buf->parts_send_d, pack_ind_unique);
-        /* Update incremented pack length accordingly */
-        md->count_parts_unique += count_ci;
       }
     } else if (task_subtype == task_subtype_gpu_gradient) {
       gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift, cis, cie);
@@ -146,8 +144,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
       if(md->pack_flags[n_leaves_packed].x==1){
         /*Check to see if cell i is unique and we should pack it*/
         gpu_pack_part_density(ci, buf->parts_send_d, pack_ind_unique);
-        /* Update incremented pack length accordingly */
-        md->count_parts_unique += count_ci;
       }
     } else if (task_subtype == task_subtype_gpu_gradient) {
       gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift_i, cjs,
@@ -172,8 +168,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
       /*Check to see if cell j is unique and we should pack it*/
       if(md->pack_flags[n_leaves_packed].y==1){
         gpu_pack_part_density(cj, buf->parts_send_d, pack_ind);
-        /* Update incremented pack length accordingly */
-        md->count_parts_unique += count_cj;
       }
     } else if (task_subtype == task_subtype_gpu_gradient) {
       gpu_pack_part_gradient(cj, buf->parts_send_g, pack_ind, shift_j, cis,

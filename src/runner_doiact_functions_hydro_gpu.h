@@ -218,32 +218,34 @@ static inline int hash_func(const struct cell *ptr, const int hash_size) {
 }
 
 // Lookup in hash table
-int hash_lookup(const struct cell *c, const int hash_size, const struct hash_entry * hash_table) {
+int hash_lookup(const struct cell *c, const int hash_size, const struct hash_entry * ht) {
 	/*Get the hash using the cell's pointer address*/
     int h_id = hash_func(c, hash_size);
     int start = h_id;
     /*Do a linear probe of hash table*/
-    while(hash_table[h_id].occupied){
+    while(ht[h_id].occupied){
       /*If we already have a cell hashed to h_id.
        * Return it's index in the array of
        * unique cells*/
-      if (hash_table[h_id].c == c)
-        return hash_table[h_id].index;
+      if (ht[h_id].c == c)
+        return ht[h_id].index;
       h_id = (h_id + 1) % hash_size;
       if(h_id == start)
         error("hash table full");
     }
+    if(h_id > hash_size)
+      error("Ran over hash table");
     /*Otherwise return -1 to indicate we've found a unique cell*/
     return -1; // Not found
 }
 
 /* Insert into hash table. No need for probing as we will
  * only store one cell in each index of hash table*/
-void hash_insert(struct cell *c, int unique_index, const int hash_size, struct hash_entry * hash_table) {
+void hash_insert(struct cell *c, int unique_index, const int hash_size, struct hash_entry * ht) {
     int h_id = hash_func(c, hash_size);
     int start = h_id;
     /*Do a linear probe of hash table*/
-    while(hash_table[h_id].occupied){
+    while(ht[h_id].occupied){
 //    while(hash_table[h_id].c)
       h_id = (h_id + 1) % hash_size;
       /*If we reach the start of the
@@ -254,67 +256,70 @@ void hash_insert(struct cell *c, int unique_index, const int hash_size, struct h
     }
     /*If we exited h_id is the next empty
      * index. Stuff our cell hash here*/
-    hash_table[h_id].c = c;
-    hash_table[h_id].index = unique_index;
-    hash_table[h_id].occupied = 1;
+    if(h_id > hash_size)
+      error("Ran over hash table");
+    ht[h_id].c = c;
+    ht[h_id].index = unique_index;
+    ht[h_id].occupied = 1;
 }
 
 
 // Main function to process leaves
-void filter_leaves(struct gpu_pack_metadata *md, struct gpu_offload_data *buf,
-                    struct cell **ci_leaves, struct cell **cj_leaves) {
-  int unique_count = md->n_unique;
-
-  struct hash_entry * hash_table = md->hash_table;
-  const int hash_size = md->hash_size;
-  for(int i = 0; i < hash_size; i++)
-	  hash_table[i].occupied = 0;
-  /*Start from where we left off in previous task.
-   * If we do not have previous non-offloaded leaf comps
-   * then n_leaves = 0. Otherwise, start from index of
-   * last packed leaf comp to however many leaves we
-   * have found in current task*/
-  for (int i = md->n_leaves; i < md->n_leaves + md->task_n_leaves; i++) {
-//	message("hashing cell %i\n", i);
-	struct cell *cii = ci_leaves[i];
-	struct cell *cjj = cj_leaves[i];
-
-	if (cii == NULL || cjj == NULL)
-	  error("Error: working on NULL cells");
-
-	md->pack_flags[i].x = 0;
-	md->pack_flags[i].y = 0;
-
-	/*Check if ci has already been found*/
-	int u_index = hash_lookup(cii, hash_size, hash_table);
-	if (u_index >= 0)
-	  /*We found this cell's hash value exists -> Not unique*/
-	  buf->my_index[i].x = u_index;
-	else {
-	  /*This cell has not been found yet.
-	   * Add to hash table and store it's index*/
-	  buf->my_index[i].x = unique_count;
-	  md->unique_cells[unique_count] = cii;
-	  md->pack_flags[i].x = 1;
-	  hash_insert(cii, unique_count, hash_size, hash_table);
-	  unique_count++;
-	}
-
-	/*Same for cj*/
-	u_index = hash_lookup(cjj, hash_size, hash_table);
-	if (u_index >= 0)
-      buf->my_index[i].y = u_index;
-	else {
-	  buf->my_index[i].y = unique_count;
-	  md->unique_cells[unique_count] = cjj;
-	  md->pack_flags[i].y = 1;
-	  hash_insert(cjj, unique_count, hash_size, hash_table);
-	  unique_count++;
-	}
-  }
-
-  md->n_unique += unique_count;
-}
+//void filter_leaves(struct gpu_pack_metadata *md, struct gpu_offload_data *buf,
+//                    struct cell **ci_leaves, struct cell **cj_leaves) {
+//  int unique_count = md->n_unique;
+//
+//  struct hash_table * hash_table = md->hash_table;
+//  const int hash_size = md->hash_size;
+//  for(int i = 0; i < hash_size; i++)
+//	  hash_table[i].occupied = 0;
+//  /*Start from where we left off in previous task.
+//   * If we do not have previous non-offloaded leaf comps
+//   * then n_leaves = 0. Otherwise, start from index of
+//   * last packed leaf comp to however many leaves we
+//   * have found in current task*/
+//  for (int i = md->n_leaves; i < md->n_leaves + md->task_n_leaves; i++) {
+////	message("hashing cell %i\n", i);
+//	struct cell *cii = ci_leaves[i];
+//	struct cell *cjj = cj_leaves[i];
+//
+//	if (cii == NULL || cjj == NULL)
+//	  error("Error: working on NULL cells");
+//
+//	md->pack_flags[i][0] = 0;
+//	md->pack_flags[i][0] = 0;
+//
+//	/*Check if ci has already been found.
+//	 * If so, return where it's unique copy is found in the unique cells array*/
+//	int u_index = hash_lookup(cii, hash_size, hash_table);
+//	if (u_index >= 0)
+//	  /*We found this cell's hash value exists -> Not unique*/
+//	  buf->my_index[i].x = u_index;
+//	else {
+//	  /*This cell has not been found yet.
+//	   * Add to hash table and store it's index*/
+//	  buf->my_index[i].x = unique_count;
+//	  md->unique_cells[unique_count] = cii;
+//	  md->pack_flags[i][0] = 1;
+//	  hash_insert(cii, unique_count, hash_size, hash_table);
+//	  unique_count++;
+//	}
+//
+//	/*Same for cj*/
+//	u_index = hash_lookup(cjj, hash_size, hash_table);
+//	if (u_index >= 0)
+//      buf->my_index[i].y = u_index;
+//	else {
+//	  buf->my_index[i].y = unique_count;
+//	  md->unique_cells[unique_count] = cjj;
+//	  md->pack_flags[i][1] = 1;
+//	  hash_insert(cjj, unique_count, hash_size, hash_table);
+//	  unique_count++;
+//	}
+//  }
+//
+//  md->n_unique += unique_count;
+//}
 
 
 
@@ -351,10 +356,10 @@ static void runner_gpu_filter_data(const struct runner *r,
 
   int unique_count = md->n_unique;
 
-  struct hash_entry * hash_table = md->hash_table;
+  struct hash_entry * ht = md->hash_table;
   const int hash_size = md->hash_size;
 
-  /*Start from n_leaves_packed index*/
+  /*Check the cell sent through to see if it is unique*/
 //  message("hashing cell %i\n", index_2_check);
 
   /* Arrays for leaf cells */
@@ -367,8 +372,10 @@ static void runner_gpu_filter_data(const struct runner *r,
   md->pack_flags[index_2_check].x = 0;
   md->pack_flags[index_2_check].y = 0;
 
-  /*Check if ci has already been found*/
-  int u_index = hash_lookup(cii, hash_size, hash_table);
+  /*Check if ci has already been found.
+   * If so, return where it's unique copy
+   * is found in the unique cells array*/
+  int u_index = hash_lookup(cii, hash_size, ht);
   if (u_index >= 0)
 	  /*We found this cell's hash value exists -> Not unique*/
 	  buf->my_index[index_2_check].x = u_index;
@@ -378,19 +385,19 @@ static void runner_gpu_filter_data(const struct runner *r,
 	  buf->my_index[index_2_check].x = unique_count;
 	  md->unique_cells[unique_count] = cii;
 	  md->pack_flags[index_2_check].x = 1;
-	  hash_insert(cii, unique_count, hash_size, hash_table);
+	  hash_insert(cii, unique_count, hash_size, ht);
 	  unique_count++;
   }
 
   /*Same for cj*/
-  u_index = hash_lookup(cjj, hash_size, hash_table);
+  u_index = hash_lookup(cjj, hash_size, ht);
   if (u_index >= 0)
 	  buf->my_index[index_2_check].y = u_index;
   else {
 	  buf->my_index[index_2_check].y = unique_count;
 	  md->unique_cells[unique_count] = cjj;
 	  md->pack_flags[index_2_check].y = 1;
-	  hash_insert(cjj, unique_count, hash_size, hash_table);
+	  hash_insert(cjj, unique_count, hash_size, ht);
 	  unique_count++;
   }
 
@@ -528,26 +535,34 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   }
 
   cudaError_t cu_error = cudaSuccess;
-//  cudaEvent_t metadata_copied;
-  /*Copy the tasks cell start/end metadata to the GPU. Send it using regular streams for now.
-   * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
-   * instead of n_bundle copies */
-//  cu_error =
-//      cudaMemcpyAsync(&buf->d_cell_i_j_start_end[0],
-//                      &buf->cell_i_j_start_end[0],
-//                      leaves_packed * sizeof(int4),
-//                      cudaMemcpyHostToDevice, stream[0]);
+
 //  if (task_subtype == task_subtype_gpu_density){
 //    /*Create an event to say we have issue a send of this data to GPU*/
 //    cudaEventCreateWithFlags(&metadata_copied, cudaEventDisableTiming);
 //    cudaEventRecord(metadata_copied, stream[0]);
 //  }
   /* Transfer particle data to device */
-  cu_error =
-      cudaMemcpy(&buf->d_parts_send_d[0],
-                      &buf->parts_send_d[0],
-                      md->count_parts_unique * sizeof(struct gpu_part_send_d),
-                      cudaMemcpyHostToDevice);
+  if (task_subtype == task_subtype_gpu_density){
+      cu_error =
+          cudaMemcpy(&buf->d_parts_send_d[0],
+            &buf->parts_send_d[0],
+            md->count_parts_unique * sizeof(struct gpu_part_send_d),
+            cudaMemcpyHostToDevice);
+      //  cudaEvent_t metadata_copied;
+        /*Copy the tasks cell start/end metadata to the GPU. Send it using regular streams for now.
+         * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
+         * instead of n_bundle copies */
+      cu_error =
+          cudaMemcpy(&buf->gpu_md.d_cell_i_j_start_end,
+            &buf->gpu_md.cell_i_j_start_end,
+            leaves_packed * sizeof(int4),
+            cudaMemcpyHostToDevice);
+      cu_error =
+          cudaMemcpy(&buf->gpu_md.d_cell_i_j_start_end_non_compact,
+            &buf->gpu_md.cell_i_j_start_end_non_compact,
+            leaves_packed * sizeof(int4),
+            cudaMemcpyHostToDevice);
+  }
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
    * its own stream. */
   const struct gpu_md *gpu_md = &buf->gpu_md;
@@ -567,27 +582,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     const int bundle_n_cells = bundle_last_cell - bundle_first_cell;
 
     if (task_subtype == task_subtype_gpu_density) {
-      /*Copy the tasks cell start/end metadata to the GPU. Send it using regular streams for now.
-       * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
-       * instead of n_bundle copies */
-      cu_error =
-          cudaMemcpyAsync(&gpu_md->d_cell_i_j_start_end_non_compact[bundle_first_cell],
-                          &gpu_md->cell_i_j_start_end_non_compact[bundle_first_cell],
-                          bundle_n_cells * sizeof(int4),
-                          cudaMemcpyHostToDevice, stream[bid]);
-      cu_error =
-          cudaMemcpyAsync(&gpu_md->d_cell_i_j_start_end[bundle_first_cell],
-                          &gpu_md->cell_i_j_start_end[bundle_first_cell],
-                          bundle_n_cells * sizeof(int4),
-                          cudaMemcpyHostToDevice, stream[bid]);
-
-//      /* Transfer particle data to device */
-//      cu_error =
-//          cudaMemcpyAsync(&buf->d_parts_send_d[bundle_first_part],
-//                          &buf->parts_send_d[bundle_first_part],
-//                          bundle_n_parts * sizeof(struct gpu_part_send_d),
-//                          cudaMemcpyHostToDevice, stream[bid]);
-//        message("n bundle %i n compact %i", bundle_n_parts, md->count_parts_unique);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
@@ -634,14 +628,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     space_dim.z = r->e->s->dim[2];
     /* Launch the kernel for ci using data for ci and cj */
     if (task_subtype == task_subtype_gpu_density) {
-      /*Tell the kernel to wait untim metadata copied*/
-//      cudaStreamWaitEvent(stream[bid], metadata_copied, cudaEventWaitDefault);
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
                          stream[bid], num_blocks_x_cells, num_blocks_y,
                          bundle_first_part, bundle_n_parts, gpu_md->d_cell_i_j_start_end,
                          gpu_md->d_cell_i_j_start_end,
                          bundle_first_cell, bundle_n_cells, space_dim);
-//      cudaEventDestroy(metadata_copied);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
@@ -675,12 +666,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     /* Copy results back to CPU BUFFERS */
     if (task_subtype == task_subtype_gpu_density) {
 
-      cu_error =
-          cudaMemcpyAsync(&buf->parts_recv_d[bundle_first_part],
-                          &buf->d_parts_recv_d[bundle_first_part],
-                          bundle_n_parts * sizeof(struct gpu_part_recv_d),
-                          cudaMemcpyDeviceToHost, stream[bid]);
-
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
       cu_error =
@@ -711,23 +696,35 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     }
 
     /* Issue event to be recorded by GPU after copy back to CPU */
-    cu_error = cudaEventRecord(event_end[bid], stream[bid]);
-    swift_assert(cu_error == cudaSuccess);
+    if (task_subtype != task_subtype_gpu_density){
+      cu_error = cudaEventRecord(event_end[bid], stream[bid]);
+      swift_assert(cu_error == cudaSuccess);
+    }
 
   } /* End of looping over bundles to launch in streams */
 
+  /* Copy results back to CPU BUFFERS */
+  if (task_subtype == task_subtype_gpu_density) {
+    cu_error =
+        cudaMemcpy(&buf->parts_recv_d[0],
+                        &buf->d_parts_recv_d[0],
+                        md->count_parts * sizeof(struct gpu_part_recv_d),
+                        cudaMemcpyDeviceToHost);
+  }
   /* Issue synchronisation commands for all events recorded by GPU
    * Should swap with one cuda Device Synchronise really if we decide to go
    * this way with unpacking done separately */
   /* TODO Abouzied: Is the comment above still appropriate? */
   for (int bid = 0; bid < n_bundles; bid++) {
-    cu_error = cudaEventSynchronize(event_end[bid]);
-    if (cu_error != cudaSuccess) {
-      error(
-          "cudaEventSynchronize failed: '%s' for task subtype %s,"
-          " cpuid=%d, bundle=%d",
-          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
-          bid);
+    if (task_subtype != task_subtype_gpu_density){
+      cu_error = cudaEventSynchronize(event_end[bid]);
+      if (cu_error != cudaSuccess) {
+        error(
+            "cudaEventSynchronize failed: '%s' for task subtype %s,"
+            " cpuid=%d, bundle=%d",
+            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
+            bid);
+    }
     }
   }
 }
@@ -1122,12 +1119,14 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           const int shift_ind = i - md->n_leaves_packed;
           md->ci_leaves[shift_ind] = md->ci_leaves[i];
           md->cj_leaves[shift_ind] = md->cj_leaves[i];
-          gpu_md->cell_i_j_start_end[shift_ind] = gpu_md->cell_i_j_start_end[i];
-          gpu_md->cell_i_j_start_end_non_compact[shift_ind] = gpu_md->cell_i_j_start_end_non_compact[i];
+          /*Un-necessary as we will start packing from scratch*/
+//          gpu_md->cell_i_j_start_end[shift_ind] = gpu_md->cell_i_j_start_end[i];
+//          gpu_md->cell_i_j_start_end_non_compact[shift_ind] = gpu_md->cell_i_j_start_end_non_compact[i];
 
-          /*TODO: Check if this would work as-is. Do we need to shift the entries in md->unique_cells[]*/
-          buf->my_index[shift_ind] = buf->my_index[i];
-          buf->my_index[shift_ind] = buf->my_index[i];
+          /*TODO: Check if this would work as-is.
+           * Do we need to shift the entries in md->unique_cells[]*/
+//          buf->my_index[shift_ind] = buf->my_index[i];
+//          buf->my_index[shift_ind] = buf->my_index[i];
 
 #ifdef SWIFT_DEBUG_CHECKS
           md->ci_leaves[i] = NULL;
