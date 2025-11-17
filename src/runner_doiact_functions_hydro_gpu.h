@@ -356,7 +356,7 @@ static void runner_gpu_filter_data(const struct runner *r,
 
   int unique_count = md->n_unique;
 
-  struct hash_entry * ht = md->hash_table;
+  struct hash_entry * ht = md->hash_table.entry;
   const int hash_size = md->hash_size;
 
   /*Check the cell sent through to see if it is unique*/
@@ -1104,6 +1104,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Store this before it's gone. */
         /* How many leaves do we still need to go through? */
         int n_leaves_new = md->n_leaves - md->n_leaves_packed;
+        if(n_leaves_new <= 0)
+          error("n_leaves %i n_leaves_packed %i", md->n_leaves, md->n_leaves_packed);
         /* How many leaves does this task have in total? */
         int task_n_leaves = md->task_n_leaves;
         /* Store launch_leftovers in case we still need to do that after we

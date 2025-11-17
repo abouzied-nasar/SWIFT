@@ -71,12 +71,17 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
 
   /* Allocate hash table. For now using 4096=8^4 assuming we recurse four times */
   size_t hash_size = 4096;
-  md->hash_table = (struct hash_entry*)malloc(hash_size * sizeof(struct hash_entry));
+//  md->hash_table = malloc(sizeof(struct hash_table));
+  md->hash_table.entry = calloc(hash_size, sizeof(struct hash_entry));
+//  md->hash_table = (struct hash_entry*)malloc(hash_size * sizeof(struct hash_entry));
   for (size_t i = 0; i < hash_size; i++){
-    md->hash_table[i].c = 0;
-    md->hash_table[i].index = 0;
-    md->hash_table[i].occupied = 0;
+
+    md->hash_table.entry[i].c = 0;
+    md->hash_table.entry[i].index = 0;
+    md->hash_table.entry[i].occupied = 0;
   }
+  md->hash_table.capacity = hash_size;
+  md->hash_table.count = 0;
   md->hash_size = hash_size;
 
   md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
@@ -143,9 +148,9 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
   md->count_parts_unique = 0;
   md->n_unique = 0;
   for(int i = 0; i < md->hash_size; i++){
-	  md->hash_table[i].occupied = 0;
-      md->hash_table[i].c = NULL;
-      md->hash_table[i].index = 0;
+	  md->hash_table.entry[i].occupied = 0;
+      md->hash_table.entry[i].c = NULL;
+      md->hash_table.entry[i].index = 0;
   }
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -186,7 +191,7 @@ void gpu_pack_metadata_free(struct gpu_pack_metadata *md) {
   free(md->bundle_first_cell);
   free((void *)md->unique_cells);
   free((void *)md->pack_flags);
-  free(md->hash_table);
+  free((void *)md->hash_table.entry);
 }
 
 #ifdef __cplusplus

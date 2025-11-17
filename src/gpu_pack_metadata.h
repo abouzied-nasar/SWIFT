@@ -62,7 +62,11 @@ struct gpu_pack_metadata {
   /*Is this cell unique? If so let the CPU know to pack it*/
   int2 *pack_flags;
   /*Hash table used to find unique cells*/
-  struct hash_entry *hash_table;
+  struct hash_table{
+    struct hash_entry * entry;
+    int capacity;
+    int count;
+  } hash_table;
   /*number of unique cells we find*/
   int n_unique;
 
