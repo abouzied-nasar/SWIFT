@@ -300,16 +300,16 @@ void *runner_main_cuda(void *data) {
 #endif
 
       const ticks task_beg = getticks();
-      if(n_d_packed > 200){
-        /* Release the bytes back into the wilderness */
-        gpu_data_buffers_free(&gpu_buf_self_dens);
-        gpu_data_buffers_free(&gpu_buf_self_grad);
-        gpu_data_buffers_free(&gpu_buf_self_forc);
-        gpu_data_buffers_free(&gpu_buf_pair_dens);
-        gpu_data_buffers_free(&gpu_buf_pair_grad);
-        gpu_data_buffers_free(&gpu_buf_pair_forc);
-        exit(0);
-      }
+//      if(n_d_packed > 200){
+//        /* Release the bytes back into the wilderness */
+//        gpu_data_buffers_free(&gpu_buf_self_dens);
+//        gpu_data_buffers_free(&gpu_buf_self_grad);
+//        gpu_data_buffers_free(&gpu_buf_self_forc);
+//        gpu_data_buffers_free(&gpu_buf_pair_dens);
+//        gpu_data_buffers_free(&gpu_buf_pair_grad);
+//        gpu_data_buffers_free(&gpu_buf_pair_forc);
+//        exit(0);
+//      }
       /* Different types of tasks... */
       switch (t->type) {
 
