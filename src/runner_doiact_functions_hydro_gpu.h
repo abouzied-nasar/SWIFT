@@ -651,7 +651,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
                          stream[bid], num_blocks_x_cells, num_blocks_y,
                          bundle_first_part, bundle_n_parts, gpu_md->d_cell_i_j_start_end,
-                         gpu_md->d_cell_i_j_start_end,
+                         gpu_md->d_cell_i_j_start_end_non_compact,
                          bundle_first_cell, bundle_n_cells, space_dim);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
@@ -946,21 +946,21 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           /*Store where ci ends*/
           gpu_md->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
 
-          double posx = cii->loc[0];
-          double posy = cii->loc[1];
-          double posz = cii->loc[2];
+//          double posx = cii->loc[0];
+//          double posy = cii->loc[1];
+//          double posz = cii->loc[2];
 
-          const struct cell * cell_u = md->unique_cells[md->my_index[md->n_leaves_packed].x];
-          double posux = cell_u->loc[0];
-          double posuy = cell_u->loc[1];
-          double posuz = cell_u->loc[2];
-
-          double distx = posx-posux;
-          double disty = posy-posuy;
-          double distz = posz-posuz;
-          double dist = sqrt(distx*distx + disty*disty + distz*distz);
-          if(dist !=0)
-        	  error("Cell positions not right");
+//          const struct cell * cell_u = md->unique_cells[md->my_index[md->n_leaves_packed].x];
+//          double posux = cell_u->loc[0];
+//          double posuy = cell_u->loc[1];
+//          double posuz = cell_u->loc[2];
+//
+//          double distx = posx-posux;
+//          double disty = posy-posuy;
+//          double distz = posz-posuz;
+//          double dist = sqrt(distx*distx + disty*disty + distz*distz);
+//          if(dist !=0)
+//        	  error("Cell positions not right");
 
           gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
           /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
@@ -1209,6 +1209,29 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     } /* if launch or launch_leftovers */
   } /* while npacked < md->task_n_leaves */
 
+  for(int i = 0; i < md->count_parts_unique; i++){
+	  double x[3];
+	  x[0] = buf->parts_send_d[i].p_data.x_h.x;
+	  x[1] = buf->parts_send_d[i].p_data.x_h.y;
+	  x[2] = buf->parts_send_d[i].p_data.x_h.z;
+	  for(int j = 0; j < md->count_parts_unique; j++){
+		  double xj[3];
+		  xj[0] = buf->parts_send_d[j].p_data.x_h.x;
+		  xj[1] = buf->parts_send_d[j].p_data.x_h.y;
+		  xj[2] = buf->parts_send_d[j].p_data.x_h.z;
+		  double dist[3];
+		  double distance = 0;
+		  for(int k = 0; k < 3; k++){
+			  dist[k] = x[k] - xj[k];
+			  dist[k] *= dist[k];
+			  distance += dist[k];
+		  }
+		  distance = sqrt(distance);
+//		  if(distance == 0.f && i != j)
+//			  error("We have duplicate particles");
+
+	  }
+  }
   /*Uncomment to dump particles contained in unique and non-unique lists of particles*/
 //  if(t->subtype == task_subtype_gpu_density){
 //    fprintf(full_list, "x, y, z\n");
