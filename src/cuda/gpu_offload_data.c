@@ -188,12 +188,6 @@ void gpu_data_buffers_free(struct gpu_offload_data *buf) {
   cu_error = cudaFreeHost(buf->gpu_md.cell_i_j_start_end);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaFreeHost(buf->parts_recv_d);
-  swift_assert(cu_error == cudaSuccess);
-
-  cu_error = cudaFreeHost(buf->parts_recv_d);
-  swift_assert(cu_error == cudaSuccess);
-
   free((void *)buf->event_end);
 }
 

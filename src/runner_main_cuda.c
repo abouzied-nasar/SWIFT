@@ -222,7 +222,6 @@ void *runner_main_cuda(void *data) {
   gpu_print_free_mem(e, r->cpuid);
 
   int step = 0;
-  int n_d_packed = 0;
   /* Main loop. */
   while (1) {
     /* Wait at the barrier. */
@@ -300,16 +299,7 @@ void *runner_main_cuda(void *data) {
 #endif
 
       const ticks task_beg = getticks();
-//      if(n_d_packed > 200){
-//        /* Release the bytes back into the wilderness */
-//        gpu_data_buffers_free(&gpu_buf_self_dens);
-//        gpu_data_buffers_free(&gpu_buf_self_grad);
-//        gpu_data_buffers_free(&gpu_buf_self_forc);
-//        gpu_data_buffers_free(&gpu_buf_pair_dens);
-//        gpu_data_buffers_free(&gpu_buf_pair_grad);
-//        gpu_data_buffers_free(&gpu_buf_pair_forc);
-//        exit(0);
-//      }
+
       /* Different types of tasks... */
       switch (t->type) {
 
@@ -326,7 +316,6 @@ void *runner_main_cuda(void *data) {
 #ifdef GPUOFFLOAD_DENSITY
             runner_doself_gpu_density(r, sched, &gpu_buf_self_dens, t, stream,
                                       d_a, d_H);
-            n_d_packed++;
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
@@ -406,7 +395,6 @@ void *runner_main_cuda(void *data) {
 #ifdef GPUOFFLOAD_DENSITY
             runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_pair_dens, t,
                                       stream_pairs, d_a, d_H);
-            n_d_packed++;
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
