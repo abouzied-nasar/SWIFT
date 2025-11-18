@@ -98,15 +98,6 @@ struct gpu_offload_data {
     int4 *d_cell_i_j_start_end_non_compact;
   } gpu_md;
 
-//  int4 *cell_i_j_start_end;
-//  int4 *cell_i_j_start_end_non_compact;
-  int2 *my_index;
-  /*! Arrays used to send positions of first particle in cells in the particle arrays above
-   * from host to device*/
-//  int4 *d_cell_i_j_start_end;
-//  int4 *d_cell_i_j_start_end_non_compact;
-  int2 *d_my_index;
-
   /*! Handle on events per cuda stream to register completion of async ops */
   cudaEvent_t *event_end;
 

@@ -59,14 +59,20 @@ struct gpu_pack_metadata {
   /*Data required for unique sorting*/
   /*list of unique cells we find in the leaves lists above*/
   struct cell **unique_cells;
+
   /*Is this cell unique? If so let the CPU know to pack it*/
   int2 *pack_flags;
+
   /*Hash table used to find unique cells*/
   struct hash_table{
     struct hash_entry * entry;
     int capacity;
     int count;
   } hash_table;
+
+  /*Array to guide each leaf computation to it's cell's/s' index in the array of unique cells/particles*/
+  int2 *my_index;
+
   /*number of unique cells we find*/
   int n_unique;
 

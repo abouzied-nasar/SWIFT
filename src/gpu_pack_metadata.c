@@ -71,11 +71,8 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
 
   /* Allocate hash table. For now using 4096=8^4 assuming we recurse four times */
   size_t hash_size = 4096;
-//  md->hash_table = malloc(sizeof(struct hash_table));
   md->hash_table.entry = calloc(hash_size, sizeof(struct hash_entry));
-//  md->hash_table = (struct hash_entry*)malloc(hash_size * sizeof(struct hash_entry));
   for (size_t i = 0; i < hash_size; i++){
-
     md->hash_table.entry[i].c = 0;
     md->hash_table.entry[i].index = 0;
     md->hash_table.entry[i].occupied = 0;
@@ -83,6 +80,9 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
   md->hash_table.capacity = hash_size;
   md->hash_table.count = 0;
   md->hash_size = hash_size;
+
+  /*This is used to tell each cell in a pair where it's index is in the uniquely sorted array*/
+  md->my_index = (int2 *)malloc(sizeof(int2) * params->pack_size_pair);
 
   md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
   for (size_t i = 0; i < pack_size; i++) md->task_list[i] = NULL;
@@ -152,6 +152,10 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
       md->hash_table.entry[i].c = NULL;
       md->hash_table.entry[i].index = 0;
   }
+  for(int i = 0; i < md->params.pack_size_pair; i++){
+    md->my_index[i].x = 0;
+    md->my_index[i].y = 0;
+  }
 
 #ifdef SWIFT_DEBUG_CHECKS
   const struct gpu_global_pack_params pars = md->params;
@@ -189,6 +193,7 @@ void gpu_pack_metadata_free(struct gpu_pack_metadata *md) {
   free(md->task_first_packed_part);
   free(md->bundle_first_part);
   free(md->bundle_first_cell);
+  free(md->my_index);
   free((void *)md->unique_cells);
   free((void *)md->pack_flags);
   free((void *)md->hash_table.entry);

@@ -378,11 +378,11 @@ static void runner_gpu_filter_data(const struct runner *r,
   int u_index = hash_lookup(cii, hash_size, ht);
   if (u_index >= 0)
 	  /*We found this cell's hash value exists -> Not unique*/
-	  buf->my_index[index_2_check].x = u_index;
+	  md->my_index[index_2_check].x = u_index;
   else {
 	  /*This cell has not been found yet.
 	   * Add to hash table and store it's index*/
-	  buf->my_index[index_2_check].x = unique_count;
+	  md->my_index[index_2_check].x = unique_count;
 	  md->unique_cells[unique_count] = cii;
 	  md->pack_flags[index_2_check].x = 1;
 	  hash_insert(cii, unique_count, hash_size, ht);
@@ -392,9 +392,9 @@ static void runner_gpu_filter_data(const struct runner *r,
   /*Same for cj*/
   u_index = hash_lookup(cjj, hash_size, ht);
   if (u_index >= 0)
-	  buf->my_index[index_2_check].y = u_index;
+	  md->my_index[index_2_check].y = u_index;
   else {
-	  buf->my_index[index_2_check].y = unique_count;
+	  md->my_index[index_2_check].y = unique_count;
 	  md->unique_cells[unique_count] = cjj;
 	  md->pack_flags[index_2_check].y = 1;
 	  hash_insert(cjj, unique_count, hash_size, ht);
@@ -548,18 +548,32 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
             &buf->parts_send_d[0],
             md->count_parts_unique * sizeof(struct gpu_part_send_d),
             cudaMemcpyHostToDevice);
+      if (cu_error != cudaSuccess) {
+        /* If we're here, assume something's messed up with our code, not with
+         * CUDA. */
+        error(
+            "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
+      }
       //  cudaEvent_t metadata_copied;
         /*Copy the tasks cell start/end metadata to the GPU. Send it using regular streams for now.
          * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
          * instead of n_bundle copies */
       cu_error =
-          cudaMemcpy(&buf->gpu_md.d_cell_i_j_start_end,
-            &buf->gpu_md.cell_i_j_start_end,
+          cudaMemcpy(&buf->gpu_md.d_cell_i_j_start_end[0],
+            &buf->gpu_md.cell_i_j_start_end[0],
             leaves_packed * sizeof(int4),
             cudaMemcpyHostToDevice);
+      if (cu_error != cudaSuccess) {
+        /* If we're here, assume something's messed up with our code, not with
+         * CUDA. */
+        error(
+            "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
+      }
       cu_error =
-          cudaMemcpy(&buf->gpu_md.d_cell_i_j_start_end_non_compact,
-            &buf->gpu_md.cell_i_j_start_end_non_compact,
+          cudaMemcpy(&buf->gpu_md.d_cell_i_j_start_end_non_compact[0],
+            &buf->gpu_md.cell_i_j_start_end_non_compact[0],
             leaves_packed * sizeof(int4),
             cudaMemcpyHostToDevice);
   }
@@ -920,7 +934,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         }
         else{
           /*Get the cell's index in the unique cell list*/
-          int my_index_i = buf->my_index[md->n_leaves_packed].x;
+          int my_index_i = md->my_index[md->n_leaves_packed].x;
           /*Store where ci starts in unique list*/
           gpu_md->cell_i_j_start_end[md->n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
@@ -937,7 +951,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         }
         else{
           /*Get the cell's index in the unique cell list*/
-          int my_index_j = buf->my_index[md->n_leaves_packed].y;
+          int my_index_j = md->my_index[md->n_leaves_packed].y;
           /*Store where cj starts*/
           gpu_md->cell_i_j_start_end[md->n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_j].z;
           /*Store where ci starts*/
@@ -972,7 +986,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         }
         else{
           /*Get the cell's index in the unique cell list*/
-          int my_index_i = buf->my_index[md->n_leaves_packed].x;
+          int my_index_i = md->my_index[md->n_leaves_packed].x;
           /*Store where ci starts in unique list*/
           gpu_md->cell_i_j_start_end[md->n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
@@ -1060,8 +1074,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_density(r, s, buf, npacked);
 
-        message("n_unique %i count parts unique %i n_leaves_packed %i n_expected in uniques %i",
-            md->n_unique, md->count_parts_unique, md->n_leaves_packed, n_particles);
+//        message("n_unique %i count parts unique %i n_leaves_packed %i n_expected in uniques %i",
+//            md->n_unique, md->count_parts_unique, md->n_leaves_packed, n_particles);
 
       } else if (t->subtype == task_subtype_gpu_gradient) {
 
