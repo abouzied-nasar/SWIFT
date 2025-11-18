@@ -841,15 +841,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   int *task_last_packed_leaf = md->task_last_packed_leaf;
 
   /*Some bits for output in case of debug*/
-  char buffer[20];
-  snprintf(buffer, sizeof(buffer), "unique.csv");
-  FILE *unique_list;
-  unique_list = fopen(buffer, "w");
-
-  char buffer1[20];
-  snprintf(buffer1, sizeof(buffer1), "full.csv");
-  FILE *full_list;
-  full_list = fopen(buffer1, "w");
+//  char buffer[20];
+//  snprintf(buffer, sizeof(buffer), "unique.csv");
+//  FILE *unique_list;
+//  unique_list = fopen(buffer, "w");
+//
+//  char buffer1[20];
+//  snprintf(buffer1, sizeof(buffer1), "full.csv");
+//  FILE *full_list;
+//  full_list = fopen(buffer1, "w");
 
   /* Nr of super-level tasks we've accounted for in the meda-data arrays. */
   int tind = md->tasks_in_list;
@@ -1277,7 +1277,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 //    fclose(full_list);
 //    fclose(unique_list);
 //    exit(0);
-  }
+//  }
   md->launch_leftovers = 0;
   md->launch = 0;
 }
