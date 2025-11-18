@@ -351,30 +351,36 @@ static void runner_gpu_filter_data(const struct runner *r,
 //  int2 pack = {0, 0};
 
   /**TODO: Check if this needs to be here*/
-//  if(md->task_n_leaves == 0)
-//    return;
+  if(md->task_n_leaves == 0)
+	  error("We shouldn't be in here if we have no leaves");
 
+  /*Get the unique number of interactions found so far*/
   int unique_count = md->n_unique;
 
+  /*Get a pointer to the full hash table and it's size
+   * TODO: Make this a dynamically sized hash table
+   * to use load factor to resize so that it is only ever 50% full*/
   struct hash_entry * ht = md->hash_table.entry;
   const int hash_size = md->hash_size;
 
-  /*Check the cell sent through to see if it is unique*/
-//  message("hashing cell %i\n", index_2_check);
-
-  /* Arrays for leaf cells */
+  /*Check the cells sent through to see if it is unique*/
+  /* Grab handles of leaf cells */
   struct cell *cii = md->ci_leaves[index_2_check];
   struct cell *cjj = md->cj_leaves[index_2_check];
 
   if (cii == NULL || cjj == NULL)
 	  error("Error: working on NULL cells");
 
+  /*Set the flag to pack this cell to false.
+   * Re-set .x to true later if cell i is unique
+   * Re-set .y to true if later cell j is unique*/
   md->pack_flags[index_2_check].x = 0;
   md->pack_flags[index_2_check].y = 0;
 
   /*Check if ci has already been found.
    * If so, return where it's unique copy
-   * is found in the unique cells array*/
+   * is found in the unique cells array
+   * Otherwise, return -1*/
   int u_index = hash_lookup(cii, hash_size, ht);
   if (u_index >= 0)
 	  /*We found this cell's hash value exists -> Not unique*/
@@ -834,6 +840,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   int *task_first_packed_leaf = md->task_first_packed_leaf;
   int *task_last_packed_leaf = md->task_last_packed_leaf;
 
+  /*Some bits for output in case of debug*/
+  char buffer[20];
+  snprintf(buffer, sizeof(buffer), "unique.csv");
+  FILE *unique_list;
+  unique_list = fopen(buffer, "w");
+
+  char buffer1[20];
+  snprintf(buffer1, sizeof(buffer1), "full.csv");
+  FILE *full_list;
+  full_list = fopen(buffer1, "w");
+
   /* Nr of super-level tasks we've accounted for in the meda-data arrays. */
   int tind = md->tasks_in_list;
 
@@ -928,6 +945,23 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           gpu_md->cell_i_j_start_end[md->n_leaves_packed].x = md->count_parts_unique;
           /*Store where ci ends*/
           gpu_md->cell_i_j_start_end[md->n_leaves_packed].y = md->count_parts_unique + cii_count;
+
+          double posx = cii->loc[0];
+          double posy = cii->loc[1];
+          double posz = cii->loc[2];
+
+          const struct cell * cell_u = md->unique_cells[md->my_index[md->n_leaves_packed].x];
+          double posux = cell_u->loc[0];
+          double posuy = cell_u->loc[1];
+          double posuz = cell_u->loc[2];
+
+          double distx = posx-posux;
+          double disty = posy-posuy;
+          double distz = posz-posuz;
+          double dist = sqrt(distx*distx + disty*disty + distz*distz);
+          if(dist !=0)
+        	  error("Cell positions not right");
+
           gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
           /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
           md->count_parts_unique += cii_count + 1;
@@ -1074,8 +1108,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_density(r, s, buf, npacked);
 
-//        message("n_unique %i count parts unique %i n_leaves_packed %i n_expected in uniques %i",
-//            md->n_unique, md->count_parts_unique, md->n_leaves_packed, n_particles);
+        message("n_unique %i count parts unique %i n_leaves_packed %i n_expected in uniques %i",
+            md->n_unique, md->count_parts_unique, md->n_leaves_packed, n_particles);
 
       } else if (t->subtype == task_subtype_gpu_gradient) {
 
@@ -1175,6 +1209,76 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     } /* if launch or launch_leftovers */
   } /* while npacked < md->task_n_leaves */
 
+  if(t->subtype == task_subtype_gpu_density){
+    fprintf(full_list, "x, y, z\n");
+    message("packed %i", md->n_leaves_packed);
+    for(int l = 0; l < md->n_leaves_packed; l++){
+    	struct cell * cip;
+    	struct cell * cjp;
+    	cip = md->ci_leaves[l];
+    	cjp = md->cj_leaves[l];
+    	for(int i = 0; i < cip->hydro.count; i++){
+    		struct part *pi = &cip->hydro.parts[i];
+    		const double *x = part_get_const_x(pi);
+    		fprintf(full_list, "%f, %f, %f\n", x[0], x[1], x[2]);
+    	}
+    	for(int i = 0; i < cjp->hydro.count; i++){
+    		struct part *pi = &cjp->hydro.parts[i];
+    		const double *x = part_get_const_x(pi);
+    		fprintf(full_list, "%f, %f, %f\n", x[0], x[1], x[2]);
+    	}
+    }
+    fprintf(unique_list, "x, y, z, dist\n");
+    for(int l = 0; l < md->n_leaves_packed; l++){
+    	int start = gpu_md->cell_i_j_start_end[l].x;
+        int end = gpu_md->cell_i_j_start_end[l].y;
+		float x[3], cx[3];
+		cx[0] = buf->parts_send_d[end].c_loc.x.x;
+		cx[1] = buf->parts_send_d[end].c_loc.x.y;
+		cx[2] = buf->parts_send_d[end].c_loc.x.z;
+    	for(int i = start; i < end; i++){
+    		x[0] = buf->parts_send_d[i].p_data.x_h.x;
+    		x[1] = buf->parts_send_d[i].p_data.x_h.y;
+    		x[2] = buf->parts_send_d[i].p_data.x_h.z;
+    		double dist = sqrt((x[0] - cx[0])*(x[0] - cx[0]) +
+    				(x[1] - cx[1])*(x[1] - cx[1]) +
+					(x[2] - cx[2])*(x[2] - cx[2]));
+    		fprintf(unique_list, "%f, %f, %f, %f\n", x[0], x[1], x[2], dist);
+    	}
+
+//		x[0] = buf->parts_send_d[end].c_loc.x.x;
+//		x[1] = buf->parts_send_d[end].c_loc.x.y;
+//		x[2] = buf->parts_send_d[end].c_loc.x.z;
+//		fprintf(unique_list, "%f, %f, %f, %f\n", cx[0], cx[1], cx[2], 0.f);
+
+    	start = gpu_md->cell_i_j_start_end[l].z;
+        end = gpu_md->cell_i_j_start_end[l].w;
+
+		cx[0] = buf->parts_send_d[end].c_loc.x.x;
+		cx[1] = buf->parts_send_d[end].c_loc.x.y;
+		cx[2] = buf->parts_send_d[end].c_loc.x.z;
+    	for(int i = start; i < end; i++){
+    		x[0] = buf->parts_send_d[i].p_data.x_h.x;
+    		x[1] = buf->parts_send_d[i].p_data.x_h.y;
+    		x[2] = buf->parts_send_d[i].p_data.x_h.z;
+    		double dist = sqrt((x[0] - cx[0])*(x[0] - cx[0]) +
+    				(x[1] - cx[1])*(x[1] - cx[1]) +
+					(x[2] - cx[2])*(x[2] - cx[2]));
+    		fprintf(unique_list, "%f, %f, %f, %f\n", x[0], x[1], x[2], dist);
+    	}
+
+//		x[0] = buf->parts_send_d[end].c_loc.x.x;
+//		x[1] = buf->parts_send_d[end].c_loc.x.y;
+//		x[2] = buf->parts_send_d[end].c_loc.x.z;
+//		fprintf(unique_list, "%f, %f, %f, %f\n", cx[0], cx[1], cx[2], 0.f);
+    }
+    message("n_unique %i n_total %i", md->count_parts_unique, md->count_parts);
+    fflush(full_list);
+    fflush(unique_list);
+    fclose(full_list);
+    fclose(unique_list);
+    exit(0);
+  }
   md->launch_leftovers = 0;
   md->launch = 0;
 }

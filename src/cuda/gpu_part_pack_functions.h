@@ -193,6 +193,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
   parts_buffer[pack_ind + count].c_loc.x.x = c->loc[0];
   parts_buffer[pack_ind + count].c_loc.x.y = c->loc[1];
   parts_buffer[pack_ind + count].c_loc.x.z = c->loc[2];
+
 }
 
 /**
