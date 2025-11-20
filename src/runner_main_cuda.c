@@ -162,8 +162,9 @@ extern "C" {
  * @brief The #runner main thread routine.
  *
  * @param data A pointer to this thread's data.
- **/
+ */
 void *runner_main_cuda(void *data) {
+
   struct runner *r = (struct runner *)data;
   struct engine *e = r->e;
   struct scheduler *sched = &e->sched;
@@ -208,6 +209,7 @@ void *runner_main_cuda(void *data) {
 
   /* Main loop. */
   while (1) {
+
     /* Wait at the barrier. */
     engine_barrier(e);
 
@@ -225,9 +227,7 @@ void *runner_main_cuda(void *data) {
     /* Re-set the pointer to the previous task, as there is none. */
     struct task *t = NULL;
     struct task *prev = NULL;
-    /*Some bits for output in case of debug*/
 
-    /* TODO: DO WE STILL NEED THIS?? */
 #ifdef CUDA_PROFILER
     if (step == 0) cudaProfilerStart();
     step++;
@@ -235,14 +235,17 @@ void *runner_main_cuda(void *data) {
 
     /* Loop while there are tasks... */
     while (1) {
-      // A. Nasar: Get qid for re-use later
+
+      /* Get qid for bookkeeping of remaining enqueued GPU tasks later. */
       int qid = r->qid;
       /* If there's no old task, try to get a new one. */
       if (t == NULL) {
+
         /* Get the task. */
         TIMER_TIC
         t = scheduler_gettask(sched, qid, prev);
         TIMER_TOC(timer_gettask);
+
         /* Did I get anything? */
         if (t == NULL) break;
       }
@@ -264,6 +267,8 @@ void *runner_main_cuda(void *data) {
         struct cell *cj_temp = cj;
         double shift[3];
         t->sid = space_getsid_and_swap_cells(e->s, &ci_temp, &cj_temp, shift);
+      } else {
+        t->sid = -1;
       }
 #endif
 
@@ -693,6 +698,7 @@ void *runner_main_cuda(void *data) {
         cj->tasks_executed[t->type]++;
         cj->subtasks_executed[t->subtype]++;
       }
+
       /* This runner is not doing a task anymore */
       r->t = NULL;
 #endif
