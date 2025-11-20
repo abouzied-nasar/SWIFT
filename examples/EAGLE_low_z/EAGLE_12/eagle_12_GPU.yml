@@ -23,7 +23,7 @@ TimeIntegration:
   time_begin: 0.    # The starting time of the simulation (in internal units).
   time_end:   1e-2  # The end time of the simulation (in internal units).
   dt_min:     1e-10 # The minimal time-step size of the simulation (in internal units).
-  dt_max:     2e-6  # The maximal time-step size of the simulation (in internal units).
+  dt_max:     1e-8  # The maximal time-step size of the simulation (in internal units).
   # dt_max:     1e-2  # The maximal time-step size of the simulation (in internal units).
   
 # Parameters governing the snapshots
@@ -38,8 +38,8 @@ Snapshots:
 
 Scheduler:
   links_per_tasks:           500
-  gpu_pack_size:             1024      # (Conditional) How many leaf cells and pairs of leaf cells to pack for offloading. If running with GPU, this parameter is mandatory.
-  gpu_bundle_size:           256       # (Conditional) How many leaf cells and pairs of leaf cells to pack into a bundle while offloading. `gpu_pack_size` total cells will be offloaded per cycle, in bundles of size `gpu_bundle_size`. When running with GPU, this parameter is mandatory.
+  gpu_pack_size:             256      # (Conditional) How many leaf cells and pairs of leaf cells to pack for offloading. If running with GPU, this parameter is mandatory.
+  gpu_bundle_size:           126       # (Conditional) How many leaf cells and pairs of leaf cells to pack into a bundle while offloading. `gpu_pack_size` total cells will be offloaded per cycle, in bundles of size `gpu_bundle_size`. When running with GPU, this parameter is mandatory.
   gpu_recursion_max_depth:   6         # (Optional) What is the maximal depth we can recurse down to from the task super level to the leaf cell levels? We need this information to estimate sufficient buffer space to allocate.
   gpu_part_buffer_size:      1000000   # (Optional) Size for GPU particle buffer arrays. If not provided, will be guessed (probably badly.)
   deadlock_waiting_time_s:         60. # (Optional) If runners didn't fetch a new task from a queue after this many seconds, assume swift deadlocked and abort. Non-positive values turn the detector off. Needs --enable-debugging-checks and MPI to take effect.
