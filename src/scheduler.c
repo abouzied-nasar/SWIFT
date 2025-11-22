@@ -2474,10 +2474,7 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
     }
 #endif
     t->skip = 1;
-    for (int j = 0; j < t->nr_unlock_tasks; j++) {
-      struct task *t2 = t->unlock_tasks[j];
-      if (atomic_dec(&t2->wait) == 1) scheduler_enqueue(s, t2);
-    }
+    scheduler_enqueue_dependencies(s, t);
   }
 
   /* Otherwise, look for a suitable queue. */
@@ -2841,7 +2838,7 @@ struct task *scheduler_done(struct scheduler *s, struct task *t) {
   if (!t->implicit) task_unlock(t);
 
   /* Enqueue its dependencies */
-  enqueue_dependencies(s, t);
+  scheduler_enqueue_dependencies(s, t);
 
   /* Task definitely done, signal any sleeping runners. */
   if (!t->implicit) {
@@ -2863,22 +2860,16 @@ struct task *scheduler_done(struct scheduler *s, struct task *t) {
   return NULL;
 }
 
-struct task *signal_sleeping_runners(struct scheduler *s, struct task *t,
-                                     int tasks_packed) {
-  /* Mark the task as skip. */
-  //  t->skip = 1;
-
-  /* Task definitely done, signal any sleeping runners. */
-  if (!t->implicit) {
-    pthread_mutex_lock(&s->sleep_mutex);
-    atomic_sub(&s->waiting, tasks_packed);
-    pthread_cond_broadcast(&s->sleep_cond);
-    pthread_mutex_unlock(&s->sleep_mutex);
-  }
-  return NULL;
-}
-
-struct task *enqueue_dependencies(struct scheduler *s, struct task *t) {
+/**
+ * @brief Put a task's dependencies in the queue.
+ *
+ * @param s The #scheduler.
+ * @param t The finished #task.
+ *
+ * @return A pointer to the next task, if a suitable one has
+ *         been identified.
+ */
+void scheduler_enqueue_dependencies(struct scheduler *s, struct task *t) {
 
   /* Loop through the dependencies and add them to a queue if
          they are ready. */
@@ -2893,46 +2884,6 @@ struct task *enqueue_dependencies(struct scheduler *s, struct task *t) {
       scheduler_enqueue(s, t2);
     }
   }
-
-  return NULL;
-}
-
-/**
- * @brief Resolve a single dependency by hand.
- *
- * @param s The #scheduler.
- * @param t The dependent #task.
- *
- * @return A pointer to the next task, if a suitable one has
- *         been identified.
- */
-struct task *scheduler_unlock(struct scheduler *s, struct task *t) {
-  /* Loop through the dependencies and add them to a queue if
-     they are ready. */
-  for (int k = 0; k < t->nr_unlock_tasks; k++) {
-    struct task *t2 = t->unlock_tasks[k];
-    const int res = atomic_dec(&t2->wait);
-    if (res < 1) {
-      error("Negative wait!");
-    } else if (res == 1) {
-      scheduler_enqueue(s, t2);
-    }
-  }
-
-  /* Task definitely done. */
-  if (!t->implicit) {
-    t->toc = getticks();
-    t->total_ticks += t->toc - t->tic;
-    pthread_mutex_lock(&s->sleep_mutex);
-    atomic_dec(&s->waiting);
-    pthread_cond_broadcast(&s->sleep_cond);
-    pthread_mutex_unlock(&s->sleep_mutex);
-  }
-
-  /* Return the next best task. Note that we currently do not
-     implement anything that does this, as getting it to respect
-     priorities is too tricky and currently unnecessary. */
-  return NULL;
 }
 
 /**

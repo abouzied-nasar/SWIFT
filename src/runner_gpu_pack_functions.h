@@ -350,7 +350,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
        * completed. */
 
       /* schedule my dependencies */
-      enqueue_dependencies(s, md->task_list[tid]);
+      scheduler_enqueue_dependencies(s, md->task_list[tid]);
 
       /* Tell the scheduler's bookkeeping that this task is done */
       pthread_mutex_lock(&s->sleep_mutex);
