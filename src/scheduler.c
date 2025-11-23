@@ -2375,7 +2375,6 @@ void scheduler_rewait_mapper(void *map_data, int num_elements,
 
     /* Increment the task's own wait counter for the enqueueing. */
     atomic_inc(&t->wait);
-    t->done = 0;
 
 #ifdef SWIFT_DEBUG_CHECKS
     /* Check that we don't have more waits that what can be stored. */
@@ -2493,15 +2492,6 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
             t->subtype == task_subtype_external_grav) {
           qid = t->ci->grav.super->owner;
           owner = &t->ci->grav.super->owner;
-        } else if (t->subtype == task_subtype_gpu_density) {  // A. Nasar
-          qid = t->ci->hydro.super->owner;
-          owner = &t->ci->hydro.super->owner;
-        } else if (t->subtype == task_subtype_gpu_force) {
-          qid = t->ci->hydro.super->owner;
-          owner = &t->ci->hydro.super->owner;
-        } else if (t->subtype == task_subtype_gpu_gradient) {
-          qid = t->ci->hydro.super->owner;
-          owner = &t->ci->hydro.super->owner;
         } else {
           qid = t->ci->hydro.super->owner;
           owner = &t->ci->hydro.super->owner;
@@ -2777,47 +2767,29 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
 
 #if defined(WITH_CUDA) || defined(WITH_HIP)
     /* A. Nasar: Increment counters required for the pack tasks */
+    /* TODO: COMBINE THESE TWO BRANCHES */
     if (t->type == task_type_self) {
-      if (t->subtype == task_subtype_gpu_density && t->ci->hydro.count > 0) {
-        lock_lock(&s->queues[qid].lock);
-        s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]++;
-        if (lock_unlock(&s->queues[qid].lock) != 0)
-          error("Error unlocking queue");
-      } else if (t->subtype == task_subtype_gpu_force &&
-                 t->ci->hydro.count > 0) {
-        lock_lock(&s->queues[qid].lock);
-        s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]++;
-        if (lock_unlock(&s->queues[qid].lock) != 0)
-          error("Error unlocking queue");
-      } else if (t->subtype == task_subtype_gpu_gradient &&
-                 t->ci->hydro.count > 0) {
-        lock_lock(&s->queues[qid].lock);
-        s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]++;
-        if (lock_unlock(&s->queues[qid].lock) != 0)
-          error("Error unlocking queue");
+      /* if (t->subtype == task_subtype_gpu_density && t->ci->hydro.count > 0) { */
+      if (t->subtype == task_subtype_gpu_density) {
+        atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]);
+      /* } else if (t->subtype == task_subtype_gpu_force && t->ci->hydro.count > 0) { */
+      } else if (t->subtype == task_subtype_gpu_force) {
+        atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]);
+      /* } else if (t->subtype == task_subtype_gpu_gradient && t->ci->hydro.count > 0) { */
+      } else if (t->subtype == task_subtype_gpu_gradient) {
+        atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]);
       }
     }
-    /* A. Nasar NEED to think about how to do this with
-     MPI where ci may not be on this node/rank */
     else if (t->type == task_type_pair) {
-      if (t->subtype == task_subtype_gpu_density && t->ci->hydro.count > 0 &&
-          t->cj->hydro.count > 0) {
-        lock_lock(&s->queues[qid].lock);
-        s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]++;
-        if (lock_unlock(&s->queues[qid].lock) != 0)
-          error("Error unlocking queue");
-      } else if (t->subtype == task_subtype_gpu_force &&
-                 t->ci->hydro.count > 0 && t->cj->hydro.count > 0) {
-        lock_lock(&s->queues[qid].lock);
-        s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]++;
-        if (lock_unlock(&s->queues[qid].lock) != 0)
-          error("Error unlocking queue");
-      } else if (t->subtype == task_subtype_gpu_gradient &&
-                 t->ci->hydro.count > 0 && t->cj->hydro.count > 0) {
-        lock_lock(&s->queues[qid].lock);
-        s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]++;
-        if (lock_unlock(&s->queues[qid].lock) != 0)
-          error("Error unlocking queue");
+      /* if (t->subtype == task_subtype_gpu_density && t->ci->hydro.count > 0 && t->cj->hydro.count > 0) { */
+      if (t->subtype == task_subtype_gpu_density) {
+        atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]);
+      /* } else if (t->subtype == task_subtype_gpu_force && t->ci->hydro.count > 0 && t->cj->hydro.count > 0) { */
+      } else if (t->subtype == task_subtype_gpu_force) {
+        atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]);
+      /* } else if (t->subtype == task_subtype_gpu_gradient && t->ci->hydro.count > 0 && t->cj->hydro.count > 0) { */
+      } else if (t->subtype == task_subtype_gpu_gradient) {
+        atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]);
       }
     }
 #endif
@@ -2852,7 +2824,6 @@ struct task *scheduler_done(struct scheduler *s, struct task *t) {
 
   /* Mark the task as skip. */
   t->skip = 1;
-  t->done = 1;
 
   /* Return the next best task. Note that we currently do not
      implement anything that does this, as getting it to respect
@@ -3032,10 +3003,10 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
 
           } else {
 
-            /* Yes --> Try locking the que we steal from */
+            /* Yes --> Try locking the queue we steal from */
             if (lock_trylock(&q_stl->lock) != 0) {
 
-              /* Failed? --> Unlock the 1st queue  and
+              /* Failed? --> Unlock the 1st queue and
                  try again */
               if (lock_unlock(&q->lock) != 0)
                 error("Unlocking our queue failed");
@@ -3059,14 +3030,14 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
             enum task_subtypes subtype = res->subtype;
 
             if (subtype == task_subtype_gpu_density) {
-              q->gpu_tasks_left[gpu_task_type_hydro_density]++;
-              q_stl->gpu_tasks_left[gpu_task_type_hydro_density]--;
+              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_density]);
+              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_density]);
             } else if (subtype == task_subtype_gpu_gradient) {
-              q->gpu_tasks_left[gpu_task_type_hydro_gradient]++;
-              q_stl->gpu_tasks_left[gpu_task_type_hydro_gradient]--;
+              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_gradient]);
+              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_gradient]);
             } else if (subtype == task_subtype_gpu_force) {
-              q->gpu_tasks_left[gpu_task_type_hydro_force]++;
-              q_stl->gpu_tasks_left[gpu_task_type_hydro_force]--;
+              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_force]);
+              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_force]);
             }
 #endif
             /* Run with the task */
