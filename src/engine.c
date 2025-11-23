@@ -2404,21 +2404,6 @@ void engine_init_particles(struct engine *e, int flag_entropy_ICs,
 
   /* Zero the list of cells that have had their time-step updated */
   bzero(e->s->cells_top_updated, e->s->nr_cells * sizeof(char));
-  //  for (int i = 0; i < e->sched.nr_tasks; i++){
-  //	  struct task *tmp_t = &e->sched.tasks[i];
-  //	  if(tmp_t->subtype == task_subtype_density){
-  //		if(tmp_t->skip == 1)error("inactive density task");
-  //	  }
-  //	  if(tmp_t->subtype == task_subtype_force){
-  //		if(tmp_t->skip == 1)error("inactive force task");
-  //	  }
-  //	  if(tmp_t->subtype == task_subtype_gpu_pack_d){
-  //		if(tmp_t->skip == 1)error("inactive pack task");
-  //	  }
-  //	  if(tmp_t->subtype == task_subtype_gpu_unpack_d){
-  //	    if(tmp_t->skip == 1)error("inactive unpack task");
-  //	  }
-  //  }
 
   /* Run the 0th time-step */
   TIMER_TIC2;
