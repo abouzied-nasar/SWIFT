@@ -242,8 +242,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
       struct task *t = md->task_list[tid];
 
       /* Can we get the locks? */
-      if (task_lock(t) == 0){
-      }
+      if (task_lock(t) == 0) continue;
 
       /* We got it! Mark that. */
       task_unpacked[tid] = 1;
