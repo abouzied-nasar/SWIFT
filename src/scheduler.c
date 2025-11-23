@@ -2767,37 +2767,12 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
 
 #if defined(WITH_CUDA) || defined(WITH_HIP)
     /* A. Nasar: Increment counters required for the pack tasks */
-    /* TODO: COMBINE THESE TWO BRANCHES */
-    if (t->type == task_type_self) {
-      /* if (t->subtype == task_subtype_gpu_density && t->ci->hydro.count > 0) {
-       */
-      if (t->subtype == task_subtype_gpu_density) {
-        atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]);
-        /* } else if (t->subtype == task_subtype_gpu_force && t->ci->hydro.count
-         * > 0) { */
-      } else if (t->subtype == task_subtype_gpu_force) {
-        atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]);
-        /* } else if (t->subtype == task_subtype_gpu_gradient &&
-         * t->ci->hydro.count > 0) { */
-      } else if (t->subtype == task_subtype_gpu_gradient) {
-        atomic_inc(
-            &s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]);
-      }
-    } else if (t->type == task_type_pair) {
-      /* if (t->subtype == task_subtype_gpu_density && t->ci->hydro.count > 0 &&
-       * t->cj->hydro.count > 0) { */
-      if (t->subtype == task_subtype_gpu_density) {
-        atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]);
-        /* } else if (t->subtype == task_subtype_gpu_force && t->ci->hydro.count
-         * > 0 && t->cj->hydro.count > 0) { */
-      } else if (t->subtype == task_subtype_gpu_force) {
-        atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]);
-        /* } else if (t->subtype == task_subtype_gpu_gradient &&
-         * t->ci->hydro.count > 0 && t->cj->hydro.count > 0) { */
-      } else if (t->subtype == task_subtype_gpu_gradient) {
-        atomic_inc(
-            &s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]);
-      }
+    if (t->subtype == task_subtype_gpu_density) {
+      atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]);
+    } else if (t->subtype == task_subtype_gpu_force) {
+      atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]);
+    } else if (t->subtype == task_subtype_gpu_gradient) {
+      atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]);
     }
 #endif
   }
