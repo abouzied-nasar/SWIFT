@@ -490,7 +490,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   int *task_last_packed_leaf = md->task_last_packed_leaf;
 
   /* Any work here? */
-  if ((md->task_n_leaves == 0) && (!md->launch_leftovers || (md->launch_leftovers && md->n_leaves_packed == 0))) {
+  if ((md->task_n_leaves == 0) &&
+      (!md->launch_leftovers ||
+       (md->launch_leftovers && md->n_leaves_packed == 0))) {
     /* Exception-handle the case where we found an active task with no cells
      * that need interacting. This can happen for a pair task when either one
      * or both cells involved are active, but their respective leaf cells are
@@ -540,7 +542,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
    * where we find a task with zero leaf cell pair interactions (see
    * explanation further below) */
   if (tind > md->params.pack_size ||
-      ((tind == md->params.pack_size && md->task_n_leaves != 0 )))
+      ((tind == md->params.pack_size && md->task_n_leaves != 0)))
     error(
         "Runner %d: Writing out of task_list array bounds: "
         "%d/%d, n_leaves_packed=%d, task_n_leaves=%d",
@@ -585,9 +587,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   char unlocked = 0;
 
   /* Do we have a task with no active cells, but are launching leftovers? */
-  char launch_empty_task_leftovers = (md->task_n_leaves == 0) && md->launch_leftovers;
+  char launch_empty_task_leftovers =
+      (md->task_n_leaves == 0) && md->launch_leftovers;
 
-   /* Now we go on to pack the particle data into the buffers. If we find enough
+  /* Now we go on to pack the particle data into the buffers. If we find enough
    * data (leaf cell pairs) for an offload, we launch. If there are leaf cell
    * pairs to pack after the launch, we pack those too after the launch and
    * unpacking is complete. By the end, all data will have been packed and some
@@ -605,7 +608,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     /* Lock this task's cell data. */
     if (unlocked) {
       /* Spin until you get the lock. */
-      while (task_lock(t) != 1){};
+      while (task_lock(t) != 1) {
+      };
       unlocked = 0;
     }
 
@@ -801,7 +805,9 @@ static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
-  int count = atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) - 1;
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
+      1;
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
@@ -834,7 +840,9 @@ static void runner_doself_gpu_gradient(struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
-  int count = atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) - 1;
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
+      1;
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
@@ -867,7 +875,8 @@ static void runner_doself_gpu_force(struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
-  int count = atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
   if (count < 1) buf->md.launch_leftovers = 1;
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
@@ -903,7 +912,9 @@ static void runner_dopair_gpu_density(const struct runner *r,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
-  int count = atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) - 1;
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
+      1;
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
@@ -940,7 +951,9 @@ static void runner_dopair_gpu_gradient(const struct runner *r,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
-  int count = atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) - 1;
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
+      1;
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
@@ -976,7 +989,8 @@ static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
-  int count = atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
