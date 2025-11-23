@@ -333,7 +333,7 @@ void *runner_main(void *data) {
           runner_do_hydro_sort(
               r, ci, t->flags,
               ci->hydro.dx_max_sort_old > space_maxreldx * ci->dmin,
-              /*lock=*/0, /*rt_requests_sorts=*/1, /*clock=*/1);
+              /*lock=*/0, /*rt_requests_sort=*/1, /*clock=*/1);
           /* Reset the sort flags as our work here is done. */
           t->flags = 0;
           break;
