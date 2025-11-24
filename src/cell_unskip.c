@@ -839,7 +839,7 @@ void cell_activate_subcell_hydro_tasks(struct cell *ci, struct cell *cj,
     }
   }
 
-  /* Otherwise, pair interation */
+  /* Otherwise, pair interaction */
   else {
     /* Should we even bother? */
     if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) return;
@@ -1027,7 +1027,7 @@ void cell_activate_subcell_stars_tasks(struct cell *ci, struct cell *cj,
         cell_activate_stars_sorts(cj, sid, s);
       }
     }
-  } /* Otherwise, pair interation */
+  } /* Otherwise, pair interaction */
 }
 
 /**
@@ -1085,7 +1085,7 @@ void cell_activate_subcell_black_holes_tasks(struct cell *ci, struct cell *cj,
     }
   }
 
-  /* Otherwise, pair interation */
+  /* Otherwise, pair interaction */
   else {
 
     /* Get the orientation of the pair. */
@@ -1132,7 +1132,7 @@ void cell_activate_subcell_black_holes_tasks(struct cell *ci, struct cell *cj,
       if (ci->nodeID == engine_rank && cj_active && with_timestep_sync)
         cell_activate_sync_part(ci, s);
     }
-  } /* Otherwise, pair interation */
+  } /* Otherwise, pair interaction */
 }
 
 /**
@@ -1193,7 +1193,7 @@ void cell_activate_subcell_sinks_tasks(struct cell *ci, struct cell *cj,
     }
   }
 
-  /* Otherwise, pair interation */
+  /* Otherwise, pair interaction */
   else {
     /* Get the orientation of the pair. */
     double shift[3];
@@ -1266,7 +1266,7 @@ void cell_activate_subcell_sinks_tasks(struct cell *ci, struct cell *cj,
         cell_activate_hydro_sorts(ci, sid, s);
       }
     }
-  } /* Otherwise, pair interation */
+  } /* Otherwise, pair interaction */
 }
 
 /**
@@ -1578,7 +1578,7 @@ void cell_activate_subcell_rt_tasks(struct cell *ci, struct cell *cj,
     }
   }
 
-  /* Otherwise, pair interation */
+  /* Otherwise, pair interaction */
   else {
 
     /* Should we even bother? */
