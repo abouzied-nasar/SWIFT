@@ -1,0 +1,89 @@
+MetaData:
+  run_name:   EAGLE-L0012N0188-Ref
+
+# Define the system of units to use internally. 
+InternalUnitSystem:
+  UnitMass_in_cgs:     1.98841e43    # 10^10 M_sun in grams
+  UnitLength_in_cgs:   3.08567758e24 # Mpc in centimeters
+  UnitVelocity_in_cgs: 1e5           # km/s in centimeters per second
+  UnitCurrent_in_cgs:  1             # Amperes
+  UnitTemp_in_cgs:     1             # Kelvin
+
+# Cosmological parameters
+Cosmology:
+  h:              0.6777        # Reduced Hubble constant
+  a_begin:        0.9090909     # Initial scale-factor of the simulation
+  a_end:          1.0           # Final scale factor of the simulation
+  Omega_cdm:      0.2587481     # Cold Dark Matter density parameter
+  Omega_lambda:   0.693         # Dark-energy density parameter
+  Omega_b:        0.0482519     # Baryon density parameter
+
+# Parameters governing the time integration
+TimeIntegration:
+  time_begin: 0.    # The starting time of the simulation (in internal units).
+  time_end:   1e-2  # The end time of the simulation (in internal units).
+  dt_min:     1e-10 # The minimal time-step size of the simulation (in internal units).
+  dt_max:     1e-8  # The maximal time-step size of the simulation (in internal units).
+  # dt_max:     1e-2  # The maximal time-step size of the simulation (in internal units).
+  
+# Parameters governing the snapshots
+Snapshots:
+  basename:            eagle # Common part of the name of output files
+  scale_factor_first:  0.91  # Scale-factor of the first snaphot (cosmological run)
+  time_first:          0.01  # Time of the first output (non-cosmological run) (in internal units)
+  delta_time:          1.01  # Time difference between consecutive outputs (in internal units)
+  compression:         1
+  recording_triggers_part: [1.0227e-4, 1.0227e-5]   # Recording starts 100M and 10M years before a snapshot
+  recording_triggers_bpart: [1.0227e-4, 1.0227e-5]  # Recording starts 100M and 10M years before a snapshot
+
+Scheduler:
+  links_per_tasks:           500
+  gpu_pack_size:             256      # (Conditional) How many leaf cells and pairs of leaf cells to pack for offloading. If running with GPU, this parameter is mandatory.
+  gpu_bundle_size:           126       # (Conditional) How many leaf cells and pairs of leaf cells to pack into a bundle while offloading. `gpu_pack_size` total cells will be offloaded per cycle, in bundles of size `gpu_bundle_size`. When running with GPU, this parameter is mandatory.
+  gpu_recursion_max_depth:   6         # (Optional) What is the maximal depth we can recurse down to from the task super level to the leaf cell levels? We need this information to estimate sufficient buffer space to allocate.
+  gpu_part_buffer_size:      1000000   # (Optional) Size for GPU particle buffer arrays. If not provided, will be guessed (probably badly.)
+  deadlock_waiting_time_s:         60. # (Optional) If runners didn't fetch a new task from a queue after this many seconds, assume swift deadlocked and abort. Non-positive values turn the detector off. Needs --enable-debugging-checks and MPI to take effect.
+
+# Parameters governing the conserved quantities statistics
+Statistics:
+  scale_factor_first:  0.92 # Scale-factor of the first stat dump (cosmological run)
+  time_first:          0.01 # Time of the first stat dump (non-cosmological run) (in internal units)
+  delta_time:          1.05 # Time between statistics output
+
+# Parameters for the self-gravity scheme
+Gravity:
+  eta:                      0.025     # Constant dimensionless multiplier for time integration.
+  MAC:                      adaptive
+  epsilon_fmm:              0.001
+  theta_cr:                 0.7       # Opening angle (Multipole acceptance criterion)
+  mesh_side_length:         128
+  comoving_DM_softening:         0.0026994 # Comoving DM softening length (in internal units).
+  max_physical_DM_softening:     0.0007    # Max physical DM softening length (in internal units).
+  comoving_baryon_softening:     0.0026994 # Comoving DM softening length (in internal units).
+  max_physical_baryon_softening: 0.0007    # Max physical DM softening length (in internal units).
+  
+# Parameters for the hydrodynamics scheme
+SPH:
+  resolution_eta:        1.2348        # Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel).
+  h_min_ratio:           0.1           # Minimal smoothing length in units of softening.
+  h_max:                 0.5           # Maximal smoothing length in co-moving internal units.
+  CFL_condition:         0.2           # Courant-Friedrich-Levy condition for time integration.
+  minimal_temperature:   100           # (internal units)
+  particle_splitting:    0
+  particle_splitting_mass_threshold: 7e-4 # Internal units (i.e. 7e6 Msun ~ 4 times the initial gas mass)
+
+# Parameters of the stars neighbour search
+Stars:
+  resolution_eta:        1.1642   # Target smoothing length in units of the mean inter-particle separation
+  h_tolerance:           7e-3
+  overwrite_birth_time:  1
+  birth_time:            0.33333  # Pretend all the stars were born at z = 2
+  luminosity_filename:   ./photometry
+
+# Parameters related to the initial conditions
+InitialConditions:
+  file_name:  ./EAGLE_ICs_12.hdf5    # The file to read
+  periodic:   1
+  cleanup_h_factors: 1               # Remove the h-factors inherited from Gadget
+  cleanup_velocity_factors: 1        # Remove the sqrt(a) factor in the velocities inherited from Gadget
+
