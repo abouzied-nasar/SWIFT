@@ -489,7 +489,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   int *task_first_packed_leaf = md->task_first_packed_leaf;
   int *task_last_packed_leaf = md->task_last_packed_leaf;
 
-  /* Any work here? */
+  /* Should we early exit? */
   if ((md->task_n_leaves == 0) &&
       (!md->launch_leftovers ||
        (md->launch_leftovers && md->n_leaves_packed == 0))) {
@@ -539,8 +539,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
 #ifdef SWIFT_DEBUG_CHECKS
   /* Check whether we'll be writing out of bounds. Allow for the special case
-   * where we find a task with zero leaf cell pair interactions (see
-   * explanation further below) */
+   * where we find a task with zero leaf cell pair interactions */
   if (tind > md->params.pack_size ||
       ((tind == md->params.pack_size && md->task_n_leaves != 0)))
     error(
