@@ -169,6 +169,10 @@ void *runner_main_cuda(void *data) {
   struct engine *e = r->e;
   struct scheduler *sched = &e->sched;
 
+  struct space *space = e->s;
+  struct part *all_parts = space->parts;
+
+
   /* Initialise cuda context for this thread. */
   gpu_init_thread(e, r->cpuid);
 
@@ -215,6 +219,22 @@ void *runner_main_cuda(void *data) {
 
     /* Can we go home yet? */
     if (e->step_props & engine_step_prop_done) break;
+
+    char logfname[80];
+    sprintf(logfname, "log_thread%03d_step%03d.dat", r->id, e->step);
+
+    FILE* logfile = fopen(logfname, "w");
+    if (logfile==NULL) error("Error opening pack trace log file");
+    r->logging_fp = logfile;
+    r->all_parts = all_parts;
+
+    fprintf(logfile, "//subtype: d (density), g (gradient), or f (force)\n");
+    fprintf(logfile, "//pack_or_unpack: p for packing operation, u for unpacking\n");
+    fprintf(logfile, "//c_offset: offset of c->hydro.parts array in global parts array\n");
+    fprintf(logfile, "//count: c->hydro.count\n");
+    fprintf(logfile, "//time: Measured time for operation, in [micro s]\n");
+    fprintf(logfile, "//\n");
+    fprintf(logfile, "//subtype,pack_or_unpack,c_offset,count,time\n");
 
     gpu_data_buffers_init_step(&gpu_buf_dens);
     gpu_data_buffers_init_step(&gpu_buf_grad);
@@ -739,6 +759,9 @@ void *runner_main_cuda(void *data) {
         t = scheduler_done(sched, t);
       }
     } /* Loop while there are tasks */
+
+    fclose(logfile);
+
   } /* main loop. */
 
   /* Release the bytes back into the wilderness */

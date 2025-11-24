@@ -101,6 +101,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     const double shift[3] = {0.0, 0.0, 0.0};
 
     /* Pack the data into the CPU-side buffers for offloading. */
+    ticks tic_start = getticks();
     if (task_subtype == task_subtype_gpu_density) {
       gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift, cis, cie);
     } else if (task_subtype == task_subtype_gpu_gradient) {
@@ -113,6 +114,14 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 #endif
+    ticks tic_end = getticks();
+    if (task_subtype == task_subtype_gpu_density) {
+      fprintf(r->logging_fp, "d,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+    } else if (task_subtype == task_subtype_gpu_gradient) {
+      fprintf(r->logging_fp, "g,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+    } else if (task_subtype == task_subtype_gpu_force) {
+      fprintf(r->logging_fp, "f,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+    }
 
   } else { /* This is a pair interaction. */
 
@@ -136,6 +145,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     const int cje = pack_ind + count_ci + count_cj;
 
     /* Pack cell i */
+    ticks tic_start = getticks();
     if (task_subtype == task_subtype_gpu_density) {
       gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs, cje);
     } else if (task_subtype == task_subtype_gpu_gradient) {
@@ -149,6 +159,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 #endif
+    ticks tic_end = getticks();
+
+    if (task_subtype == task_subtype_gpu_density) {
+      fprintf(r->logging_fp, "d,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+    } else if (task_subtype == task_subtype_gpu_gradient) {
+      fprintf(r->logging_fp, "g,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+    } else if (task_subtype == task_subtype_gpu_force) {
+      fprintf(r->logging_fp, "f,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+    }
 
     /* Update the packed particles counter */
     /* Note: md->count_parts will be increased later */
@@ -157,6 +176,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     /* Do the same for cj */
     const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
 
+    tic_start = getticks();
     if (task_subtype == task_subtype_gpu_density) {
       gpu_pack_part_density(cj, buf->parts_send_d, pack_ind, shift_j, cis, cie);
     } else if (task_subtype == task_subtype_gpu_gradient) {
@@ -170,6 +190,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
       error("Unknown task subtype %s", subtaskID_names[task_subtype]);
     }
 #endif
+    tic_end = getticks();
+
+    if (task_subtype == task_subtype_gpu_density) {
+      fprintf(r->logging_fp, "d,p,%ld,%d,%.4f\n", cj->hydro.parts - r->all_parts, cj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+    } else if (task_subtype == task_subtype_gpu_gradient) {
+      fprintf(r->logging_fp, "g,p,%ld,%d,%.4f\n", cj->hydro.parts - r->all_parts, cj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+    } else if (task_subtype == task_subtype_gpu_force) {
+      fprintf(r->logging_fp, "f,p,%ld,%d,%.4f\n", cj->hydro.parts - r->all_parts, cj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+    }
   }
 
   /* Now finish up the bookkeeping. */
@@ -284,6 +313,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
 
         /* Get the particle data into CPU-side buffers. */
         if (cell_is_active_hydro(cii, e)) {
+          ticks tic_start = getticks();
           if (task_subtype == task_subtype_gpu_density) {
             gpu_unpack_part_density(cii, buf->parts_recv_d, unpack_index,
                                     count_ci, e);
@@ -299,12 +329,23 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
             error("Unknown task subtype %s", subtaskID_names[task_subtype]);
           }
 #endif
+          ticks tic_end = getticks();
+
+          if (task_subtype == task_subtype_gpu_density) {
+            fprintf(r->logging_fp, "d,u,%ld,%d,%.4f\n", cii->hydro.parts - r->all_parts, cii->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+          } else if (task_subtype == task_subtype_gpu_gradient) {
+            fprintf(r->logging_fp, "g,u,%ld,%d,%.4f\n", cii->hydro.parts - r->all_parts, cii->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+          } else if (task_subtype == task_subtype_gpu_force) {
+            fprintf(r->logging_fp, "f,u,%ld,%d,%.4f\n", cii->hydro.parts - r->all_parts, cii->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+          }
+
           unpack_index += count_ci;
         }
 
         if (cii != cjj) {
           /* We have a pair interaction. Get the other cell too. */
           if (cell_is_active_hydro(cjj, e)) {
+            ticks tic_start = getticks();
             if (task_subtype == task_subtype_gpu_density) {
               gpu_unpack_part_density(cjj, buf->parts_recv_d, unpack_index,
                                       count_cj, e);
@@ -320,8 +361,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
               error("Unknown task subtype %s", subtaskID_names[task_subtype]);
             }
 #endif
+            ticks tic_end = getticks();
+
+            if (task_subtype == task_subtype_gpu_density) {
+              fprintf(r->logging_fp, "d,u,%ld,%d,%.4f\n", cjj->hydro.parts - r->all_parts, cjj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+            } else if (task_subtype == task_subtype_gpu_gradient) {
+              fprintf(r->logging_fp, "g,u,%ld,%d,%.4f\n", cjj->hydro.parts - r->all_parts, cjj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+            } else if (task_subtype == task_subtype_gpu_force) {
+              fprintf(r->logging_fp, "f,u,%ld,%d,%.4f\n", cjj->hydro.parts - r->all_parts, cjj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+            }
+
+            unpack_index += count_cj;
           }
-          unpack_index += count_cj;
         }
 
       } /* Loop over all leaves of task */

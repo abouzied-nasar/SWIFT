@@ -2939,6 +2939,7 @@ int engine_step(struct engine *e) {
     scheduler_write_dependencies(&e->sched, e->verbose, e->step);
     scheduler_write_cell_dependencies(&e->sched, e->verbose, e->step);
   }
+  scheduler_log_run_params(&e->sched, e->nr_threads, e->s->nr_parts, e->step);
 
   /* Write the task levels */
   if (e->sched.frequency_task_levels != 0 &&

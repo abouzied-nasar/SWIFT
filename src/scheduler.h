@@ -315,4 +315,6 @@ void scheduler_dump_queues(struct engine *e);
 void scheduler_report_task_times(const struct scheduler *s,
                                  const int nr_threads);
 
+void scheduler_log_run_params(struct scheduler* s, int nr_threads, size_t nr_parts, int nr_steps);
+
 #endif /* SWIFT_SCHEDULER_H */
