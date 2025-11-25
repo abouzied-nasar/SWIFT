@@ -27,6 +27,8 @@
 #include "runner.h"
 #include "timers.h"
 
+#include "logging_struct.h"
+
 /* Temporary warning during dev works. */
 #if !(defined(HAVE_CUDA) || defined(HAVE_HIP))
 #pragma warning "Don't have CUDA nor HIP"
@@ -55,7 +57,8 @@
 __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     const struct runner *r, struct gpu_offload_data *restrict buf,
     const struct cell *ci, const struct cell *cj,
-    const enum task_subtypes task_subtype) {
+    const enum task_subtypes task_subtype,
+    struct logging_data* logdata) {
 
   /* Grab handles */
   const struct engine *e = r->e;
@@ -115,13 +118,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     }
 #endif
     ticks tic_end = getticks();
+
+    char subtype = '0';
     if (task_subtype == task_subtype_gpu_density) {
-      fprintf(r->logging_fp, "d,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+      subtype = 'd';
     } else if (task_subtype == task_subtype_gpu_gradient) {
-      fprintf(r->logging_fp, "g,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+      subtype = 'g';
     } else if (task_subtype == task_subtype_gpu_force) {
-      fprintf(r->logging_fp, "f,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+      subtype = 'f';
     }
+    struct logging_entry ent = {subtype, 'p', ci->hydro.parts - logdata->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start) };
+    logdata->entries[logdata->count] = ent;
+    logdata->count++;
 
   } else { /* This is a pair interaction. */
 
@@ -161,13 +169,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
 #endif
     ticks tic_end = getticks();
 
+    char subtype2 = '0';
     if (task_subtype == task_subtype_gpu_density) {
-      fprintf(r->logging_fp, "d,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+      subtype2 = 'd';
     } else if (task_subtype == task_subtype_gpu_gradient) {
-      fprintf(r->logging_fp, "g,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+      subtype2 = 'g';
     } else if (task_subtype == task_subtype_gpu_force) {
-      fprintf(r->logging_fp, "f,p,%ld,%d,%.4f\n", ci->hydro.parts - r->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+      subtype2 = 'f';
     }
+    struct logging_entry ent2 = {subtype2, 'p', ci->hydro.parts - logdata->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start) };
+    logdata->entries[logdata->count] = ent2;
+    logdata->count++;
+
 
     /* Update the packed particles counter */
     /* Note: md->count_parts will be increased later */
@@ -192,13 +205,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
 #endif
     tic_end = getticks();
 
+    char subtype = '0';
     if (task_subtype == task_subtype_gpu_density) {
-      fprintf(r->logging_fp, "d,p,%ld,%d,%.4f\n", cj->hydro.parts - r->all_parts, cj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+      subtype = 'd';
     } else if (task_subtype == task_subtype_gpu_gradient) {
-      fprintf(r->logging_fp, "g,p,%ld,%d,%.4f\n", cj->hydro.parts - r->all_parts, cj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+      subtype = 'g';
     } else if (task_subtype == task_subtype_gpu_force) {
-      fprintf(r->logging_fp, "f,p,%ld,%d,%.4f\n", cj->hydro.parts - r->all_parts, cj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+      subtype = 'f';
     }
+    struct logging_entry ent = {subtype, 'p', cj->hydro.parts - logdata->all_parts, cj->hydro.count, clocks_diff_ticks(tic_end, tic_start) };
+    logdata->entries[logdata->count] = ent;
+    logdata->count++;
   }
 
   /* Now finish up the bookkeeping. */
@@ -244,7 +261,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
 __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
     const struct runner *r, struct scheduler *s,
     struct gpu_offload_data *restrict buf, const int npacked,
-    const enum task_subtypes task_subtype) {
+    const enum task_subtypes task_subtype,
+    struct logging_data* logdata) {
 
   /* Grab handles */
   struct gpu_pack_metadata *md = &buf->md;
@@ -331,13 +349,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
 #endif
           ticks tic_end = getticks();
 
+          char subtype = '0';
           if (task_subtype == task_subtype_gpu_density) {
-            fprintf(r->logging_fp, "d,u,%ld,%d,%.4f\n", cii->hydro.parts - r->all_parts, cii->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+            subtype = 'd';
           } else if (task_subtype == task_subtype_gpu_gradient) {
-            fprintf(r->logging_fp, "g,u,%ld,%d,%.4f\n", cii->hydro.parts - r->all_parts, cii->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+            subtype = 'g';
           } else if (task_subtype == task_subtype_gpu_force) {
-            fprintf(r->logging_fp, "f,u,%ld,%d,%.4f\n", cii->hydro.parts - r->all_parts, cii->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+            subtype = 'f';
           }
+          struct logging_entry ent = {subtype, 'u', cii->hydro.parts - logdata->all_parts, cii->hydro.count, clocks_diff_ticks(tic_end, tic_start) };
+          logdata->entries[logdata->count] = ent;
+          logdata->count++;
 
           unpack_index += count_ci;
         }
@@ -363,13 +385,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
 #endif
             ticks tic_end = getticks();
 
+            char subtype = '0';
             if (task_subtype == task_subtype_gpu_density) {
-              fprintf(r->logging_fp, "d,u,%ld,%d,%.4f\n", cjj->hydro.parts - r->all_parts, cjj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+              subtype = 'd';
             } else if (task_subtype == task_subtype_gpu_gradient) {
-              fprintf(r->logging_fp, "g,u,%ld,%d,%.4f\n", cjj->hydro.parts - r->all_parts, cjj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+              subtype = 'g';
             } else if (task_subtype == task_subtype_gpu_force) {
-              fprintf(r->logging_fp, "f,u,%ld,%d,%.4f\n", cjj->hydro.parts - r->all_parts, cjj->hydro.count, clocks_diff_ticks(tic_end, tic_start)*1e3);
+              subtype = 'f';
             }
+            struct logging_entry ent = {subtype, 'u', cjj->hydro.parts - logdata->all_parts, cjj->hydro.count, clocks_diff_ticks(tic_end, tic_start) };
+            logdata->entries[logdata->count] = ent;
+            logdata->count++;
 
             unpack_index += count_cj;
           }
@@ -415,11 +441,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
  */
 __attribute__((always_inline)) INLINE static void runner_gpu_pack_density(
     const struct runner *r, struct gpu_offload_data *restrict buf,
-    const struct cell *ci, const struct cell *cj) {
+    const struct cell *ci, const struct cell *cj,
+    struct logging_data* logdata) {
 
   TIMER_TIC;
 
-  runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_density);
+  runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_density, logdata);
 
   TIMER_TOC(timer_gpu_pack_d);
 }
@@ -429,11 +456,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_density(
  */
 __attribute__((always_inline)) INLINE static void runner_gpu_pack_gradient(
     const struct runner *r, struct gpu_offload_data *restrict buf,
-    const struct cell *ci, const struct cell *cj) {
+    const struct cell *ci, const struct cell *cj,
+    struct logging_data* logdata) {
 
   TIMER_TIC;
 
-  runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_gradient);
+  runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_gradient, logdata);
 
   TIMER_TOC(timer_gpu_pack_g);
 }
@@ -443,11 +471,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_gradient(
  */
 __attribute__((always_inline)) INLINE static void runner_gpu_pack_force(
     const struct runner *r, struct gpu_offload_data *restrict buf,
-    const struct cell *ci, const struct cell *cj) {
+    const struct cell *ci, const struct cell *cj,
+    struct logging_data* logdata) {
 
   TIMER_TIC;
 
-  runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_force);
+  runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_force, logdata);
 
   TIMER_TOC(timer_gpu_pack_f);
 }
@@ -464,11 +493,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_force(
  */
 __attribute__((always_inline)) INLINE static void runner_gpu_unpack_density(
     const struct runner *r, struct scheduler *s,
-    struct gpu_offload_data *restrict buf, const int npacked) {
+    struct gpu_offload_data *restrict buf, const int npacked,
+    struct logging_data* logdata) {
 
   TIMER_TIC;
 
-  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_density);
+  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_density, logdata);
 
   TIMER_TOC(timer_gpu_unpack_d);
 }
@@ -485,11 +515,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_density(
  */
 __attribute__((always_inline)) INLINE static void runner_gpu_unpack_gradient(
     const struct runner *r, struct scheduler *s,
-    struct gpu_offload_data *restrict buf, const int npacked) {
+    struct gpu_offload_data *restrict buf, const int npacked,
+    struct logging_data* logdata) {
 
   TIMER_TIC;
 
-  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_gradient);
+  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_gradient, logdata);
 
   TIMER_TOC(timer_gpu_unpack_g);
 }
@@ -507,11 +538,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_gradient(
 __attribute__((always_inline)) INLINE static void
 runner_dopair_gpu_unpack_force(const struct runner *r, struct scheduler *s,
                                struct gpu_offload_data *restrict buf,
-                               const int npacked) {
+                               const int npacked,
+                               struct logging_data* logdata) {
 
   TIMER_TIC;
 
-  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_force);
+  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_force, logdata);
 
   TIMER_TOC(timer_gpu_unpack_f);
 }
