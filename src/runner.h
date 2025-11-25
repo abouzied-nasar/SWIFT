@@ -29,6 +29,7 @@
 /* Local headers. */
 #include "cache.h"
 #include "gravity_cache.h"
+#include "logging_struct.h"
 
 struct cell;
 struct engine;

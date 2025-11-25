@@ -46,6 +46,7 @@ extern "C" {
 #endif
 
 /* This object's header. */
+#include "logging_struct.h"
 #include "runner.h"
 
 /* Local headers. */
@@ -211,6 +212,12 @@ void *runner_main_cuda(void *data) {
   /* Tell me how much memory we're using. */
   gpu_print_free_mem(e, r->cpuid);
 
+  /* This is just a guess. Increase if necessary. */
+  const int n_logs = 16384;
+  struct logging_data logdata;
+  logdata.count = 0;
+  logdata.entries = malloc(2 * n_logs * sizeof(struct logging_entry));
+
   /* Main loop. */
   while (1) {
 
@@ -220,13 +227,12 @@ void *runner_main_cuda(void *data) {
     /* Can we go home yet? */
     if (e->step_props & engine_step_prop_done) break;
 
+    /* Set up logging */
     char logfname[80];
     sprintf(logfname, "log_thread%03d_step%03d.dat", r->id, e->step);
 
     FILE* logfile = fopen(logfname, "w");
     if (logfile==NULL) error("Error opening pack trace log file");
-    r->logging_fp = logfile;
-    r->all_parts = all_parts;
 
     fprintf(logfile, "//subtype: d (density), g (gradient), or f (force)\n");
     fprintf(logfile, "//pack_or_unpack: p for packing operation, u for unpacking\n");
@@ -235,6 +241,10 @@ void *runner_main_cuda(void *data) {
     fprintf(logfile, "//time: Measured time for operation, in [micro s]\n");
     fprintf(logfile, "//\n");
     fprintf(logfile, "//subtype,pack_or_unpack,c_offset,count,time\n");
+
+    logdata.count = 0;
+    logdata.all_parts = all_parts;
+
 
     gpu_data_buffers_init_step(&gpu_buf_dens);
     gpu_data_buffers_init_step(&gpu_buf_grad);
@@ -255,6 +265,16 @@ void *runner_main_cuda(void *data) {
 
     /* Loop while there are tasks... */
     while (1) {
+
+      if (logdata.count > 0) {
+        /* Dump raw data */
+        /* fwrite(logdata.entries, sizeof(struct logging_entry), logdata.count, logfile); */
+        for (int i = 0; i < logdata.count; i++){
+          struct logging_entry ent = logdata.entries[i];
+          fprintf(logfile, "%c,%c,%ld,%d,%.3f\n", ent.subtype, ent.pack_or_unpack, ent.offset, ent.count, ent.time * 1e3);
+        }
+        logdata.count = 0;
+      }
 
       /* Get qid for bookkeeping of remaining enqueued GPU tasks later. */
       int qid = r->qid;
@@ -315,17 +335,17 @@ void *runner_main_cuda(void *data) {
           } else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
             runner_doself_gpu_density(r, sched, &gpu_buf_dens, t, stream, d_a,
-                                      d_H);
+                                      d_H, &logdata);
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
             runner_doself_gpu_gradient(r, sched, &gpu_buf_grad, t, stream, d_a,
-                                       d_H);
+                                       d_H, &logdata);
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
             runner_doself_gpu_force(r, sched, &gpu_buf_forc, t, stream, d_a,
-                                    d_H);
+                                    d_H, &logdata);
 #endif
           }
 #ifdef EXTRA_HYDRO_LOOP
@@ -394,17 +414,17 @@ void *runner_main_cuda(void *data) {
           else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
             runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_dens, t,
-                                      stream, d_a, d_H);
+                                      stream, d_a, d_H, &logdata);
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
             runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_grad, t,
-                                       stream, d_a, d_H);
+                                       stream, d_a, d_H, &logdata);
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
             runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_forc, t, stream,
-                                    d_a, d_H);
+                                    d_a, d_H, &logdata);
 #endif
           }
 
@@ -760,6 +780,15 @@ void *runner_main_cuda(void *data) {
       }
     } /* Loop while there are tasks */
 
+    if (logdata.count > 0) {
+     for (int i = 0; i < logdata.count; i++){
+        struct logging_entry ent = logdata.entries[i];
+        fprintf(logfile, "%c,%c,%ld,%d,%.3f\n", ent.subtype, ent.pack_or_unpack, ent.offset, ent.count, ent.time * 1e3);
+      }
+      /* Raw Dump leftover data */
+      /* fwrite(logdata.entries, sizeof(struct logging_entry), logdata.count, logfile); */
+    }
+
     fclose(logfile);
 
   } /* main loop. */
@@ -771,6 +800,9 @@ void *runner_main_cuda(void *data) {
 
   for (int i = 0; i < gpu_pack_params.n_bundles; i++)
     cudaStreamDestroy(stream[i]);
+
+  free(logdata.entries);
+
   /* Be kind, rewind. */
   return NULL;
 }

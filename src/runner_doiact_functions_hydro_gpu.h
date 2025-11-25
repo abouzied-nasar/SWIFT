@@ -482,7 +482,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_force(
 __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     const struct runner *r, struct scheduler *s,
     struct gpu_offload_data *restrict buf, struct task *t, cudaStream_t *stream,
-    const float d_a, const float d_H) {
+    const float d_a, const float d_H,
+    struct logging_data* logdata) {
 
   /* Grab handles */
   struct gpu_pack_metadata *md = &buf->md;
@@ -638,11 +639,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       /* Pack the particle data */
       /* Note that this increments md->count_parts and md->n_leaves_packed */
       if (t->subtype == task_subtype_gpu_density) {
-        runner_gpu_pack_density(r, buf, cii, cjj);
+        runner_gpu_pack_density(r, buf, cii, cjj, logdata);
       } else if (t->subtype == task_subtype_gpu_gradient) {
-        runner_gpu_pack_gradient(r, buf, cii, cjj);
+        runner_gpu_pack_gradient(r, buf, cii, cjj, logdata);
       } else if (t->subtype == task_subtype_gpu_force) {
-        runner_gpu_pack_force(r, buf, cii, cjj);
+        runner_gpu_pack_force(r, buf, cii, cjj, logdata);
       }
 #ifdef SWIFT_DEBUG_CHECKS
       else {
@@ -680,7 +681,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
 
         /* Unpack the results into CPU memory */
-        runner_gpu_unpack_density(r, s, buf, npacked);
+        runner_gpu_unpack_density(r, s, buf, npacked, logdata);
 
       } else if (t->subtype == task_subtype_gpu_gradient) {
 
@@ -688,7 +689,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         runner_gpu_launch_gradient(r, buf, stream, d_a, d_H);
 
         /* Unpack the results into CPU memory */
-        runner_gpu_unpack_gradient(r, s, buf, npacked);
+        runner_gpu_unpack_gradient(r, s, buf, npacked, logdata);
 
       } else if (t->subtype == task_subtype_gpu_force) {
 
@@ -696,7 +697,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         runner_gpu_launch_force(r, buf, stream, d_a, d_H);
 
         /* Unpack the results into CPU memory */
-        runner_dopair_gpu_unpack_force(r, s, buf, npacked);
+        runner_dopair_gpu_unpack_force(r, s, buf, npacked, logdata);
 
       }
 #ifdef SWIFT_DEBUG_CHECKS
@@ -793,7 +794,8 @@ static void runner_doself_gpu_density(const struct runner *r,
                                       struct scheduler *s,
                                       struct gpu_offload_data *buf,
                                       struct task *t, cudaStream_t *stream,
-                                      const float d_a, const float d_H) {
+                                      const float d_a, const float d_H,
+                                      struct logging_data* logdata) {
 
   /* Reset leaf cell counter for this task before we recurse down */
   buf->md.task_n_leaves = 0;
@@ -811,7 +813,7 @@ static void runner_doself_gpu_density(const struct runner *r,
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
-  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
+  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H, logdata);
 }
 
 /**
@@ -829,7 +831,8 @@ static void runner_doself_gpu_gradient(const struct runner *r,
                                        struct scheduler *s,
                                        struct gpu_offload_data *buf,
                                        struct task *t, cudaStream_t *stream,
-                                       const float d_a, const float d_H) {
+                                       const float d_a, const float d_H,
+                                       struct logging_data* logdata) {
 
   /* Reset leaf cell counter for this task before we recurse down */
   buf->md.task_n_leaves = 0;
@@ -847,7 +850,7 @@ static void runner_doself_gpu_gradient(const struct runner *r,
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
-  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
+  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H, logdata);
 }
 
 /**
@@ -864,7 +867,8 @@ static void runner_doself_gpu_gradient(const struct runner *r,
 static void runner_doself_gpu_force(const struct runner *r, struct scheduler *s,
                                     struct gpu_offload_data *buf,
                                     struct task *t, cudaStream_t *stream,
-                                    const float d_a, const float d_H) {
+                                    const float d_a, const float d_H,
+                                    struct logging_data* logdata) {
 
   /* Reset leaf cell counter for this task before we recurse down */
   buf->md.task_n_leaves = 0;
@@ -880,7 +884,7 @@ static void runner_doself_gpu_force(const struct runner *r, struct scheduler *s,
       atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
   if (count < 1) buf->md.launch_leftovers = 1;
   /* pack the data and run, if enough data has been gathered */
-  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
+  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H, logdata);
 }
 
 /**
@@ -896,12 +900,13 @@ static void runner_doself_gpu_force(const struct runner *r, struct scheduler *s,
  * @param d_a the current expansion scale factor
  * @param d_H the current Hubble constant
  */
-static void runner_dopair_gpu_density(const struct runner *r,
+static void runner_dopair_gpu_density(struct runner *r,
                                       struct scheduler *s, struct cell *ci,
                                       struct cell *cj,
                                       struct gpu_offload_data *restrict buf,
                                       struct task *t, cudaStream_t *stream,
-                                      const float d_a, const float d_H) {
+                                      const float d_a, const float d_H,
+                                      struct logging_data* logdata) {
 
   /* Reset leaf cell counter for this task before we recurse down */
   buf->md.task_n_leaves = 0;
@@ -919,7 +924,7 @@ static void runner_dopair_gpu_density(const struct runner *r,
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
-  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
+  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H, logdata);
 }
 
 /**
@@ -935,12 +940,13 @@ static void runner_dopair_gpu_density(const struct runner *r,
  * @param d_a the current expansion scale factor
  * @param d_H the current Hubble constant
  */
-static void runner_dopair_gpu_gradient(const struct runner *r,
+static void runner_dopair_gpu_gradient(struct runner *r,
                                        struct scheduler *s, struct cell *ci,
                                        struct cell *cj,
                                        struct gpu_offload_data *restrict buf,
                                        struct task *t, cudaStream_t *stream,
-                                       const float d_a, const float d_H) {
+                                       const float d_a, const float d_H,
+                                       struct logging_data* logdata) {
 
   /* Reset leaf cell counter for this task before we recurse down */
   buf->md.task_n_leaves = 0;
@@ -958,7 +964,7 @@ static void runner_dopair_gpu_gradient(const struct runner *r,
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
-  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
+  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H, logdata);
 }
 
 /**
@@ -974,11 +980,12 @@ static void runner_dopair_gpu_gradient(const struct runner *r,
  * @param d_a the current expansion scale factor
  * @param d_H the current Hubble constant
  */
-static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
+static void runner_dopair_gpu_force(struct runner *r, struct scheduler *s,
                                     struct cell *ci, struct cell *cj,
                                     struct gpu_offload_data *restrict buf,
                                     struct task *t, cudaStream_t *stream,
-                                    const float d_a, const float d_H) {
+                                    const float d_a, const float d_H,
+                                    struct logging_data* logdata) {
 
   /* Reset leaf cell counter for this task before we recurse down */
   buf->md.task_n_leaves = 0;
@@ -995,7 +1002,7 @@ static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
-  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
+  runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H, logdata);
 }
 
 #ifdef __cplusplus
