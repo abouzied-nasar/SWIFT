@@ -88,9 +88,6 @@ struct runner {
   /*! Pointer to the task this runner is currently performing */
   const struct task *t;
 #endif
-
-  FILE* logging_fp;
-  struct part* all_parts;
 };
 
 /* Function prototypes. */
