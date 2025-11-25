@@ -20,6 +20,9 @@ struct logging_entry {
   /*! nr of particles in the cell */
   int count;
 
+  /*! Index in buffer to pack/unpack to */
+  int pack_ind;
+
   /*! timing of operation */
   double time;
 };
