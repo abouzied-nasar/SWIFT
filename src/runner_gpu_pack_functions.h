@@ -127,7 +127,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     } else if (task_subtype == task_subtype_gpu_force) {
       subtype = 'f';
     }
-    struct logging_entry ent = {subtype, 'p', ci->hydro.parts - logdata->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start) };
+    struct logging_entry ent = {subtype, 'p', ci->hydro.parts - logdata->all_parts, ci->hydro.count, pack_ind, clocks_diff_ticks(tic_end, tic_start) };
     logdata->entries[logdata->count] = ent;
     logdata->count++;
 
@@ -177,7 +177,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     } else if (task_subtype == task_subtype_gpu_force) {
       subtype2 = 'f';
     }
-    struct logging_entry ent2 = {subtype2, 'p', ci->hydro.parts - logdata->all_parts, ci->hydro.count, clocks_diff_ticks(tic_end, tic_start) };
+    struct logging_entry ent2 = {subtype2, 'p', ci->hydro.parts - logdata->all_parts, ci->hydro.count, pack_ind, clocks_diff_ticks(tic_end, tic_start) };
     logdata->entries[logdata->count] = ent2;
     logdata->count++;
 
@@ -213,7 +213,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     } else if (task_subtype == task_subtype_gpu_force) {
       subtype = 'f';
     }
-    struct logging_entry ent = {subtype, 'p', cj->hydro.parts - logdata->all_parts, cj->hydro.count, clocks_diff_ticks(tic_end, tic_start) };
+    struct logging_entry ent = {subtype, 'p', cj->hydro.parts - logdata->all_parts, cj->hydro.count, pack_ind, clocks_diff_ticks(tic_end, tic_start) };
     logdata->entries[logdata->count] = ent;
     logdata->count++;
   }
@@ -357,7 +357,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
           } else if (task_subtype == task_subtype_gpu_force) {
             subtype = 'f';
           }
-          struct logging_entry ent = {subtype, 'u', cii->hydro.parts - logdata->all_parts, cii->hydro.count, clocks_diff_ticks(tic_end, tic_start) };
+          struct logging_entry ent = {subtype, 'u', cii->hydro.parts - logdata->all_parts, cii->hydro.count, unpack_index, clocks_diff_ticks(tic_end, tic_start) };
           logdata->entries[logdata->count] = ent;
           logdata->count++;
 
@@ -393,7 +393,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
             } else if (task_subtype == task_subtype_gpu_force) {
               subtype = 'f';
             }
-            struct logging_entry ent = {subtype, 'u', cjj->hydro.parts - logdata->all_parts, cjj->hydro.count, clocks_diff_ticks(tic_end, tic_start) };
+            struct logging_entry ent = {subtype, 'u', cjj->hydro.parts - logdata->all_parts, cjj->hydro.count, unpack_index, clocks_diff_ticks(tic_end, tic_start) };
             logdata->entries[logdata->count] = ent;
             logdata->count++;
 

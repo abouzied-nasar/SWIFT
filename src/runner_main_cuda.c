@@ -238,9 +238,10 @@ void *runner_main_cuda(void *data) {
     fprintf(logfile, "//pack_or_unpack: p for packing operation, u for unpacking\n");
     fprintf(logfile, "//c_offset: offset of c->hydro.parts array in global parts array\n");
     fprintf(logfile, "//count: c->hydro.count\n");
+    fprintf(logfile, "//index: index in particle buffer array to write into/read from\n");
     fprintf(logfile, "//time: Measured time for operation, in [micro s]\n");
     fprintf(logfile, "//\n");
-    fprintf(logfile, "//subtype,pack_or_unpack,c_offset,count,time\n");
+    fprintf(logfile, "//subtype,pack_or_unpack,c_offset,count,index,time\n");
 
     logdata.count = 0;
     logdata.all_parts = all_parts;
@@ -271,7 +272,7 @@ void *runner_main_cuda(void *data) {
         /* fwrite(logdata.entries, sizeof(struct logging_entry), logdata.count, logfile); */
         for (int i = 0; i < logdata.count; i++){
           struct logging_entry ent = logdata.entries[i];
-          fprintf(logfile, "%c,%c,%ld,%d,%.3f\n", ent.subtype, ent.pack_or_unpack, ent.offset, ent.count, ent.time * 1e3);
+          fprintf(logfile, "%c,%c,%ld,%d,%d,%.3f\n", ent.subtype, ent.pack_or_unpack, ent.offset, ent.count, ent.pack_ind, ent.time * 1e3);
         }
         logdata.count = 0;
       }
@@ -783,7 +784,7 @@ void *runner_main_cuda(void *data) {
     if (logdata.count > 0) {
      for (int i = 0; i < logdata.count; i++){
         struct logging_entry ent = logdata.entries[i];
-        fprintf(logfile, "%c,%c,%ld,%d,%.3f\n", ent.subtype, ent.pack_or_unpack, ent.offset, ent.count, ent.time * 1e3);
+        fprintf(logfile, "%c,%c,%ld,%d,%d,%.3f\n", ent.subtype, ent.pack_or_unpack, ent.offset, ent.count, ent.pack_ind, ent.time * 1e3);
       }
       /* Raw Dump leftover data */
       /* fwrite(logdata.entries, sizeof(struct logging_entry), logdata.count, logfile); */
