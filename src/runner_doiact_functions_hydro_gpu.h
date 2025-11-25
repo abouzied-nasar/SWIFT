@@ -789,7 +789,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
  * @param d_a current expansion scale factor
  * @param d_H current Hubble constant
  */
-static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
+static void runner_doself_gpu_density(const struct runner *r,
+                                      struct scheduler *s,
                                       struct gpu_offload_data *buf,
                                       struct task *t, cudaStream_t *stream,
                                       const float d_a, const float d_H) {
@@ -824,7 +825,8 @@ static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
  * @param d_a current expansion scale factor
  * @param d_H current Hubble constant
  */
-static void runner_doself_gpu_gradient(struct runner *r, struct scheduler *s,
+static void runner_doself_gpu_gradient(const struct runner *r,
+                                       struct scheduler *s,
                                        struct gpu_offload_data *buf,
                                        struct task *t, cudaStream_t *stream,
                                        const float d_a, const float d_H) {
@@ -859,7 +861,7 @@ static void runner_doself_gpu_gradient(struct runner *r, struct scheduler *s,
  * @param d_a current expansion scale factor
  * @param d_H current Hubble constant
  */
-static void runner_doself_gpu_force(struct runner *r, struct scheduler *s,
+static void runner_doself_gpu_force(const struct runner *r, struct scheduler *s,
                                     struct gpu_offload_data *buf,
                                     struct task *t, cudaStream_t *stream,
                                     const float d_a, const float d_H) {
