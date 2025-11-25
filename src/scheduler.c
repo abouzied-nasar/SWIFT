@@ -3367,8 +3367,19 @@ void scheduler_log_run_params(struct scheduler* s, int nr_threads, size_t nr_par
 
   fprintf(outfile, "nr_threads: %d\n", nr_threads);
   fprintf(outfile, "nr_parts: %ld\n", nr_parts);
-  fprintf(outfile, "nr_steps: %d\n", nr_steps);
+  fprintf(outfile, "nr_steps: %d\n\n", nr_steps);
+
+  fprintf(outfile, "git revision: %s\n", git_revision());
+  fprintf(outfile, "git branch: %s\n", git_branch());
+  fprintf(outfile, "git date: %s\n\n", git_date());
+
+  fprintf(outfile, "config. options: %s\n", configuration_options());
+  fprintf(outfile, "Compiler: %s, Version: %s\n", compiler_name(), compiler_version());
+  fprintf(outfile, "CFLAGS  : %s\n\n", compilation_cflags());
+
   fclose(outfile);
+
+  system("lscpu >> log_runtime_params.dat");
 
   message("Written simulation parameter log.");
 }
