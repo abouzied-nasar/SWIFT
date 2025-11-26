@@ -397,8 +397,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
             logdata->entries[logdata->count] = ent;
             logdata->count++;
 
-            unpack_index += count_cj;
           }
+          unpack_index += count_cj;
         }
 
       } /* Loop over all leaves of task */
