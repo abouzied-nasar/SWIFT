@@ -900,7 +900,7 @@ static void runner_doself_gpu_force(const struct runner *r, struct scheduler *s,
  * @param d_a the current expansion scale factor
  * @param d_H the current Hubble constant
  */
-static void runner_dopair_gpu_density(struct runner *r,
+static void runner_dopair_gpu_density(const struct runner *r,
                                       struct scheduler *s, struct cell *ci,
                                       struct cell *cj,
                                       struct gpu_offload_data *restrict buf,
@@ -940,7 +940,7 @@ static void runner_dopair_gpu_density(struct runner *r,
  * @param d_a the current expansion scale factor
  * @param d_H the current Hubble constant
  */
-static void runner_dopair_gpu_gradient(struct runner *r,
+static void runner_dopair_gpu_gradient(const struct runner *r,
                                        struct scheduler *s, struct cell *ci,
                                        struct cell *cj,
                                        struct gpu_offload_data *restrict buf,
@@ -980,7 +980,7 @@ static void runner_dopair_gpu_gradient(struct runner *r,
  * @param d_a the current expansion scale factor
  * @param d_H the current Hubble constant
  */
-static void runner_dopair_gpu_force(struct runner *r, struct scheduler *s,
+static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
                                     struct cell *ci, struct cell *cj,
                                     struct gpu_offload_data *restrict buf,
                                     struct task *t, cudaStream_t *stream,
