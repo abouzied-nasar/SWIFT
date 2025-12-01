@@ -40,6 +40,12 @@ parser.add_argument(
     help="use seconds as units, not milliseconds",
 )
 
+parser.add_argument(
+    "-z",
+    "--include-step-zero",
+    action="store_true",
+    help="Include the zeroth step in the timing averages",
+)
 
 args = parser.parse_args()
 nthreads = args.nthreads
@@ -51,6 +57,10 @@ if not os.path.exists(args.timer_file):
     print(f"Couldn't find timer file {args.timer_file}.")
     exit(1)
 
+# Which data do we include in the averages?
+first_index = 1
+if args.include_step_zero:
+    first_index = 0
 
 timer_names = [
     # 0: step |
@@ -218,14 +228,84 @@ if nthreads > 1:
 if args.seconds:
     data *= 1e-3
 
+# Print values to screen
+timesum_avg = 0.0
+timesum_total = 0.0
+
+print()
+print("Times averaged over all available measured steps:")
+
+if nthreads <= 1:
+    print("{0:25} {1:>18s}".format("Task Type", f"Total time {units}"))
+
+    for i, col in enumerate(cols_to_use):
+        avg = data[first_index:, i].mean()
+        name = timer_names[col - 1]  # subtract 1 to get the index in my hand-made list
+
+        print("{0:25} {1:18.3e}".format(name, avg))
+        timesum_avg += avg
+
+    print()
+    print(f"Total: {timesum_avg:18.3e} {units}")
+
+else:
+    print(
+        "{0:25} {1:>18} {2:>18}".format(
+            "Task Type", f"Avg. Time {nthreads} thr", f"Total time {units}"
+        )
+    )
+
+    for i, col in enumerate(cols_to_use):
+        avg = data[first_index:, i].mean()
+        name = timer_names[col - 1]  # subtract 1 to get the index in my hand-made list
+
+        print("{0:25} {1:18.3e} {2:18.3e}".format(name, avg, avg * nthreads))
+        timesum_avg += avg
+        timesum_total += avg * nthreads
+
+    print()
+    print(f"Total: All threads:     {timesum_total:18.3e} {units}")
+    print(f"       Avg. per thread: {timesum_avg:18.3e} {units}")
+print()
 
 fig = plt.figure(figsize=(8, 8), dpi=200)
 
 ax = fig.add_subplot(111)
+#with open("average_timings.txt", "w", encoding="utf-8") as f:
+#    f.write("gpu_self_pack_density, gpu_self_pack_gradient, gpu_self_pack_force, " \
+#    "gpu_self_unpack_density, gpu_self_unpack_gradient, gpu_self_unpack_force, "\
+#    "gpu_self_launch_density, gpu_self_launch_gradient, gpu_self_launch_force, "\
+#    "gpu_pair_pack_density, gpu_pair_pack_gradient, gpu_pair_pack_force, "\
+#    "gpu_pair_unpack_density, gpu_pair_unpack_gradient, gpu_pair_unpack_force, "\
+#    "gpu_pair_launch_density, gpu_pair_launch_gradient, gpu_pair_launch_force, "\
+#    "gpu_pair_recurse,\n")
+with open("average_timings.txt", "w", encoding="utf-8") as f:
+    f.write("pack_unpack, launch \n")
+pack_time = 0.0
+launch_time = 0.0
+for i in range(0, 6):
+    pack_time = pack_time + data[:, i].mean()
+for i in range(9, 15):
+    pack_time = pack_time + data[:, i].mean()
+pack_time = pack_time + data[:, i].mean()
+
+for i in range(6,9):
+    launch_time = launch_time + data[:, i].mean()
+for i in range(15,18):
+    launch_time = launch_time + data[:, i].mean()
+#launch_time = launch_time * nthreads
+
+with open("average_timings.txt", "a", encoding="utf-8") as f:
+    f.write(str(pack_time))
+    f.write(", ")
+    f.write(str(launch_time))
+
+
 for i, col in enumerate(cols_to_use):
     avg = data[:, i].mean()
     minval = data[:, i].min()
     maxval = data[:, i].max()
+
     name = timer_names[col - 1]  # subtract 1 to get the index in my hand-made list
     color = "C0"
     if "_pack_" in name:
