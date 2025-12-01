@@ -290,8 +290,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
     struct gpu_offload_data *buf, const struct cell *ci, const struct cell *cj,
     const double shift[3]) {
 
-  TIMER_TIC;
-
   const int count_ci = ci->hydro.count;
   const int count_cj = cj->hydro.count;
 
@@ -340,8 +338,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
 
   gpu_pack_part_pair_density(cj, buf->parts_send_d, pack_ind, shift_j, cis,
                              cie);
-
-  TIMER_TOC(timer_dopair_gpu_pack_d);
 }
 
 /**
@@ -357,8 +353,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_density(
 __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
     struct gpu_offload_data *buf, const struct cell *ci, const struct cell *cj,
     const double shift[3]) {
-
-  TIMER_TIC;
 
   /* Anything to do here? */
   const int count_ci = ci->hydro.count;
@@ -404,8 +398,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
 
   gpu_pack_part_pair_gradient(cj, buf->parts_send_g, pack_ind, shift_j, cis,
                               cie);
-
-  TIMER_TOC(timer_dopair_gpu_pack_g);
 }
 
 /**
@@ -421,8 +413,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_gradient(
 __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(
     struct gpu_offload_data *buf, const struct cell *ci, const struct cell *cj,
     const double shift[3]) {
-
-  TIMER_TIC;
 
   /* Anything to do here? */
   const int count_ci = ci->hydro.count;
@@ -464,7 +454,5 @@ __attribute__((always_inline)) INLINE static void gpu_pack_pair_force(
   const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
 
   gpu_pack_part_pair_force(cj, buf->parts_send_f, pack_ind, shift_j, cis, cie);
-
-  TIMER_TOC(timer_dopair_gpu_pack_f);
 }
 #endif /* RUNNER_GPU_PACK_FUNCTIONS_H */
