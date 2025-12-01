@@ -281,24 +281,34 @@ ax = fig.add_subplot(111)
 #    "gpu_pair_recurse,\n")
 with open("average_timings.txt", "w", encoding="utf-8") as f:
     f.write("pack_unpack, launch \n")
-pack_time = 0.0
-launch_time = 0.0
+pack_time_self = 0.0
+launch_time_self = 0.0
+pack_time_pair = 0.0
+launch_time_pair = 0.0
+
 for i in range(0, 6):
-    pack_time = pack_time + data[:, i].mean()
+    pack_time_self = pack_time_self + data[:, i].mean()
+
 for i in range(9, 15):
-    pack_time = pack_time + data[:, i].mean()
-pack_time = pack_time + data[:, i].mean()
+    pack_time_pair = pack_time_pair + data[:, i].mean()
+pack_time_pair = pack_time_pair + data[:, 18].mean()
 
 for i in range(6,9):
-    launch_time = launch_time + data[:, i].mean()
+    launch_time_self = launch_time_self + data[:, i].mean()
+
 for i in range(15,18):
-    launch_time = launch_time + data[:, i].mean()
+    launch_time_pair = launch_time_pair + data[:, i].mean()
 #launch_time = launch_time * nthreads
 
 with open("average_timings.txt", "a", encoding="utf-8") as f:
-    f.write(str(pack_time))
+    f.write(str(pack_time_self))
     f.write(", ")
-    f.write(str(launch_time))
+    f.write(str(launch_time_self))    
+    f.write(", ")
+    f.write(str(pack_time_pair))
+    f.write(", ")
+    f.write(str(launch_time_pair))
+
 
 
 for i, col in enumerate(cols_to_use):
