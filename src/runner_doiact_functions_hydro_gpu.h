@@ -643,6 +643,20 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_launch(
     swift_assert(cu_error == cudaSuccess);
 
   } /*End of looping over bundles to launch in streams*/
+  /* Issue synchronisation commands for all events recorded by GPU
+   * Should swap with one cuda Device Synchronise really if we decide to go
+   * this way with unpacking done separately */
+  /* TODO Abouzied: Is the comment above still appropriate? */
+  for (int bid = 0; bid < n_bundles; bid++) {
+    cudaError_t cu_error = cudaEventSynchronize(buf->event_end[bid]);
+    if (cu_error != cudaSuccess) {
+      error(
+          "cudaEventSynchronize failed: '%s' for task subtype %s,"
+          " cpuid=%d, bundle=%d",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
+          bid);
+    }
+  }
 }
 
 /**
@@ -666,9 +680,6 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
   /* How many tasks should be in a bundle? */
   const int bundle_size = md->params.bundle_size;
 
-  /* Current index in buffer particle arrays */
-  cudaError_t cu_error;
-
   char *task_unpacked = malloc(tasks_packed * sizeof(char));
   for (int i = 0; i < tasks_packed; i++) task_unpacked[i] = 0;
   int ntasks_unpacked = 0;
@@ -678,9 +689,6 @@ __attribute__((always_inline)) INLINE static void runner_doself_gpu_unpack(
   while (ntasks_unpacked < tasks_packed) {
 
     for (int bid = 0; bid < n_bundles; bid++) {
-
-      cu_error = cudaEventSynchronize(buf->event_end[bid]);
-      swift_assert(cu_error == cudaSuccess);
 
       /* Loop over tasks in bundle */
       for (int tid = bid * bundle_size;
