@@ -104,35 +104,85 @@ struct xpart {
  */
 struct part {
 
-  /*! Particle unique ID. */
-  long long _id;
-
-  /*! Pointer to corresponding gravity part. */
-  struct gpart *_gpart;
-
   /*! Particle position. */
   double _x[3];
-
-  /*! Particle predicted velocity. */
-  float _v[3];
-
-  /*! Particle acceleration. */
-  float _a_hydro[3];
-
-  /*! Particle mass. */
-  float _mass;
 
   /*! Particle smoothing length. */
   float _h;
 
-  /*! Particle internal energy. */
-  float _u;
+  /*! Particle predicted velocity. */
+  float _v[3];
+
+  /*! Particle mass. */
+  float _mass;
+
+  /*! Particle acceleration. */
+  float _a_hydro[3];
 
   /*! Time derivative of the internal energy. */
   float _u_dt;
 
+  /*! Particle internal energy. */
+  float _u;
+
   /*! Particle density. */
   float _rho;
+
+  /* Store density/force specific stuff. */
+
+  union {
+    /**
+     * @brief Structure for the variables only used in the density loop over
+     * neighbours.
+     *
+     * Quantities in this sub-structure should only be accessed in the density
+     * loop over neighbours and the ghost task.
+     */
+    struct {
+
+      /*! Derivative of density with respect to h */
+      float _rho_dh;
+
+      /*! Neighbour number count. */
+      float _wcount;
+
+      /*! Derivative of the neighbour number with respect to h. */
+      float _wcount_dh;
+
+      /*! Particle velocity curl. */
+      float _rot_v[3];
+
+    } density;
+
+    /**
+     * @brief Structure for the variables only used in the force loop over
+     * neighbours.
+     *
+     * Quantities in this sub-structure should only be accessed in the force
+     * loop over neighbours and the ghost, drift and kick tasks.
+     */
+    struct {
+
+      /*! "Grad h" term -- only partial in P-U */
+      float _f_gradh;
+
+      /*! Particle pressure. */
+      float _pressure;
+
+      /*! Balsara switch */
+      float _balsara;
+
+      /*! Particle soundspeed. */
+      float _soundspeed;
+
+      /*! Maximal alpha (viscosity) over neighbours */
+      float _alpha_visc_max_ngb;
+
+      /*! Time derivative of smoothing length  */
+      float _h_dt;
+
+    } force;
+  };
 
   /* Store viscosity information in a separate struct. */
   struct {
@@ -165,61 +215,11 @@ struct part {
 
   } diffusion;
 
-  /* Store density/force specific stuff. */
+  /*! Particle unique ID. */
+  long long _id;
 
-  union {
-    /**
-     * @brief Structure for the variables only used in the density loop over
-     * neighbours.
-     *
-     * Quantities in this sub-structure should only be accessed in the density
-     * loop over neighbours and the ghost task.
-     */
-    struct {
-
-      /*! Neighbour number count. */
-      float _wcount;
-
-      /*! Derivative of the neighbour number with respect to h. */
-      float _wcount_dh;
-
-      /*! Derivative of density with respect to h */
-      float _rho_dh;
-
-      /*! Particle velocity curl. */
-      float _rot_v[3];
-
-    } density;
-
-    /**
-     * @brief Structure for the variables only used in the force loop over
-     * neighbours.
-     *
-     * Quantities in this sub-structure should only be accessed in the force
-     * loop over neighbours and the ghost, drift and kick tasks.
-     */
-    struct {
-
-      /*! "Grad h" term -- only partial in P-U */
-      float _f_gradh;
-
-      /*! Particle pressure. */
-      float _pressure;
-
-      /*! Particle soundspeed. */
-      float _soundspeed;
-
-      /*! Time derivative of smoothing length  */
-      float _h_dt;
-
-      /*! Balsara switch */
-      float _balsara;
-
-      /*! Maximal alpha (viscosity) over neighbours */
-      float _alpha_visc_max_ngb;
-
-    } force;
-  };
+  /*! Pointer to corresponding gravity part. */
+  struct gpart *_gpart;
 
   /*! Additional data used for adaptive softening */
   struct adaptive_softening_part_data _adaptive_softening_data;

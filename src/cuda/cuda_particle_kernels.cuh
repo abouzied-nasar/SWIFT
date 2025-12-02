@@ -169,14 +169,14 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
   const float vzi = pi.vx_m.z;
   /* const float mi = pi.vx_m.w; */
 
-  /* const float rhoi = pi.rho_avisc_u_c.x; */
-  /* const float avisci = pi.rho_avisc_u_c.y; */
-  const float energyi = pi.rho_avisc_u_c.z;
-  const float ci = pi.rho_avisc_u_c.w;
+  const float energyi = pi.u_rho_c_aviscmax.x;
+  /* const float rhoi = pi.u_rho_c_aviscmax.y; */
+  const float ci = pi.u_rho_c_aviscmax.z;
+  const float avisc_maxi = pi.u_rho_c_aviscmax.w;
 
-  const float vsigi = pi.vsig_lapu_aviscmax.x;
-  const float lapui = pi.vsig_lapu_aviscmax.y;
-  const float avisc_maxi = pi.vsig_lapu_aviscmax.z;
+  /* const float avisci = pi.avisc_vsig_lapu.x; */
+  const float vsigi = pi.avisc_vsig_lapu.y;
+  const float lapui = pi.avisc_vsig_lapu.z;
 
   const int pj_start = pi.pjs_pje.x;
   const int pj_end = pi.pjs_pje.y;
@@ -187,7 +187,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
 
   /* Prep output */
   /* v_sig, laplace_u, a_viscosity_max */
-  float3 res_vsig_lapu_avisci = {vsigi, lapui, avisc_maxi};
+  float3 res_aviscmax_vsig_lapui = {avisc_maxi, vsigi, lapui};
 
   /* Start the neighbour interactions */
   for (int j = pj_start; j < pj_end; j++) {
@@ -205,16 +205,17 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
     const float vzj = pj.vx_m.z;
     const float mj = pj.vx_m.w;
 
-    const float rhoj = pj.rho_avisc_u_c.x;
-    const float aviscj = pj.rho_avisc_u_c.y;
-    const float energyj = pj.rho_avisc_u_c.z;
-    const float cj = pj.rho_avisc_u_c.w;
+    const float energyj = pj.u_rho_c_aviscmax.x;
+    const float rhoj = pj.u_rho_c_aviscmax.y;
+    const float cj = pj.u_rho_c_aviscmax.z;
+    /* const float avisc_maxj = pj.u_rho_c_aviscmax.w; */
 
-    /* const float vsigj = pj.vsig_lapu_aviscmax.x; */
-    /* const float lapuj = pj.vsig_lapu_aviscmax.y; */
-    /* const float avisc_maxj = pj.vsig_lapu_aviscmax.z; */
+    const float aviscj = pj.avisc_vsig_lapu.x;
+    /* const float vsigj = pj.avisc_vsig_lapu.y; */
+    /* const float lapuj = pj.avisc_vsig_lapu.z; */
 
     /* Now get stuff done. */
+
     const float xij = xi - xj;
     const float yij = yi - yj;
     const float zij = zi - zj;
@@ -223,6 +224,10 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
 
     /* (j != pid): Exclude self contribution. This happens at a later step. */
     const float mask = (r2 < hig2) && (j != pid) ? 1.f : 0.f;
+
+    /* Set the maximal alpha from the previous step over the neighbours
+     * (this is used to limit the diffusion in hydro_prepare_force) */
+    res_aviscmax_vsig_lapui.x = fmaxf(res_aviscmax_vsig_lapui.x, aviscj * mask);
 
     const float r = sqrtf(r2);
     /* r == 0 can happen for self-interaction, which we're masking out,
@@ -250,7 +255,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
     const float new_v_sig = ci + cj - const_viscosity_beta * mu_ij;
 
     /* Update if we need to */
-    res_vsig_lapu_avisci.x = fmaxf(vsigi, new_v_sig * mask);
+    res_aviscmax_vsig_lapui.y = fmaxf(vsigi, new_v_sig * mask);
 
     /* Calculate Del^2 u for the thermal diffusion coefficient. */
     /* Need to get some kernel values F_ij = wi_dx */
@@ -260,15 +265,12 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
     d_kernel_deval(ui, &wi, &wi_dx);
 
     const float delta_u_factor = (energyi - energyj) * r_inv;
-    res_vsig_lapu_avisci.y += mj * delta_u_factor * wi_dx / rhoj * mask;
+    res_aviscmax_vsig_lapui.z += mj * delta_u_factor * wi_dx / rhoj * mask;
 
-    /* Set the maximal alpha from the previous step over the neighbours
-     * (this is used to limit the diffusion in hydro_prepare_force) */
-    res_vsig_lapu_avisci.z = fmaxf(res_vsig_lapu_avisci.z, aviscj * mask);
   } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
   /* Write results. */
-  d_parts_recv[pid].vsig_lapu_aviscmax = res_vsig_lapu_avisci;
+  d_parts_recv[pid].aviscmax_vsig_lapu = res_aviscmax_vsig_lapui;
 }
 
 /**
@@ -297,15 +299,15 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
   const float vzi = pi.vx_m.z;
   const float mi = pi.vx_m.w;
 
-  const float fi = pi.f_bals_rho_p.x;
-  const float balsi = pi.f_bals_rho_p.y;
-  const float rhoi = pi.f_bals_rho_p.z;
-  const float pressurei = pi.f_bals_rho_p.w;
+  const float energyi = pi.u_rho_f_p.x;
+  const float rhoi = pi.u_rho_f_p.y;
+  const float fi = pi.u_rho_f_p.z;
+  const float pressurei = pi.u_rho_f_p.w;
 
-  const float ci = pi.c_u_avisc_adiff.x;
-  const float energyi = pi.c_u_avisc_adiff.y;
-  const float avisci = pi.c_u_avisc_adiff.z;
-  const float adiffi = pi.c_u_avisc_adiff.w;
+  const float balsi = pi.bals_c_avisc_adiff.x;
+  const float ci = pi.bals_c_avisc_adiff.y;
+  const float avisci = pi.bals_c_avisc_adiff.z;
+  const float adiffi = pi.bals_c_avisc_adiff.w;
 
   /* const int tbi = pi.timebin_minngbtimebin_pjs_pje.x; */
   const int min_ngb_tbi = pi.timebin_minngbtimebin_pjs_pje.y;
@@ -341,15 +343,15 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
     const float vzj = pj.vx_m.z;
     const float mj = pj.vx_m.w;
 
-    const float fj = pj.f_bals_rho_p.x;
-    const float balsj = pj.f_bals_rho_p.y;
-    const float rhoj = pj.f_bals_rho_p.z;
-    const float pressurej = pj.f_bals_rho_p.w;
+    const float energyj = pj.u_rho_f_p.x;
+    const float rhoj = pj.u_rho_f_p.y;
+    const float fj = pj.u_rho_f_p.z;
+    const float pressurej = pj.u_rho_f_p.w;
 
-    const float cj = pj.c_u_avisc_adiff.x;
-    const float energyj = pj.c_u_avisc_adiff.y;
-    const float aviscj = pj.c_u_avisc_adiff.z;
-    const float adiffj = pj.c_u_avisc_adiff.w;
+    const float balsj = pj.bals_c_avisc_adiff.x;
+    const float cj = pj.bals_c_avisc_adiff.y;
+    const float aviscj = pj.bals_c_avisc_adiff.z;
+    const float adiffj = pj.bals_c_avisc_adiff.w;
 
     const int tbj = pi.timebin_minngbtimebin_pjs_pje.x;
     /* const int min_ngb_tbj = pi.timebin_minngbtimebin_pjs_pje.y; */

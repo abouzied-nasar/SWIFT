@@ -40,7 +40,7 @@ struct gpu_part_send_d {
   /*! Particle position and h -> x, y, z, h */
   float4 x_h;
 
-  /*! Particle predicted velocity and mass -> ux, uy, uz, m */
+  /*! Particle predicted velocity and mass -> vx, vy, vz, m */
   float4 vx_m;
 
   /*! Start and end index of particles to be interacted with in particle
@@ -73,11 +73,11 @@ struct gpu_part_send_g {
   /*! Particle velocity and mass */
   float4 vx_m;
 
-  /*! Particle density alpha visc internal energy u and speed of sound c */
-  float4 rho_avisc_u_c;
+  /*! Particle density, alpha visc, internal energy u, and speed of sound c */
+  float4 u_rho_c_aviscmax;
 
   /*! viscosity information results */
-  float3 vsig_lapu_aviscmax;
+  float3 avisc_vsig_lapu;
 
   /*! Start and end index of particles to be interacted with in particle
    * buffer arrays */
@@ -91,7 +91,7 @@ struct gpu_part_recv_g {
 #ifdef WITH_CUDA
 
   /*! viscosity information results */
-  float3 vsig_lapu_aviscmax;
+  float3 aviscmax_vsig_lapu;
 
 #endif
 };
@@ -109,11 +109,11 @@ struct gpu_part_send_f {
   float4 vx_m;
 
   /*! Variable smoothing length term f, balsara, density, pressure */
-  float4 f_bals_rho_p;
+  float4 u_rho_f_p;
 
   /*! Particle speed of sound, internal energy, alpha constants for
    * viscosity and diffusion */
-  float4 c_u_avisc_adiff;
+  float4 bals_c_avisc_adiff;
 
   /*! Particle timebin, initial value of min neighbour timebin, start
    * and end index of particles to be interacted with in particle buffer
@@ -127,11 +127,11 @@ struct gpu_part_send_f {
 struct gpu_part_recv_f {
 #ifdef WITH_CUDA
 
-  /*! change of u and h with dt, v_sig */
-  float3 udt_hdt_minngbtb;
-
   /*! Particle acceleration vector */
   float3 a_hydro;
+
+  /*! change of u and h with dt, v_sig */
+  float3 udt_hdt_minngbtb;
 
 #endif
 };
