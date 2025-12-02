@@ -280,7 +280,7 @@ ax = fig.add_subplot(111)
 #    "gpu_pair_launch_density, gpu_pair_launch_gradient, gpu_pair_launch_force, "\
 #    "gpu_pair_recurse,\n")
 with open("average_timings.txt", "w", encoding="utf-8") as f:
-    f.write("pack_unpack, launch \n")
+    f.write("pack_unpack_self, launch_self, pack_unpack_pair, launch_pair\n")
 pack_time_self = 0.0
 launch_time_self = 0.0
 pack_time_pair = 0.0

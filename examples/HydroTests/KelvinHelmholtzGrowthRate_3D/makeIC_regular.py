@@ -29,7 +29,7 @@ P0 = 2.5  # Pressure
 rho0 = 1.0  # Density
 d = 0.0317  # Thickness of the transition layer
 B = 0.0005  # Amplitude of the seed velocity
-N1D = 64  # Number of particles in one dimension
+N1D = 256  # Number of particles in one dimension
 
 fileOutputName = "kelvinHelmholtzGrowthRate.hdf5"
 
