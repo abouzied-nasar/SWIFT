@@ -40,9 +40,8 @@ extern "C" {
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#ifdef CUDA_PROFILER
+
 #include <cuda_profiler_api.h>
-#endif
 #endif
 
 /* This object's header. */
@@ -214,9 +213,7 @@ void *runner_main_cuda(void *data) {
     cudaStreamCreateWithFlags(&stream_pairs[i], cudaStreamNonBlocking);
 
     /* Declare some global variables */
-#ifdef CUDA_PROFILER
   int step = 0;
-#endif
 
   /* Tell me how much memory we're using. */
   gpu_print_free_mem(e, r->cpuid);
@@ -246,10 +243,8 @@ void *runner_main_cuda(void *data) {
     /*Some bits for output in case of debug*/
 
     /* TODO: DO WE STILL NEED THIS?? */
-#ifdef CUDA_PROFILER
-    if (step == 0) cudaProfilerStart();
+    if (step == 1) cudaProfilerStart();
     step++;
-#endif
 
     /* Loop while there are tasks... */
     while (1) {
@@ -732,6 +727,7 @@ void *runner_main_cuda(void *data) {
         t = scheduler_done(sched, t);
       }
     } /* Loop while there are tasks */
+    if (step == 3) cudaProfilerStop();
   } /* main loop. */
 
   /* Release the bytes back into the wilderness */

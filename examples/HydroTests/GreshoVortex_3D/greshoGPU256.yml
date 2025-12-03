@@ -8,9 +8,9 @@ InternalUnitSystem:
 
 Scheduler:
   gpu_self_pack_size:        32
-  gpu_self_bundle_size:      32
+  gpu_self_bundle_size:      16
   gpu_pair_pack_size:        2048
-  gpu_pair_bundle_size:      2048
+  gpu_pair_bundle_size:      1024
   gpu_recursion_max_depth:   4
   gpu_part_buffer_size:      700000
   max_top_level_cells:       16  # Use 16 for 64^3 with replicate 2, 32 for replicate 4
