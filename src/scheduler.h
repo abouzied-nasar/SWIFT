@@ -290,6 +290,7 @@ void scheduler_init(struct scheduler *s, struct space *space, int nr_tasks,
 struct task *scheduler_gettask(struct scheduler *s, int qid,
                                const struct task *prev);
 void scheduler_enqueue(struct scheduler *s, struct task *t);
+void scheduler_enqueue_dependencies(struct scheduler *s, struct task *t);
 void scheduler_start(struct scheduler *s);
 void scheduler_reset(struct scheduler *s, int nr_tasks);
 void scheduler_ranktasks(struct scheduler *s);
@@ -300,7 +301,6 @@ struct task *scheduler_addtask(struct scheduler *s, enum task_types type,
 void scheduler_splittasks(struct scheduler *s, const int fof_tasks,
                           const int verbose);
 struct task *scheduler_done(struct scheduler *s, struct task *t);
-struct task *scheduler_unlock(struct scheduler *s, struct task *t);
 void scheduler_addunlock(struct scheduler *s, struct task *ta, struct task *tb);
 void scheduler_set_unlocks(struct scheduler *s, struct threadpool *tp);
 void scheduler_dump_queue(struct scheduler *s);
@@ -314,8 +314,5 @@ void scheduler_write_task_level(const struct scheduler *s, int step);
 void scheduler_dump_queues(struct engine *e);
 void scheduler_report_task_times(const struct scheduler *s,
                                  const int nr_threads);
-struct task *enqueue_dependencies(struct scheduler *s, struct task *t);
-struct task *signal_sleeping_runners(struct scheduler *s, struct task *t,
-                                     int tasks_packed);
 
 #endif /* SWIFT_SCHEDULER_H */

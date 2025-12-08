@@ -489,20 +489,70 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   int *task_first_packed_leaf = md->task_first_packed_leaf;
   int *task_last_packed_leaf = md->task_last_packed_leaf;
 
+  /* Should we early exit? */
+  if ((md->task_n_leaves == 0) &&
+      (!md->launch_leftovers ||
+       (md->launch_leftovers && md->n_leaves_packed == 0))) {
+    /* Exception-handle the case where we found an active task with no cells
+     * that need interacting. This can happen for a pair task when either one
+     * or both cells involved are active, but their respective leaf cells are
+     * too far apart to actually interact with each other.
+     * If we're not launching leftovers, we can just skip doing any work on
+     * this task. So just mark it as completed. However, if we're unlucky and
+     * have to launch leftovers currently stored in the buffer, they may never
+     * get launched otherwise. So only early-exit if we're not launching
+     * leftovers too.
+     * The third option to skip launching is if we're launching a single
+     * leftover task that has no interacting cells and we have no previously
+     * packed tasks. Not exception-handling this scenario leads to errors down
+     * the line (e.g. bundle_size = 0). */
+
+#ifdef SWIFT_DEBUG_CHECKS
+    /* This could be benign if I failed to account for some weird scenario, but
+     * an active self task should have at least one active self cell to do work
+     * on. */
+    if (t->type == task_type_self)
+      error("Found active self task with zero interactions.");
+#endif
+
+    /* Unlock this task's resources. */
+    task_unlock(t);
+
+    /* No work left for this task, close it up. */
+    scheduler_enqueue_dependencies(s, t);
+
+    /* Tell the scheduler's bookkeeping that this task is done */
+    pthread_mutex_lock(&s->sleep_mutex);
+    atomic_dec(&s->waiting);
+    pthread_cond_broadcast(&s->sleep_cond);
+    pthread_mutex_unlock(&s->sleep_mutex);
+
+    /* Mark the task as done. */
+    t->skip = 1;
+
+    /* We're done here. */
+    return;
+  }
+
   /* Nr of super-level tasks we've accounted for in the meda-data arrays. */
   int tind = md->tasks_in_list;
 
 #ifdef SWIFT_DEBUG_CHECKS
-  if (tind >= md->params.pack_size)
-    error("Writing out of task_list array bounds: %d/%d",
-          tind, md->params.pack_size);
+  /* Check whether we'll be writing out of bounds. Allow for the special case
+   * where we find a task with zero leaf cell pair interactions */
+  if (tind > md->params.pack_size ||
+      ((tind == md->params.pack_size && md->task_n_leaves != 0)))
+    error(
+        "Runner %d: Writing out of task_list array bounds: "
+        "%d/%d, n_leaves_packed=%d, task_n_leaves=%d",
+        r->id, tind, md->params.pack_size, md->n_leaves_packed,
+        md->task_n_leaves);
 #endif
 
   /* Keep track of index of first leaf cell pairs in lists per super-level pair
    * task in case we are packing more than one super-level task into this
-   * buffer. Note that md->n_leaves has not been yet updated to contain this
-   * task's leaf cell pair count.*/
-  task_first_packed_leaf[tind] = md->n_leaves;
+   * buffer. */
+  task_first_packed_leaf[tind] = md->n_leaves_packed;
   /* Same for the first particle index in particle buffers */
   md->task_first_packed_part[tind] = md->count_parts;
 
@@ -528,26 +578,39 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   /* How many leaf cell interactions do we want to offload at once? */
   const int target_n_leaves = md->params.pack_size;
 
-  /* Counter for how many leaf cells  of this task we've packed */
+  /* Counter for how many leaf cells of this task we've packed */
   int npacked = 0;
 
-  /* TODO: @Abouzied Please document what is happening here, this looks very
-   * important and scary. Why does this need to happen here, and not
-   * earlier/later? */
-  cell_unlocktree(t->ci);
-  if (t->cj != NULL) cell_unlocktree(t->cj);
+  /* Is this task's cell data currently unlocked? It comes in locked, but we
+   * may unlock it during the offloading. */
+  char unlocked = 0;
+
+  /* Do we have a task with no active cells, but are launching leftovers? */
+  char launch_empty_task_leftovers =
+      (md->task_n_leaves == 0) && md->launch_leftovers;
 
   /* Now we go on to pack the particle data into the buffers. If we find enough
    * data (leaf cell pairs) for an offload, we launch. If there are leaf cell
    * pairs to pack after the launch, we pack those too after the launch and
    * unpacking is complete. By the end, all data will have been packed and some
    * of it (possibly all of it) will have been solved on the GPU already. */
-  while (npacked < md->task_n_leaves) {
+  while ((npacked < md->task_n_leaves) || launch_empty_task_leftovers) {
+
+    /* We only need this for the first entry into the main loop. */
+    launch_empty_task_leftovers = 0;
 
     /* Inside this loop, we're always working on the last task in our list. But
      * if we launch within this loop, we will shift data back to index 0
      * afterwards, so read the correct up-to-date task index here each time. */
     tind = md->tasks_in_list - 1;
+
+    /* Lock this task's cell data. */
+    if (unlocked) {
+      /* Spin until you get the lock. */
+      while (task_lock(t) != 1) {
+      };
+      unlocked = 0;
+    }
 
 #ifdef SWIFT_DEBUG_CHECKS
     if (md->n_leaves_packed >= md->params.leaf_buffer_size)
@@ -559,34 +622,37 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     struct cell *cii = md->ci_leaves[md->n_leaves_packed];
     struct cell *cjj = md->cj_leaves[md->n_leaves_packed];
 
+    if (md->task_n_leaves > 0) {
+
 #ifdef SWIFT_DEBUG_CHECKS
-    if (cii->hydro.count == 0)
-      error(
-          "Found cell cii with particle count=0 during packing. "
-          "It should have been excluded during the recursion.");
-    if (cjj->hydro.count == 0)
-      error(
-          "Found cell cjj with particle count=0 during packing. "
-          "It should have been excluded during the recursion.");
+      if (cii->hydro.count == 0)
+        error(
+            "Found cell cii with particle count=0 during packing. "
+            "It should have been excluded during the recursion.");
+      if (cjj->hydro.count == 0)
+        error(
+            "Found cell cjj with particle count=0 during packing. "
+            "It should have been excluded during the recursion.");
 #endif
 
-    /* Pack the particle data */
-    /* Note that this increments md->count_parts and md->n_leaves_packed */
-    if (t->subtype == task_subtype_gpu_density) {
-      runner_gpu_pack_density(r, buf, cii, cjj);
-    } else if (t->subtype == task_subtype_gpu_gradient) {
-      runner_gpu_pack_gradient(r, buf, cii, cjj);
-    } else if (t->subtype == task_subtype_gpu_force) {
-      runner_gpu_pack_force(r, buf, cii, cjj);
-    }
+      /* Pack the particle data */
+      /* Note that this increments md->count_parts and md->n_leaves_packed */
+      if (t->subtype == task_subtype_gpu_density) {
+        runner_gpu_pack_density(r, buf, cii, cjj);
+      } else if (t->subtype == task_subtype_gpu_gradient) {
+        runner_gpu_pack_gradient(r, buf, cii, cjj);
+      } else if (t->subtype == task_subtype_gpu_force) {
+        runner_gpu_pack_force(r, buf, cii, cjj);
+      }
 #ifdef SWIFT_DEBUG_CHECKS
-    else {
-      error("Unknown task subtype %s", subtaskID_names[t->subtype]);
-    }
+      else {
+        error("Unknown task subtype %s", subtaskID_names[t->subtype]);
+      }
 #endif
 
-    /* record how many leaves we've packed in total during this while loop */
-    npacked++;
+      /* record how many leaves we've packed in total during this while loop */
+      npacked++;
+    }
 
     /* Update the current last leaf cell pair index of this task. */
     /* md->leaf_pairs_packed was incremented in runner_dopair_gpu_pack_<*>. */
@@ -599,6 +665,14 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
      * remaining leaves? */
     if (md->launch ||
         (md->launch_leftovers && (npacked == md->task_n_leaves))) {
+
+      /* Let others touch data while we're doing GPU computations.
+       * We need this task's data released for the unpacking procedure: If
+       * there is another task in the list we're offloading which requires data
+       * of a cell that this current task is locking, then we'll deadlock. */
+      task_unlock(t);
+      /* Take note that we unlocked this task. */
+      unlocked = 1;
 
       if (t->subtype == task_subtype_gpu_density) {
 
@@ -695,6 +769,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     } /* if launch or launch_leftovers */
   } /* while npacked < md->task_n_leaves */
 
+  /* We're done with this task's data: Everything we'll need has been copied
+   * into buffers. So we can release the cell locks now. */
+  if (!unlocked) task_unlock(t);
+
+  /* Reset flags too. */
   md->launch_leftovers = 0;
   md->launch = 0;
 }
@@ -724,11 +803,11 @@ static void runner_doself_gpu_density(struct runner *r, struct scheduler *s,
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
-  lock_lock(&s->queues[qid].lock);
-  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]--;
-  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density] < 1)
-    buf->md.launch_leftovers = 1;
-  (void)lock_unlock(&s->queues[qid].lock);
+  /* atomic_dec returns previously held value; So subtract 1 from it again */
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
+      1;
+  if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
@@ -759,11 +838,11 @@ static void runner_doself_gpu_gradient(struct runner *r, struct scheduler *s,
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
-  lock_lock(&s->queues[qid].lock);
-  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]--;
-  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient] < 1)
-    buf->md.launch_leftovers = 1;
-  (void)lock_unlock(&s->queues[qid].lock);
+  /* atomic_dec returns previously held value; So subtract 1 from it again */
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
+      1;
+  if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
@@ -794,12 +873,10 @@ static void runner_doself_gpu_force(struct runner *r, struct scheduler *s,
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
-  lock_lock(&s->queues[qid].lock);
-  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]--;
-  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force] < 1)
-    buf->md.launch_leftovers = 1;
-  (void)lock_unlock(&s->queues[qid].lock);
-
+  /* atomic_dec returns previously held value; So subtract 1 from it again */
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
+  if (count < 1) buf->md.launch_leftovers = 1;
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
 }
@@ -833,11 +910,11 @@ static void runner_dopair_gpu_density(const struct runner *r,
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
-  lock_lock(&s->queues[qid].lock);
-  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]--;
-  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density] < 1)
-    buf->md.launch_leftovers = 1;
-  (void)lock_unlock(&s->queues[qid].lock);
+  /* atomic_dec returns previously held value; So subtract 1 from it again */
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
+      1;
+  if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
@@ -872,11 +949,11 @@ static void runner_dopair_gpu_gradient(const struct runner *r,
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
-  lock_lock(&s->queues[qid].lock);
-  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]--;
-  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient] < 1)
-    buf->md.launch_leftovers = 1;
-  (void)lock_unlock(&s->queues[qid].lock);
+  /* atomic_dec returns previously held value; So subtract 1 from it again */
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
+      1;
+  if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
@@ -910,11 +987,10 @@ static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
-  lock_lock(&s->queues[qid].lock);
-  s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]--;
-  if (s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force] < 1)
-    buf->md.launch_leftovers = 1;
-  (void)lock_unlock(&s->queues[qid].lock);
+  /* atomic_dec returns previously held value; So subtract 1 from it again */
+  int count =
+      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
+  if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);

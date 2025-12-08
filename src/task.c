@@ -526,7 +526,7 @@ float task_overlap(const struct task *restrict ta,
  *
  * @param t The #task.
  */
-void task_unlock(struct task *t) {
+void task_unlock(const struct task *t) {
 
   const enum task_types type = t->type;
   const enum task_subtypes subtype = t->subtype;
@@ -730,14 +730,17 @@ void task_unlock(struct task *t) {
  * @brief Try to lock the cells associated with this task.
  *
  * @param t the #task.
+ * @return 1 if lock was successfully obtained, 0 otherwise.
  */
 int task_lock(struct task *t) {
 
   const enum task_types type = t->type;
   const enum task_subtypes subtype = t->subtype;
-  struct cell *ci = t->ci, *cj = t->cj;
+  struct cell *ci = t->ci;
+  struct cell *cj = t->cj;
 #ifdef WITH_MPI
-  int res = 0, err = 0;
+  int res = 0;
+  int err = 0;
   MPI_Status stat;
 #endif
 

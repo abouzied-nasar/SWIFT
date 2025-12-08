@@ -251,9 +251,6 @@ struct task {
   /*! Pointers to the cells this task acts upon */
   struct cell *ci, *cj;
 
-  /* TODO: Do we still need this? */
-  int done;
-
   /*! List of tasks unlocked by this one */
   struct task **unlock_tasks;
 
@@ -316,7 +313,7 @@ struct task {
 } SWIFT_STRUCT_ALIGN;
 
 /* Function prototypes. */
-void task_unlock(struct task *t);
+void task_unlock(const struct task *t);
 float task_overlap(const struct task *ta, const struct task *tb);
 int task_lock(struct task *t);
 struct task *task_get_unique_dependent(const struct task *t);

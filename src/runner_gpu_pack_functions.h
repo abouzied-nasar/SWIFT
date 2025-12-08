@@ -239,18 +239,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
       /* Anything to do here? */
       if (task_unpacked[tid]) continue;
 
-      const struct task *t = md->task_list[tid];
+      struct task *t = md->task_list[tid];
 
       /* Can we get the locks? */
-      if (cell_locktree(t->ci) != 0) continue;
-      if (t->cj != NULL) {
-        /* This was a pair task, get other cell too */
-        /* TODO: skip MPI proxy cells ? */
-        if (cell_locktree(t->cj) != 0) {
-          cell_unlocktree(t->ci);
-          continue;
-        }
-      }
+      if (task_lock(t) == 0) continue;
 
       /* We got it! Mark that. */
       task_unpacked[tid] = 1;
@@ -334,9 +326,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
 
       } /* Loop over all leaves of task */
 
-      /* We're done with this task. Release the cells */
-      cell_unlocktree(t->ci);
-      if (t->cj != NULL) cell_unlocktree(t->cj);
+      /* We're done with this task. Release the cells. */
+      task_unlock(t);
 
       /* If we haven't finished packing the currently handled task's leaf cells,
        * we mustn't unlock its dependencies yet. ("Currently handled task" is
@@ -350,7 +341,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
        * completed. */
 
       /* schedule my dependencies */
-      enqueue_dependencies(s, md->task_list[tid]);
+      scheduler_enqueue_dependencies(s, t);
 
       /* Tell the scheduler's bookkeeping that this task is done */
       pthread_mutex_lock(&s->sleep_mutex);
@@ -359,8 +350,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
       pthread_mutex_unlock(&s->sleep_mutex);
 
       /* Mark the task as done. */
-      md->task_list[tid]->skip = 1;
-      md->task_list[tid]->done = 1;
+      t->skip = 1;
 
     } /* Loop over tasks in list */
   } /* While there are unpacked tasks */
