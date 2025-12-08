@@ -76,7 +76,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
 }
 
 /**
- * @brief Unpacks the density data from GPU buffers into cell's particle arrays
+ * @brief Unpacks the gradient data from GPU buffers into cell's particle arrays
  *
  * @param c the #cell
  * @param parts_buffer the "receive" buffer to copy from
@@ -98,20 +98,20 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_gradient(
 
     struct gpu_part_recv_g pr = parts_recv[i];
 
-    float vsig = fmaxf(pr.vsig_lapu_aviscmax.x, part_get_v_sig(p));
+    float vsig = fmaxf(pr.aviscmax_vsig_lapu.y, part_get_v_sig(p));
     part_set_v_sig(p, vsig);
 
-    float lu = pr.vsig_lapu_aviscmax.y + part_get_laplace_u(p);
-    part_set_laplace_u(p, lu);
-
     float avisc_old = part_get_alpha_visc_max_ngb(p);
-    float avisc = fmaxf(avisc_old, pr.vsig_lapu_aviscmax.z);
+    float avisc = fmaxf(avisc_old, pr.aviscmax_vsig_lapu.z);
     part_set_alpha_visc_max_ngb(p, avisc);
+
+    float lu = pr.aviscmax_vsig_lapu.z + part_get_laplace_u(p);
+    part_set_laplace_u(p, lu);
   }
 }
 
 /**
- * @brief Unpacks the density data from GPU buffers into cell's particle arrays
+ * @brief Unpacks the force data from GPU buffers into cell's particle arrays
  *
  * @param c the #cell
  * @param parts_buffer the "receive" buffer to copy from
@@ -150,7 +150,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
 }
 
 /**
- * @brief Packs the cell particle data for pair density interactions into the
+ * @brief Packs the cell particle data for density interactions into the
  * CPU-side buffers.
  *
  * @param c the #cell
@@ -194,8 +194,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
 }
 
 /**
- * @brief Packs the cell particle data for pair gradient interactions into the
- * CPU-side buffers.
+ * @brief Packs the cell particle data for gradient interactions into
+ * the CPU-side buffers.
  *
  * @param ci the #cell
  * @param parts_buffer the buffer to pack into
@@ -232,10 +232,14 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     ps[i].vx_m.z = v[2];
     ps[i].vx_m.w = part_get_mass(p);
 
-    ps[i].rho_avisc_u_c.x = part_get_rho(p);
-    ps[i].rho_avisc_u_c.y = part_get_alpha_av(p);
-    ps[i].rho_avisc_u_c.z = part_get_u(p);
-    ps[i].rho_avisc_u_c.w = part_get_soundspeed(p);
+    ps[i].u_rho_c_aviscmax.x = part_get_u(p);
+    ps[i].u_rho_c_aviscmax.y = part_get_rho(p);
+    ps[i].u_rho_c_aviscmax.z = part_get_soundspeed(p);
+    ps[i].u_rho_c_aviscmax.w = part_get_alpha_visc_max_ngb(p);
+
+    ps[i].avisc_vsig_lapu.x = part_get_alpha_av(p);
+    ps[i].avisc_vsig_lapu.y = part_get_v_sig(p);
+    ps[i].avisc_vsig_lapu.z = part_get_laplace_u(p);
 
     ps[i].pjs_pje.x = cjstart;
     ps[i].pjs_pje.y = cjend;
@@ -243,7 +247,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
 }
 
 /**
- * @brief Packs the cell particle data for pair gradient interactions into the
+ * @brief Packs the cell particle data for force interactions into the
  * CPU-side buffers.
  *
  * @param ci the #cell
@@ -280,15 +284,15 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     ps[i].vx_m.z = v[2];
     ps[i].vx_m.w = part_get_mass(p);
 
-    ps[i].f_bals_rho_p.x = part_get_f_gradh(p);
-    ps[i].f_bals_rho_p.y = part_get_balsara(p);
-    ps[i].f_bals_rho_p.z = part_get_rho(p);
-    ps[i].f_bals_rho_p.w = part_get_pressure(p);
+    ps[i].u_rho_f_p.x = part_get_u(p);
+    ps[i].u_rho_f_p.y = part_get_rho(p);
+    ps[i].u_rho_f_p.z = part_get_f_gradh(p);
+    ps[i].u_rho_f_p.w = part_get_pressure(p);
 
-    ps[i].c_u_avisc_adiff.x = part_get_soundspeed(p);
-    ps[i].c_u_avisc_adiff.y = part_get_u(p);
-    ps[i].c_u_avisc_adiff.z = part_get_alpha_av(p);
-    ps[i].c_u_avisc_adiff.w = part_get_alpha_diff(p);
+    ps[i].bals_c_avisc_adiff.x = part_get_balsara(p);
+    ps[i].bals_c_avisc_adiff.y = part_get_soundspeed(p);
+    ps[i].bals_c_avisc_adiff.z = part_get_alpha_av(p);
+    ps[i].bals_c_avisc_adiff.w = part_get_alpha_diff(p);
 
     ps[i].timebin_minngbtimebin_pjs_pje.x = (int)part_get_time_bin(p);
     int mintbin = (int)part_get_timestep_limiter_min_ngb_time_bin(p);
