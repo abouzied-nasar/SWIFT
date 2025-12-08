@@ -124,7 +124,7 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
     md->task_n_leaves++;
   }
 
-  if (timer) TIMER_TOC(timer_dopair_gpu_recurse);
+  if (timer) TIMER_TOC(timer_gpu_pair_recurse);
 }
 
 /**
@@ -200,7 +200,7 @@ static void runner_doself_gpu_recurse(const struct runner *r,
     md->task_n_leaves++;
   }
 
-  if (timer) TIMER_TOC(timer_doself_gpu_recurse);
+  if (timer) TIMER_TOC(timer_gpu_self_recurse);
 }
 
 /**
