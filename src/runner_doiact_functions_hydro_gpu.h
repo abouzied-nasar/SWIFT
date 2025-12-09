@@ -241,7 +241,7 @@ int hash_lookup(const struct cell *c, const int hash_size, const struct hash_ent
 
 /* Insert into hash table. No need for probing as we will
  * only store one cell in each index of hash table*/
-void hash_insert(struct cell *c, int unique_index, const int hash_size, struct hash_entry * ht) {
+void hash_insert(struct cell *c, int unique_count, const int hash_size, struct hash_entry * ht) {
     int h_id = hash_func(c, hash_size);
     int start = h_id;
     /*Do a linear probe of hash table*/
@@ -259,7 +259,8 @@ void hash_insert(struct cell *c, int unique_index, const int hash_size, struct h
     if(h_id > hash_size)
       error("Ran over hash table");
     ht[h_id].c = c;
-    ht[h_id].index = unique_index;
+    /*This is where the cell is located in the unique_cells array*/
+    ht[h_id].index = unique_count;
     ht[h_id].occupied = 1;
 }
 
@@ -319,16 +320,19 @@ static void runner_gpu_filter_data(const struct runner *r,
 
   /*Check if ci has already been found.
    * If so, return where it's unique copy
-   * is found in the unique cells array
+   * is found in the hash table
    * Otherwise, return -1*/
-  int unique_index = hash_lookup(cii, hash_size, ht);
-  if (unique_index >= 0)
+  int ht_index = hash_lookup(cii, hash_size, ht);
+  if (ht_index >= 0)
 	  /*We found this cell's hash value exists -> Not unique*/
-	  md->my_index[index_2_check].x = unique_index;
+	  md->my_index[index_2_check].x = ht_index;
   else {
 	  /*This cell has not been found yet.
 	   * Add to hash table and store it's index*/
 	  md->my_index[index_2_check].x = unique_count;
+	  /*unique_cells is different from hash table.
+	   * This is just an array to keep track of
+	   * unique cells*/
 	  md->unique_cells[unique_count] = cii;
 	  md->pack_flags[index_2_check].x = 1;
 	  hash_insert(cii, unique_count, hash_size, ht);
@@ -336,9 +340,9 @@ static void runner_gpu_filter_data(const struct runner *r,
   }
 
   /*Same for cj*/
-  unique_index = hash_lookup(cjj, hash_size, ht);
-  if (unique_index >= 0)
-	  md->my_index[index_2_check].y = unique_index;
+  ht_index = hash_lookup(cjj, hash_size, ht);
+  if (ht_index >= 0)
+	  md->my_index[index_2_check].y = ht_index;
   else {
 	  md->my_index[index_2_check].y = unique_count;
 	  md->unique_cells[unique_count] = cjj;
