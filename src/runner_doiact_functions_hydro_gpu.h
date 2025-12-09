@@ -243,21 +243,6 @@ int hash_lookup(const struct cell *c, const int hash_size, const struct hash_ent
  * only store one cell in each index of hash table*/
 void hash_insert(struct cell *c, int unique_index, const int hash_size, struct hash_entry * ht) {
     int h_id = hash_func(c, hash_size);
-    int start = h_id;
-    /*Do a linear probe of hash table*/
-    while(ht[h_id].occupied){
-//    while(hash_table[h_id].c)
-      h_id = (h_id + 1) % hash_size;
-      /*If we reach the start of the
-       * has table it means we've over-filled it.
-       * Nothing to do but crash*/
-      if(h_id == start)
-    	error("hash table full");
-    }
-    /*If we exited h_id is the next empty
-     * index. Stuff our cell hash here*/
-    if(h_id > hash_size)
-      error("Ran over hash table");
     ht[h_id].c = c;
     ht[h_id].index = unique_index;
     ht[h_id].occupied = 1;
@@ -321,10 +306,10 @@ static void runner_gpu_filter_data(const struct runner *r,
    * If so, return where it's unique copy
    * is found in the unique cells array
    * Otherwise, return -1*/
-  int u_index = hash_lookup(cii, hash_size, ht);
-  if (u_index >= 0)
+  int unique_index = hash_lookup(cii, hash_size, ht);
+  if (unique_index >= 0)
 	  /*We found this cell's hash value exists -> Not unique*/
-	  md->my_index[index_2_check].x = u_index;
+	  md->my_index[index_2_check].x = unique_index;
   else {
 	  /*This cell has not been found yet.
 	   * Add to hash table and store it's index*/
@@ -336,9 +321,9 @@ static void runner_gpu_filter_data(const struct runner *r,
   }
 
   /*Same for cj*/
-  u_index = hash_lookup(cjj, hash_size, ht);
-  if (u_index >= 0)
-	  md->my_index[index_2_check].y = u_index;
+  unique_index = hash_lookup(cjj, hash_size, ht);
+  if (unique_index >= 0)
+	  md->my_index[index_2_check].y = unique_index;
   else {
 	  md->my_index[index_2_check].y = unique_count;
 	  md->unique_cells[unique_count] = cjj;
