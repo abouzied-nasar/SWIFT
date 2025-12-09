@@ -413,7 +413,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     }
 #endif
   }
-
+  /*Send to GPU to have an idea of space size for periodics*/
+  double3 space_dim;
+  space_dim.x = r->e->s->dim[0];
+  space_dim.y = r->e->s->dim[1];
+  space_dim.z = r->e->s->dim[2];
+  const struct gpu_md *gpu_md = &buf->gpu_md;
   cudaError_t cu_error = cudaSuccess;
 
 //  if (task_subtype == task_subtype_gpu_density){
@@ -451,15 +456,25 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
             "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i ",
             cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
       }
+      /* Get the cell count for this bundle */
+      const int bundle_n_cells = md->n_leaves_packed;
+      const int num_blocks_x_cells =
+          (bundle_n_cells + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+
+      gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
+    		  num_blocks_x_cells,
+			  gpu_md->d_cell_i_j_start_end,
+			  gpu_md->d_cell_i_j_start_end_non_compact,
+			  bundle_n_cells, space_dim);
+      /* Copy results back to CPU BUFFERS */
       cu_error =
-          cudaMemcpy(&buf->gpu_md.d_cell_i_j_start_end_non_compact[0],
-            &buf->gpu_md.cell_i_j_start_end_non_compact[0],
-            leaves_packed * sizeof(int4),
-            cudaMemcpyHostToDevice);
+          cudaMemcpy(&buf->parts_recv_d[0],
+                          &buf->d_parts_recv_d[0],
+                          md->count_parts * sizeof(struct gpu_part_recv_d),
+                          cudaMemcpyDeviceToHost);
   }
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
    * its own stream. */
-  const struct gpu_md *gpu_md = &buf->gpu_md;
   for (int bid = 0; bid < n_bundles; bid++) {
 
 //    /* Get the particle count for this bundle */
@@ -468,12 +483,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
                                      ? md->bundle_first_part[bid + 1]
                                      : md->count_parts;
     const int bundle_n_parts = bundle_last_part - bundle_first_part;
-    /* Get the particle count for this bundle */
-    const int bundle_first_cell = md->bundle_first_cell[bid];
-    const int bundle_last_cell = bid < (n_bundles - 1)
-                                     ? md->bundle_first_cell[bid + 1]
-                                     : leaves_packed;
-    const int bundle_n_cells = bundle_last_cell - bundle_first_cell;
 
     if (task_subtype == task_subtype_gpu_density) {
 
@@ -512,21 +521,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     /* TODO: num_blocks_y is not used anymore. Purge it. */
     const int num_blocks_x =
         (bundle_n_parts + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
-    const int num_blocks_x_cells =
-        (bundle_n_cells + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
     const int num_blocks_y = 0;
 
-    double3 space_dim;
-    space_dim.x = r->e->s->dim[0];
-    space_dim.y = r->e->s->dim[1];
-    space_dim.z = r->e->s->dim[2];
     /* Launch the kernel for ci using data for ci and cj */
     if (task_subtype == task_subtype_gpu_density) {
-      gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
-                         stream[bid], num_blocks_x_cells, num_blocks_y,
-                         bundle_first_part, bundle_n_parts, gpu_md->d_cell_i_j_start_end,
-                         gpu_md->d_cell_i_j_start_end_non_compact,
-                         bundle_first_cell, bundle_n_cells, space_dim);
+//      gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
+//                         stream[bid], num_blocks_x_cells, num_blocks_y,
+//                         bundle_first_part, bundle_n_parts, gpu_md->d_cell_i_j_start_end,
+//                         gpu_md->d_cell_i_j_start_end_non_compact,
+//                         bundle_first_cell, bundle_n_cells, space_dim);
 
     } else if (task_subtype == task_subtype_gpu_gradient) {
 
@@ -597,14 +600,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
   } /* End of looping over bundles to launch in streams */
 
-  /* Copy results back to CPU BUFFERS */
-  if (task_subtype == task_subtype_gpu_density) {
-    cu_error =
-        cudaMemcpy(&buf->parts_recv_d[0],
-                        &buf->d_parts_recv_d[0],
-                        md->count_parts * sizeof(struct gpu_part_recv_d),
-                        cudaMemcpyDeviceToHost);
-  }
   /* Issue synchronisation commands for all events recorded by GPU
    * Should swap with one cuda Device Synchronise really if we decide to go
    * this way with unpacking done separately */

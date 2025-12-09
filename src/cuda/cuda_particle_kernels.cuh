@@ -80,7 +80,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   double3 shift = {0.0, 0.0, 0.0};
 
   /*Fine for now as thread divergence
-   * will be one line of code*/
+   * will be one (three) line of code*/
   if(distx < -space_dim.x * 0.5)
     shift.x = space_dim.x;
   else if(distx > space_dim.x * 0.5)
@@ -169,6 +169,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
       if ((r2 < hig2) && (j != i)) {
         /* j != pid: Exclude self contribution. This happens at a later step. */
 
+        printf("found a neighbour %i\n", j);
     	n_neighbours++;
         /* Recover some data */
         const float r = sqrtf(r2);

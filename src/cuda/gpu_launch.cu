@@ -55,15 +55,15 @@ extern "C" {
 __global__ void cuda_launch_density(
     const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv, const float d_a,
-    const float d_H, const int bundle_first_part, const int bundle_n_parts,
+    const float d_H,
     const int4 *__restrict__ d_cell_i_j_start_end, const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
-    const int bundle_first_cell, const int bundle_n_cells,
+    const int bundle_n_cells,
     const double3 space_dim) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
-  const int cid = bundle_first_cell + threadid;
+  const int cid = threadid;
 
-  if (cid < bundle_first_cell + bundle_n_cells) {
+  if (cid < bundle_n_cells) {
     cuda_kernel_density(cid, d_parts_send, d_parts_recv, d_a, d_H, d_cell_i_j_start_end, d_cell_i_j_start_end_non_compact, space_dim);
   }
 }
@@ -132,18 +132,17 @@ __global__ void cuda_launch_force(
  */
 void gpu_launch_density(const struct gpu_part_send_d *__restrict__ d_parts_send,
                         struct gpu_part_recv_d *__restrict__ d_parts_recv,
-                        const float d_a, const float d_H, cudaStream_t stream,
-                        const int num_blocks_x, const int num_blocks_y,
-                        const int bundle_first_part, const int bundle_n_parts,
+                        const float d_a, const float d_H,
+                        const int num_blocks_x,
                         const int4 *__restrict__ d_cell_i_j_start_end,
                         const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
-                        const int bundle_first_cell, const int bundle_n_cells, const double3 space_dim) {
+                        const int bundle_n_cells, const double3 space_dim) {
 
   /* TODO: Do we want to allocate shared memory here? */
-  cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
-      d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts,
+  cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0>>>(
+      d_parts_send, d_parts_recv, d_a, d_H,
       d_cell_i_j_start_end, d_cell_i_j_start_end_non_compact,
-      bundle_first_cell, bundle_n_cells, space_dim);
+      bundle_n_cells, space_dim);
 }
 
 /**
