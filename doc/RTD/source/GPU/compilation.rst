@@ -226,7 +226,7 @@ CUDA and ASAN don't like each other so WHEN RUNNING CODE COMPILED WITH SANITIZER
 ----------------------------------------------
 
 Happens on some machines/environments for (yet) unknown reasons. To resolve the
-problem, add pass ``-lstdc++`` to the linker, e.g.
+problem, pass the ``-lstdc++`` flag to the linker, e.g.
 
 .. code-block:: bash
 
