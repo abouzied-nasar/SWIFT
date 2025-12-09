@@ -263,66 +263,6 @@ void hash_insert(struct cell *c, int unique_index, const int hash_size, struct h
     ht[h_id].occupied = 1;
 }
 
-
-// Main function to process leaves
-//void filter_leaves(struct gpu_pack_metadata *md, struct gpu_offload_data *buf,
-//                    struct cell **ci_leaves, struct cell **cj_leaves) {
-//  int unique_count = md->n_unique;
-//
-//  struct hash_table * hash_table = md->hash_table;
-//  const int hash_size = md->hash_size;
-//  for(int i = 0; i < hash_size; i++)
-//	  hash_table[i].occupied = 0;
-//  /*Start from where we left off in previous task.
-//   * If we do not have previous non-offloaded leaf comps
-//   * then n_leaves = 0. Otherwise, start from index of
-//   * last packed leaf comp to however many leaves we
-//   * have found in current task*/
-//  for (int i = md->n_leaves; i < md->n_leaves + md->task_n_leaves; i++) {
-////	message("hashing cell %i\n", i);
-//	struct cell *cii = ci_leaves[i];
-//	struct cell *cjj = cj_leaves[i];
-//
-//	if (cii == NULL || cjj == NULL)
-//	  error("Error: working on NULL cells");
-//
-//	md->pack_flags[i][0] = 0;
-//	md->pack_flags[i][0] = 0;
-//
-//	/*Check if ci has already been found.
-//	 * If so, return where it's unique copy is found in the unique cells array*/
-//	int u_index = hash_lookup(cii, hash_size, hash_table);
-//	if (u_index >= 0)
-//	  /*We found this cell's hash value exists -> Not unique*/
-//	  buf->my_index[i].x = u_index;
-//	else {
-//	  /*This cell has not been found yet.
-//	   * Add to hash table and store it's index*/
-//	  buf->my_index[i].x = unique_count;
-//	  md->unique_cells[unique_count] = cii;
-//	  md->pack_flags[i][0] = 1;
-//	  hash_insert(cii, unique_count, hash_size, hash_table);
-//	  unique_count++;
-//	}
-//
-//	/*Same for cj*/
-//	u_index = hash_lookup(cjj, hash_size, hash_table);
-//	if (u_index >= 0)
-//      buf->my_index[i].y = u_index;
-//	else {
-//	  buf->my_index[i].y = unique_count;
-//	  md->unique_cells[unique_count] = cjj;
-//	  md->pack_flags[i][1] = 1;
-//	  hash_insert(cjj, unique_count, hash_size, hash_table);
-//	  unique_count++;
-//	}
-//  }
-//
-//  md->n_unique += unique_count;
-//}
-
-
-
 /**
  * @brief recurse into a cell and recursively identify all leaf cell
  * interactions needed in this step.
