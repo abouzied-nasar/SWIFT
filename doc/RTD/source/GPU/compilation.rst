@@ -108,6 +108,7 @@ So if you intend on adding new files, please follow this convention:
   * should be ``.cu`` files. Add them to the ``AM_CUDA_DEVICE_SOURCES``,
     ``AM_CUDA_DEVICE_OBJECTS``, and ``AM_CUDA_DEVICE_DLINK_OBJECTS`` variables
     in ``src/Makefile.am``.
+
   * Corresponding header files should be ``.cuh`` files. Add them to the
     ``include_HEADERS`` variable.
 
@@ -221,8 +222,15 @@ CUDA and ASAN don't like each other so WHEN RUNNING CODE COMPILED WITH SANITIZER
 
 
 
+``undefined reference to `__cxa_guard_abort'``
+----------------------------------------------
 
+Happens on some machines/environments for (yet) unknown reasons. To resolve the
+problem, add pass ``-lstdc++`` to the linker, e.g.
 
+.. code-block:: bash
+
+   LIBS="-lstdc++" ./configure --with-cuda
 
 
 
