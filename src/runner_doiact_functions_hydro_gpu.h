@@ -322,13 +322,13 @@ static void runner_gpu_filter_data(const struct runner *r,
    * If so, return where it's unique copy
    * is found in the hash table
    * Otherwise, return -1*/
-  int ht_index = hash_lookup(cii, hash_size, ht);
-  if (ht_index >= 0)
+  int unique_index = hash_lookup(cii, hash_size, ht);
+  if (unique_index >= 0)
 	  /*We found this cell's hash value exists -> Not unique*/
-	  md->my_index[index_2_check].x = ht_index;
+	  md->my_index[index_2_check].x = unique_index;
   else {
 	  /*This cell has not been found yet.
-	   * Add to hash table and store it's index*/
+	   * Add to unique_cells and store it's index*/
 	  md->my_index[index_2_check].x = unique_count;
 	  /*unique_cells is different from hash table.
 	   * This is just an array to keep track of
@@ -340,9 +340,9 @@ static void runner_gpu_filter_data(const struct runner *r,
   }
 
   /*Same for cj*/
-  ht_index = hash_lookup(cjj, hash_size, ht);
-  if (ht_index >= 0)
-	  md->my_index[index_2_check].y = ht_index;
+  unique_index = hash_lookup(cjj, hash_size, ht);
+  if (unique_index >= 0)
+	  md->my_index[index_2_check].y = unique_index;
   else {
 	  md->my_index[index_2_check].y = unique_count;
 	  md->unique_cells[unique_count] = cjj;
@@ -352,82 +352,6 @@ static void runner_gpu_filter_data(const struct runner *r,
   }
 
   md->n_unique = unique_count;
-
-//  filter_leaves(md, buf, ci_leaves, cj_leaves);
-
-
-//  /*TODO: Crude loop for now just to quickly bash something in to work.
-//   * Come back to this and optimise so we only loop to
-//   * uniqe_count not i in inner loop(s)*/
-//  for(int i = 0; i < md->n_leaves; i++) {
-//    struct cell *cii = ci_leaves[i];
-//    struct cell *cjj = cj_leaves[i];
-//    md->pack_flags[i].x = 0;
-//    md->pack_flags[i].y = 0;
-//    if (cii == NULL || cjj == NULL)
-//      error("working on NULL cells");
-//
-//    /*Test for ci by looping through all other leaves
-//     * found so far to see if ci has already been added to list*/
-//    int unique = 1;
-//    for (int j = 0; j < i; j++) {
-////      const double distx = md->unique_cells[j]->loc[0] - cii->loc[0];
-////      const double disty = md->unique_cells[j]->loc[1] - cii->loc[1];
-////      const double distz = md->unique_cells[j]->loc[2] - cii->loc[2];
-////      const double cell_dist = sqrt(distx*distx + disty*disty + distz*distz);
-//      /*If ci is already in the list, store that
-//       * this cell is already listed in index j
-//       * and move onto next leaf cell*/
-//      if (md->unique_cells[j] == cii) {
-////      if (cell_dist == 0.0) {
-//        buf->my_index[i].x = j;
-//        unique = 0;
-//        break;
-//      }
-//    }
-//    /*ci is not in the list, add it and save
-//     * that we want to pack this cell later (set pack_flag to 1)*/
-//    if (unique) {
-//      md->unique_cells[unique_count] = cii;
-//      buf->my_index[i].x = unique_count;
-//      md->pack_flags[i].x = 1;
-//      unique_count++;
-//    }
-//    /*Test for cj*/
-//    unique = 1;
-//    for (int j = 0; j < i; j++) {
-////      const double distx = md->unique_cells[j]->loc[0] - cjj->loc[0];
-////      const double disty = md->unique_cells[j]->loc[1] - cjj->loc[1];
-////      const double distz = md->unique_cells[j]->loc[2] - cjj->loc[2];
-////      const double cell_dist = sqrt(distx*distx + disty*disty + distz*distz);
-//      if (md->unique_cells[j] == cjj) {
-////      if (cell_dist == 0.0) {
-//        buf->my_index[i].y = j;
-//        unique = 0;
-//        break;
-//      }
-//    }
-//    if (unique) {
-//      md->unique_cells[unique_count] = cjj;
-//      buf->my_index[i].y = unique_count;
-//      md->pack_flags[i].y = 1;
-//      unique_count++;
-//    }
-//  }
-//    process_cells(ci_leaves, cj_leaves, md->n_leaves,
-//                     md, buf);
-//  for(int i = 0; i < md->n_leaves; i++){
-//    message("cell i %i unique position is %i", i, buf->my_index[i].x);
-//  }
-
-//TODO: Add a debug check that the list is unique
-
-//  md->n_unique = unique_count;
-//  if(md->n_unique > md->n_leaves * 2)
-//	  message("We have more unique cells (%i) "
-//			  "than we have leaf computations (%i). "
-//			  "Some thing is not right! Task is %s", md->n_unique, md->n_leaves, taskID_names[t->type]);
-//  message("found %i unique cells in %i leaf computations", unique_count, md->n_leaves);
 
   if (timer) TIMER_TOC(timer_doself_gpu_recurse);
 }
