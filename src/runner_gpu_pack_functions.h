@@ -104,7 +104,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     /* Pack the data into the CPU-side buffers for offloading. */
     if (task_subtype == task_subtype_gpu_density) {
       /*Check to see if the cell is unique and we should pack it*/
-      if(md->pack_flags[n_leaves_packed].x==1){
+      if(md->pack_ci[n_leaves_packed]==1){
+    	  error("Shouldn't be in here");
         gpu_pack_part_density(ci, buf->parts_send_d, pack_ind_unique);
       }
     } else if (task_subtype == task_subtype_gpu_gradient) {
@@ -141,7 +142,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
 
     /* Pack cell i */
     if (task_subtype == task_subtype_gpu_density) {
-      if(md->pack_flags[n_leaves_packed].x==1){
+      if(md->pack_ci[n_leaves_packed]==1){
+    	error("Shouldn't be in here");
         /*Check to see if cell i is unique and we should pack it*/
         gpu_pack_part_density(ci, buf->parts_send_d, pack_ind_unique);
       }
@@ -166,7 +168,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
 
     if (task_subtype == task_subtype_gpu_density) {
       /*Check to see if cell j is unique and we should pack it*/
-      if(md->pack_flags[n_leaves_packed].y==1){
+      if(md->pack_cj[n_leaves_packed]==1){
+    	error("Shouldn't be in here");
         gpu_pack_part_density(cj, buf->parts_send_d, pack_ind);
       }
     } else if (task_subtype == task_subtype_gpu_gradient) {

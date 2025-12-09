@@ -63,10 +63,11 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
   for (size_t i = 0; i < 2 * leaf_buffer_size; i++) md->unique_cells[i] = 0;
 
   /*Allocate memory for packed flags*/
-  md->pack_flags = (int2 *)malloc(leaf_buffer_size * sizeof(int2));
+  md->pack_ci = (int *)malloc(leaf_buffer_size * sizeof(int));
+  md->pack_cj = (int *)malloc(leaf_buffer_size * sizeof(int));
   for (size_t i = 0; i < leaf_buffer_size; i++){
-    md->pack_flags[i].x = 0;
-    md->pack_flags[i].y = 0;
+    md->pack_ci[i] = 0;
+    md->pack_cj[i] = 0;
   }
 
   /* Allocate hash table. For now using 4096=8^4 assuming we recurse four times */
@@ -195,7 +196,8 @@ void gpu_pack_metadata_free(struct gpu_pack_metadata *md) {
   free(md->bundle_first_cell);
   free(md->my_index);
   free((void *)md->unique_cells);
-  free((void *)md->pack_flags);
+  free((void *)md->pack_ci);
+  free((void *)md->pack_cj);
   free((void *)md->hash_table.entry);
 }
 

@@ -60,8 +60,9 @@ struct gpu_pack_metadata {
   /*list of unique cells we find in the leaves lists above*/
   struct cell **unique_cells;
 
-  /*Is this cell unique? If so let the CPU know to pack it*/
-  int2 *pack_flags;
+  /*Are cells i or j unique? If so let the CPU know to pack it*/
+  int *pack_ci;
+  int *pack_cj;
 
   /*Hash table used to find unique cells*/
   struct hash_table{
