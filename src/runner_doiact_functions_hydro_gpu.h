@@ -243,6 +243,21 @@ int hash_lookup(const struct cell *c, const int hash_size, const struct hash_ent
  * only store one cell in each index of hash table*/
 void hash_insert(struct cell *c, int unique_index, const int hash_size, struct hash_entry * ht) {
     int h_id = hash_func(c, hash_size);
+    int start = h_id;
+    /*Do a linear probe of hash table*/
+    while(ht[h_id].occupied){
+//    while(hash_table[h_id].c)
+      h_id = (h_id + 1) % hash_size;
+      /*If we reach the start of the
+       * has table it means we've over-filled it.
+       * Nothing to do but crash*/
+      if(h_id == start)
+    	error("hash table full");
+    }
+    /*If we exited h_id is the next empty
+     * index. Stuff our cell hash here*/
+    if(h_id > hash_size)
+      error("Ran over hash table");
     ht[h_id].c = c;
     ht[h_id].index = unique_index;
     ht[h_id].occupied = 1;
