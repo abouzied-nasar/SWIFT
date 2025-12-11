@@ -75,7 +75,7 @@ __attribute__((always_inline)) INLINE static void drift_gpart(
   /* Get the ID of the gpart for forcing */
   long long id = 0;
   if (gp->type == swift_type_gas)
-    id = e->s->parts[-gp->id_or_neg_offset].id;
+    id = part_get_id(&e->s->parts[-gp->id_or_neg_offset]);
   else if (gp->type == swift_type_stars)
     id = e->s->sparts[-gp->id_or_neg_offset].id;
   else if (gp->type == swift_type_sink)
@@ -157,7 +157,7 @@ __attribute__((always_inline)) INLINE static void drift_part(
 #endif
 
   /* Apply forcing */
-  forcing_part_drift_apply(p->id, e->forcing_terms, p, xp);
+  forcing_part_drift_apply(part_get_id(p), e->forcing_terms, p, xp);
 
 #ifdef WITH_LIGHTCONE
   /* Store initial position and velocity for lightcone check after the drift */

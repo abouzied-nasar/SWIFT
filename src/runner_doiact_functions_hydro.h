@@ -839,7 +839,7 @@ void DOPAIR_SUBSET_NAIVE(struct runner *r, const struct cell *restrict ci,
         runner_iact_nonsym_sink(r2, dx, hi, hj, pi, pj, a, H);
 #endif
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_GRADIENT)
-        runner_iact_nonsym_gradient_diffusion(r2, dx, hi, pj->h, pi, pj, a, H);
+        runner_iact_nonsym_gradient_diffusion(r2, dx, hi, hj, pi, pj, a, H);
 #endif
 #if (FUNCTION_TASK_LOOP == TASK_LOOP_FORCE)
         runner_iact_nonsym_timebin(r2, dx, hi, hj, pi, pj, a, H);
