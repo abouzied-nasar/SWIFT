@@ -50,11 +50,11 @@
  * @param internal_units struct holding internal units
  */
 __attribute__((always_inline)) INLINE static void
-rt_compute_stellar_emission_rate(struct spart* restrict sp, double time,
+rt_compute_stellar_emission_rate(struct spart *restrict sp, double time,
                                  double star_age, double dt,
-                                 const struct rt_props* rt_props,
-                                 const struct phys_const* phys_const,
-                                 const struct unit_system* internal_units) {
+                                 const struct rt_props *rt_props,
+                                 const struct phys_const *phys_const,
+                                 const struct unit_system *internal_units) {
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   sp->rt_data.debug_emission_rate_set += 1;
@@ -105,7 +105,7 @@ rt_compute_stellar_emission_rate(struct spart* restrict sp, double time,
  * @param p Particle to work on
  */
 __attribute__((always_inline)) INLINE static void rt_init_part(
-    struct part* restrict p) {}
+    struct part *restrict p) {}
 
 /**
  * @brief Reset the RT hydro particle data not related to the hydro density.
@@ -117,12 +117,12 @@ __attribute__((always_inline)) INLINE static void rt_init_part(
  * @param cosmo Cosmology.
  */
 __attribute__((always_inline)) INLINE static void rt_reset_part(
-    struct part* restrict p, const struct cosmology* cosmo) {
+    struct part *restrict p, const struct cosmology *cosmo) {
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   /* reset this here as well as in the rt_debugging_checks_end_of_step()
    * routine to test task dependencies are done right */
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
   rt_data->debug_iact_stars_inject = 0;
   rt_data->debug_nsubcycles = 0;
   rt_data->debug_kicked = 0;
@@ -137,7 +137,7 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
  * @param dt the current particle RT time step
  */
 __attribute__((always_inline)) INLINE static void rt_reset_part_each_subcycle(
-    struct part* restrict p, const struct cosmology* cosmo, double dt) {
+    struct part *restrict p, const struct cosmology *cosmo, double dt) {
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debugging_reset_each_subcycle(p);
@@ -148,7 +148,7 @@ __attribute__((always_inline)) INLINE static void rt_reset_part_each_subcycle(
    * so we're skipping it for now. */
   /* rt_slope_limit_cell_init(p); */
 
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
   rt_data->flux_dt = dt;
 }
 
@@ -160,8 +160,8 @@ __attribute__((always_inline)) INLINE static void rt_reset_part_each_subcycle(
  * @param rt_props RT properties struct
  */
 __attribute__((always_inline)) INLINE static void rt_first_init_part(
-    struct part* restrict p, const struct cosmology* cosmo,
-    const struct rt_props* restrict rt_props) {
+    struct part *restrict p, const struct cosmology *cosmo,
+    const struct rt_props *restrict rt_props) {
 
   /* Don't reset conserved quantities here! ICs will be overwritten */
   rt_init_part(p);
@@ -171,7 +171,7 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
   rt_part_reset_fluxes(p);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
   rt_data->debug_radiation_absorbed_tot = 0ULL;
 #endif
 }
@@ -184,7 +184,7 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
  * @param sp star particle to work on
  */
 __attribute__((always_inline)) INLINE static void rt_init_spart(
-    struct spart* restrict sp) {
+    struct spart *restrict sp) {
 
   for (int i = 0; i < 8; i++) {
     sp->rt_data.octant_weights[i] = 0.f;
@@ -215,7 +215,7 @@ __attribute__((always_inline)) INLINE static void rt_init_spart(
  * @param sp star particle to work on
  */
 __attribute__((always_inline)) INLINE static void rt_reset_spart(
-    struct spart* restrict sp) {
+    struct spart *restrict sp) {
 
   for (int g = 0; g < RT_NGROUPS; g++) {
     sp->rt_data.emission_this_step[g] = 0.f;
@@ -228,7 +228,7 @@ __attribute__((always_inline)) INLINE static void rt_reset_spart(
  * @param sp star particle to work on
  */
 __attribute__((always_inline)) INLINE static void rt_first_init_spart(
-    struct spart* restrict sp) {
+    struct spart *restrict sp) {
 
   rt_init_spart(sp);
   rt_reset_spart(sp);
@@ -246,7 +246,7 @@ __attribute__((always_inline)) INLINE static void rt_first_init_spart(
  * @param p The #part.
  * @param n The number of pieces to split into.
  */
-__attribute__((always_inline)) INLINE static void rt_split_part(struct part* p,
+__attribute__((always_inline)) INLINE static void rt_split_part(struct part *p,
                                                                 double n) {
   error("RT can't run with split particles for now.");
 }
@@ -257,7 +257,7 @@ __attribute__((always_inline)) INLINE static void rt_split_part(struct part* p,
  * @param p The #part.
  */
 __attribute__((always_inline)) INLINE static void rt_part_has_no_neighbours(
-    struct part* p) {
+    struct part *p) {
   message("WARNING: found particle without neighbours");
 }
 
@@ -267,7 +267,7 @@ __attribute__((always_inline)) INLINE static void rt_part_has_no_neighbours(
  * @param sp The #spart.
  */
 __attribute__((always_inline)) INLINE static void rt_spart_has_no_neighbours(
-    struct spart* sp) {
+    struct spart *sp) {
 
   /* Reset energy to be injected so that global statistics
    * checks still work */
@@ -288,11 +288,11 @@ __attribute__((always_inline)) INLINE static void rt_spart_has_no_neighbours(
  * @param cosmo cosmology struct
  */
 __attribute__((always_inline)) INLINE static void rt_convert_quantities(
-    struct part* restrict p, const struct rt_props* rt_props,
-    const struct hydro_props* hydro_props,
-    const struct phys_const* restrict phys_const,
-    const struct unit_system* restrict us,
-    const struct cosmology* restrict cosmo) {
+    struct part *restrict p, const struct rt_props *rt_props,
+    const struct hydro_props *hydro_props,
+    const struct phys_const *restrict phys_const,
+    const struct unit_system *restrict us,
+    const struct cosmology *restrict cosmo) {
 
   /* If we're reducing the speed of light, then we may encounter
    * photon fluxes which are way too high than the physically
@@ -302,8 +302,8 @@ __attribute__((always_inline)) INLINE static void rt_convert_quantities(
    * it if necessary.
    * We only read in conserved quantities, so only check those. */
 
-  struct rt_part_data* rtd = part_get_rt_data_p(p);
-  const struct fvpm_geometry_struct* geometry =
+  struct rt_part_data *rtd = part_get_rt_data_p(p);
+  const struct fvpm_geometry_struct *geometry =
       part_get_const_fvpm_geometry_p(p);
   const float Vinv = 1.f / geometry->volume;
 
@@ -346,13 +346,13 @@ __attribute__((always_inline)) INLINE static void rt_convert_quantities(
  * @param dt The time-step of this particle.
  */
 __attribute__((always_inline)) INLINE static float rt_compute_timestep(
-    const struct part* restrict p, const struct xpart* restrict xp,
-    struct rt_props* rt_props, const struct cosmology* restrict cosmo,
-    const struct hydro_props* hydro_props,
-    const struct phys_const* restrict phys_const,
-    const struct unit_system* restrict us) {
+    const struct part *restrict p, const struct xpart *restrict xp,
+    struct rt_props *rt_props, const struct cosmology *restrict cosmo,
+    const struct hydro_props *hydro_props,
+    const struct phys_const *restrict phys_const,
+    const struct unit_system *restrict us) {
 
-  const struct fvpm_geometry_struct* geometry =
+  const struct fvpm_geometry_struct *geometry =
       part_get_const_fvpm_geometry_p(p);
 
   /* just mimic the gizmo particle "size" for now */
@@ -383,8 +383,8 @@ __attribute__((always_inline)) INLINE static float rt_compute_timestep(
  * @param cosmo the cosmology
  */
 __attribute__((always_inline)) INLINE static float rt_compute_spart_timestep(
-    const struct spart* restrict sp, const struct rt_props* restrict rt_props,
-    const struct cosmology* restrict cosmo) {
+    const struct spart *restrict sp, const struct rt_props *restrict rt_props,
+    const struct cosmology *restrict cosmo) {
 
   /* For now, the only thing we care about is the upper threshold for stars. */
   return rt_props->stars_max_timestep;
@@ -408,7 +408,7 @@ __attribute__((always_inline)) INLINE static float rt_compute_spart_timestep(
 __attribute__((always_inline)) INLINE static double rt_part_dt(
     const integertime_t ti_beg, const integertime_t ti_end,
     const double time_base, const int with_cosmology,
-    const struct cosmology* cosmo) {
+    const struct cosmology *cosmo) {
   if (with_cosmology) {
     return cosmology_get_delta_time(cosmo, ti_beg, ti_end);
   } else {
@@ -423,9 +423,9 @@ __attribute__((always_inline)) INLINE static double rt_part_dt(
  * @param props struct #rt_props that contains global RT properties
  */
 __attribute__((always_inline)) INLINE static void rt_finalise_injection(
-    struct part* restrict p, struct rt_props* props) {
+    struct part *restrict p, struct rt_props *props) {
 
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 1, "rt_ghost1/rt_finalise_injection");
@@ -447,9 +447,9 @@ __attribute__((always_inline)) INLINE static void rt_finalise_injection(
  * @param cosmo #cosmology data structure.
  */
 __attribute__((always_inline)) INLINE static void rt_end_gradient(
-    struct part* restrict p, const struct cosmology* cosmo) {
+    struct part *restrict p, const struct cosmology *cosmo) {
 
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 2, __func__);
@@ -474,11 +474,11 @@ __attribute__((always_inline)) INLINE static void rt_end_gradient(
  * @param cosmo #cosmology data structure.
  */
 __attribute__((always_inline)) INLINE static void rt_finalise_transport(
-    struct part* restrict p, struct rt_props* rtp, const double dt,
-    const struct cosmology* restrict cosmo) {
+    struct part *restrict p, struct rt_props *rtp, const double dt,
+    const struct cosmology *restrict cosmo) {
 
-  struct rt_part_data* restrict rtd = part_get_rt_data_p(p);
-  const struct fvpm_geometry_struct* restrict geometry =
+  struct rt_part_data *restrict rtd = part_get_rt_data_p(p);
+  const struct fvpm_geometry_struct *restrict geometry =
       part_get_const_fvpm_geometry_p(p);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
@@ -550,16 +550,16 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
  * @param dt The time-step of this particle.
  */
 __attribute__((always_inline)) INLINE static void rt_tchem(
-    struct part* restrict p, struct xpart* restrict xp,
-    struct rt_props* rt_props, const struct cosmology* restrict cosmo,
-    const struct hydro_props* hydro_props,
-    const struct phys_const* restrict phys_const,
-    const struct unit_system* restrict us, const double dt) {
+    struct part *restrict p, struct xpart *restrict xp,
+    struct rt_props *rt_props, const struct cosmology *restrict cosmo,
+    const struct hydro_props *hydro_props,
+    const struct phys_const *restrict phys_const,
+    const struct unit_system *restrict us, const double dt) {
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 4, __func__);
 
-  struct rt_part_data* restrict rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *restrict rt_data = part_get_rt_data_p(p);
   rt_data->debug_thermochem_done += 1;
 #endif
 
@@ -583,9 +583,9 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
  * @param hydro_props Additional hydro properties.
  */
 __attribute__((always_inline)) INLINE static void rt_kick_extra(
-    struct part* p, float dt_therm, float dt_grav, float dt_hydro,
-    float dt_kick_corr, const struct cosmology* cosmo,
-    const struct hydro_props* hydro_props) {
+    struct part *p, float dt_therm, float dt_grav, float dt_hydro,
+    float dt_kick_corr, const struct cosmology *cosmo,
+    const struct hydro_props *hydro_props) {
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   /* Don't account for timestep_sync backward kicks */
@@ -593,7 +593,7 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
       dt_kick_corr >= 0.f) {
 
     rt_debug_sequence_check(p, 0, __func__);
-    struct rt_part_data* restrict rt_data = part_get_rt_data_p(p);
+    struct rt_part_data *restrict rt_data = part_get_rt_data_p(p);
     rt_data->debug_kicked += 1;
   }
 #endif
@@ -688,7 +688,7 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
  * @param p particle to work on
  **/
 __attribute__((always_inline)) INLINE static void rt_prepare_force(
-    struct part* p) {}
+    struct part *p) {}
 
 /**
  * @brief Extra operations to be done during the drift
@@ -698,9 +698,9 @@ __attribute__((always_inline)) INLINE static void rt_prepare_force(
  * @param dt_drift The drift time-step for positions.
  */
 __attribute__((always_inline)) INLINE static void rt_predict_extra(
-    struct part* p, struct xpart* xp, float dt_drift) {
+    struct part *p, struct xpart *xp, float dt_drift) {
 
-  struct rt_part_data* restrict rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *restrict rt_data = part_get_rt_data_p(p);
   float dx[3] = {xp->v_full[0] * dt_drift, xp->v_full[1] * dt_drift,
                  xp->v_full[2] * dt_drift};
 
@@ -721,7 +721,7 @@ __attribute__((always_inline)) INLINE static void rt_predict_extra(
  * @param restart did we restart?
  */
 __attribute__((always_inline)) INLINE static void rt_clean(
-    struct rt_props* props, int restart) {
+    struct rt_props *props, int restart) {
 
   /* If we were restarting, free-ing manually will lead to
    * segfaults since we didn't malloc the stuff */

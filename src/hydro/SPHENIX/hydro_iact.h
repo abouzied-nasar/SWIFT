@@ -48,7 +48,7 @@
  */
 __attribute__((always_inline)) INLINE static void runner_iact_density(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct part* restrict pi, struct part* restrict pj, const float a,
+    struct part *restrict pi, struct part *restrict pj, const float a,
     const float H) {
 
   float wi, wj, wi_dx, wj_dx;
@@ -126,13 +126,13 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
   curlvr[1] = dv[2] * dx[0] - dv[0] * dx[2];
   curlvr[2] = dv[0] * dx[1] - dv[1] * dx[0];
 
-  float* rot_v_i = part_get_rot_v(pi);
+  float *rot_v_i = part_get_rot_v(pi);
   rot_v_i[0] += faci * curlvr[0];
   rot_v_i[1] += faci * curlvr[1];
   rot_v_i[2] += faci * curlvr[2];
 
   /* Negative because of the change in sign of dx & dv. */
-  float* rot_v_j = part_get_rot_v(pj);
+  float *rot_v_j = part_get_rot_v(pj);
   rot_v_j[0] += facj * curlvr[0];
   rot_v_j[1] += facj * curlvr[1];
   rot_v_j[2] += facj * curlvr[2];
@@ -159,7 +159,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_density(
  */
 __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct part* restrict pi, const struct part* restrict pj, const float a,
+    struct part *restrict pi, const struct part *restrict pj, const float a,
     const float H) {
 
   float wi, wi_dx;
@@ -209,7 +209,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
   curlvr[1] = dv[2] * dx[0] - dv[0] * dx[2];
   curlvr[2] = dv[0] * dx[1] - dv[1] * dx[0];
 
-  float* rot_v_i = part_get_rot_v(pi);
+  float *rot_v_i = part_get_rot_v(pi);
   rot_v_i[0] += faci * curlvr[0];
   rot_v_i[1] += faci * curlvr[1];
   rot_v_i[2] += faci * curlvr[2];
@@ -238,7 +238,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_density(
  */
 __attribute__((always_inline)) INLINE static void runner_iact_gradient(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct part* restrict pi, struct part* restrict pj, const float a,
+    struct part *restrict pi, struct part *restrict pj, const float a,
     const float H) {
 
   /* We need to construct the maximal signal velocity between our particle
@@ -328,7 +328,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_gradient(
  */
 __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct part* restrict pi, struct part* restrict pj, const float a,
+    struct part *restrict pi, struct part *restrict pj, const float a,
     const float H) {
 
   /* We need to construct the maximal signal velocity between our particle
@@ -399,7 +399,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_gradient(
  */
 __attribute__((always_inline)) INLINE static void runner_iact_force(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct part* restrict pi, struct part* restrict pj, const float a,
+    struct part *restrict pi, struct part *restrict pj, const float a,
     const float H) {
 
   /* Cosmological factors entering the EoMs */
@@ -484,12 +484,12 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
   const float acc = sph_acc_term + visc_acc_term + adapt_soft_acc_term;
 
   /* Use the force Luke ! */
-  float* a_hydro_i = part_get_a_hydro(pi);
+  float *a_hydro_i = part_get_a_hydro(pi);
   a_hydro_i[0] -= mj * acc * dx[0];
   a_hydro_i[1] -= mj * acc * dx[1];
   a_hydro_i[2] -= mj * acc * dx[2];
 
-  float* a_hydro_j = part_get_a_hydro(pj);
+  float *a_hydro_j = part_get_a_hydro(pj);
   a_hydro_j[0] += mi * acc * dx[0];
   a_hydro_j[1] += mi * acc * dx[1];
   a_hydro_j[2] += mi * acc * dx[2];
@@ -550,7 +550,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_force(
  */
 __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
     const float r2, const float dx[3], const float hi, const float hj,
-    struct part* restrict pi, const struct part* restrict pj, const float a,
+    struct part *restrict pi, const struct part *restrict pj, const float a,
     const float H) {
 
   /* Cosmological factors entering the EoMs */
@@ -635,7 +635,7 @@ __attribute__((always_inline)) INLINE static void runner_iact_nonsym_force(
   const float acc = sph_acc_term + visc_acc_term + adapt_soft_acc_term;
 
   /* Use the force Luke ! */
-  float* a_hydro_i = part_get_a_hydro(pi);
+  float *a_hydro_i = part_get_a_hydro(pi);
   a_hydro_i[0] -= mj * acc * dx[0];
   a_hydro_i[1] -= mj * acc * dx[1];
   a_hydro_i[2] -= mj * acc * dx[2];

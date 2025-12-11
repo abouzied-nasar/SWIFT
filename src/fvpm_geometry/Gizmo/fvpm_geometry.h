@@ -37,9 +37,9 @@
  * @return 1 if the gradient matrix is well behaved, 0 otherwise.
  */
 __attribute__((always_inline)) INLINE static int
-fvpm_part_geometry_well_behaved(const struct part* restrict p) {
+fvpm_part_geometry_well_behaved(const struct part *restrict p) {
 
-  const struct fvpm_geometry_struct* geometry =
+  const struct fvpm_geometry_struct *geometry =
       part_get_const_fvpm_geometry_p(p);
   return geometry->wcorr > const_gizmo_min_wcorr;
 }
@@ -48,10 +48,10 @@ fvpm_part_geometry_well_behaved(const struct part* restrict p) {
  * @brief Collect the data needed for the matrix construction.
  */
 __attribute__((always_inline)) INLINE static void
-fvpm_accumulate_geometry_and_matrix(struct part* restrict pi, const float wi,
+fvpm_accumulate_geometry_and_matrix(struct part *restrict pi, const float wi,
                                     const float dx[3]) {
 
-  struct fvpm_geometry_struct* geometry = part_get_fvpm_geometry_p(pi);
+  struct fvpm_geometry_struct *geometry = part_get_fvpm_geometry_p(pi);
 
   /* these are eqns. (1) and (2) in the Gizmo theory summary */
   geometry->volume += wi;
@@ -60,9 +60,9 @@ fvpm_accumulate_geometry_and_matrix(struct part* restrict pi, const float wi,
 }
 
 __attribute__((always_inline)) INLINE static void fvpm_geometry_init(
-    struct part* restrict p) {
+    struct part *restrict p) {
 
-  struct fvpm_geometry_struct* geometry = part_get_fvpm_geometry_p(p);
+  struct fvpm_geometry_struct *geometry = part_get_fvpm_geometry_p(p);
 
   geometry->volume = 0.0f;
   geometry->matrix_E[0][0] = 0.0f;
@@ -86,9 +86,9 @@ __attribute__((always_inline)) INLINE static void fvpm_geometry_init(
  * @param ihdim 1/h^{dim}
  */
 __attribute__((always_inline)) INLINE static void
-fvpm_compute_volume_and_matrix(struct part* restrict p, const float ihdim) {
+fvpm_compute_volume_and_matrix(struct part *restrict p, const float ihdim) {
 
-  struct fvpm_geometry_struct* geometry = part_get_fvpm_geometry_p(p);
+  struct fvpm_geometry_struct *geometry = part_get_fvpm_geometry_p(p);
 
   /* Final operation on the geometry. */
   /* we multiply with the smoothing kernel normalization ih3 and calculate the

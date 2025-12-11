@@ -59,8 +59,8 @@
  * @param grav_props The properties of the gravity scheme.
  */
 INLINE static void gravity_update_softening(
-    struct gpart* restrict gp, const struct part* restrict p,
-    const struct gravity_props* grav_props) {
+    struct gpart *restrict gp, const struct part *restrict p,
+    const struct gravity_props *grav_props) {
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (gp != p->gpart) error("Unlinked part and gpart!");
@@ -82,7 +82,7 @@ INLINE static void gravity_update_softening(
  *
  * @param p The particle to act upon
  */
-INLINE static void adaptive_softening_init_part(struct part* p) {
+INLINE static void adaptive_softening_init_part(struct part *p) {
 
   p->adaptive_softening_data.zeta = 0.f;
 }
@@ -97,7 +97,7 @@ INLINE static void adaptive_softening_init_part(struct part* p) {
  * @param props The properties of the gravity scheme.
  */
 INLINE static void adaptive_softening_end_density(
-    struct part* p, const struct gravity_props* props) {
+    struct part *p, const struct gravity_props *props) {
 
   /* Finish calculation of the adaptive softening prefactor (zeta)
    * Pre-factor in eq. 26 of Price & Monaghan 2007 */
@@ -125,8 +125,8 @@ INLINE static void adaptive_softening_end_density(
  * @param grav_props The properties of the gravity scheme.
  */
 INLINE static void gravity_update_softening(
-    struct gpart* restrict gp, const struct part* restrict p,
-    const struct gravity_props* grav_props) {}
+    struct gpart *restrict gp, const struct part *restrict p,
+    const struct gravity_props *grav_props) {}
 
 /**
  * @brief Prepares a particle for the density calculation.
@@ -135,7 +135,7 @@ INLINE static void gravity_update_softening(
  *
  * @param p The particle to act upon
  */
-INLINE static void adaptive_softening_init_part(struct part* p) {}
+INLINE static void adaptive_softening_init_part(struct part *p) {}
 
 /**
  * @brief Finishes the density calculation.
@@ -146,7 +146,7 @@ INLINE static void adaptive_softening_init_part(struct part* p) {}
  * @param props The properties of the gravity scheme.
  */
 INLINE static void adaptive_softening_end_density(
-    struct part* p, const struct gravity_props* props) {}
+    struct part *p, const struct gravity_props *props) {}
 
 #endif /* ADAPTIVE_SOFTENING */
 

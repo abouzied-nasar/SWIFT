@@ -43,7 +43,7 @@
  * @param callloc integer indentifier where this function was called from
  */
 __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
-    float* energy_density, float* flux, const float e_old, int callloc) {
+    float *energy_density, float *flux, const float e_old, int callloc) {
 
   /* Check for negative energies */
   /* Note to self for printouts: Maximal allowable F = E * c.
@@ -105,8 +105,8 @@ __attribute__((always_inline)) INLINE static void rt_check_unphysical_state(
  * light.
  */
 __attribute__((always_inline)) INLINE static void rt_check_unphysical_state_ICs(
-    const struct part* restrict p, int group, float* energy_density,
-    float* flux, const double c) {
+    const struct part *restrict p, int group, float *energy_density,
+    float *flux, const double c) {
 
   /* Nothing to do here. The other unphysical check will catch other problems.
    */
@@ -184,7 +184,7 @@ rt_check_unphysical_hyperbolic_flux(float flux[4][3]) {
  * @param p particle to work on
  */
 __attribute__((always_inline)) INLINE static void
-rt_check_unphysical_mass_fractions(struct part* restrict p) {
+rt_check_unphysical_mass_fractions(struct part *restrict p) {
 
   /* For now, catch either mass or rho being zero. At the moment, they are not
    * necessarily both zero. For example, an unphysical check may zero out both
@@ -194,7 +194,7 @@ rt_check_unphysical_mass_fractions(struct part* restrict p) {
    * inactive particles however remains zero until the particle is active
    * again. See issue #833. */
 
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
 
   if (hydro_get_mass(p) <= 0.f || part_get_rho(p) <= 0.f) {
     /* Deal with unphysical situations and vacuum. */
