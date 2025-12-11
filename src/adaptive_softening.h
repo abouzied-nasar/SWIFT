@@ -126,7 +126,7 @@ INLINE static void adaptive_softening_end_density(
  */
 INLINE static void gravity_update_softening(
     struct gpart *restrict gp, const struct part *restrict p,
-    const struct gravity_props* grav_props) {}
+    const struct gravity_props *grav_props) {}
 
 /**
  * @brief Prepares a particle for the density calculation.

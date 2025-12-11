@@ -36,9 +36,9 @@
  * @brief Initialize the GPU context for each thread. This should be
  * called in a threaded region, e.g. runner_main_cuda.
  */
-void gpu_init_thread(const struct engine* e, const int cpuid) {
+void gpu_init_thread(const struct engine *e, const int cpuid) {
 
-  const struct gpu_global_pack_params* gpu_pack_params = &e->gpu_pack_params;
+  const struct gpu_global_pack_params *gpu_pack_params = &e->gpu_pack_params;
 
   /* Find and print GPU name(s) */
   int dev_id = 0; /* gpu device name */
@@ -79,7 +79,7 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
 
   size_t free_mem;
   size_t total_mem;
-  const struct space* space = e->s;
+  const struct space *space = e->s;
   cu_error = cudaMemGetInfo(&free_mem, &total_mem);
   swift_assert(cu_error == cudaSuccess);
 
@@ -113,7 +113,7 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
  * @brief Initialize the GPU context for each thread. This should be
  * called in a threaded region, e.g. runner_main_cuda.
  */
-void gpu_print_free_mem(const struct engine* e, const int cpuid) {
+void gpu_print_free_mem(const struct engine *e, const int cpuid) {
 
   /* Find and print GPU name(s) */
   int dev_id = 0;

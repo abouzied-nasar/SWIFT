@@ -85,7 +85,7 @@ INLINE static void convert_part_pos(const struct engine *e,
                                     const struct xpart *xp, double *ret) {
 
   const struct space *s = e->s;
-  const double* x = part_get_const_x(p);
+  const double *x = part_get_const_x(p);
   if (s->periodic) {
     ret[0] = box_wrap(x[0], 0.0, s->dim[0]);
     ret[1] = box_wrap(x[1], 0.0, s->dim[1]);
@@ -133,13 +133,13 @@ INLINE static void convert_part_vel(const struct engine *e,
   }
 
   /* Extrapolate the velocites to the current time (hydro term)*/
-  const float* a_hydro = part_get_const_a_hydro(p);
+  const float *a_hydro = part_get_const_a_hydro(p);
   ret[0] = xp->v_full[0] + a_hydro[0] * dt_kick_hydro;
   ret[1] = xp->v_full[1] + a_hydro[1] * dt_kick_hydro;
   ret[2] = xp->v_full[2] + a_hydro[2] * dt_kick_hydro;
 
   /* Add the gravity term */
-  const struct gpart* gp = part_get_gpart(p);
+  const struct gpart *gp = part_get_gpart(p);
   if (gp != NULL) {
     ret[0] += gp->a_grav[0] * dt_kick_grav;
     ret[1] += gp->a_grav[1] * dt_kick_grav;

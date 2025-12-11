@@ -84,11 +84,11 @@
  */
 #define CELL_COUNT_NON_INHIBITED_PARTICLES_GETTERS(TYPE, CELL_TYPE)           \
   cell_count_non_inhibited_##TYPE(                                            \
-      const struct cell* c, const int subsample, const float subsample_ratio, \
+      const struct cell *c, const int subsample, const float subsample_ratio, \
       const int snap_num, double min_pos[3], double max_pos[3]) {             \
                                                                               \
     const int total_count = c->CELL_TYPE.count;                               \
-    const struct TYPE* parts = c->CELL_TYPE.parts;                            \
+    const struct TYPE *parts = c->CELL_TYPE.parts;                            \
     long long count = 0;                                                      \
     min_pos[0] = min_pos[1] = min_pos[2] = DBL_MAX;                           \
     max_pos[0] = max_pos[1] = max_pos[2] = -DBL_MAX;                          \
@@ -107,7 +107,7 @@
                                                                               \
         ++count;                                                              \
                                                                               \
-        const double* x = TYPE##_get_const_x(&parts[i]);                      \
+        const double *x = TYPE##_get_const_x(&parts[i]);                      \
         min_pos[0] = min(x[0], min_pos[0]);                                   \
         min_pos[1] = min(x[1], min_pos[1]);                                   \
         min_pos[2] = min(x[2], min_pos[2]);                                   \

@@ -119,7 +119,7 @@ __attribute__((always_inline)) INLINE static void
 rt_tchem_get_species_densities(const struct part *restrict p, gr_float rho,
                                gr_float species_densities[6]) {
 
-  const struct rt_part_data* rt_data = part_get_const_rt_data_p(p);
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
 
   species_densities[0] = rt_data->tchem.mass_fraction_HI * rho;
   species_densities[1] = rt_data->tchem.mass_fraction_HII * rho;
@@ -149,7 +149,8 @@ rt_tchem_get_species_densities(const struct part *restrict p, gr_float rho,
  **/
 __attribute__((always_inline)) INLINE static void
 rt_tchem_get_ionizing_species_number_densities(
-    double ns_cgs[rt_ionizing_species_count], const gr_float species_densities[6],
+    double ns_cgs[rt_ionizing_species_count],
+    const gr_float species_densities[6],
     const struct phys_const *restrict phys_const,
     const struct unit_system *restrict us) {
 
@@ -178,7 +179,7 @@ rt_tchem_get_gas_temperature(const struct part *restrict p,
   const double kB = phys_const->const_boltzmann_k;
   const double mp = phys_const->const_proton_mass;
 
-  const struct rt_part_data* rt_data = part_get_const_rt_data_p(p);
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(p);
 
   const float XHI = rt_data->tchem.mass_fraction_HI;
   const float XHII = rt_data->tchem.mass_fraction_HII;
@@ -277,7 +278,7 @@ rt_tchem_set_particle_radiation_field_for_test(
   /* Note that we inject energy / time / surface, not identical to what */
   /* is in Iliev06 paper */
 
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
   for (int g = 0; g < RT_NGROUPS; g++) {
     rt_data->radiation[g].energy_density = fixed_fluxes[g] * cf;
   }
@@ -294,7 +295,7 @@ __attribute__((always_inline)) INLINE static void
 rt_tchem_set_boundary_particles_for_test(struct part *restrict p) {
 
   if (part_get_id(p) >= 1000000000) {
-    struct rt_part_data* rt_data = part_get_rt_data_p(p);
+    struct rt_part_data *rt_data = part_get_rt_data_p(p);
     for (int g = 0; g < RT_NGROUPS; g++) {
       rt_data->radiation[g].energy_density = 0.f;
       rt_data->radiation[g].flux[0] = 0.f;

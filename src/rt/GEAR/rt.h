@@ -122,7 +122,7 @@ __attribute__((always_inline)) INLINE static void rt_reset_part(
 #ifdef SWIFT_RT_DEBUG_CHECKS
   /* reset this here as well as in the rt_debugging_checks_end_of_step()
    * routine to test task dependencies are done right */
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
   rt_data->debug_iact_stars_inject = 0;
   rt_data->debug_nsubcycles = 0;
   rt_data->debug_kicked = 0;
@@ -148,7 +148,7 @@ __attribute__((always_inline)) INLINE static void rt_reset_part_each_subcycle(
    * so we're skipping it for now. */
   /* rt_slope_limit_cell_init(p); */
 
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
   rt_data->flux_dt = dt;
 }
 
@@ -171,7 +171,7 @@ __attribute__((always_inline)) INLINE static void rt_first_init_part(
   rt_part_reset_fluxes(p);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
   rt_data->debug_radiation_absorbed_tot = 0ULL;
 #endif
 }
@@ -352,7 +352,7 @@ __attribute__((always_inline)) INLINE static float rt_compute_timestep(
     const struct phys_const *restrict phys_const,
     const struct unit_system *restrict us) {
 
-  const struct fvpm_geometry_struct* geometry =
+  const struct fvpm_geometry_struct *geometry =
       part_get_const_fvpm_geometry_p(p);
 
   /* just mimic the gizmo particle "size" for now */
@@ -425,7 +425,7 @@ __attribute__((always_inline)) INLINE static double rt_part_dt(
 __attribute__((always_inline)) INLINE static void rt_finalise_injection(
     struct part *restrict p, struct rt_props *props) {
 
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 1, "rt_ghost1/rt_finalise_injection");
@@ -449,7 +449,7 @@ __attribute__((always_inline)) INLINE static void rt_finalise_injection(
 __attribute__((always_inline)) INLINE static void rt_end_gradient(
     struct part *restrict p, const struct cosmology *cosmo) {
 
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 2, __func__);
@@ -477,8 +477,8 @@ __attribute__((always_inline)) INLINE static void rt_finalise_transport(
     struct part *restrict p, struct rt_props *rtp, const double dt,
     const struct cosmology *restrict cosmo) {
 
-  struct rt_part_data* restrict rtd = part_get_rt_data_p(p);
-  const struct fvpm_geometry_struct* restrict geometry =
+  struct rt_part_data *restrict rtd = part_get_rt_data_p(p);
+  const struct fvpm_geometry_struct *restrict geometry =
       part_get_const_fvpm_geometry_p(p);
 
 #ifdef SWIFT_RT_DEBUG_CHECKS
@@ -559,7 +559,7 @@ __attribute__((always_inline)) INLINE static void rt_tchem(
 #ifdef SWIFT_RT_DEBUG_CHECKS
   rt_debug_sequence_check(p, 4, __func__);
 
-  struct rt_part_data* restrict rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *restrict rt_data = part_get_rt_data_p(p);
   rt_data->debug_thermochem_done += 1;
 #endif
 
@@ -593,7 +593,7 @@ __attribute__((always_inline)) INLINE static void rt_kick_extra(
       dt_kick_corr >= 0.f) {
 
     rt_debug_sequence_check(p, 0, __func__);
-    struct rt_part_data* restrict rt_data = part_get_rt_data_p(p);
+    struct rt_part_data *restrict rt_data = part_get_rt_data_p(p);
     rt_data->debug_kicked += 1;
   }
 #endif
@@ -700,7 +700,7 @@ __attribute__((always_inline)) INLINE static void rt_prepare_force(
 __attribute__((always_inline)) INLINE static void rt_predict_extra(
     struct part *p, struct xpart *xp, float dt_drift) {
 
-  struct rt_part_data* restrict rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *restrict rt_data = part_get_rt_data_p(p);
   float dx[3] = {xp->v_full[0] * dt_drift, xp->v_full[1] * dt_drift,
                  xp->v_full[2] * dt_drift};
 

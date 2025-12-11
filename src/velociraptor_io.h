@@ -31,7 +31,7 @@ INLINE static void velociraptor_convert_part_groupID(const struct engine *e,
                                                      const struct part *p,
                                                      const struct xpart *xp,
                                                      long long *ret) {
-  const struct gpart* gp = part_get_gpart(p);
+  const struct gpart *gp = part_get_gpart(p);
   if (gp == NULL)
     ret[0] = 0.f;
   else {

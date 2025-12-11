@@ -104,8 +104,8 @@ INLINE static void rt_convert_radiation_energies(const struct engine *engine,
                                                  const struct xpart *xpart,
                                                  float *ret) {
 
-  const struct rt_part_data* rtd = part_get_const_rt_data_p(part);
-  const struct fvpm_geometry_struct* geometry =
+  const struct rt_part_data *rtd = part_get_const_rt_data_p(part);
+  const struct fvpm_geometry_struct *geometry =
       part_get_const_fvpm_geometry_p(part);
 
   for (int g = 0; g < RT_NGROUPS; g++) {
@@ -127,7 +127,7 @@ INLINE static void rt_convert_radiation_fluxes(const struct engine *engine,
                                                const struct xpart *xpart,
                                                float *ret) {
 
-  const struct rt_part_data* rt_data = part_get_const_rt_data_p(part);
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(part);
   int i = 0;
   for (int g = 0; g < RT_NGROUPS; g++) {
     ret[i++] = rt_data->radiation[g].flux[0];
@@ -150,7 +150,7 @@ INLINE static void rt_convert_mass_fractions(const struct engine *engine,
                                              const struct xpart *xpart,
                                              float *ret) {
 
-  const struct rt_part_data* rt_data = part_get_const_rt_data_p(part);
+  const struct rt_part_data *rt_data = part_get_const_rt_data_p(part);
 
   ret[0] = rt_data->tchem.mass_fraction_HI;
   ret[1] = rt_data->tchem.mass_fraction_HII;

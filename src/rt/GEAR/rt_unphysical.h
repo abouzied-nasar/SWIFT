@@ -194,7 +194,7 @@ rt_check_unphysical_mass_fractions(struct part *restrict p) {
    * inactive particles however remains zero until the particle is active
    * again. See issue #833. */
 
-  struct rt_part_data* rt_data = part_get_rt_data_p(p);
+  struct rt_part_data *rt_data = part_get_rt_data_p(p);
 
   if (hydro_get_mass(p) <= 0.f || part_get_rho(p) <= 0.f) {
     /* Deal with unphysical situations and vacuum. */
