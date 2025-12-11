@@ -43,7 +43,7 @@
  * @param p Particle.
  */
 __attribute__((always_inline)) INLINE static void rt_part_reset_fluxes(
-    struct part* restrict p) {
+    struct part *restrict p) {
 
   struct rt_part_data* rt_data = part_get_rt_data_p(p);
 
@@ -103,7 +103,7 @@ __attribute__((always_inline)) INLINE static void rt_compute_flux(
  * @param p particle to work on.
  **/
 __attribute__((always_inline)) INLINE static void rt_part_reset_mass_fluxes(
-    struct part* restrict p) {
+    struct part *restrict p) {
 #ifdef GIZMO_MFV_SPH
   p->rt_data.mass_flux.HI = 0.f;
   p->rt_data.mass_flux.HII = 0.f;

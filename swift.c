@@ -164,6 +164,7 @@ int main(int argc, char *argv[]) {
 
   int with_aff = 0;
   int with_nointerleave = 0;
+  int with_no_io = 0;
   int with_interleave = 0; /* Deprecated. */
   int dry_run = 0;
   int dump_tasks = 0;
@@ -315,6 +316,8 @@ int main(int argc, char *argv[]) {
                   "time integration. Checks the validity of parameters and IC "
                   "files as well as memory limits.",
                   NULL, 0, 0),
+      OPT_BOOLEAN(0, "no-io", &with_no_io,
+                  "Skip writing snapshots and restart files.", NULL, 0, 0),
       OPT_BOOLEAN('e', "fpe", &with_fp_exceptions,
                   "Enable floating-point exceptions (debugging mode).", NULL, 0,
                   0),
@@ -786,6 +789,9 @@ int main(int argc, char *argv[]) {
     message("WARNING: Non-optimal thread barriers are being used.");
 #endif
 
+  if (myrank == 0 && with_no_io)
+    message("WARNING: No snapshots or restart files will be written.");
+
   /* How large are the parts? */
   if (myrank == 0) {
     message("sizeof(part)          is %4zi bytes.", sizeof(struct part));
@@ -842,7 +848,7 @@ int main(int argc, char *argv[]) {
     error("Cannot reconstruct m-poles every step over MPI (yet).");
 #endif
 
-    /* Temporary early aborts for modes not supported with hand-vec. */
+  /* Temporary early aborts for modes not supported with hand-vec. */
 #if defined(WITH_VECTORIZATION) && defined(GADGET2_SPH) && \
     !defined(CHEMISTRY_NONE)
   error(
@@ -1180,7 +1186,7 @@ int main(int argc, char *argv[]) {
     } else
       bzero(&sink_properties, sizeof(struct sink_props));
 
-      /* Initialise the cooling function properties */
+    /* Initialise the cooling function properties */
 #ifdef COOLING_NONE
     if (with_cooling) {
       error(
@@ -1556,6 +1562,7 @@ int main(int argc, char *argv[]) {
     if (with_sinks) engine_policies |= engine_policy_sinks;
     if (with_rt) engine_policies |= engine_policy_rt;
     if (with_power) engine_policies |= engine_policy_power_spectra;
+    if (with_no_io) engine_policies |= engine_policy_no_io;
 
     /* Initialize the engine with the space and policies. */
     engine_init(&e, &s, params, output_options, N_total[swift_type_gas],

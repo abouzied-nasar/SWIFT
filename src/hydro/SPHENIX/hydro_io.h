@@ -40,9 +40,9 @@
  * @param list The list of i/o properties to read.
  * @param num_fields The number of i/o fields to read.
  */
-INLINE static void hydro_read_particles(struct part* parts,
-                                        struct io_props* list,
-                                        int* num_fields) {
+INLINE static void hydro_read_particles(struct part *parts,
+                                        struct io_props *list,
+                                        int *num_fields) {
 
   *num_fields = 8;
 
@@ -68,23 +68,23 @@ INLINE static void hydro_read_particles(struct part* parts,
       "Density", FLOAT, 1, OPTIONAL, UNIT_CONV_DENSITY, parts, part_get_rho_p);
 }
 
-INLINE static void convert_S(const struct engine* e, const struct part* p,
-                             const struct xpart* xp, float* ret) {
+INLINE static void convert_S(const struct engine *e, const struct part *p,
+                             const struct xpart *xp, float *ret) {
 
   ret[0] = hydro_get_comoving_entropy(p, xp);
 }
 
-INLINE static void convert_P(const struct engine* e, const struct part* p,
-                             const struct xpart* xp, float* ret) {
+INLINE static void convert_P(const struct engine *e, const struct part *p,
+                             const struct xpart *xp, float *ret) {
 
   ret[0] = hydro_get_comoving_pressure(p);
 }
 
-INLINE static void convert_part_pos(const struct engine* e,
-                                    const struct part* p,
-                                    const struct xpart* xp, double* ret) {
+INLINE static void convert_part_pos(const struct engine *e,
+                                    const struct part *p,
+                                    const struct xpart *xp, double *ret) {
 
-  const struct space* s = e->s;
+  const struct space *s = e->s;
   const double* x = part_get_const_x(p);
   if (s->periodic) {
     ret[0] = box_wrap(x[0], 0.0, s->dim[0]);
@@ -102,12 +102,12 @@ INLINE static void convert_part_pos(const struct engine* e,
   }
 }
 
-INLINE static void convert_part_vel(const struct engine* e,
-                                    const struct part* p,
-                                    const struct xpart* xp, float* ret) {
+INLINE static void convert_part_vel(const struct engine *e,
+                                    const struct part *p,
+                                    const struct xpart *xp, float *ret) {
 
   const int with_cosmology = (e->policy & engine_policy_cosmology);
-  const struct cosmology* cosmo = e->cosmology;
+  const struct cosmology *cosmo = e->cosmology;
   const integertime_t ti_current = e->ti_current;
   const double time_base = e->time_base;
   const float dt_kick_grav_mesh = e->dt_kick_grav_mesh_for_io;
@@ -159,18 +159,18 @@ INLINE static void convert_part_vel(const struct engine* e,
   ret[2] *= cosmo->a_inv;
 }
 
-INLINE static void convert_part_potential(const struct engine* e,
-                                          const struct part* p,
-                                          const struct xpart* xp, float* ret) {
+INLINE static void convert_part_potential(const struct engine *e,
+                                          const struct part *p,
+                                          const struct xpart *xp, float *ret) {
   if (part_get_gpart(p) != NULL)
     ret[0] = gravity_get_comoving_potential(part_get_gpart(p));
   else
     ret[0] = 0.f;
 }
 
-INLINE static void convert_part_softening(const struct engine* e,
-                                          const struct part* p,
-                                          const struct xpart* xp, float* ret) {
+INLINE static void convert_part_softening(const struct engine *e,
+                                          const struct part *p,
+                                          const struct xpart *xp, float *ret) {
   if (part_get_gpart(p) != NULL)
     ret[0] = kernel_gravity_softening_plummer_equivalent_inv *
              gravity_get_softening(part_get_gpart(p), e->gravity_properties);
@@ -178,15 +178,15 @@ INLINE static void convert_part_softening(const struct engine* e,
     ret[0] = 0.f;
 }
 
-INLINE static void convert_viscosity(const struct engine* e,
-                                     const struct part* p,
-                                     const struct xpart* xp, float* ret) {
+INLINE static void convert_viscosity(const struct engine *e,
+                                     const struct part *p,
+                                     const struct xpart *xp, float *ret) {
   ret[0] = part_get_alpha_av(p) * part_get_balsara(p);
 }
 
-INLINE static void convert_diffusion(const struct engine* e,
-                                     const struct part* p,
-                                     const struct xpart* xp, float* ret) {
+INLINE static void convert_diffusion(const struct engine *e,
+                                     const struct part *p,
+                                     const struct xpart *xp, float *ret) {
   ret[0] = part_get_alpha_diff(p);
 }
 
@@ -197,10 +197,10 @@ INLINE static void convert_diffusion(const struct engine* e,
  * @param list The list of i/o properties to write.
  * @param num_fields The number of i/o fields to write.
  */
-INLINE static void hydro_write_particles(const struct part* parts,
-                                         const struct xpart* xparts,
-                                         struct io_props* list,
-                                         int* num_fields) {
+INLINE static void hydro_write_particles(const struct part *parts,
+                                         const struct xpart *xparts,
+                                         struct io_props *list,
+                                         int *num_fields) {
 
   *num_fields = 16;
 

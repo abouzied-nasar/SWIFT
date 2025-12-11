@@ -9,7 +9,7 @@
  * correction.
  */
 __attribute__((always_inline)) INLINE static void fvpm_reset_centroids(
-    struct part* restrict p) {}
+    struct part *restrict p) {}
 
 /**
  * @brief Normalise the centroids after the density loop.
@@ -20,7 +20,7 @@ __attribute__((always_inline)) INLINE static void fvpm_reset_centroids(
  * is used here.
  */
 __attribute__((always_inline)) INLINE static void fvpm_normalise_centroid(
-    struct part* restrict p, const float wcount) {}
+    struct part *restrict p, const float wcount) {}
 
 /**
  * @brief Update the centroid with the given contribution, assuming the particle
@@ -32,7 +32,7 @@ __attribute__((always_inline)) INLINE static void fvpm_normalise_centroid(
  * @param w Kernel value at position pj->x.
  */
 __attribute__((always_inline)) INLINE static void fvpm_update_centroid_left(
-    struct part* restrict p, const float* dx, const float w) {}
+    struct part *restrict p, const float *dx, const float w) {}
 
 /**
  * @brief Update the centroid with the given contribution, assuming the particle
@@ -44,6 +44,6 @@ __attribute__((always_inline)) INLINE static void fvpm_update_centroid_left(
  * @param w Kernel value at position pi->x.
  */
 __attribute__((always_inline)) INLINE static void fvpm_update_centroid_right(
-    struct part* restrict p, const float* dx, const float w) {}
+    struct part *restrict p, const float *dx, const float w) {}
 
 #endif /* SWIFT_FVPM_GEOMETRY_GIZMO_MFM_H */

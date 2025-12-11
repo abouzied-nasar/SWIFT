@@ -43,11 +43,11 @@
  * @param cosmo cosmology struct
  */
 __attribute__((always_inline)) INLINE static void rt_tchem_first_init_part(
-    struct part* restrict p, const struct rt_props* rt_props,
-    const struct hydro_props* hydro_props,
-    const struct phys_const* restrict phys_const,
-    const struct unit_system* restrict us,
-    const struct cosmology* restrict cosmo) {
+    struct part *restrict p, const struct rt_props *rt_props,
+    const struct hydro_props *hydro_props,
+    const struct phys_const *restrict phys_const,
+    const struct unit_system *restrict us,
+    const struct cosmology *restrict cosmo) {
 
   struct rt_part_data* rt_data = part_get_rt_data_p(p);
 
@@ -108,11 +108,11 @@ __attribute__((always_inline)) INLINE static void rt_tchem_first_init_part(
  * @param depth recursion depth
  */
 INLINE static void rt_do_thermochemistry(
-    struct part* restrict p, struct xpart* restrict xp,
-    struct rt_props* rt_props, const struct cosmology* restrict cosmo,
-    const struct hydro_props* hydro_props,
-    const struct phys_const* restrict phys_const,
-    const struct unit_system* restrict us, const double dt, int depth) {
+    struct part *restrict p, struct xpart *restrict xp,
+    struct rt_props *rt_props, const struct cosmology *restrict cosmo,
+    const struct hydro_props *hydro_props,
+    const struct phys_const *restrict phys_const,
+    const struct unit_system *restrict us, const double dt, int depth) {
   /* Note: Can't pass rt_props as const struct because of grackle
    * accessinging its properties there */
 
@@ -261,11 +261,11 @@ INLINE static void rt_do_thermochemistry(
  * @param us The internal system of units.
  */
 __attribute__((always_inline)) INLINE static float rt_tchem_get_tchem_time(
-    const struct part* restrict p, const struct xpart* restrict xp,
-    struct rt_props* rt_props, const struct cosmology* restrict cosmo,
-    const struct hydro_props* hydro_props,
-    const struct phys_const* restrict phys_const,
-    const struct unit_system* restrict us) {
+    const struct part *restrict p, const struct xpart *restrict xp,
+    struct rt_props *rt_props, const struct cosmology *restrict cosmo,
+    const struct hydro_props *hydro_props,
+    const struct phys_const *restrict phys_const,
+    const struct unit_system *restrict us) {
   /* Note: Can't pass rt_props as const struct because of grackle
    * accessinging its properties there */
 

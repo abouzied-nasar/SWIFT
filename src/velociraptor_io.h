@@ -27,10 +27,10 @@
 
 #include <config.h>
 
-INLINE static void velociraptor_convert_part_groupID(const struct engine* e,
-                                                     const struct part* p,
-                                                     const struct xpart* xp,
-                                                     long long* ret) {
+INLINE static void velociraptor_convert_part_groupID(const struct engine *e,
+                                                     const struct part *p,
+                                                     const struct xpart *xp,
+                                                     long long *ret) {
   const struct gpart* gp = part_get_gpart(p);
   if (gp == NULL)
     ret[0] = 0.f;
@@ -40,9 +40,9 @@ INLINE static void velociraptor_convert_part_groupID(const struct engine* e,
   }
 }
 
-INLINE static void velociraptor_convert_spart_groupID(const struct engine* e,
-                                                      const struct spart* sp,
-                                                      long long* ret) {
+INLINE static void velociraptor_convert_spart_groupID(const struct engine *e,
+                                                      const struct spart *sp,
+                                                      long long *ret) {
   if (sp->gpart == NULL)
     ret[0] = 0.f;
   else {
@@ -51,9 +51,9 @@ INLINE static void velociraptor_convert_spart_groupID(const struct engine* e,
   }
 }
 
-INLINE static void velociraptor_convert_bpart_groupID(const struct engine* e,
-                                                      const struct bpart* bp,
-                                                      long long* ret) {
+INLINE static void velociraptor_convert_bpart_groupID(const struct engine *e,
+                                                      const struct bpart *bp,
+                                                      long long *ret) {
   if (bp->gpart == NULL)
     ret[0] = 0.f;
   else {
@@ -63,8 +63,8 @@ INLINE static void velociraptor_convert_bpart_groupID(const struct engine* e,
 }
 
 __attribute__((always_inline)) INLINE static int velociraptor_write_parts(
-    const struct part* parts, const struct xpart* xparts,
-    struct io_props* list) {
+    const struct part *parts, const struct xpart *xparts,
+    struct io_props *list) {
 
   list[0] = io_make_output_field_convert_part(
       "VELOCIraptorGroupIDs", LONGLONG, 1, UNIT_CONV_NO_UNITS, 0.f, parts,
@@ -75,7 +75,7 @@ __attribute__((always_inline)) INLINE static int velociraptor_write_parts(
 }
 
 __attribute__((always_inline)) INLINE static int velociraptor_write_gparts(
-    const struct velociraptor_gpart_data* group_data, struct io_props* list) {
+    const struct velociraptor_gpart_data *group_data, struct io_props *list) {
 
   list[0] = io_make_output_field(
       "VELOCIraptorGroupIDs", LONGLONG, 1, UNIT_CONV_NO_UNITS, 0.f, group_data,
@@ -85,7 +85,7 @@ __attribute__((always_inline)) INLINE static int velociraptor_write_gparts(
 }
 
 __attribute__((always_inline)) INLINE static int velociraptor_write_sparts(
-    const struct spart* sparts, struct io_props* list) {
+    const struct spart *sparts, struct io_props *list) {
 
   list[0] = io_make_output_field_convert_spart(
       "VELOCIraptorGroupIDs", LONGLONG, 1, UNIT_CONV_NO_UNITS, 0.f, sparts,
@@ -96,7 +96,7 @@ __attribute__((always_inline)) INLINE static int velociraptor_write_sparts(
 }
 
 __attribute__((always_inline)) INLINE static int velociraptor_write_bparts(
-    const struct bpart* bparts, struct io_props* list) {
+    const struct bpart *bparts, struct io_props *list) {
 
   list[0] = io_make_output_field_convert_bpart(
       "VELOCIraptorGroupIDs", LONGLONG, 1, UNIT_CONV_NO_UNITS, 0.f, bparts,
