@@ -61,7 +61,8 @@ void gpu_init_thread(const struct engine* e, const int cpuid) {
     cu_error = cudaSetDevice(engine_rank % n_devices);
     swift_assert(cu_error == cudaSuccess);
 
-    dev_id = engine_rank;
+    dev_id = engine_rank % n_devices;
+    message("engine_rank %i got GPU %i", engine_rank, dev_id);
   }
 #endif
 
