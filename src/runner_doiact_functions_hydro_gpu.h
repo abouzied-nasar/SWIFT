@@ -824,6 +824,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         else{
           /*Get the cell's index in the unique cell list*/
           int my_index_i = md->my_index[n_leaves_packed].x;
+          message("n_leaves_packed %i my_index_i %i", n_leaves_packed, my_index_i);
           /*Store where ci starts in unique list*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
@@ -842,6 +843,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         else{
           /*Get the cell's index in the unique cell list*/
           int my_index_j = md->my_index[n_leaves_packed].y;
+          message("n_leaves_packed %i my_index_j %i", n_leaves_packed, my_index_j);
           /*Store where cj starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_j].z;
           /*Store where ci starts*/

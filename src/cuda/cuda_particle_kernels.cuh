@@ -169,7 +169,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
       if ((r2 < hig2) && (j != i)) {
         /* j != pid: Exclude self contribution. This happens at a later step. */
 
-        printf("found a neighbour %i\n", j);
+//        printf("found a neighbour %i\n", j);
     	n_neighbours++;
         /* Recover some data */
         const float r = sqrtf(r2);
