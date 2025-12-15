@@ -710,15 +710,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   int *task_last_packed_leaf = md->task_last_packed_leaf;
 
   /*Some bits for output in case of debug*/
-//  char buffer[20];
-//  snprintf(buffer, sizeof(buffer), "unique.csv");
-//  FILE *unique_list;
-//  unique_list = fopen(buffer, "w");
-//
-//  char buffer1[20];
-//  snprintf(buffer1, sizeof(buffer1), "full.csv");
-//  FILE *full_list;
-//  full_list = fopen(buffer1, "w");
+  char buffer[20];
+  snprintf(buffer, sizeof(buffer), "cells_i.csv");
+  FILE *cells_i;
+  cells_i = fopen(buffer, "w");
+
+  char buffer1[20];
+  snprintf(buffer1, sizeof(buffer1), "cells_j.csv");
+  FILE *cells_j;
+  cells_j = fopen(buffer1, "w");
 
   /* Nr of super-level tasks we've accounted for in the meda-data arrays. */
   int tind = md->tasks_in_list;
@@ -959,20 +959,66 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         (md->launch_leftovers && (npacked == md->task_n_leaves))) {
 
       if (t->subtype == task_subtype_gpu_density) {
-//        int n_particles = 0;
-//        for(int i = 0; i < md->n_unique; i++){
-//          n_particles += md->unique_cells[i]->hydro.count;
-//        }
-//        message("n_in_uniques %i c_p_unique %i c_p_total %i n_cell_uniq %i",
-//        		n_particles, md->count_parts_unique, md->count_parts, md->n_unique);
+
+        for(int i = 0; i < md->n_leaves_packed; i++){
+
+          int cii_s = gpu_md->cell_i_j_start_end[i].x;
+          int cii_e = gpu_md->cell_i_j_start_end[i].y;
+          int cjj_s = gpu_md->cell_i_j_start_end[i].z;
+          int cjj_e = gpu_md->cell_i_j_start_end[i].w;
+          //get cell i's position
+          const struct gpu_cell_pos_d cell_i_pos = buf->parts_send_d[cii_e].c_loc;
+          double cx[3];
+          cx[0] = cell_i_pos.x.x;
+          cx[1] = cell_i_pos.x.y;
+          cx[2] = cell_i_pos.x.z;
+          message("n in cell i %i n in cell j %i", cii_e - cii_s, cjj_e - cjj_s);
+
+          for(int p = cii_s; p < cii_e; p++){
+
+            const struct gpu_part_data_d part = buf->parts_send_d[p].p_data;
+            double x[3];
+            const float4 x_h = part.x_h;
+            x[0] = x_h.x;
+            x[1] = x_h.y;
+            x[2] = x_h.z;
+            double dist = sqrt((x[0] - cx[0])*(x[0] - cx[0]) +
+                (x[1] - cx[1])*(x[1] - cx[1]) +
+                (x[2] - cx[2])*(x[2] - cx[2]));
+            fprintf(cells_i, "%f, %f, %f, %f, %f, %i\n", x[0], x[1], x[2], dist, cx[0], i);
+
+          }
+
+          const struct gpu_cell_pos_d cell_j_pos = buf->parts_send_d[cjj_e].c_loc;
+          cx[0] = cell_j_pos.x.x;
+          cx[1] = cell_j_pos.x.y;
+          cx[2] = cell_j_pos.x.z;
+
+          for(int p = cjj_s; p < cjj_e; p++){
+
+            const struct gpu_part_data_d part = buf->parts_send_d[p].p_data;
+            double x[3];
+            x[0] = part.x_h.x;
+            x[1] = part.x_h.y;
+            x[2] = part.x_h.z;
+            double dist = sqrt((x[0] - cx[0])*(x[0] - cx[0]) +
+                (x[1] - cx[1])*(x[1] - cx[1]) +
+                (x[2] - cx[2])*(x[2] - cx[2]));
+            fprintf(cells_j, "%f, %f, %f, %f, %i\n", x[0], x[1], x[2], dist, i);
+
+          }
+
+        }
+        fflush(cells_i);
+        fflush(cells_j);
+        fclose(cells_i);
+        fclose(cells_j);
+        exit(0);
+
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
-
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_density(r, s, buf, npacked);
-
-//        message("n_unique %i count parts unique %i n_leaves_packed %i n_expected in uniques %i",
-//            md->n_unique, md->count_parts_unique, md->n_leaves_packed, n_particles);
 
       } else if (t->subtype == task_subtype_gpu_gradient) {
 
@@ -1072,29 +1118,29 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     } /* if launch or launch_leftovers */
   } /* while npacked < md->task_n_leaves */
 
-  for(int i = 0; i < md->count_parts_unique; i++){
-	  double x[3];
-	  x[0] = buf->parts_send_d[i].p_data.x_h.x;
-	  x[1] = buf->parts_send_d[i].p_data.x_h.y;
-	  x[2] = buf->parts_send_d[i].p_data.x_h.z;
-	  for(int j = 0; j < md->count_parts_unique; j++){
-		  double xj[3];
-		  xj[0] = buf->parts_send_d[j].p_data.x_h.x;
-		  xj[1] = buf->parts_send_d[j].p_data.x_h.y;
-		  xj[2] = buf->parts_send_d[j].p_data.x_h.z;
-		  double dist[3];
-		  double distance = 0;
-		  for(int k = 0; k < 3; k++){
-			  dist[k] = x[k] - xj[k];
-			  dist[k] *= dist[k];
-			  distance += dist[k];
-		  }
-		  distance = sqrt(distance);
-//		  if(distance == 0.f && i != j)
-//			  error("We have duplicate particles");
-
-	  }
-  }
+//  for(int i = 0; i < md->count_parts_unique; i++){
+//	  double x[3];
+//	  x[0] = buf->parts_send_d[i].p_data.x_h.x;
+//	  x[1] = buf->parts_send_d[i].p_data.x_h.y;
+//	  x[2] = buf->parts_send_d[i].p_data.x_h.z;
+//	  for(int j = 0; j < md->count_parts_unique; j++){
+//		  double xj[3];
+//		  xj[0] = buf->parts_send_d[j].p_data.x_h.x;
+//		  xj[1] = buf->parts_send_d[j].p_data.x_h.y;
+//		  xj[2] = buf->parts_send_d[j].p_data.x_h.z;
+//		  double dist[3];
+//		  double distance = 0;
+//		  for(int k = 0; k < 3; k++){
+//			  dist[k] = x[k] - xj[k];
+//			  dist[k] *= dist[k];
+//			  distance += dist[k];
+//		  }
+//		  distance = sqrt(distance);
+////		  if(distance == 0.f && i != j)
+////			  error("We have duplicate particles");
+//
+//	  }
+//  }
   /*Uncomment to dump particles contained in unique and non-unique lists of particles*/
 //  if(t->subtype == task_subtype_gpu_density){
 //    fprintf(full_list, "x, y, z\n");

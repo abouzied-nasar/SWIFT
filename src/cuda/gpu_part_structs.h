@@ -36,7 +36,7 @@ extern "C" {
 /*! Container for particle data required for density calcs */
 struct gpu_part_data_d {
 #ifdef WITH_CUDA
-
+//TODO: This needs changing to doubles too. Darn it...
 /*! Particle position and h -> x, y, z, h */
   float4 x_h;
 
