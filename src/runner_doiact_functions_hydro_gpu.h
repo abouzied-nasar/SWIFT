@@ -1036,12 +1036,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         fflush(cells_j);
         fclose(cells_i);
         fclose(cells_j);
-        exit(0);
 
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_density(r, s, buf, npacked);
+
+        exit(0);
 
       } else if (t->subtype == task_subtype_gpu_gradient) {
 

@@ -212,6 +212,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     d_parts_recv[k + ci_write_start].rho_rhodh_wcount_wcount_dh = res_rho;
     d_parts_recv[k + ci_write_start].rot_vx_div_v = res_rot;
     d_parts_recv[k + ci_write_start].n_neighbours = n_neighbours;
+//    if(n_neighbours > 0)
+      printf("found %i neigbours\n", n_neighbours);
     k++;
   }
 }
