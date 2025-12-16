@@ -217,6 +217,11 @@ static inline int hash_func(const struct cell *ptr, const int hash_size) {
     return ((uintptr_t)ptr) % hash_size;
 }
 
+// Simple hash function for pointers
+static inline int lin_probe(const struct cell *ptr, const int hash_size) {
+    return ((uintptr_t)ptr + 1) % hash_size;
+}
+
 // Lookup in hash table
 int hash_lookup(const struct cell *c, const int hash_size, const struct hash_entry * ht) {
 	/*Get the hash using the cell's pointer address*/
@@ -227,15 +232,19 @@ int hash_lookup(const struct cell *c, const int hash_size, const struct hash_ent
       /*If we already have a cell hashed to h_id.
        * Return it's index in the array of
        * unique cells*/
-      if (ht[h_id].c == c)
+      if (ht[h_id].c == c){
+        message("Cell %p is in table as %p", c, ht[h_id].c);
         return ht[h_id].index;
-      h_id = (h_id + 1) % hash_size;
+      }
+      //Add one to the cells pointer after converting to int and hash again
+      h_id = lin_probe(c, hash_size);
       if(h_id == start)
         error("hash table full");
     }
     if(h_id > hash_size)
       error("Ran over hash table");
     /*Otherwise return -1 to indicate we've found a unique cell*/
+    message("unique cell %i", h_id);
     return -1; // Not found
 }
 
@@ -247,7 +256,8 @@ void hash_insert(struct cell *c, int unique_count, const int hash_size, struct h
     /*Do a linear probe of hash table*/
     while(ht[h_id].occupied){
 //    while(hash_table[h_id].c)
-      h_id = (h_id + 1) % hash_size;
+      //Add one to the cells pointer after converting to int and hash again
+      h_id = lin_probe(c, hash_size);
       /*If we reach the start of the
        * has table it means we've over-filled it.
        * Nothing to do but crash*/
@@ -259,7 +269,7 @@ void hash_insert(struct cell *c, int unique_count, const int hash_size, struct h
     if(h_id > hash_size)
       error("Ran over hash table");
     ht[h_id].c = c;
-    /*This is where the cell is located in the unique_cells array*/
+    /*This is where the cell will be located in the unique_cells array*/
     ht[h_id].index = unique_count;
     ht[h_id].occupied = 1;
 }
@@ -278,8 +288,8 @@ void hash_insert(struct cell *c, int unique_count, const int hash_size, struct h
 static void runner_gpu_filter_data(const struct runner *r,
                                       const struct scheduler *s,
                                       struct gpu_offload_data *buf,
-                                      const char timer, const struct task * t,
-									  const int index_2_check) {
+                                      const char timer, const struct task * t, struct cell *cii,
+                                      struct cell *cjj) {
 
   /* Note: Can't inline a recursive function... */
 
@@ -288,6 +298,7 @@ static void runner_gpu_filter_data(const struct runner *r,
   /* Grab some handles. */
   /* packing data and metadata */
   struct gpu_pack_metadata *md = &buf->md;
+  const int n_leaves_packed = md->n_leaves_packed;
  /* TODO: Use this to replace array when checking as we no longer need to track this for the entire list of cells*/
 //  int2 pack = {0, 0};
 
@@ -304,19 +315,14 @@ static void runner_gpu_filter_data(const struct runner *r,
   struct hash_entry * ht = md->hash_table.entry;
   const int hash_size = md->hash_size;
 
-  /*Check the cells sent through to see if it is unique*/
-  /* Grab handles of leaf cells */
-  struct cell *cii = md->ci_leaves[index_2_check];
-  struct cell *cjj = md->cj_leaves[index_2_check];
-
+  /*None of these should be NULL. Even for selfs where cjj = cii*/
   if (cii == NULL || cjj == NULL)
 	  error("Error: working on NULL cells");
 
   /*Set the flag to pack this cell to false.
-   * Re-set .x to true later if cell i is unique
-   * Re-set .y to true if later cell j is unique*/
-  md->pack_ci[index_2_check] = 0;
-  md->pack_cj[index_2_check] = 0;
+   * Re-set .x to true later if cell i or cj are unique*/
+  md->pack_ci[n_leaves_packed] = 0;
+  md->pack_cj[n_leaves_packed] = 0;
 
   /*Check if ci has already been found.
    * If so, return where it's unique copy
@@ -324,38 +330,47 @@ static void runner_gpu_filter_data(const struct runner *r,
    * Otherwise, return -1*/
   int unique_index = hash_lookup(cii, hash_size, ht);
   if (unique_index >= 0){
-	  /*We found this cell's hash value exists -> Not unique*/
-	  md->my_index[index_2_check].x = unique_index;
-      md->pack_ci[index_2_check] = 0;
+	/*We found this cell's hash value exists -> Not unique.
+	 * The hash_lookup returns it's position in the sorted list
+	 * (not in the hash table)*/
+	md->my_index[n_leaves_packed].x = unique_index;
+	/*Not necessary but setting it to zero here to be sure*/
+	md->pack_ci[n_leaves_packed] = 0;
   }
   else {
-	  /*This cell has not been found yet.
-	   * Add to unique_cells and store it's index*/
-	  md->my_index[index_2_check].x = unique_count;
-	  /*unique_cells is different from hash table.
-	   * This is just an array to keep track of
-	   * unique cells*/
-	  md->unique_cells[unique_count] = cii;
-	  md->pack_ci[index_2_check] = 1;
-	  hash_insert(cii, unique_count, hash_size, ht);
-	  unique_count++;
+    /*This cell has not been found yet.
+     * Add to unique_cells and store it's index ascending
+     * from index where we last inserted a unique cell*/
+    md->my_index[n_leaves_packed].x = unique_count;
+    /*unique_cells is different from hash table.
+     * This is just an array to keep track of
+     * unique cells*/
+    md->unique_cells[unique_count] = cii;
+    md->pack_ci[n_leaves_packed] = 1;
+    hash_insert(cii, unique_count, hash_size, ht);
+    unique_count++;
   }
-
   /*Same for cj*/
-  if(t->type == task_type_pair){
-	  unique_index = hash_lookup(cjj, hash_size, ht);
-	  if (unique_index >= 0){
-		  md->my_index[index_2_check].y = unique_index;
-		  md->pack_cj[index_2_check] = 0;
-	  }
-	  else {
-		  md->my_index[index_2_check].y = unique_count;
-		  md->unique_cells[unique_count] = cjj;
-		  md->pack_cj[index_2_check] = 1;
-		  hash_insert(cjj, unique_count, hash_size, ht);
-		  unique_count++;
-	  }
-  }
+//  if(t->type == task_type_pair){
+    unique_index = hash_lookup(cjj, hash_size, ht);
+    if (unique_index >= 0){
+      md->my_index[n_leaves_packed].y = unique_index;
+      md->pack_cj[n_leaves_packed] = 0;
+    }
+    else {
+      md->my_index[n_leaves_packed].y = unique_count;
+      md->unique_cells[unique_count] = cjj;
+      md->pack_cj[n_leaves_packed] = 1;
+      hash_insert(cjj, unique_count, hash_size, ht);
+      unique_count++;
+    }
+//  }
+  /*TODO: This is a self task and we have either already found
+   * it's unique ci or it was found before*/
+//  else{
+////    md->my_index[n_leaves_packed].x = unique_index;
+////    md->pack_ci[n_leaves_packed] = 0;
+//  }
 
   md->n_unique = unique_count;
 
@@ -807,11 +822,14 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
 
         /* Test to see if cells i and j have already been packed*/
-        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, n_leaves_packed);
+        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
         /*Now figure out where to start from in the unique particle buffer*/
         /*Don't count my count. this is the start pos
          * Check if ci should be packed*/
         if(md->pack_ci[n_leaves_packed] == 1){
+          /*Get the cell's index in the unique cell list*/
+          int my_index_i = md->my_index[n_leaves_packed].x;
+          message("n_leaves_packed %i my_index_i %i unique ci %i", n_leaves_packed, my_index_i, (int)(uintptr_t)cii);
           /*Store where ci starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].x = md->count_parts_unique;
           /*Store where ci ends*/
@@ -824,7 +842,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         else{
           /*Get the cell's index in the unique cell list*/
           int my_index_i = md->my_index[n_leaves_packed].x;
-          message("n_leaves_packed %i my_index_i %i", n_leaves_packed, my_index_i);
+          message("n_leaves_packed %i my_index_i %i not unique ci %i", n_leaves_packed, my_index_i, (int)(uintptr_t)cii);
           /*Store where ci starts in unique list*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
@@ -832,6 +850,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         }
         /*Check if cj should be packed*/
         if(md->pack_cj[n_leaves_packed] == 1){
+          /*Get the cell's index in the unique cell list*/
+          int my_index_j = md->my_index[n_leaves_packed].y;
+          message("n_leaves_packed %i my_index_j %i unique cj %i", n_leaves_packed, my_index_j, (int)(uintptr_t)cjj);
           /*Store where cj starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].z = md->count_parts_unique;
           /*Store where cj ends*/
@@ -843,7 +864,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         else{
           /*Get the cell's index in the unique cell list*/
           int my_index_j = md->my_index[n_leaves_packed].y;
-          message("n_leaves_packed %i my_index_j %i", n_leaves_packed, my_index_j);
+          message("n_leaves_packed %i my_index_j %i not unique cj %i", n_leaves_packed, my_index_j, (int)(uintptr_t)cjj);
           /*Store where cj starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_j].z;
           /*Store where ci starts*/
@@ -860,7 +881,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Test to see if cells i and j have already been packed
          * cells i and j are the same cell here but use the same
          * function as for the pairs*/
-        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, n_leaves_packed);
+        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
         /*Now figure out where to start from in the unique particle buffer*/
         /*Don't count my count. this is the start pos*/
         if(md->pack_cj[n_leaves_packed] == 1){
@@ -959,7 +980,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         (md->launch_leftovers && (npacked == md->task_n_leaves))) {
 
       if (t->subtype == task_subtype_gpu_density) {
-
+        message("n_leaves_packed %i n_unique %i", md->n_leaves_packed, md->n_unique);
+        fprintf(cells_i, "x, y, z, dist, cx, i\n");
+        fprintf(cells_j, "x, y, z, dist, cx, i\n");
         for(int i = 0; i < md->n_leaves_packed; i++){
 
           int cii_s = gpu_md->cell_i_j_start_end[i].x;
@@ -972,7 +995,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           cx[0] = cell_i_pos.x.x;
           cx[1] = cell_i_pos.x.y;
           cx[2] = cell_i_pos.x.z;
-          message("n in cell i %i n in cell j %i", cii_e - cii_s, cjj_e - cjj_s);
+//          message("n in cell i %i n in cell j %i", cii_e - cii_s, cjj_e - cjj_s);
 
           for(int p = cii_s; p < cii_e; p++){
 
@@ -1004,7 +1027,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
             double dist = sqrt((x[0] - cx[0])*(x[0] - cx[0]) +
                 (x[1] - cx[1])*(x[1] - cx[1]) +
                 (x[2] - cx[2])*(x[2] - cx[2]));
-            fprintf(cells_j, "%f, %f, %f, %f, %i\n", x[0], x[1], x[2], dist, i);
+            fprintf(cells_j, "%f, %f, %f, %f, %f, %i\n", x[0], x[1], x[2], cx[0], dist, i);
 
           }
 
