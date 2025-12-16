@@ -233,7 +233,7 @@ int hash_lookup(const struct cell *c, const int hash_size, const struct hash_ent
        * Return it's index in the array of
        * unique cells*/
       if (ht[h_id].c == c){
-        message("Cell %p is in table as %p", c, ht[h_id].c);
+//        message("Cell %p is in table as %p", c, ht[h_id].c);
         return ht[h_id].index;
       }
       //Add one to the cells pointer after converting to int and hash again
@@ -244,7 +244,7 @@ int hash_lookup(const struct cell *c, const int hash_size, const struct hash_ent
     if(h_id > hash_size)
       error("Ran over hash table");
     /*Otherwise return -1 to indicate we've found a unique cell*/
-    message("unique cell %i", h_id);
+//    message("unique cell %i", h_id);
     return -1; // Not found
 }
 
@@ -828,8 +828,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
          * Check if ci should be packed*/
         if(md->pack_ci[n_leaves_packed] == 1){
           /*Get the cell's index in the unique cell list*/
-          int my_index_i = md->my_index[n_leaves_packed].x;
-          message("n_leaves_packed %i my_index_i %i unique ci %i", n_leaves_packed, my_index_i, (int)(uintptr_t)cii);
+//          int my_index_i = md->my_index[n_leaves_packed].x;
+//          message("n_leaves_packed %i my_index_i %i unique ci %i", n_leaves_packed, my_index_i, (int)(uintptr_t)cii);
           /*Store where ci starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].x = md->count_parts_unique;
           /*Store where ci ends*/
@@ -842,7 +842,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         else{
           /*Get the cell's index in the unique cell list*/
           int my_index_i = md->my_index[n_leaves_packed].x;
-          message("n_leaves_packed %i my_index_i %i not unique ci %i", n_leaves_packed, my_index_i, (int)(uintptr_t)cii);
+//          message("n_leaves_packed %i my_index_i %i not unique ci %i", n_leaves_packed, my_index_i, (int)(uintptr_t)cii);
           /*Store where ci starts in unique list*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
@@ -851,8 +851,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /*Check if cj should be packed*/
         if(md->pack_cj[n_leaves_packed] == 1){
           /*Get the cell's index in the unique cell list*/
-          int my_index_j = md->my_index[n_leaves_packed].y;
-          message("n_leaves_packed %i my_index_j %i unique cj %i", n_leaves_packed, my_index_j, (int)(uintptr_t)cjj);
+//          int my_index_j = md->my_index[n_leaves_packed].y;
+//          message("n_leaves_packed %i my_index_j %i unique cj %i", n_leaves_packed, my_index_j, (int)(uintptr_t)cjj);
           /*Store where cj starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].z = md->count_parts_unique;
           /*Store where cj ends*/
@@ -864,7 +864,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         else{
           /*Get the cell's index in the unique cell list*/
           int my_index_j = md->my_index[n_leaves_packed].y;
-          message("n_leaves_packed %i my_index_j %i not unique cj %i", n_leaves_packed, my_index_j, (int)(uintptr_t)cjj);
+//          message("n_leaves_packed %i my_index_j %i not unique cj %i", n_leaves_packed, my_index_j, (int)(uintptr_t)cjj);
           /*Store where cj starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_j].z;
           /*Store where ci starts*/
