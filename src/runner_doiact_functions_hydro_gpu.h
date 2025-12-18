@@ -464,6 +464,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
             &buf->gpu_md.cell_i_j_start_end[0],
             leaves_packed * sizeof(int4),
             cudaMemcpyHostToDevice);
+      cu_error =
+          cudaMemcpy(&buf->gpu_md.d_cell_i_j_start_end_non_compact[0],
+            &buf->gpu_md.cell_i_j_start_end_non_compact[0],
+            leaves_packed * sizeof(int4),
+            cudaMemcpyHostToDevice);
       if (cu_error != cudaSuccess) {
         /* If we're here, assume something's messed up with our code, not with
          * CUDA. */
