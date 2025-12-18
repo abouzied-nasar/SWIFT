@@ -118,7 +118,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
 
     /* r == 0 can happen for self-interaction, which we're masking out,
      * but it'll produce NaNs through division by zero, so handle that. */
-    const float r_inv = r > 0.f ? 1.f / r : 1.f;
+    const float r_inv = r > 0.f ? (1.f / r) : 1.f;
     const float faci = mj * wi_dx * r_inv;
 
     /* Compute dv dot r */
@@ -232,7 +232,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
     const float r = sqrtf(r2);
     /* r == 0 can happen for self-interaction, which we're masking out,
      * but it'll produce NaNs through division by zero, so handle that. */
-    const float r_inv = r > 0.f ? 1.f / r : 1.f;
+    const float r_inv = r > 0.f ? (1.f / r) : 1.f;
 
     /* Cosmology terms for the signal velocity */
     const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
@@ -353,8 +353,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
     const float aviscj = pj.bals_c_avisc_adiff.z;
     const float adiffj = pj.bals_c_avisc_adiff.w;
 
-    const int tbj = pi.timebin_minngbtimebin_pjs_pje.x;
-    /* const int min_ngb_tbj = pi.timebin_minngbtimebin_pjs_pje.y; */
+    const int tbj = pj.timebin_minngbtimebin_pjs_pje.x;
+    /* const int min_ngb_tbj = pj.timebin_minngbtimebin_pjs_pje.y; */
 
     /* Now get stuff done. */
     const float xij = xi - xj;
@@ -376,7 +376,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
     const float r = sqrtf(r2);
     /* r == 0 can happen for self-interaction, which we're masking out,
      * but it'll produce NaNs through division by zero, so handle that. */
-    const float r_inv = r > 0.f ? 1.f / r : 1.f;
+    const float r_inv = r > 0.f ? (1.f / r) : 1.f;
 
     /* Get the kernel for hi. */
     const float qi = r * hi_inv;
@@ -429,7 +429,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
     const float rhoj2 = rhoj * rhoj;
     const float rhoj_inv = 1.f / rhoj;
     const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
-    const float P_over_rho2_j = pressurej / (rhoj2)*f_ji;
+    const float P_over_rho2_j = pressurej / (rhoj2) * f_ji;
 
     /* SPH acceleration term */
     const float sph_acc_term =
