@@ -222,56 +222,75 @@ static inline int lin_probe(const struct cell *ptr, const int hash_size) {
     return ((uintptr_t)ptr + 1) % hash_size;
 }
 
-// Lookup in hash table
-int hash_lookup(const struct cell *c, const int hash_size, const struct hash_entry * ht) {
-	/*Get the hash using the cell's pointer address*/
-    int h_id = hash_func(c, hash_size);
-    int start = h_id;
-    /*Do a linear probe of hash table*/
-    while(ht[h_id].occupied){
-      /*If we already have a cell hashed to h_id.
-       * Return it's index in the array of
-       * unique cells*/
-      if (ht[h_id].c == c){
-//        message("Cell %p is in table as %p", c, ht[h_id].c);
-        return ht[h_id].index;
-      }
-      //Add one to the cells pointer after converting to int and hash again
-      h_id = (h_id + 1) % hash_size;// lin_probe(c, hash_size);
-      if(h_id == start)
-        error("hash table full");
-    }
-    if(h_id > hash_size)
-      error("Ran over hash table");
-    /*Otherwise return -1 to indicate we've found a unique cell*/
-//    message("unique cell %i", h_id);
-    return -1; // Not found
-}
-
 /* Insert into hash table. No need for probing as we will
  * only store one cell in each index of hash table*/
-void hash_insert(struct cell *c, int unique_count, const int hash_size, struct hash_entry * ht) {
-    int h_id = hash_func(c, hash_size);
-    int start = h_id;
-    /*Do a linear probe of hash table*/
-    while(ht[h_id].occupied){
-//    while(hash_table[h_id].c)
-      //Add one to the cells pointer after converting to int and hash again
-      h_id = (h_id + 1) % hash_size;// lin_probe(c, hash_size);
-      /*If we reach the start of the
-       * has table it means we've over-filled it.
-       * Nothing to do but crash*/
-      if(h_id == start)
-    	error("hash table full");
-    }
-    /*If we exited h_id is the next empty
-     * index. Stuff our cell hash here*/
-    if(h_id > hash_size)
-      error("Ran over hash table");
+void hash_insert(struct cell *c, int unique_count, const int h_id, struct hash_entry * ht) {
     ht[h_id].c = c;
     /*This is where the cell will be located in the unique_cells array*/
     ht[h_id].index = unique_count;
     ht[h_id].occupied = 1;
+}
+
+// Lookup in hash table
+void hash_lookup(struct cell *c, const int hash_size,
+		struct hash_entry * ht, struct gpu_pack_metadata *md, const int ij) {
+
+  /*Get the hash using the cell's pointer address*/
+  int h_id = hash_func(c, hash_size);
+  int start = h_id;
+  const int n_leaves_packed = md->n_leaves_packed;
+  int unique_count = md->n_unique;
+  /*Do a linear probe of hash table*/
+  while(ht[h_id].occupied){
+	/*If we already have a cell hashed to h_id.
+	 * Return it's index in the array of
+	 * unique cells*/
+	if (ht[h_id].c == c){
+	  /*We found this cell's hash value exists -> Not unique.
+	   * The hash_lookup returns it's position in the sorted list
+	   * (not in the hash table)*/
+	  /*Check if this is ci*/
+	  if(ij == 0){
+		md->my_index[n_leaves_packed].x = h_id;
+		md->pack_ci[n_leaves_packed] = 0;
+	  }
+	  /*cell is cj*/
+	  else{
+		md->my_index[n_leaves_packed].y = h_id;
+		md->pack_cj[n_leaves_packed] = 0;
+	  }
+	  return;
+	}
+	//Add one to the cells pointer after converting to int and hash again
+	h_id = (h_id + 1) % hash_size;// lin_probe(c, hash_size);
+	if(h_id == start)
+		error("hash table full");
+  }
+  if(h_id > hash_size)
+	  error("Ran over hash table");
+
+  /*unique_cells is different from hash table.
+   * This is just an array to keep track of
+   * unique cells*/
+  md->unique_cells[unique_count] = c;
+  if(ij == 0){
+	md->pack_ci[n_leaves_packed] = 1;
+	/*This cell has not been found yet.
+	 * Add to unique_cells and store it's index ascending
+	 * from index where we last inserted a unique cell*/
+	md->my_index[n_leaves_packed].x = unique_count;
+  }
+  else{
+	md->pack_cj[n_leaves_packed] = 1;
+	/*This cell has not been found yet.
+	 * Add to unique_cells and store it's index ascending
+	 * from index where we last inserted a unique cell*/
+	md->my_index[n_leaves_packed].y = unique_count;
+  }
+
+  hash_insert(c, unique_count, h_id, ht);
+  md->n_unique++;
+
 }
 
 /**
@@ -291,7 +310,7 @@ static void runner_gpu_filter_data(const struct runner *r,
                                       const char timer, const struct task * t, struct cell *cii,
                                       struct cell *cjj) {
 
-  /* Note: Can't inline a recursive function... */
+  //TODO: Inline this function
 
   TIMER_TIC;
 
@@ -305,9 +324,6 @@ static void runner_gpu_filter_data(const struct runner *r,
   /**TODO: Check if this needs to be here*/
   if(md->task_n_leaves == 0)
 	  error("We shouldn't be in here if we have no leaves");
-
-  /*Get the unique number of interactions found so far*/
-  int unique_count = md->n_unique;
 
   /*Get a pointer to the full hash table and it's size
    * TODO: Make this a dynamically sized hash table
@@ -328,42 +344,14 @@ static void runner_gpu_filter_data(const struct runner *r,
    * If so, return where it's unique copy
    * is found in the hash table
    * Otherwise, return -1*/
-  int unique_index = hash_lookup(cii, hash_size, ht);
-  if (unique_index >= 0){
-	/*We found this cell's hash value exists -> Not unique.
-	 * The hash_lookup returns it's position in the sorted list
-	 * (not in the hash table)*/
-	md->my_index[n_leaves_packed].x = unique_index;
-	/*Not necessary but setting it to zero here to be sure*/
-	md->pack_ci[n_leaves_packed] = 0;
-  }
-  else {
-    /*This cell has not been found yet.
-     * Add to unique_cells and store it's index ascending
-     * from index where we last inserted a unique cell*/
-    md->my_index[n_leaves_packed].x = unique_count;
-    /*unique_cells is different from hash table.
-     * This is just an array to keep track of
-     * unique cells*/
-    md->unique_cells[unique_count] = cii;
-    md->pack_ci[n_leaves_packed] = 1;
-    hash_insert(cii, unique_count, hash_size, ht);
-    unique_count++;
-  }
-  /*Same for cj*/
+  /*Flag that we're testing ci*/
+  int ij = 0;
+  hash_lookup(cii, hash_size, ht, md, ij);
+  /*Same for cj. Only do this for pair tasks*/
   if(t->type == task_type_pair){
-    unique_index = hash_lookup(cjj, hash_size, ht);
-    if (unique_index >= 0){
-      md->my_index[n_leaves_packed].y = unique_index;
-      md->pack_cj[n_leaves_packed] = 0;
-    }
-    else {
-      md->my_index[n_leaves_packed].y = unique_count;
-      md->unique_cells[unique_count] = cjj;
-      md->pack_cj[n_leaves_packed] = 1;
-      hash_insert(cjj, unique_count, hash_size, ht);
-      unique_count++;
-    }
+	/*Flag that we're testing cj*/
+	ij = 1;
+	hash_lookup(cjj, hash_size, ht, md, ij);
   }
   /*TODO: This is a self task and we have either already found
    * it's unique ci or it was found before*/
@@ -372,7 +360,7 @@ static void runner_gpu_filter_data(const struct runner *r,
 ////    md->pack_ci[n_leaves_packed] = 0;
 //  }
 
-  md->n_unique = unique_count;
+//  md->n_unique = unique_count;
 
   if (timer) TIMER_TOC(timer_doself_gpu_recurse);
 }
@@ -985,7 +973,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         (md->launch_leftovers && (npacked == md->task_n_leaves))) {
 
       if (t->subtype == task_subtype_gpu_density) {
-//        message("n_leaves_packed %i n_unique %i", md->n_leaves_packed, md->n_unique);
+        message("n_leaves_packed %i n_unique %i", md->n_leaves_packed, md->n_unique);
 //        fprintf(cells_i, "x, y, z, dist, cx, i\n");
 //        fprintf(cells_j, "x, y, z, dist, cx, i\n");
 //        for(int i = 0; i < md->n_leaves_packed; i++){
