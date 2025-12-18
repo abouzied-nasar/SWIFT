@@ -98,12 +98,12 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_gradient(
 
     struct gpu_part_recv_g pr = parts_recv[i];
 
+    float avisc_old = part_get_alpha_visc_max_ngb(p);
+    float avisc = fmaxf(avisc_old, pr.aviscmax_vsig_lapu.x);
+    part_set_alpha_visc_max_ngb(p, avisc);
+
     float vsig = fmaxf(pr.aviscmax_vsig_lapu.y, part_get_v_sig(p));
     part_set_v_sig(p, vsig);
-
-    float avisc_old = part_get_alpha_visc_max_ngb(p);
-    float avisc = fmaxf(avisc_old, pr.aviscmax_vsig_lapu.z);
-    part_set_alpha_visc_max_ngb(p, avisc);
 
     float lu = pr.aviscmax_vsig_lapu.z + part_get_laplace_u(p);
     part_set_laplace_u(p, lu);
