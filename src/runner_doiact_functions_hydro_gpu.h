@@ -251,12 +251,12 @@ void hash_lookup(struct cell *c, const int hash_size,
 	   * (not in the hash table)*/
 	  /*Check if this is ci*/
 	  if(ij == 0){
-		md->my_index[n_leaves_packed].x = h_id;
+		md->my_index[n_leaves_packed].x = ht[h_id].index;
 		md->pack_ci[n_leaves_packed] = 0;
 	  }
 	  /*cell is cj*/
 	  else{
-		md->my_index[n_leaves_packed].y = h_id;
+		md->my_index[n_leaves_packed].y = ht[h_id].index;
 		md->pack_cj[n_leaves_packed] = 0;
 	  }
 	  return;
@@ -973,7 +973,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         (md->launch_leftovers && (npacked == md->task_n_leaves))) {
 
       if (t->subtype == task_subtype_gpu_density) {
-        message("n_leaves_packed %i n_unique %i", md->n_leaves_packed, md->n_unique);
+//        message("n_leaves_packed %i n_unique %i", md->n_leaves_packed, md->n_unique);
 //        fprintf(cells_i, "x, y, z, dist, cx, i\n");
 //        fprintf(cells_j, "x, y, z, dist, cx, i\n");
 //        for(int i = 0; i < md->n_leaves_packed; i++){
