@@ -248,6 +248,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
   for (int i = 0; i < md->tasks_in_list; i++) task_unpacked[i] = 0;
   int ntasks_unpacked = 0;
 
+//  if(task_subtype == task_subtype_gpu_density){
+//	  for(int i = 0; i < md->count_parts; i++){
+//		  if(buf->parts_recv_d[i].n_neighbours > 0)
+//			  message("UP found %i neighbours", buf->parts_recv_d[i].n_neighbours);
+//	  }
+//  }
   while (ntasks_unpacked < md->tasks_in_list) {
 
     /* Loop over all tasks that we have offloaded */
@@ -331,6 +337,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
           /* We have a pair interaction. Get the other cell too. */
           if (cell_is_active_hydro(cjj, e)) {
             if (task_subtype == task_subtype_gpu_density) {
+              /*TODO: Check whether this is still needed when writing to non_unique cells*/
               gpu_unpack_part_density(cjj, buf->parts_recv_d, unpack_index,
                                       count_cj, e);
             } else if (task_subtype == task_subtype_gpu_gradient) {
