@@ -388,8 +388,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
 
     } /* Loop over tasks in list */
   } /* While there are unpacked tasks */
-  if (task_subtype == task_subtype_gpu_density)
-    error("Unpacked a full density launch");
 
   /* clean up after yourself */
   free(task_unpacked);
