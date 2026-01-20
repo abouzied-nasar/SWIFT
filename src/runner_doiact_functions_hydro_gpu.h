@@ -312,8 +312,6 @@ static void runner_gpu_filter_data(const struct runner *r,
 
   //TODO: Inline this function
 
-  TIMER_TIC;
-
   /* Grab some handles. */
   /* packing data and metadata */
   struct gpu_pack_metadata *md = &buf->md;
@@ -353,16 +351,6 @@ static void runner_gpu_filter_data(const struct runner *r,
 	ij = 1;
 	hash_lookup(cjj, hash_size, ht, md, ij);
   }
-  /*TODO: This is a self task and we have either already found
-   * it's unique ci or it was found before*/
-//  else{
-////    md->my_index[n_leaves_packed].x = unique_index;
-////    md->pack_ci[n_leaves_packed] = 0;
-//  }
-
-//  md->n_unique = unique_count;
-
-  if (timer) TIMER_TOC(timer_doself_gpu_recurse);
 }
 
 /**
