@@ -156,6 +156,8 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
   for(int i = 0; i < md->params.pack_size_pair; i++){
     md->my_index[i].x = 0;
     md->my_index[i].y = 0;
+    md->pack_ci[i] = 0;
+    md->pack_cj[i] = 0;
   }
 
 #ifdef SWIFT_DEBUG_CHECKS
