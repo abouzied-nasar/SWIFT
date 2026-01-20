@@ -1030,6 +1030,22 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 //        fclose(cells_i);
 //        fclose(cells_j);
 
+//    	int i_unique = 2 * md->n_leaves_packed;
+    	int distinct_count = 0;
+    	for(int i = 0; i < 2 * md->n_leaves_packed; i++){
+    		struct cell * ccii = (i < md->n_leaves_packed) ? md->ci_leaves[i] : md->cj_leaves[i - md->n_leaves_packed];
+    	    int seen_before = 0;
+    		for(int j = 0; j < i; j++){
+    			struct cell * prev = (j < md->n_leaves_packed) ? md->ci_leaves[j] : md->cj_leaves[j - md->n_leaves_packed];
+    			if (ccii == prev){
+    				seen_before = 1;
+    				break;
+    			}
+    		}
+    		if(!seen_before)
+    			distinct_count++;
+    	}
+    	error("n_packed %i n_unique %i n_unique_hash %i", 2 * md->n_leaves_packed, distinct_count, md->n_unique);
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
         /* Unpack the results into CPU memory */

@@ -7,10 +7,10 @@ InternalUnitSystem:
   UnitTemp_in_cgs:     1   # Kelvin
 
 Scheduler:
-  gpu_self_pack_size:        32
-  gpu_self_bundle_size:      32
-  gpu_pair_pack_size:        32
-  gpu_pair_bundle_size:      32
+  gpu_self_pack_size:        16
+  gpu_self_bundle_size:      16
+  gpu_pair_pack_size:        16
+  gpu_pair_bundle_size:      16
   gpu_recursion_max_depth:   5
   max_top_level_cells:       8
   tasks_per_cell:            200
@@ -46,4 +46,4 @@ SPH:
 InitialConditions:
   file_name:  greshoVortex.hdf5
   periodic:   1
-  replicate:  1     # assuming 64^3 base: 2=~2e6 particles, 4=~16e6 particles
+#  replicate:  1     # assuming 64^3 base: 2=~2e6 particles, 4=~16e6 particles
