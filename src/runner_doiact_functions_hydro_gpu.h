@@ -828,6 +828,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           gpu_md->cell_i_j_start_end[n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].y = gpu_md->cell_i_j_start_end[my_index_i].y;
+          if(cii != md->unique_cells[my_index_i])
+        	  error("Incorrect pointer");
         }
         /*Check if cj should be packed*/
         if(md->pack_cj[n_leaves_packed] == 1){
@@ -850,6 +852,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           gpu_md->cell_i_j_start_end[n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_j].z;
           /*Store where ci starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].w = gpu_md->cell_i_j_start_end[my_index_j].w;
+          if(cjj != md->unique_cells[my_index_j])
+        	  error("Incorrect pointer");
         }
       }
       /*This is a self task*/
@@ -1033,7 +1037,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     		if(!seen_before)
     			distinct_count++;
     	}
-    	error("n_packed %i n_unique %i n_unique_hash %i", 2 * md->n_leaves_packed, distinct_count, md->n_unique);
+//    	error("n_packed %i n_unique %i n_unique_hash %i", 2 * md->n_leaves_packed, distinct_count, md->n_unique);
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
         /* Unpack the results into CPU memory */
