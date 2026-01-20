@@ -892,6 +892,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           gpu_md->cell_i_j_start_end[n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].y = gpu_md->cell_i_j_start_end[my_index_i].y;
+          if(cii != md->unique_cells[my_index_i])
+        	  error("Incorrect pointer");
         }
       }
       /* Now finish up the bookkeeping. */
@@ -1023,6 +1025,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 //        fclose(cells_j);
 
 //    	int i_unique = 2 * md->n_leaves_packed;
+    	/*Check if hash map provides correct number of unique cells*/
     	int distinct_count = 0;
     	for(int i = 0; i < 2 * md->n_leaves_packed; i++){
     		struct cell * ccii = (i < md->n_leaves_packed) ? md->ci_leaves[i] : md->cj_leaves[i - md->n_leaves_packed];
