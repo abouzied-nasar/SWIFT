@@ -338,8 +338,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
           if (cell_is_active_hydro(cjj, e)) {
             if (task_subtype == task_subtype_gpu_density) {
               /*TODO: Check whether this is still needed when writing to non_unique cells*/
-              gpu_unpack_part_density(cjj, buf->parts_recv_d, unpack_index,
-                                      count_cj, e);
+//              gpu_unpack_part_density(cjj, buf->parts_recv_d, unpack_index,
+//                                      count_cj, e);
             } else if (task_subtype == task_subtype_gpu_gradient) {
               gpu_unpack_part_gradient(cjj, buf->parts_recv_g, unpack_index,
                                        count_cj, e);

@@ -63,6 +63,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   const int cj_end = cell_starts_ends_read.w;
 
   const int ci_write_start = cell_starts_ends_write.x;
+  const int ci_write_end = cell_starts_ends_write.y;
 
   /*Now get the cell positions*/
   const struct gpu_cell_pos_d ci_loc = d_parts_send[ci_end].c_loc;
@@ -117,7 +118,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   int k = 0;
   const int pj_start = cell_starts_ends_read.z;
   const int pj_end = cell_starts_ends_read.w;
-
+  int n_total = 0;
   for(int i = cell_starts_ends_read.x; i < cell_starts_ends_read.y; i++){
     const struct gpu_part_data_d pi = d_parts_send[i].p_data;
     const float xi = pi.x_h.x - shift_ix;
@@ -209,13 +210,18 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
 
     /* Write results. */
     //Write to i + non_compact_start_of_cell
+    if(k + ci_write_start >= ci_write_end)
+    	printf("Overbound write in kernel\n");
     d_parts_recv[k + ci_write_start].rho_rhodh_wcount_wcount_dh = res_rho;
     d_parts_recv[k + ci_write_start].rot_vx_div_v = res_rot;
     d_parts_recv[k + ci_write_start].n_neighbours = n_neighbours;
-//    if(n_neighbours > 0)
-//      printf("found %i neigbours\n", n_neighbours);
+    if(n_neighbours > 0)
+      printf("found %i neigbours\n", n_neighbours);
+    n_total += n_neighbours;
     k++;
   }
+//  printf("found %i neigbours in cell\n", n_total);
+//  fflush();
 }
 
 /**
