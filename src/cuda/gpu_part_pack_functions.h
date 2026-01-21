@@ -76,8 +76,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
 
     p->N_density += pr.n_neighbours;
     n_total += pr.n_neighbours;
-    if(pr.n_neighbours > 0)
-    	message("n_neighbours %i", pr.n_neighbours);
+//    if(pr.n_neighbours > 0)
+//    	message("n_neighbours %i", pr.n_neighbours);
   }
 //  message("n_neighbours %i", n_total);
 }
