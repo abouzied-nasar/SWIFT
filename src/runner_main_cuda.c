@@ -397,8 +397,8 @@ void *runner_main_cuda(void *data) {
             runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_pair_dens, t,
                                       stream_pairs, d_a, d_H);
             dens_launches++;
-            if (dens_launches > 2)
-            	error("Packed 3 times");
+//            if (dens_launches > 2)
+//            	error("Packed 3 times");
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
