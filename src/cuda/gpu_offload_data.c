@@ -145,6 +145,9 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
   memset(buf->parts_send_d, 0, pars.part_buffer_size * md.send_struct_size);
   memset(buf->parts_recv_d, 0, pars.part_buffer_size * md.recv_struct_size);
 
+  memset(buf->gpu_md.cell_i_j_start_end, 0, sizeof(int4) * pars.pack_size_pair);
+  memset(buf->gpu_md.cell_i_j_start_end_non_compact, 0, sizeof(int4) * pars.pack_size_pair);
+
   /* Can't do this from the host side, would need to launch cuda kernel */
   /* bzero(buf->d_parts_recv_d, pars.part_buffer_size *
    * sizeof(md.send_struct_size)); */

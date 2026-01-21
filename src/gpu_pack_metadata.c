@@ -158,6 +158,7 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
     md->my_index[i].y = 0;
     md->pack_ci[i] = 0;
     md->pack_cj[i] = 0;
+    md->unique_cells[i] = NULL;
   }
 
 #ifdef SWIFT_DEBUG_CHECKS
