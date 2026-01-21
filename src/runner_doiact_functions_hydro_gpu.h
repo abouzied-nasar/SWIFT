@@ -949,12 +949,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       runner_gpu_pack_force(r, buf, cii, cjj);
     }
 
-#ifdef SWIFT_DEBUG_CHECKS
-//    else {
-//      error("Unknown task subtype %s", subtaskID_names[t->subtype]);
-//    }
-#endif
-
     /* record how many leaves we've packed in total during this while loop */
     npacked++;
 
