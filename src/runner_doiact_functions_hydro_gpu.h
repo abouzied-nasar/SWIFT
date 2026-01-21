@@ -1040,7 +1040,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 //    	}
 //    	error("n_packed %i n_unique %i n_unique_hash %i", 2 * md->n_leaves_packed, distinct_count, md->n_unique);
         /* Launch the GPU offload */
-    	  message("launched");
+    	message("launched");
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_density(r, s, buf, npacked);
