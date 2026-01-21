@@ -58,16 +58,18 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   const int4 cell_starts_ends_read = d_cell_i_j_start_end[cid];
   const int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[cid];
   const int ci_start = cell_starts_ends_read.x;
-  const int ci_end = cell_starts_ends_read.y;
+  const int ci_end = cell_starts_ends_read.y - 1;
   const int cj_start = cell_starts_ends_read.z;
-  const int cj_end = cell_starts_ends_read.w;
+  const int cj_end = cell_starts_ends_read.w - 1;
 
   const int ci_write_start = cell_starts_ends_write.x;
   const int ci_write_end = cell_starts_ends_write.y;
 
+  printf("count_read %i count_write %i\n", ci_end - ci_start, ci_write_end - ci_write_start);
+
   /*Now get the cell positions*/
-  const struct gpu_cell_pos_d ci_loc = d_parts_send[ci_end].c_loc;
-  const struct gpu_cell_pos_d cj_loc = d_parts_send[cj_end].c_loc;
+  const struct gpu_cell_pos_d ci_loc = d_parts_send[ci_end + 1].c_loc;
+  const struct gpu_cell_pos_d cj_loc = d_parts_send[cj_end + 1].c_loc;
 
   const double distx = cj_loc.x.x - ci_loc.x.x;
   const double disty = cj_loc.x.y - ci_loc.x.y;
@@ -116,10 +118,10 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   /*Now loop over the particles in cell i*/
 
   int k = 0;
-  const int pj_start = cell_starts_ends_read.z;
-  const int pj_end = cell_starts_ends_read.w;
+//  const int pj_start = cell_starts_ends_read.z;
+//  const int pj_end = cell_starts_ends_read.w;
   int n_total = 0;
-  for(int i = cell_starts_ends_read.x; i < cell_starts_ends_read.y; i++){
+  for(int i = ci_start; i < ci_end; i++){
     const struct gpu_part_data_d pi = d_parts_send[i].p_data;
     const float xi = pi.x_h.x - shift_ix;
     const float yi = pi.x_h.y - shift_iy;
@@ -146,7 +148,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     float4 res_rot = {0.0, 0.0, 0.0, 0.0};
 
     /* Start the neighbour interactions */
-    for (int j = pj_start; j < pj_end; j++) {
+    for (int j = cj_start; j < cj_end; j++) {
 
       /* First, grab handles. */
       const struct gpu_part_data_d pj = d_parts_send[j].p_data;
