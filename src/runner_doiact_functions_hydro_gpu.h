@@ -814,7 +814,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           /*Store where ci starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].x = md->count_parts_unique;
           /*Store where ci ends*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].y = md->count_parts_unique + cii_count;
+          gpu_md->cell_i_j_start_end[n_leaves_packed].y = md->count_parts_unique + cii_count + 1;
           /*Now pack the particles since this cell is unique*/
           gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
           /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
@@ -839,7 +839,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           /*Store where cj starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].z = md->count_parts_unique;
           /*Store where cj ends*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].w = md->count_parts_unique + cjj_count;
+          gpu_md->cell_i_j_start_end[n_leaves_packed].w = md->count_parts_unique + cjj_count + 1;
           gpu_pack_part_density(cjj, buf->parts_send_d, md->count_parts_unique);
           /*Add one as we have packed the cells position in index count_parts_unique + cjj_count*/
           md->count_parts_unique += cjj_count + 1;
@@ -876,11 +876,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           /*Store where ci starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].x = md->count_parts_unique;
           /*Store where ci ends*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].y = md->count_parts_unique + cii_count;
+          gpu_md->cell_i_j_start_end[n_leaves_packed].y = md->count_parts_unique + cii_count + 1;
           /*Store where ci starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].z = md->count_parts_unique;
           /*Store where ci ends*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].w = md->count_parts_unique + cii_count;
+          gpu_md->cell_i_j_start_end[n_leaves_packed].w = md->count_parts_unique + cii_count + 1;
           gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
           /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
           md->count_parts_unique += cii_count + 1;
@@ -892,6 +892,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           gpu_md->cell_i_j_start_end[n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
           /*Store where ci ends in unique list*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].y = gpu_md->cell_i_j_start_end[my_index_i].y;
+          /*Store where ci starts in unique list*/
+          gpu_md->cell_i_j_start_end[n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_i].x;
+          /*Store where ci ends in unique list*/
+          gpu_md->cell_i_j_start_end[n_leaves_packed].w = gpu_md->cell_i_j_start_end[my_index_i].y;
           if(cii != md->unique_cells[my_index_i])
         	  error("Incorrect pointer");
         }
