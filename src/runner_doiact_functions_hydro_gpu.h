@@ -346,11 +346,12 @@ static void runner_gpu_filter_data(const struct runner *r,
   int ij = 0;
   hash_lookup(cii, hash_size, ht, md, ij);
   /*Same for cj. Only do this for pair tasks*/
-  if(t->type == task_type_pair){
+  /*TODO: Make sure we don't need this check*/
+//  if(t->type == task_type_pair){
 	/*Flag that we're testing cj*/
 	ij = 1;
 	hash_lookup(cjj, hash_size, ht, md, ij);
-  }
+//  }
 }
 
 /**
@@ -869,9 +870,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
         /*Now figure out where to start from in the unique particle buffer*/
         /*Don't count my count. this is the start pos*/
-        if(md->pack_cj[n_leaves_packed] == 1){
-        	error("Found mark cj");
-        }
+//        if(md->pack_cj[n_leaves_packed] == 1){
+//        	error("Found mark cj");
+//        }
         if(md->pack_ci[n_leaves_packed] == 1){
           /*Store where ci starts*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].x = md->count_parts_unique;

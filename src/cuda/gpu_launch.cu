@@ -63,8 +63,43 @@ __global__ void cuda_launch_density(
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
   const int cid = threadid;
 
+  /* First, grab handles for where cells start and end */
+  int4 cell_starts_ends_read = d_cell_i_j_start_end[cid];
+  int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[cid];
+  const int ci_start = cell_starts_ends_read.x;
+  const int ci_end = cell_starts_ends_read.y - 1;
+  const int cj_start = cell_starts_ends_read.z;
+  const int cj_end = cell_starts_ends_read.w - 1;
+
+  const int ci_write_start = cell_starts_ends_write.x;
+  const int ci_write_end = cell_starts_ends_write.y;
+  const int cj_write_start = cell_starts_ends_write.w;
+  const int cj_write_end = cell_starts_ends_write.z;
+
   if (cid < bundle_n_cells) {
-    cuda_kernel_density(cid, d_parts_send, d_parts_recv, d_a, d_H, d_cell_i_j_start_end, d_cell_i_j_start_end_non_compact, space_dim);
+	/*Interact ci with cj*/
+//    printf("Doing ci\n");
+    cuda_kernel_density(cid, d_parts_send, d_parts_recv, d_a, d_H, cell_starts_ends_read, cell_starts_ends_write, space_dim);
+    /*Check if this is a self interaction.
+     * If it is, skip as we don't need to re-do computations
+     * We could just let threads do this again to avoid
+     * divergence since we only unpack ci once on host
+     * (for it's ci not the dummy cj used for indexing)*/
+    if(ci_start != cj_start){
+//      printf("Doing cj\n");
+      /*We've done ci with cj, now interact cj with ci*/
+      cell_starts_ends_read.x = cj_start;
+      cell_starts_ends_read.y = cj_end;
+      cell_starts_ends_read.z = ci_start;
+      cell_starts_ends_read.w = ci_end;
+      cell_starts_ends_write.x = cj_start;
+      cell_starts_ends_write.y = cj_end;
+      //TODO: Un-necesary as we only need to write to cj but leave for now///
+      cell_starts_ends_write.z = ci_start;
+      cell_starts_ends_write.w = ci_end;
+      ///////////////////////////////////////////////////////////////////////
+      cuda_kernel_density(cid, d_parts_send, d_parts_recv, d_a, d_H, cell_starts_ends_read, cell_starts_ends_write, space_dim);
+    }
   }
 }
 
