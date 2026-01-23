@@ -100,7 +100,9 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
     shift.z = -space_dim.z;
 
   const double cell_dist = sqrt(distx*distx + disty*disty + distz*distz);
-  const double c_pos_mask = cell_dist ? 1.0 : 0.0;
+//  if(cell_dist)
+//	  printf("Distance %f is > 0\n", cell_dist);
+  const double c_pos_mask = 1.;//cell_dist ? 1.0 : 0.0;
 
   const double shift_ix = c_pos_mask * shift.x + cj_loc.x.x;
   const double shift_iy = c_pos_mask * shift.y + cj_loc.x.y;
