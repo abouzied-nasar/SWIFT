@@ -820,8 +820,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
           /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
           md->count_parts_unique += cii_count + 1;
-        }
-        else{
+        }else{
           /*Get the cell's index in the unique cell list*/
           int my_index_i = md->my_index[n_leaves_packed].x;
 //          message("n_leaves_packed %i my_index_i %i not unique ci %i", n_leaves_packed, my_index_i, (int)(uintptr_t)cii);
@@ -841,11 +840,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           gpu_md->cell_i_j_start_end[n_leaves_packed].z = md->count_parts_unique;
           /*Store where cj ends*/
           gpu_md->cell_i_j_start_end[n_leaves_packed].w = md->count_parts_unique + cjj_count + 1;
+          /*Now pack the particles since this cell is unique*/
           gpu_pack_part_density(cjj, buf->parts_send_d, md->count_parts_unique);
           /*Add one as we have packed the cells position in index count_parts_unique + cjj_count*/
           md->count_parts_unique += cjj_count + 1;
-        }
-        else{
+        }else{
           /*Get the cell's index in the unique cell list*/
           int my_index_j = md->my_index[n_leaves_packed].y;
 //          message("n_leaves_packed %i my_index_j %i not unique cj %i", n_leaves_packed, my_index_j, (int)(uintptr_t)cjj);
@@ -856,9 +855,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           if(cjj != md->unique_cells[my_index_j])
         	  error("Incorrect pointer");
         }
-      }
-      /*This is a self task*/
-      else{
+      }else{/*This is a self task*/
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].x = md->count_parts;
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].y = md->count_parts + cii_count;
         //TODO: Add a debug check in unpacking to make sure we never touch this!
@@ -885,8 +882,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
           /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
           md->count_parts_unique += cii_count + 1;
-        }
-        else{
+        }else{
           /*Get the cell's index in the unique cell list*/
           int my_index_i = md->my_index[n_leaves_packed].x;
           /*Store where ci starts in unique list*/

@@ -66,17 +66,21 @@ __global__ void cuda_launch_density(
   /* First, grab handles for where cells start and end */
   int4 cell_starts_ends_read = d_cell_i_j_start_end[cid];
   int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[cid];
+  /*Assign without accounting for ci/cj_end being the index of cell positions.
+   * This will be accounted for in cuda_kernel_density()*/
   const int ci_start = cell_starts_ends_read.x;
-  const int ci_end = cell_starts_ends_read.y - 1;
+  const int ci_end = cell_starts_ends_read.y;
   const int cj_start = cell_starts_ends_read.z;
-  const int cj_end = cell_starts_ends_read.w - 1;
+  const int cj_end = cell_starts_ends_read.w;
 
   const int ci_write_start = cell_starts_ends_write.x;
   const int ci_write_end = cell_starts_ends_write.y;
-  const int cj_write_start = cell_starts_ends_write.w;
-  const int cj_write_end = cell_starts_ends_write.z;
+  const int cj_write_start = cell_starts_ends_write.z;
+  const int cj_write_end = cell_starts_ends_write.w;
 
-  if (cid < bundle_n_cells) {
+  if(cid > bundle_n_cells)
+	printf("Block indexing is off\n");
+//  if (cid < bundle_n_cells) {
 	/*Interact ci with cj*/
 //    printf("Doing ci\n");
     cuda_kernel_density(cid, d_parts_send, d_parts_recv, d_a, d_H, cell_starts_ends_read, cell_starts_ends_write, space_dim);
@@ -92,15 +96,15 @@ __global__ void cuda_launch_density(
       cell_starts_ends_read.y = cj_end;
       cell_starts_ends_read.z = ci_start;
       cell_starts_ends_read.w = ci_end;
-      cell_starts_ends_write.x = cj_start;
-      cell_starts_ends_write.y = cj_end;
+      cell_starts_ends_write.x = cj_write_start;
+      cell_starts_ends_write.y = cj_write_end;
       //TODO: Un-necesary as we only need to write to cj but leave for now///
-      cell_starts_ends_write.z = ci_start;
-      cell_starts_ends_write.w = ci_end;
+//      cell_starts_ends_write.z = ci_start;
+//      cell_starts_ends_write.w = ci_end;
       ///////////////////////////////////////////////////////////////////////
       cuda_kernel_density(cid, d_parts_send, d_parts_recv, d_a, d_H, cell_starts_ends_read, cell_starts_ends_write, space_dim);
     }
-  }
+//  }
 }
 
 /**

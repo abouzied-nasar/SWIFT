@@ -212,9 +212,10 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
 
     /* Write results. */
     //Write to i + non_compact_start_of_cell
-    if(k + ci_write_start >= ci_write_end)
+//    if(k + ci_write_start >= ci_write_end){
 //    	printf("Overbound by %i write in kernel k %i ci_start %i ci_end %i\n",
 //    			ci_write_end - k - ci_write_start, k, ci_write_start, ci_write_end);
+//    }
     d_parts_recv[k + ci_write_start].rho_rhodh_wcount_wcount_dh = res_rho;
     d_parts_recv[k + ci_write_start].rot_vx_div_v = res_rot;
     d_parts_recv[k + ci_write_start].n_neighbours = n_neighbours;
