@@ -78,23 +78,16 @@ __global__ void cuda_launch_density(
   const int cj_write_start = cell_starts_ends_write.z;
   const int cj_write_end = cell_starts_ends_write.w;
 
-  if(cid > bundle_n_cells)
-	printf("Block indexing is off\n");
   /*First things first. Find the shifts in case we're periodic*/
   /*Step I: Get the cell positions*/
-  const struct gpu_cell_pos_d ci_loc = d_parts_send[ci_end].c_loc;
-  const struct gpu_cell_pos_d cj_loc = d_parts_send[cj_end].c_loc;
+  const struct gpu_cell_pos_d ci_loc = d_parts_send[ci_end - 1].c_loc;
+  const struct gpu_cell_pos_d cj_loc = d_parts_send[cj_end - 1].c_loc;
+
+  double3 shift = {0.0, 0.0, 0.0};
 
   const double distx = cj_loc.x.x - ci_loc.x.x;
   const double disty = cj_loc.x.y - ci_loc.x.y;
   const double distz = cj_loc.x.z - ci_loc.x.z;
-
-//  if(cid == 0){
-//	  printf("distx %f ci_posx %f cjposx %f\n", distx, ci_loc.x.x, cj_loc.x.x);
-//	  printf("disty %f ci_posy %f cjposy %f\n", disty, ci_loc.x.y, cj_loc.x.y);
-//	  printf("distz %f ci_posz %f cjposz %f\n", distz, ci_loc.x.z, cj_loc.x.z);
-//  }
-  double3 shift = {0.0, 0.0, 0.0};
 
   /*Fine for now as thread divergence
    * will be one (three) line of code*/
@@ -121,6 +114,11 @@ __global__ void cuda_launch_density(
   const double shift_iy = shift.y + cj_loc.x.y;
   const double shift_iz = shift.z + cj_loc.x.z;
 
+
+//  const double shift_ix = ci_loc.x.x;
+//  const double shift_iy = ci_loc.x.y;
+//  const double shift_iz = ci_loc.x.z;
+
   const double3 shift_i_res = {shift_ix, shift_iy, shift_iz};
   const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
 //  if (cid < bundle_n_cells) {
@@ -146,10 +144,12 @@ __global__ void cuda_launch_density(
       //TODO: Un-necesary as we only need to write to cj but leave for now///
 //      cell_starts_ends_write.z = ci_start;
 //      cell_starts_ends_write.w = ci_end;
+      const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
+      const double3 shift_jj_res = {shift_ix, shift_iy, shift_iz};
       ///////////////////////////////////////////////////////////////////////
       cuda_kernel_density(cid, d_parts_send, d_parts_recv, d_a, d_H,
     		  cell_starts_ends_read, cell_starts_ends_write,
-    		  space_dim, shift_i_res, shift_j_res);
+    		  space_dim, shift_ii_res, shift_jj_res);
     }
 //  }
 }

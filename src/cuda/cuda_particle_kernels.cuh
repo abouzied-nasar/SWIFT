@@ -58,6 +58,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
 //  const int4 cell_starts_ends_read = d_cell_i_j_start_end[cid];
 //  const int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[cid];
   const int ci_start = cell_starts_ends_read.x;
+  /*Subtract one to make sure we don't loop over the cell position index*/
   const int ci_end = cell_starts_ends_read.y - 1;
   const int cj_start = cell_starts_ends_read.z;
   const int cj_end = cell_starts_ends_read.w - 1;
