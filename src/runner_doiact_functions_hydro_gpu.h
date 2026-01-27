@@ -273,14 +273,15 @@ void hash_lookup(struct cell *c, const int hash_size,
    * This is just an array to keep track of
    * unique cells*/
   md->unique_cells[unique_count] = c;
-  if(ij == 0){
+  md->hash_table.count++;
+  if(ij == 0){ /*This is ci and it is unique*/
 	md->pack_ci[n_leaves_packed] = 1;
 	/*This cell has not been found yet.
 	 * Add to unique_cells and store it's index ascending
 	 * from index where we last inserted a unique cell*/
 	md->my_index[n_leaves_packed].x = unique_count;
   }
-  else{
+  else{ /*This is cj and it is unique*/
 	md->pack_cj[n_leaves_packed] = 1;
 	/*This cell has not been found yet.
 	 * Add to unique_cells and store it's index ascending
@@ -346,7 +347,9 @@ static void runner_gpu_filter_data(const struct runner *r,
   int ij = 0;
   hash_lookup(cii, hash_size, ht, md, ij);
   /*Same for cj. Only do this for pair tasks*/
-  /*TODO: Make sure we don't need this check*/
+  /*TODO: Make sure we don't need this check
+   * and we should pack lookup cj for self task as well
+   * where cj will be ci*/
 //  if(t->type == task_type_pair){
 	/*Flag that we're testing cj*/
 	ij = 1;
@@ -1088,6 +1091,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         if(n_leaves_new <= 0)
           error("n_leaves %i n_leaves_packed %i", md->n_leaves, md->n_leaves_packed);
         /* How many leaves does this task have in total? */
+        /*TODO: This is un-necessary as we only do
+         * an opposite assignement below with this variable
+         * Basically we read the value, and assign it back to
+           md->task_n_leaves below*/
         int task_n_leaves = md->task_n_leaves;
         /* Store launch_leftovers in case we still need to do that after we
          * finish packing all leaf cell pairs */

@@ -7,10 +7,10 @@ InternalUnitSystem:
   UnitTemp_in_cgs:     1   # Kelvin
 
 Scheduler:
-  gpu_self_pack_size:        4
-  gpu_self_bundle_size:      4
-  gpu_pair_pack_size:        4
-  gpu_pair_bundle_size:      4
+  gpu_self_pack_size:        16
+  gpu_self_bundle_size:      16
+  gpu_pair_pack_size:        16
+  gpu_pair_bundle_size:      16
   gpu_recursion_max_depth:   5
   max_top_level_cells:       16
   tasks_per_cell:            200

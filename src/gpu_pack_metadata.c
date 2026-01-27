@@ -70,8 +70,9 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
     md->pack_cj[i] = 0;
   }
 
-  /* Allocate hash table. For now using 4096=8^4 assuming we recurse four times */
-  size_t hash_size = 4096;
+  /* Allocate hash table. For now using pack_size * 10 (a reasonable estimate)*/
+  /*TODO: */
+  size_t hash_size = params->pack_size_pair * 10;
   md->hash_table.entry = calloc(hash_size, sizeof(struct hash_entry));
   for (size_t i = 0; i < hash_size; i++){
     md->hash_table.entry[i].c = 0;
@@ -148,6 +149,8 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
   md->launch_leftovers = 0;
   md->count_parts_unique = 0;
   md->n_unique = 0;
+  md->hash_table.capacity = md->hash_size;
+  md->hash_table.count = 0;
   for(int i = 0; i < md->hash_size; i++){
 	  md->hash_table.entry[i].occupied = 0;
       md->hash_table.entry[i].c = NULL;
