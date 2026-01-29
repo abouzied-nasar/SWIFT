@@ -742,6 +742,9 @@ void *runner_main_cuda(void *data) {
         t = scheduler_done(sched, t);
       }
     } /* Loop while there are tasks */
+
+    /*Dump file headers*/
+    fprintf(fgpu_steps, "x, y, z, N\n");
     for (int tid = 0; tid < e->s->nr_local_cells; tid++) {
     	struct cell *ctemp = &(e->s->cells_top[tid]);
     	for(int i = 0; i < ctemp->hydro.count; i++){

@@ -12,7 +12,7 @@ Scheduler:
   gpu_pair_pack_size:        16
   gpu_pair_bundle_size:      16
   gpu_recursion_max_depth:   5
-  max_top_level_cells:       16
+  max_top_level_cells:       8
   tasks_per_cell:            200
   # deadlock_waiting_time_s:   30
   # cell_split_size:           100
