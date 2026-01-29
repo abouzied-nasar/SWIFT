@@ -233,9 +233,10 @@ void hash_insert(struct cell *c, int unique_count, const int h_id, struct hash_e
 
 // Lookup in hash table
 void hash_lookup(struct cell *c, const int hash_size,
-		struct hash_entry * ht, struct gpu_pack_metadata *md, const int ij) {
+		struct hash_entry * ht, struct gpu_offload_data *buf, const int ij) {
 
   /*Get the hash using the cell's pointer address*/
+  struct gpu_pack_metadata *md = &buf->md;
   int h_id = hash_func(c, hash_size);
   int start = h_id;
   const int n_leaves_packed = md->n_leaves_packed;
@@ -274,12 +275,21 @@ void hash_lookup(struct cell *c, const int hash_size,
    * unique cells*/
   md->unique_cells[unique_count] = c;
   md->hash_table.count++;
+  int c_count = c->hydro.count;
   if(ij == 0){ /*This is ci and it is unique*/
 	md->pack_ci[n_leaves_packed] = 1;
 	/*This cell has not been found yet.
 	 * Add to unique_cells and store it's index ascending
 	 * from index where we last inserted a unique cell*/
 	md->my_index[n_leaves_packed].x = unique_count;
+    /*Store where ci starts*/
+    md->unique_start_end[unique_count].x = md->count_parts_unique;
+    /*Store where ci ends*/
+    md->unique_start_end[unique_count].y = md->count_parts_unique + c_count + 1;
+    /*Now pack the particles since this cell is unique*/
+    gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
+    /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
+    md->count_parts_unique += c_count + 1;
   }
   else{ /*This is cj and it is unique*/
 	md->pack_cj[n_leaves_packed] = 1;
@@ -287,6 +297,14 @@ void hash_lookup(struct cell *c, const int hash_size,
 	 * Add to unique_cells and store it's index ascending
 	 * from index where we last inserted a unique cell*/
 	md->my_index[n_leaves_packed].y = unique_count;
+    /*Store where ci starts*/
+    md->unique_start_end[unique_count].x = md->count_parts_unique;
+    /*Store where ci ends*/
+    md->unique_start_end[unique_count].y = md->count_parts_unique + c_count + 1;
+    /*Now pack the particles since this cell is unique*/
+    gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
+    /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
+    md->count_parts_unique += c_count + 1;
   }
 
   hash_insert(c, unique_count, h_id, ht);
@@ -345,15 +363,15 @@ static void runner_gpu_filter_data(const struct runner *r,
    * Otherwise, return -1*/
   /*Flag that we're testing ci*/
   int ij = 0;
-  hash_lookup(cii, hash_size, ht, md, ij);
+  hash_lookup(cii, hash_size, ht, buf, ij);
   /*Same for cj. Only do this for pair tasks*/
   /*TODO: Make sure we don't need this check
    * and we should pack lookup cj for self task as well
    * where cj will be ci*/
 //  if(t->type == task_type_pair){
 	/*Flag that we're testing cj*/
-	ij = 1;
-	hash_lookup(cjj, hash_size, ht, md, ij);
+  ij = 1;
+  hash_lookup(cjj, hash_size, ht, buf, ij);
 //  }
 }
 
@@ -806,58 +824,89 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].z = md->count_parts + cii_count;
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
 
+//        int n_unique_initial = md->n_unique;
         /* Test to see if cells i and j have already been packed*/
         runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
+        /*Get indices we need to read from since this is a unique cell*/
+//        int n_unique_current = md->n_unique;
         /*Now figure out where to start from in the unique particle buffer*/
         /*Don't count my count. this is the start pos
          * Check if ci should be packed*/
-        if(md->pack_ci[n_leaves_packed] == 1){
-          /*Get the cell's index in the unique cell list*/
+//        if(md->pack_ci[n_leaves_packed] == 1){
+//          /*Get the cell's index in the unique cell list*/
+////          int my_index_i = md->my_index[n_leaves_packed].x;
+////          message("n_leaves_packed %i my_index_i %i unique ci %i", n_leaves_packed, my_index_i, (int)(uintptr_t)cii);
+//          /*Store where ci starts*/
+//          gpu_md->cell_i_j_start_end[n_unique].x = md->count_parts_unique;
+//          /*Store where ci ends*/
+//          gpu_md->cell_i_j_start_end[n_leaves_packed].y = md->count_parts_unique + cii_count + 1;
+//          /*Now pack the particles since this cell is unique*/
+//          gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
+//          /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
+//          md->count_parts_unique += cii_count + 1;
+//        }else{
+//          /*Get the cell's index in the unique cell list.
+//           * It could be saved as ci or cj of another leaf comp.*/
 //          int my_index_i = md->my_index[n_leaves_packed].x;
-//          message("n_leaves_packed %i my_index_i %i unique ci %i", n_leaves_packed, my_index_i, (int)(uintptr_t)cii);
-          /*Store where ci starts*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].x = md->count_parts_unique;
-          /*Store where ci ends*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].y = md->count_parts_unique + cii_count + 1;
-          /*Now pack the particles since this cell is unique*/
-          gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
-          /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
-          md->count_parts_unique += cii_count + 1;
-        }else{
-          /*Get the cell's index in the unique cell list*/
-          int my_index_i = md->my_index[n_leaves_packed].x;
-//          message("n_leaves_packed %i my_index_i %i not unique ci %i", n_leaves_packed, my_index_i, (int)(uintptr_t)cii);
-          /*Store where ci starts in unique list*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
-          /*Store where ci ends in unique list*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].y = gpu_md->cell_i_j_start_end[my_index_i].y;
-          if(cii != md->unique_cells[my_index_i])
-        	  error("Incorrect pointer");
-        }
-        /*Check if cj should be packed*/
-        if(md->pack_cj[n_leaves_packed] == 1){
-          /*Get the cell's index in the unique cell list*/
 //          int my_index_j = md->my_index[n_leaves_packed].y;
-//          message("n_leaves_packed %i my_index_j %i unique cj %i", n_leaves_packed, my_index_j, (int)(uintptr_t)cjj);
-          /*Store where cj starts*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].z = md->count_parts_unique;
-          /*Store where cj ends*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].w = md->count_parts_unique + cjj_count + 1;
-          /*Now pack the particles since this cell is unique*/
-          gpu_pack_part_density(cjj, buf->parts_send_d, md->count_parts_unique);
-          /*Add one as we have packed the cells position in index count_parts_unique + cjj_count*/
-          md->count_parts_unique += cjj_count + 1;
-        }else{
-          /*Get the cell's index in the unique cell list*/
-          int my_index_j = md->my_index[n_leaves_packed].y;
-//          message("n_leaves_packed %i my_index_j %i not unique cj %i", n_leaves_packed, my_index_j, (int)(uintptr_t)cjj);
-          /*Store where cj starts*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_j].z;
-          /*Store where ci starts*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].w = gpu_md->cell_i_j_start_end[my_index_j].w;
-          if(cjj != md->unique_cells[my_index_j])
-        	  error("Incorrect pointer");
-        }
+//          if(cii == md->unique_cells[my_index_i]){
+//            /*Store where ci starts in unique list*/
+//            gpu_md->cell_i_j_start_end[n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
+//            /*Store where ci ends in unique list*/
+//            gpu_md->cell_i_j_start_end[n_leaves_packed].y = gpu_md->cell_i_j_start_end[my_index_i].y;
+//            message("i is i my_index i %i n_packed %i start %i end %i", my_index_i, n_leaves_packed,
+//                gpu_md->cell_i_j_start_end[n_leaves_packed].x, gpu_md->cell_i_j_start_end[n_leaves_packed].y);
+//          }
+//          else{
+//            /*Store where ci starts in unique list*/
+//            gpu_md->cell_i_j_start_end[n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_j].z;
+//            /*Store where ci ends in unique list*/
+//            gpu_md->cell_i_j_start_end[n_leaves_packed].y = gpu_md->cell_i_j_start_end[my_index_j].w;
+//
+//            message("i is j n_packed %i start %i end %i", n_leaves_packed,
+//                gpu_md->cell_i_j_start_end[n_leaves_packed].x, gpu_md->cell_i_j_start_end[n_leaves_packed].y);
+//          }
+//          if(cii != md->unique_cells[my_index_i])
+//        	  error("Incorrect pointer");
+//        }
+//        /*Check if cj should be packed*/
+//        if(md->pack_cj[n_leaves_packed] == 1){
+//          /*Get the cell's index in the unique cell list*/
+////          int my_index_j = md->my_index[n_leaves_packed].y;
+////          message("n_leaves_packed %i my_index_j %i unique cj %i", n_leaves_packed, my_index_j, (int)(uintptr_t)cjj);
+//          /*Store where cj starts*/
+//          gpu_md->cell_i_j_start_end[n_leaves_packed].z = md->count_parts_unique;
+//          /*Store where cj ends*/
+//          gpu_md->cell_i_j_start_end[n_leaves_packed].w = md->count_parts_unique + cjj_count + 1;
+//          /*Now pack the particles since this cell is unique*/
+//          gpu_pack_part_density(cjj, buf->parts_send_d, md->count_parts_unique);
+//          /*Add one as we have packed the cells position in index count_parts_unique + cjj_count*/
+//          md->count_parts_unique += cjj_count + 1;
+//        }else{
+//          /*Get the cell's index in the unique cell list.
+//           * It could be saved as ci or cj of another leaf comp.*/
+//          int my_index_i = md->my_index[n_leaves_packed].x;
+//          int my_index_j = md->my_index[n_leaves_packed].y;
+//          if(cjj == md->unique_cells[my_index_i]){
+//            /*Store where ci starts in unique list*/
+//            gpu_md->cell_i_j_start_end[n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_i].x;
+//            /*Store where ci ends in unique list*/
+//            gpu_md->cell_i_j_start_end[n_leaves_packed].w = gpu_md->cell_i_j_start_end[my_index_i].y;
+//            message("j is i n_packed %i start %i end %i", n_leaves_packed,
+//                gpu_md->cell_i_j_start_end[n_leaves_packed].z, gpu_md->cell_i_j_start_end[n_leaves_packed].w);
+//          }
+//          else{
+//            /*Store where ci starts in unique list*/
+//            gpu_md->cell_i_j_start_end[n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_j].z;
+//            /*Store where ci ends in unique list*/
+//            gpu_md->cell_i_j_start_end[n_leaves_packed].w = gpu_md->cell_i_j_start_end[my_index_j].w;
+//            message("j is j my_index j is %i n_packed %i start %i end %i", my_index_j, n_leaves_packed,
+//                gpu_md->cell_i_j_start_end[n_leaves_packed].z, gpu_md->cell_i_j_start_end[n_leaves_packed].w);
+//
+//          }
+//          if(cii != md->unique_cells[my_index_i])
+//              error("Incorrect pointer");
+//        }
       }else{/*This is a self task*/
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].x = md->count_parts;
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].y = md->count_parts + cii_count;
@@ -873,32 +922,32 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 //        if(md->pack_cj[n_leaves_packed] == 1){
 //        	error("Found mark cj");
 //        }
-        if(md->pack_ci[n_leaves_packed] == 1){
-          /*Store where ci starts*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].x = md->count_parts_unique;
-          /*Store where ci ends*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].y = md->count_parts_unique + cii_count + 1;
-          /*Store where ci starts*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].z = md->count_parts_unique;
-          /*Store where ci ends*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].w = md->count_parts_unique + cii_count + 1;
-          gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
-          /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
-          md->count_parts_unique += cii_count + 1;
-        }else{
-          /*Get the cell's index in the unique cell list*/
-          int my_index_i = md->my_index[n_leaves_packed].x;
-          /*Store where ci starts in unique list*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
-          /*Store where ci ends in unique list*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].y = gpu_md->cell_i_j_start_end[my_index_i].y;
-          /*Store where ci starts in unique list*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_i].x;
-          /*Store where ci ends in unique list*/
-          gpu_md->cell_i_j_start_end[n_leaves_packed].w = gpu_md->cell_i_j_start_end[my_index_i].y;
-          if(cii != md->unique_cells[my_index_i])
-        	  error("Incorrect pointer");
-        }
+//        if(md->pack_ci[n_leaves_packed] == 1){
+//          /*Store where ci starts*/
+//          gpu_md->cell_i_j_start_end[n_leaves_packed].x = md->count_parts_unique;
+//          /*Store where ci ends*/
+//          gpu_md->cell_i_j_start_end[n_leaves_packed].y = md->count_parts_unique + cii_count + 1;
+//          /*Store where ci starts*/
+//          gpu_md->cell_i_j_start_end[n_leaves_packed].z = md->count_parts_unique;
+//          /*Store where ci ends*/
+//          gpu_md->cell_i_j_start_end[n_leaves_packed].w = md->count_parts_unique + cii_count + 1;
+//          gpu_pack_part_density(cii, buf->parts_send_d, md->count_parts_unique);
+//          /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
+//          md->count_parts_unique += cii_count + 1;
+//        }else{
+//          /*Get the cell's index in the unique cell list*/
+//          int my_index_i = md->my_index[n_leaves_packed].x;
+//          /*Store where ci starts in unique list*/
+//          gpu_md->cell_i_j_start_end[n_leaves_packed].x = gpu_md->cell_i_j_start_end[my_index_i].x;
+//          /*Store where ci ends in unique list*/
+//          gpu_md->cell_i_j_start_end[n_leaves_packed].y = gpu_md->cell_i_j_start_end[my_index_i].y;
+//          /*Store where ci starts in unique list*/
+//          gpu_md->cell_i_j_start_end[n_leaves_packed].z = gpu_md->cell_i_j_start_end[my_index_i].x;
+//          /*Store where ci ends in unique list*/
+//          gpu_md->cell_i_j_start_end[n_leaves_packed].w = gpu_md->cell_i_j_start_end[my_index_i].y;
+//          if(cii != md->unique_cells[my_index_i])
+//        	  error("Incorrect pointer");
+//        }
       }
       /* Now finish up the bookkeeping. */
 
@@ -968,7 +1017,30 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 //        message("n_leaves_packed %i n_unique %i", md->n_leaves_packed, md->n_unique);
 //        fprintf(cells_i, "x, y, z, dist, cx, i\n");
 //        fprintf(cells_j, "x, y, z, dist, cx, i\n");
-//        for(int i = 0; i < md->n_leaves_packed; i++){
+        for(int i = 0; i < md->n_leaves_packed; i++){
+
+          int index_i = md->my_index[i].x;
+          int index_j = md->my_index[i].y;
+
+          gpu_md->cell_i_j_start_end[i].x = md->unique_start_end[index_i].x;
+          gpu_md->cell_i_j_start_end[i].y = md->unique_start_end[index_i].y;
+          gpu_md->cell_i_j_start_end[i].z = md->unique_start_end[index_j].x;
+          gpu_md->cell_i_j_start_end[i].w = md->unique_start_end[index_j].y;
+
+
+//          int ci_end = gpu_md->cell_i_j_start_end[i].y;
+//          int cj_end = gpu_md->cell_i_j_start_end[i].w;
+//          if( ci_end == 0 || cj_end == 0){
+//            error("ci end %i cj end %i n_packed_id %i n_total %i my_index_i %i, my_index_j %i"
+//                , ci_end, cj_end, i, n_leaves_packed, md->my_index[i].x, md->my_index[i].y);
+//          }
+//          else{
+//            message("ci end %i cj end %i n_packed_id %i n_total %i my_index_i %i, my_index_j %i, n_unique %i"
+//                , ci_end, cj_end, i, n_leaves_packed, md->my_index[i].x, md->my_index[i].y, md->n_unique);
+//          }
+
+
+
 //
 //          int cii_s = gpu_md->cell_i_j_start_end[i].x;
 //          int cii_e = gpu_md->cell_i_j_start_end[i].y;
@@ -1016,7 +1088,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 //
 //          }
 //
-//        }
+        }
 //        fflush(cells_i);
 //        fflush(cells_j);
 //        fclose(cells_i);
