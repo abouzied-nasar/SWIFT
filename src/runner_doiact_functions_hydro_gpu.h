@@ -727,18 +727,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   int *task_first_packed_leaf = md->task_first_packed_leaf;
   int *task_last_packed_leaf = md->task_last_packed_leaf;
 
-  /*Some bits for output in case of debug*/
-//  char buffer[20];
-//  snprintf(buffer, sizeof(buffer), "cells_i.csv");
-//  FILE *cells_i;
-//  cells_i = fopen(buffer, "w");
-//
-//  char buffer1[20];
-//  snprintf(buffer1, sizeof(buffer1), "cells_j.csv");
-//  FILE *cells_j;
-//  cells_j = fopen(buffer1, "w");
-
-  /* Nr of super-level tasks we've accounted for in the meda-data arrays. */
+  /* Nr of super-level tasks we've accounted for in the meta-data arrays. */
   int tind = md->tasks_in_list;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -1023,99 +1012,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       } /* Launched, but not finished packing */
     } /* if launch or launch_leftovers */
   } /* while npacked < md->task_n_leaves */
-
-//  for(int i = 0; i < md->count_parts_unique; i++){
-//	  double x[3];
-//	  x[0] = buf->parts_send_d[i].p_data.x_h.x;
-//	  x[1] = buf->parts_send_d[i].p_data.x_h.y;
-//	  x[2] = buf->parts_send_d[i].p_data.x_h.z;
-//	  for(int j = 0; j < md->count_parts_unique; j++){
-//		  double xj[3];
-//		  xj[0] = buf->parts_send_d[j].p_data.x_h.x;
-//		  xj[1] = buf->parts_send_d[j].p_data.x_h.y;
-//		  xj[2] = buf->parts_send_d[j].p_data.x_h.z;
-//		  double dist[3];
-//		  double distance = 0;
-//		  for(int k = 0; k < 3; k++){
-//			  dist[k] = x[k] - xj[k];
-//			  dist[k] *= dist[k];
-//			  distance += dist[k];
-//		  }
-//		  distance = sqrt(distance);
-////		  if(distance == 0.f && i != j)
-////			  error("We have duplicate particles");
-//
-//	  }
-//  }
-  /*Uncomment to dump particles contained in unique and non-unique lists of particles*/
-//  if(t->subtype == task_subtype_gpu_density){
-//    fprintf(full_list, "x, y, z\n");
-//    message("packed %i", md->n_leaves_packed);
-//    for(int l = 0; l < md->n_leaves_packed; l++){
-//    	struct cell * cip = md->ci_leaves[l];
-//    	struct cell * cjp = md->cj_leaves[l];
-//    	for(int i = 0; i < cip->hydro.count; i++){
-//    		struct part *pi = &cip->hydro.parts[i];
-//    		const double *x = part_get_const_x(pi);
-//    		fprintf(full_list, "%f, %f, %f\n", x[0], x[1], x[2]);
-//    	}
-//    	for(int i = 0; i < cjp->hydro.count; i++){
-//    		struct part *pi = &cjp->hydro.parts[i];
-//    		const double *x = part_get_const_x(pi);
-//    		fprintf(full_list, "%f, %f, %f\n", x[0], x[1], x[2]);
-//    	}
-//    }
-//    fprintf(unique_list, "x, y, z, dist\n");
-//    for(int l = 0; l < md->n_leaves_packed; l++){
-//    	int start = gpu_md->cell_i_j_start_end[l].x;
-//        int end = gpu_md->cell_i_j_start_end[l].y;
-//		float x[3], cx[3];
-//		cx[0] = buf->parts_send_d[end].c_loc.x.x;
-//		cx[1] = buf->parts_send_d[end].c_loc.x.y;
-//		cx[2] = buf->parts_send_d[end].c_loc.x.z;
-//    	for(int i = start; i < end; i++){
-//    		x[0] = buf->parts_send_d[i].p_data.x_h.x;
-//    		x[1] = buf->parts_send_d[i].p_data.x_h.y;
-//    		x[2] = buf->parts_send_d[i].p_data.x_h.z;
-//    		double dist = sqrt((x[0] - cx[0])*(x[0] - cx[0]) +
-//    				(x[1] - cx[1])*(x[1] - cx[1]) +
-//					(x[2] - cx[2])*(x[2] - cx[2]));
-//    		fprintf(unique_list, "%f, %f, %f, %f\n", x[0], x[1], x[2], dist);
-//    	}
-//
-////		x[0] = buf->parts_send_d[end].c_loc.x.x;
-////		x[1] = buf->parts_send_d[end].c_loc.x.y;
-////		x[2] = buf->parts_send_d[end].c_loc.x.z;
-////		fprintf(unique_list, "%f, %f, %f, %f\n", cx[0], cx[1], cx[2], 0.f);
-//
-//    	start = gpu_md->cell_i_j_start_end[l].z;
-//        end = gpu_md->cell_i_j_start_end[l].w;
-//
-//		cx[0] = buf->parts_send_d[end].c_loc.x.x;
-//		cx[1] = buf->parts_send_d[end].c_loc.x.y;
-//		cx[2] = buf->parts_send_d[end].c_loc.x.z;
-//    	for(int i = start; i < end; i++){
-//    		x[0] = buf->parts_send_d[i].p_data.x_h.x;
-//    		x[1] = buf->parts_send_d[i].p_data.x_h.y;
-//    		x[2] = buf->parts_send_d[i].p_data.x_h.z;
-//    		double dist = sqrt((x[0] - cx[0])*(x[0] - cx[0]) +
-//    				(x[1] - cx[1])*(x[1] - cx[1]) +
-//					(x[2] - cx[2])*(x[2] - cx[2]));
-//    		fprintf(unique_list, "%f, %f, %f, %f\n", x[0], x[1], x[2], dist);
-//    	}
-//
-////		x[0] = buf->parts_send_d[end].c_loc.x.x;
-////		x[1] = buf->parts_send_d[end].c_loc.x.y;
-////		x[2] = buf->parts_send_d[end].c_loc.x.z;
-////		fprintf(unique_list, "%f, %f, %f, %f\n", cx[0], cx[1], cx[2], 0.f);
-//    }
-//    message("n_unique %i n_total %i", md->count_parts_unique, md->count_parts);
-//    fflush(full_list);
-//    fflush(unique_list);
-//    fclose(full_list);
-//    fclose(unique_list);
-//    exit(0);
-//  }
   md->launch_leftovers = 0;
   md->launch = 0;
 }
