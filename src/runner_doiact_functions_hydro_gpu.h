@@ -806,18 +806,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
     /*Figure out where cells start for controlling GPU computations*/
     if(t->subtype == task_subtype_gpu_density){
-      if(t->type == task_type_pair){
-        /*Get indices for where we unpack to*/
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].x = md->count_parts;
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].y = md->count_parts + cii_count;
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].z = md->count_parts + cii_count;
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
-
-        /* Test to see if cells i and j have already been packed.
-         * If not, pack them, increment counters and create an
-         * index for them in metadata*/
-        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
-      }else{/*This is a self task*/
+      if(cii == cjj){
         /*Get indices for where we unpack to*/
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].x = md->count_parts;
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].y = md->count_parts + cii_count;
@@ -827,6 +816,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Test to see if cells i and j have already been packed
          * cells i and j are the same cell here but use the same
          * function as for the pairs*/
+        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
+      }else{/*This is a self task*/
+        /*Get indices for where we unpack to*/
+        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].x = md->count_parts;
+        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].y = md->count_parts + cii_count;
+        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].z = md->count_parts + cii_count;
+        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
+
+        /* Test to see if cells i and j have already been packed.
+         * If not, pack them, increment counters and create an
+         * index for them in metadata*/
         runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
       }
       /* Now finish up the bookkeeping. */
@@ -905,7 +905,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         }
         /*TODO: Is this the issue with recursion?*/
         for(int i = 0; i < md->n_leaves_packed; i++){
-
+//          for(int i = task_first_packed_leaf[tind]; i < md->n_leaves_packed; i++){
           int index_i = md->my_index[i].x;
           int index_j = md->my_index[i].y;
           gpu_md->cell_i_j_start_end[i].x = md->unique_start_end[index_i].x;
@@ -914,11 +914,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           gpu_md->cell_i_j_start_end[i].w = md->unique_start_end[index_j].y;
 
         }
+
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
 
+        /*TODO: Check if this is the problem for unique sorting code*/
         /* Unpack the results into CPU memory */
-        runner_gpu_unpack_density(r, s, buf, npacked);;
+        runner_gpu_unpack_density(r, s, buf, npacked);
 
       } else if (t->subtype == task_subtype_gpu_gradient) {
 
@@ -969,6 +971,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
          * Basically we read the value, and assign it back to
            md->task_n_leaves below*/
         int task_n_leaves = md->task_n_leaves;
+
         /* Store launch_leftovers in case we still need to do that after we
          * finish packing all leaf cell pairs */
         char launch_leftovers = md->launch_leftovers;
