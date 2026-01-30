@@ -475,7 +475,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
             cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
       }
       /* Get the cell count for this bundle */
-      const int bundle_n_cells = md->n_leaves_packed;
+      const int bundle_n_cells = leaves_packed;
       const int num_blocks_x_cells =
           (bundle_n_cells + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
@@ -831,20 +831,20 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       }
       /* Now finish up the bookkeeping. */
 
-      /* Get the index for the leaf cell */
-      const int lid = md->n_leaves_packed;
-
-      /*TODO: Do we still need this? We're now working with cells not particles*/
-      /* Identify first particle for each bundle of tasks */
-      const int bundle_size =
-          md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
-      if (lid % bundle_size == 0) {
-        int bid = lid / bundle_size;
-        /* Store this before we increment md->count_parts */
-        md->bundle_first_part[bid] = md->count_parts;
-        /* Store this before we increment md->count_parts */
-        md->bundle_first_cell[bid] = lid;
-      }
+//      /* Get the index for the leaf cell */
+//      const int lid = md->n_leaves_packed;
+//
+//      /*TODO: Do we still need this? We're now working with cells not particles*/
+//      /* Identify first particle for each bundle of tasks */
+//      const int bundle_size =
+//          md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
+//      if (lid % bundle_size == 0) {
+//        int bid = lid / bundle_size;
+//        /* Store this before we increment md->count_parts */
+//        md->bundle_first_part[bid] = md->count_parts;
+//        /* Store this before we increment md->count_parts */
+//        md->bundle_first_cell[bid] = lid;
+//      }
 
       /* Update incremented pack length accordingly */
       if (cii == cjj) {
@@ -895,6 +895,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
       if (t->subtype == task_subtype_gpu_density) {
 
+        for(int i = 0; i < md->n_unique; i++){
+          for(int j = 0; j < md->n_unique; j++){
+            if(i != j){
+              if (md->unique_cells[i] == md->unique_cells[j])
+                error("i == j");
+            }
+          }
+        }
+        /*TODO: Is this the issue with recursion?*/
         for(int i = 0; i < md->n_leaves_packed; i++){
 
           int index_i = md->my_index[i].x;
