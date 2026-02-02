@@ -352,7 +352,8 @@ static void runner_gpu_filter_data(const struct runner *r,
   if (cii == NULL || cjj == NULL)
 	  error("Error: working on NULL cells");
 
-  /*Set the flag to pack this cell to false.
+  /*TODO: No longer needed so remove
+   * Set the flag to pack this cell to false.
    * Re-set .x to true later if cell i or cj are unique*/
   md->pack_ci[n_leaves_packed] = 0;
   md->pack_cj[n_leaves_packed] = 0;
@@ -360,15 +361,11 @@ static void runner_gpu_filter_data(const struct runner *r,
   /*Check if ci has already been found.
    * If so, return where it's unique copy
    * is found in the hash table
-   * Otherwise, return -1*/
+   * Otherwise, add cell to hash table*/
   /*Flag that we're testing ci*/
   int ij = 0;
   hash_lookup(cii, hash_size, ht, buf, ij);
-  /*Same for cj. Only do this for pair tasks*/
-  /*TODO: Make sure we don't need this check
-   * and we should pack lookup cj for self task as well
-   * where cj will be ci*/
-//  if(t->type == task_type_pair){
+  /*Same for cj. For self tasks this will point to ci's location*/
 	/*Flag that we're testing cj*/
   ij = 1;
   hash_lookup(cjj, hash_size, ht, buf, ij);
@@ -806,6 +803,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
     /*Figure out where cells start for controlling GPU computations*/
     if(t->subtype == task_subtype_gpu_density){
+      TIMER_TIC;
       if(cii == cjj){
         /*Get indices for where we unpack to*/
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].x = md->count_parts;
@@ -831,21 +829,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       }
       /* Now finish up the bookkeeping. */
 
-//      /* Get the index for the leaf cell */
-//      const int lid = md->n_leaves_packed;
-//
-//      /*TODO: Do we still need this? We're now working with cells not particles*/
-//      /* Identify first particle for each bundle of tasks */
-//      const int bundle_size =
-//          md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
-//      if (lid % bundle_size == 0) {
-//        int bid = lid / bundle_size;
-//        /* Store this before we increment md->count_parts */
-//        md->bundle_first_part[bid] = md->count_parts;
-//        /* Store this before we increment md->count_parts */
-//        md->bundle_first_cell[bid] = lid;
-//      }
-
       /* Update incremented pack length accordingly */
       if (cii == cjj) {
         /* We packed a self interaction */
@@ -857,6 +840,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       /* Record that we have now packed a new leaf cell (pair) & increment number
        * of leaf cells to offload */
       md->n_leaves_packed++;
+      TIMER_TOC(timer_dopair_gpu_pack_d);
     }
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -894,16 +878,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         (md->launch_leftovers && (npacked == md->task_n_leaves))) {
 
       if (t->subtype == task_subtype_gpu_density) {
-
-        for(int i = 0; i < md->n_unique; i++){
-          for(int j = 0; j < md->n_unique; j++){
-            if(i != j){
-              if (md->unique_cells[i] == md->unique_cells[j])
-                error("i == j");
-            }
-          }
-        }
         /*TODO: Is this the issue with recursion?*/
+        TIMER_TIC;
         for(int i = 0; i < md->n_leaves_packed; i++){
 //          for(int i = task_first_packed_leaf[tind]; i < md->n_leaves_packed; i++){
           int index_i = md->my_index[i].x;
@@ -914,6 +890,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           gpu_md->cell_i_j_start_end[i].w = md->unique_start_end[index_j].y;
 
         }
+        TIMER_TOC(timer_dopair_gpu_pack_d);
 
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
