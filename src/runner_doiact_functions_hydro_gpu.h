@@ -878,10 +878,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         (md->launch_leftovers && (npacked == md->task_n_leaves))) {
 
       if (t->subtype == task_subtype_gpu_density) {
-        /*TODO: Is this the issue with recursion?*/
+        /*Expand the start/end list from only the unique_start_end array into
+         * the full metadata required by GPU threads*/
         TIMER_TIC;
         for(int i = 0; i < md->n_leaves_packed; i++){
-//          for(int i = task_first_packed_leaf[tind]; i < md->n_leaves_packed; i++){
+
           int index_i = md->my_index[i].x;
           int index_j = md->my_index[i].y;
           gpu_md->cell_i_j_start_end[i].x = md->unique_start_end[index_i].x;

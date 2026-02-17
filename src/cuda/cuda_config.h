@@ -27,7 +27,7 @@
  * configuring the cuda setup/run until we sort everything out cleanly.
  */
 
-#define GPU_THREAD_BLOCK_SIZE 16
+#define GPU_THREAD_BLOCK_SIZE 32
 
 #undef CUDA_PROFILER
 
