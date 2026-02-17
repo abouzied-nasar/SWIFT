@@ -431,11 +431,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   const struct gpu_md *gpu_md = &buf->gpu_md;
   cudaError_t cu_error = cudaSuccess;
 
-//  if (task_subtype == task_subtype_gpu_density){
-//    /*Create an event to say we have issue a send of this data to GPU*/
-//    cudaEventCreateWithFlags(&metadata_copied, cudaEventDisableTiming);
-//    cudaEventRecord(metadata_copied, stream[0]);
-//  }
   /* Transfer particle data to device */
   if (task_subtype == task_subtype_gpu_density){
       cu_error =
@@ -944,8 +939,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         if(n_leaves_new <= 0)
           error("n_leaves %i n_leaves_packed %i", md->n_leaves, md->n_leaves_packed);
         /* How many leaves does this task have in total? */
-        /*TODO: This is un-necessary as we only do
-         * an opposite assignement below with this variable
+        /*TODO: Remove below assignment. This is un-necessary as we only do
+         * an opposite assignment below with this variable
          * Basically we read the value, and assign it back to
            md->task_n_leaves below*/
         int task_n_leaves = md->task_n_leaves;
