@@ -880,6 +880,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       if (t->subtype == task_subtype_gpu_density) {
         /*Expand the start/end list from only the unique_start_end array into
          * the full metadata required by GPU threads*/
+    	/*TODO: Move into launch function*/
         TIMER_TIC;
         for(int i = 0; i < md->n_leaves_packed; i++){
 
@@ -896,7 +897,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
 
-        /*TODO: Check if this is the problem for unique sorting code*/
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_density(r, s, buf, npacked);
 
@@ -963,14 +963,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           const int shift_ind = i - md->n_leaves_packed;
           md->ci_leaves[shift_ind] = md->ci_leaves[i];
           md->cj_leaves[shift_ind] = md->cj_leaves[i];
-          /*Un-necessary as we will start packing from scratch*/
-//          gpu_md->cell_i_j_start_end[shift_ind] = gpu_md->cell_i_j_start_end[i];
-//          gpu_md->cell_i_j_start_end_non_compact[shift_ind] = gpu_md->cell_i_j_start_end_non_compact[i];
-
-          /*TODO: Check if this would work as-is.
-           * Do we need to shift the entries in md->unique_cells[]*/
-//          buf->my_index[shift_ind] = buf->my_index[i];
-//          buf->my_index[shift_ind] = buf->my_index[i];
 
 #ifdef SWIFT_DEBUG_CHECKS
           md->ci_leaves[i] = NULL;
