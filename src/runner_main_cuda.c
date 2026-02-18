@@ -251,10 +251,8 @@ void *runner_main_cuda(void *data) {
 //    fgpu_steps = fopen(buf5, "w");
     /* TODO: DO WE STILL NEED THIS?? */
 #ifdef CUDA_PROFILER
-    if (step == 1){
+    if (step == 1)
     	cudaProfilerStart();
-    	message("started profiler step %i", step);
-    }
 
     step++;
 #endif
@@ -760,10 +758,8 @@ void *runner_main_cuda(void *data) {
 //    fflush(fgpu_steps);
 //    fclose(fgpu_steps);
 #ifdef CUDA_PROFILER
-    if (step == 3){
+    if (step == 3)
     	cudaProfilerStop();
-    	message("shutdown profiler step %i", step);
-    }
 #endif
   } /* main loop. */
 

@@ -84,6 +84,9 @@ struct gpu_offload_data {
   /*GPU metadata for controlling which particles
    * interact with which and currently where to write
    * results to*/
+  /*TODO: We can probably get away with sending
+   * this to GPU all at once, as in send in one go from gpu_md (host)
+   *  to d_gpu_md (device)*/
   struct gpu_md {
 	/*This contains the indices of where GPU threads should
 	 * read from in the compact particle buffer (with no
@@ -94,8 +97,16 @@ struct gpu_offload_data {
 	 * TODO: Do reduction on GPU to avoid sending back lots
 	 *  of data to CPU*/
     int4 *cell_i_j_start_end_non_compact;
+    /*Allocate device copies*/
     int4 *d_cell_i_j_start_end;
     int4 *d_cell_i_j_start_end_non_compact;
+
+    /*This array is used to tell each cuda block
+     * which leaf computation it should work on*/
+    /*Host copy*/
+    int *block_leaf_id;
+    /*Device copy*/
+    int *d_block_leaf_id;
   } gpu_md;
 
   /*! Handle on events per cuda stream to register completion of async ops */

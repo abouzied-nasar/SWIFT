@@ -28,6 +28,7 @@
 extern "C" {
 #endif
 
+#include "cuda_config.h"
 #include "gpu_offload_data.h"
 
 #include "task.h"
@@ -87,6 +88,19 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                             size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
+  const size_t n_blocks = (part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+
+  /*Allocate memory for array containing
+   * leaf_computation_id for each cuda block*/
+  cu_error = cudaMallocHost((void **)&buf->gpu_md.block_leaf_id,
+                            n_blocks * sizeof(int));
+  swift_assert(cu_error == cudaSuccess);
+
+  /*Repeat for device copy*/
+  cu_error = cudaMalloc((void **)&buf->gpu_md.d_block_leaf_id,
+                            n_blocks * sizeof(int));
+  swift_assert(cu_error == cudaSuccess);
+
   /* Now allocate memory for Buffer and GPU particle arrays */
   cu_error = cudaMalloc((void **)&buf->d_parts_send_d,
                         part_buffer_size * send_struct_size);
@@ -142,11 +156,17 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
   const struct gpu_global_pack_params pars = buf->md.params;
   const struct gpu_pack_metadata md = buf->md;
 
+  const n_blocks = pars->part_buffer_size/GPU_THREAD_BLOCK_SIZE;
+
   memset(buf->parts_send_d, 0, pars.part_buffer_size * md.send_struct_size);
   memset(buf->parts_recv_d, 0, pars.part_buffer_size * md.recv_struct_size);
 
   memset(buf->gpu_md.cell_i_j_start_end, 0, sizeof(int4) * pars.pack_size_pair);
   memset(buf->gpu_md.cell_i_j_start_end_non_compact, 0, sizeof(int4) * pars.pack_size_pair);
+
+  memset(buf->gpu_md.block_leaf_id, 0, sizeof(int) * n_blocks);
+
+  buf->gpu_md.n_blocks_packed = 0;
 
   /* Can't do this from the host side, would need to launch cuda kernel */
   /* bzero(buf->d_parts_recv_d, pars.part_buffer_size *

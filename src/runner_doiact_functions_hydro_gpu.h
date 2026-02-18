@@ -805,6 +805,19 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         //TODO: Add a debug check in unpacking to make sure we never touch this!
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].z = -1;
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].w = -1;
+
+        const int n_blocks_packed = gpu_md->n_blocks_packed;
+        const int n_blocks_current = (cii_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+        for(int b = 0; b < n_blocks_current; b++){
+        	/*TODO: FIX THIS -> This is running over the limit
+        	 * somehow and writing to other members of gpu_md*/
+        	gpu_md->block_leaf_id[n_blocks_packed + b] = n_leaves_packed;
+        }
+        int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+        buf->gpu_md.n_blocks_packed += n_blocks_current;
+        if(buf->gpu_md.n_blocks_packed > n_blocks_max)
+        	error("exceeded n_block_max");
+
         /* Test to see if cells i and j have already been packed
          * cells i and j are the same cell here but use the same
          * function as for the pairs*/
@@ -815,6 +828,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].y = md->count_parts + cii_count;
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].z = md->count_parts + cii_count;
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
+
+        const int n_blocks_packed = gpu_md->n_blocks_packed;
+        const int n_blocks_current = (cii_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+        for(int b = 0; b < n_blocks_current; b++){
+        	/*TODO: FIX THIS -> This is running over the limit
+        	 * somehow and writing to other members of gpu_md*/
+        	gpu_md->block_leaf_id[n_blocks_packed + b] = n_leaves_packed;
+        }
+        int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+        buf->gpu_md.n_blocks_packed += n_blocks_current;
+        if(buf->gpu_md.n_blocks_packed > n_blocks_max)
+        	error("exceeded n_block_max");
 
         /* Test to see if cells i and j have already been packed.
          * If not, pack them, increment counters and create an
