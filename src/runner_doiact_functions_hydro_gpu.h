@@ -445,7 +445,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
             "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i ",
             cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
       }
-      //  cudaEvent_t metadata_copied;
         /*Copy the tasks cell start/end metadata to the GPU. Send it using regular streams for now.
          * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
          * instead of n_bundle copies */

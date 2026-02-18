@@ -39,10 +39,6 @@ extern "C" {
 #ifdef WITH_CUDA
 #include <cuda.h>
 #include <cuda_runtime.h>
-
-#ifdef CUDA_PROFILER
-#include <cuda_profiler_api.h>
-#endif
 #endif
 
 /* This object's header. */
@@ -50,6 +46,9 @@ extern "C" {
 
 /* Local headers. */
 #include "cuda/cuda_config.h"
+#ifdef CUDA_PROFILER
+#include <cuda_profiler_api.h>
+#endif
 #include "cuda/gpu_offload_data.h"
 #include "cuda/gpu_utils.h"
 #include "engine.h"
@@ -221,7 +220,6 @@ void *runner_main_cuda(void *data) {
   /* Tell me how much memory we're using. */
   gpu_print_free_mem(e, r->cpuid);
 
-  int step = 0;
   /* Main loop. */
   while (1) {
     /* Wait at the barrier. */
@@ -249,11 +247,11 @@ void *runner_main_cuda(void *data) {
     /*Some bits for output in case of debug*/
     char buf5[20];
     snprintf(buf5, sizeof(buf5), "t%dr%dstep%d", r->cpuid, engine_rank, step);
-    FILE *fgpu_steps;
-    fgpu_steps = fopen(buf5, "w");
+//    FILE *fgpu_steps;
+//    fgpu_steps = fopen(buf5, "w");
     /* TODO: DO WE STILL NEED THIS?? */
 #ifdef CUDA_PROFILER
-    if (step == 0) cudaProfilerStart();
+    if (step == 1) cudaProfilerStart();
     step++;
 #endif
     int dens_launches = 0;
@@ -744,19 +742,23 @@ void *runner_main_cuda(void *data) {
     } /* Loop while there are tasks */
 
     /*Dump file headers*/
-    fprintf(fgpu_steps, "x, y, z, N\n");
-    for (int tid = 0; tid < e->s->nr_local_cells; tid++) {
-    	struct cell *ctemp = &(e->s->cells_top[tid]);
-    	for(int i = 0; i < ctemp->hydro.count; i++){
-        	struct part *pi = &ctemp->hydro.parts[i];
-        	const double *x = part_get_const_x(pi);
-    		fprintf(fgpu_steps, "%f, %f, %f, %i\n", x[0], x[1], x[2], pi->N_density);
-    		pi->N_density = 0;
-    	}
-    }
+//    fprintf(fgpu_steps, "x, y, z, N\n");
+//    for (int tid = 0; tid < e->s->nr_local_cells; tid++) {
+//    	struct cell *ctemp = &(e->s->cells_top[tid]);
+//    	for(int i = 0; i < ctemp->hydro.count; i++){
+//        	struct part *pi = &ctemp->hydro.parts[i];
+//        	const double *x = part_get_const_x(pi);
+//    		fprintf(fgpu_steps, "%f, %f, %f, %i\n", x[0], x[1], x[2], pi->N_density);
+//    		pi->N_density = 0;
+//    	}
+//    }
+//    step++;
+//    fflush(fgpu_steps);
+//    fclose(fgpu_steps);
+#ifdef CUDA_PROFILER
+    if (step == 3) cudaProfilerStop();
     step++;
-    fflush(fgpu_steps);
-    fclose(fgpu_steps);
+#endif
   } /* main loop. */
 
   /* Release the bytes back into the wilderness */
