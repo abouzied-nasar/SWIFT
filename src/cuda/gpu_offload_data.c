@@ -166,8 +166,6 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
 
   memset(buf->gpu_md.block_leaf_id, 0, sizeof(int) * n_blocks);
 
-  buf->gpu_md.n_blocks_packed = 0;
-
   /* Can't do this from the host side, would need to launch cuda kernel */
   /* bzero(buf->d_parts_recv_d, pars.part_buffer_size *
    * sizeof(md.send_struct_size)); */

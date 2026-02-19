@@ -157,6 +157,8 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
   md->n_unique = 0;
   md->hash_table.capacity = md->hash_size;
   md->hash_table.count = 0;
+  md->n_blocks_packed = 0;
+
   for(int i = 0; i < md->hash_size; i++){
 	  md->hash_table.entry[i].occupied = 0;
       md->hash_table.entry[i].c = NULL;

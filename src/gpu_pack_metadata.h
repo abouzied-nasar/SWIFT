@@ -116,6 +116,8 @@ struct gpu_pack_metadata {
    * copied) into the buffers */
   int n_leaves_packed;
 
+  /*How many blocks of cuda threads do we need to process the computations*/
+  int n_blocks_packed;
   /*! Total number of leaf cells which require interactions found during
    * recursive searches since last offload cycle */
   int n_leaves;
