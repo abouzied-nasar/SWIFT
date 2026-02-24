@@ -836,7 +836,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
 
         const int n_blocks_packed = md->n_blocks_packed;
-        const int n_blocks_current = (cii_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+        const int n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
         for(int b = 0; b < n_blocks_current; b++){
         	/*TODO: FIX THIS -> This is running over the limit
         	 * somehow and writing to other members of gpu_md*/
