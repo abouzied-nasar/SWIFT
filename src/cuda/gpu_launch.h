@@ -33,6 +33,7 @@ void gpu_launch_density(const struct gpu_part_send_d *restrict d_parts_send,
                         const int num_blocks_x,
                         const int4 *restrict d_cell_i_j_start_end,
                         const int4 *restrict d_cell_i_j_start_end_non_compact,
+						const int *__restrict__ d_block_leaf_id,
                         const int bundle_n_cells, const double3 space_dim);
 void gpu_launch_gradient(const struct gpu_part_send_g *restrict d_parts_send,
                          struct gpu_part_recv_g *restrict d_parts_recv,

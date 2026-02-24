@@ -458,6 +458,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
             &buf->gpu_md.cell_i_j_start_end_non_compact[0],
             leaves_packed * sizeof(int4),
             cudaMemcpyHostToDevice);
+      cu_error =
+          cudaMemcpy(&buf->gpu_md.d_block_leaf_id[0],
+            &buf->gpu_md.block_leaf_id[0],
+            md->n_blocks_packed * sizeof(int),
+            cudaMemcpyHostToDevice);
       if (cu_error != cudaSuccess) {
         /* If we're here, assume something's messed up with our code, not with
          * CUDA. */
@@ -474,6 +479,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     		  num_blocks_x_cells,
 			  gpu_md->d_cell_i_j_start_end,
 			  gpu_md->d_cell_i_j_start_end_non_compact,
+			  gpu_md->d_block_leaf_id,
 			  bundle_n_cells, space_dim);
       /* Copy results back to CPU BUFFERS */
       cu_error =

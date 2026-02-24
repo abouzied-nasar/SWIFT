@@ -57,7 +57,7 @@ __global__ void cuda_launch_density(
     struct gpu_part_recv_d *__restrict__ d_parts_recv, const float d_a,
     const float d_H,
     const int4 *__restrict__ d_cell_i_j_start_end, const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
-    const int bundle_n_cells,
+	const int *__restrict__ d_block_leaf_id, const int bundle_n_cells,
     const double3 space_dim) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -230,13 +230,14 @@ void gpu_launch_density(const struct gpu_part_send_d *__restrict__ d_parts_send,
                         const int num_blocks_x,
                         const int4 *__restrict__ d_cell_i_j_start_end,
                         const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
+                        const int *__restrict__ d_block_leaf_id,
                         const int bundle_n_cells, const double3 space_dim) {
 
   /* TODO: Do we want to allocate shared memory here? */
   cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0>>>(
       d_parts_send, d_parts_recv, d_a, d_H,
       d_cell_i_j_start_end, d_cell_i_j_start_end_non_compact,
-      bundle_n_cells, space_dim);
+	  d_block_leaf_id, bundle_n_cells, space_dim);
 }
 
 /**
