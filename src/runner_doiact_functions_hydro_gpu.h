@@ -475,8 +475,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       const int num_blocks_x_cells =
           (bundle_n_cells + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
+      const int n_blocks_parts = md->n_blocks_packed;
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
-    		  num_blocks_x_cells,
+              n_blocks_parts,
 			  gpu_md->d_cell_i_j_start_end,
 			  gpu_md->d_cell_i_j_start_end_non_compact,
 			  gpu_md->d_block_leaf_id,

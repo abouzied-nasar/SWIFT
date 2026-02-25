@@ -61,6 +61,8 @@ __global__ void cuda_launch_density(
     const double3 space_dim) {
 
   const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
+  const int bid = blockIdx.x;
+  //cid for now corresponds to leaf computation id
   const int cid = threadid;
 
   /*Necessary to prevent out of bounds access
@@ -70,6 +72,12 @@ __global__ void cuda_launch_density(
     /* First, grab handles for where cells start and end */
     int4 cell_starts_ends_read = d_cell_i_j_start_end[cid];
     int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[cid];
+    //Find the block id for the first block to work with this leaf computation
+    const int leaf_bid_0 = d_block_leaf_id[cid];
+    //Find which block this is within the list of blocks acting on leaf computation cid
+    const int b_id_local = bid - leaf_bid_0;
+    //Now find the particle this thread needs to work on
+    const int p_id = b_id_local * GPU_THREAD_BLOCK_SIZE + threadIdx.x;
     /*Assign without accounting for ci/cj_end being the index of cell positions.
      * This will be accounted for in cuda_kernel_density()*/
     const int ci_start = cell_starts_ends_read.x;
