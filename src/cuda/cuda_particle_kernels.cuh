@@ -202,22 +202,21 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
     struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H,
     const int4 __restrict__ cell_starts_ends_read,
     const int4 __restrict__ cell_starts_ends_write,
-	const double3 space_dim, const double3 shift_i, const double3 shift_j) {
+	const double3 space_dim, const double3 shift_i, const double3 shift_j, const int pid) {
 
   /*TODO:These could and should be shared variables.
   Their value is the same for entire block*/
   /* First, grab handles for where cells start and end */
   const int ci_start = cell_starts_ends_read.x;
   /*Subtract one to make sure we don't loop over the cell position index*/
-  const int ci_end = cell_starts_ends_read.y - 1;
+//  const int ci_end = cell_starts_ends_read.y - 1;
   const int cj_start = cell_starts_ends_read.z;
   const int cj_end = cell_starts_ends_read.w - 1;
 
   const int ci_write_start = cell_starts_ends_write.x;
   const int ci_write_end = cell_starts_ends_write.y;
-  int k = 0;
   int n_total = 0;
-  const struct gpu_part_data_d pi = d_parts_send[i].p_data;
+  const struct gpu_part_data_d pi = d_parts_send[pid].p_data;
   const float xi = pi.x_h.x - shift_i.x;
   const float yi = pi.x_h.y - shift_i.y;
   const float zi = pi.x_h.z - shift_i.z;
@@ -260,7 +259,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
 	const float zij = zi - zj;
 	const float r2 = xij * xij + yij * yij + zij * zij;
 
-	if ((r2 < hig2) && (j != i)) {
+	if ((r2 < hig2) && (j != pid)) {
 	  /* j != pid: Exclude self contribution. This happens at a later step. */
 
       n_neighbours++;
@@ -300,11 +299,16 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
 	}
   } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
   /* Write results. */
+  /*k is the index of the particle we want to write to within this
+   * cell starting from zero so we need to subtract ci_start from pid and
+   * add it to ci_write_start*/
+  /*We have out-of-bounds barrier (if statement) to ensure we don't try
+   * to write outside of this cell's partice range*/
+  const int k = pid - ci_start;
   d_parts_recv[k + ci_write_start].rho_rhodh_wcount_wcount_dh = res_rho;
   d_parts_recv[k + ci_write_start].rot_vx_div_v = res_rot;
   d_parts_recv[k + ci_write_start].n_neighbours = n_neighbours;
   n_total += n_neighbours;
-  k++;
 }
 
 /**
