@@ -461,7 +461,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       cu_error =
           cudaMemcpy(&buf->gpu_md.d_block_leaf_id[0],
             &buf->gpu_md.block_leaf_id[0],
-            md->n_blocks_packed * sizeof(int),
+            md->n_blocks_packed * sizeof(int2),
             cudaMemcpyHostToDevice);
       if (cu_error != cudaSuccess) {
         /* If we're here, assume something's messed up with our code, not with
@@ -472,8 +472,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       }
       /* Get the cell count for this bundle */
       const int bundle_n_cells = leaves_packed;
-      const int num_blocks_x_cells =
-          (bundle_n_cells + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+//      const int num_blocks_x_cells =
+//          (bundle_n_cells + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
       const int n_blocks_parts = md->n_blocks_packed;
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
@@ -818,7 +818,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         for(int b = 0; b < n_blocks_current; b++){
         	/*TODO: FIX THIS -> This is running over the limit
         	 * somehow and writing to other members of gpu_md*/
-        	gpu_md->block_leaf_id[n_blocks_packed + b] = n_leaves_packed;
+        	gpu_md->block_leaf_id[n_blocks_packed + b].x = n_leaves_packed;
+        	/*Save the id of the first block acting on this leaf comp.*/
+        	gpu_md->block_leaf_id[n_blocks_packed + b].y = n_blocks_packed;
         }
         int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
         md->n_blocks_packed += n_blocks_current;
@@ -841,7 +843,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         for(int b = 0; b < n_blocks_current; b++){
         	/*TODO: FIX THIS -> This is running over the limit
         	 * somehow and writing to other members of gpu_md*/
-        	gpu_md->block_leaf_id[n_blocks_packed + b] = n_leaves_packed;
+        	gpu_md->block_leaf_id[n_blocks_packed + b].x = n_leaves_packed;
+        	/*Save the id of the first block acting on this leaf comp.*/
+        	gpu_md->block_leaf_id[n_blocks_packed + b].y = n_blocks_packed;
         }
         int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
         md->n_blocks_packed += n_blocks_current;

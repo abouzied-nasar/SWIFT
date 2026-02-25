@@ -38,7 +38,7 @@ extern "C" {
 #include <config.h>
 
 /**
- * @brief Naive kernel computing the density interactions of a single particle
+ * @brief Naive kernel where each thread computes the density interactions of all parts in one cell
  *
  * @param pid index of particle to compute density for in the data arrays
  * @param d_pars_send array of particle data received from CPU
@@ -47,7 +47,7 @@ extern "C" {
  * @param d_H current Hubble constant
  */
 //TODO: When changing the file cuda_particle_kernels.cuh and then recompiling the compiler doesn't realise the file has changed
-__device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
+__device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_c(
     int cid, const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H,
     const int4 __restrict__ cell_starts_ends_read,
@@ -185,6 +185,126 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density(
   }
 //  printf("found %i neigbours in cell\n", n_total);
 //  fflush();
+}
+
+/**
+ * @brief Naive kernel computing the density interactions of a single particle
+ *
+ * @param pid index of particle to compute density for in the data arrays
+ * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_recv array of particle data to write results into
+ * @param d_a current cosmological expansion factor
+ * @param d_H current Hubble constant
+ */
+//TODO: When changing the file cuda_particle_kernels.cuh and then recompiling the compiler doesn't realise the file has changed
+__device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
+    int cid, const struct gpu_part_send_d *__restrict__ d_parts_send,
+    struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H,
+    const int4 __restrict__ cell_starts_ends_read,
+    const int4 __restrict__ cell_starts_ends_write,
+	const double3 space_dim, const double3 shift_i, const double3 shift_j) {
+
+  /*TODO:These could and should be shared variables.
+  Their value is the same for entire block*/
+  /* First, grab handles for where cells start and end */
+  const int ci_start = cell_starts_ends_read.x;
+  /*Subtract one to make sure we don't loop over the cell position index*/
+  const int ci_end = cell_starts_ends_read.y - 1;
+  const int cj_start = cell_starts_ends_read.z;
+  const int cj_end = cell_starts_ends_read.w - 1;
+
+  const int ci_write_start = cell_starts_ends_write.x;
+  const int ci_write_end = cell_starts_ends_write.y;
+  int k = 0;
+  int n_total = 0;
+  const struct gpu_part_data_d pi = d_parts_send[i].p_data;
+  const float xi = pi.x_h.x - shift_i.x;
+  const float yi = pi.x_h.y - shift_i.y;
+  const float zi = pi.x_h.z - shift_i.z;
+  const float hi = pi.x_h.w;
+
+  const float vxi = pi.vx_m.x;
+  const float vyi = pi.vx_m.y;
+  const float vzi = pi.vx_m.z;
+  /* Do some auxiliary computations */
+  const float hig2 = hi * hi * kernel_gamma2;
+  const float hi_inv = 1.f / hi;
+
+  int n_neighbours = 0;
+
+  /* Prep output */
+  /* rho, rho_dh, wcount, wcount_dh */
+  float4 res_rho = {0.0, 0.0, 0.0, 0.0};
+  /* curl of velocity (3 coordinates), velocity divergence */
+  float4 res_rot = {0.0, 0.0, 0.0, 0.0};
+
+  /* Start the neighbour interactions */
+  for (int j = cj_start; j < cj_end; j++) {
+
+    /* First, grab handles. */
+	const struct gpu_part_data_d pj = d_parts_send[j].p_data;
+
+	const float xj = pj.x_h.x - shift_j.x;
+	const float yj = pj.x_h.y - shift_j.y;
+	const float zj = pj.x_h.z - shift_j.z;
+	/* const float hj = pj.x_p_h.w; */
+
+	const float vxj = pj.vx_m.x;
+	const float vyj = pj.vx_m.y;
+	const float vzj = pj.vx_m.z;
+	const float mj = pj.vx_m.w;
+
+	/* Now get stuff done. */
+	const float xij = xi - xj;
+	const float yij = yi - yj;
+	const float zij = zi - zj;
+	const float r2 = xij * xij + yij * yij + zij * zij;
+
+	if ((r2 < hig2) && (j != i)) {
+	  /* j != pid: Exclude self contribution. This happens at a later step. */
+
+      n_neighbours++;
+      /* Recover some data */
+      const float r = sqrtf(r2);
+
+      /* Get the kernel for hi. */
+      const float ui = r * hi_inv;
+      float wi;
+      float wi_dx;
+      d_kernel_deval(ui, &wi, &wi_dx);
+
+      /* Add to sums of rho, rho_dh, wcount and wcount_dh */
+      res_rho.x += mj * wi;
+      res_rho.y -= mj * (hydro_dimension * wi + ui * wi_dx);
+      res_rho.z += wi;
+      res_rho.w -= (hydro_dimension * wi + ui * wi_dx);
+
+      const float r_inv = r ? 1.0f/r : 0.0f;
+      const float faci = mj * wi_dx * r_inv;
+
+      /* Compute dv dot r */
+      const float dvx = vxi - vxj;
+      const float dvy = vyi - vyj;
+      const float dvz = vzi - vzj;
+      const float dvdr = dvx * xij + dvy * yij + dvz * zij;
+
+      /* Compute dv cross r */
+      const float curlvrx = dvy * zij - dvz * yij;
+      const float curlvry = dvz * xij - dvx * zij;
+      const float curlvrz = dvx * yij - dvy * xij;
+
+      res_rot.x += faci * curlvrx;
+      res_rot.y += faci * curlvry;
+      res_rot.z += faci * curlvrz;
+      res_rot.w -= faci * dvdr;
+	}
+  } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
+  /* Write results. */
+  d_parts_recv[k + ci_write_start].rho_rhodh_wcount_wcount_dh = res_rho;
+  d_parts_recv[k + ci_write_start].rot_vx_div_v = res_rot;
+  d_parts_recv[k + ci_write_start].n_neighbours = n_neighbours;
+  n_total += n_neighbours;
+  k++;
 }
 
 /**

@@ -93,12 +93,12 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   /*Allocate memory for array containing
    * leaf_computation_id for each cuda block*/
   cu_error = cudaMallocHost((void **)&buf->gpu_md.block_leaf_id,
-                            n_blocks * sizeof(int));
+                            n_blocks * sizeof(int2));
   swift_assert(cu_error == cudaSuccess);
 
   /*Repeat for device copy*/
   cu_error = cudaMalloc((void **)&buf->gpu_md.d_block_leaf_id,
-                            n_blocks * sizeof(int));
+                            n_blocks * sizeof(int2));
   swift_assert(cu_error == cudaSuccess);
 
   /* Now allocate memory for Buffer and GPU particle arrays */
@@ -164,7 +164,7 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
   memset(buf->gpu_md.cell_i_j_start_end, 0, sizeof(int4) * pars.pack_size_pair);
   memset(buf->gpu_md.cell_i_j_start_end_non_compact, 0, sizeof(int4) * pars.pack_size_pair);
 
-  memset(buf->gpu_md.block_leaf_id, 0, sizeof(int) * n_blocks);
+  memset(buf->gpu_md.block_leaf_id, 0, sizeof(int2) * n_blocks);
 
   /* Can't do this from the host side, would need to launch cuda kernel */
   /* bzero(buf->d_parts_recv_d, pars.part_buffer_size *

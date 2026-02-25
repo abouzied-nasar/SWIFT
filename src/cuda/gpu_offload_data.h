@@ -104,9 +104,9 @@ struct gpu_offload_data {
     /*This array is used to tell each cuda block
      * which leaf computation it should work on*/
     /*Host copy*/
-    int *block_leaf_id;
+    int2 *block_leaf_id;
     /*Device copy*/
-    int *d_block_leaf_id;
+    int2 *d_block_leaf_id;
   } gpu_md;
 
   /*! Handle on events per cuda stream to register completion of async ops */

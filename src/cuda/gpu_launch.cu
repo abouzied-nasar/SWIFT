@@ -57,25 +57,36 @@ __global__ void cuda_launch_density(
     struct gpu_part_recv_d *__restrict__ d_parts_recv, const float d_a,
     const float d_H,
     const int4 *__restrict__ d_cell_i_j_start_end, const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
-	const int *__restrict__ d_block_leaf_id, const int bundle_n_cells,
+	const int2 *__restrict__ d_block_leaf_id, const int bundle_n_cells,
     const double3 space_dim) {
 
-  const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
+//  const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
+  //get my block id globally in this kernel
   const int bid = blockIdx.x;
-  //cid for now corresponds to leaf computation id
-  const int cid = threadid;
+  //Get my leaf computation id
+  const int leafid = d_block_leaf_id[bid].x;
+  //Get id of first block working on this leaf
+  const int bid_0 = d_block_leaf_id[bid].y;
+  /* Grab handles for where cells start and end */
+  int4 cell_starts_ends_read = d_cell_i_j_start_end[leafid];
+  int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[leafid];
+  /*Assign without accounting for ci/cj_end being the index of cell positions.
+   * This will be accounted for in cuda_kernel_density()*/
+  const int ci_start = cell_starts_ends_read.x;
+  const int ci_end = cell_starts_ends_read.y;
+  //Find the block id for the first block to work with this leaf computation
+  const int n_blocks_this_leaf = ((ci_end - ci_start + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE);
 
   /*Necessary to prevent out of bounds access
    * for thread ids above what is necessary to
    * complete computations*/
-  if(cid < bundle_n_cells){
+  if(leafid < bundle_n_cells){
     /* First, grab handles for where cells start and end */
-    int4 cell_starts_ends_read = d_cell_i_j_start_end[cid];
-    int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[cid];
-    //Find the block id for the first block to work with this leaf computation
-    const int leaf_bid_0 = d_block_leaf_id[cid];
-    //Find which block this is within the list of blocks acting on leaf computation cid
-    const int b_id_local = bid - leaf_bid_0;
+    int4 cell_starts_ends_read = d_cell_i_j_start_end[leafid];
+    int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[leafid];
+
+    //Find which block this is within the list of blocks acting on leaf computation leafid
+    const int b_id_local = bid - bid_0;
     //Now find the particle this thread needs to work on
     const int p_id = b_id_local * GPU_THREAD_BLOCK_SIZE + threadIdx.x;
     /*Assign without accounting for ci/cj_end being the index of cell positions.
@@ -136,10 +147,10 @@ __global__ void cuda_launch_density(
 
     const double3 shift_i_res = {shift_ix, shift_iy, shift_iz};
     const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
-    //  if (cid < bundle_n_cells) {
+    //  if (leafid < bundle_n_cells) {
     /*Interact ci with cj*/
     //    printf("Doing ci\n");
-    cuda_kernel_density(cid, d_parts_send, d_parts_recv, d_a, d_H,
+    cuda_kernel_density(leafid, d_parts_send, d_parts_recv, d_a, d_H,
         cell_starts_ends_read, cell_starts_ends_write,
         space_dim, shift_i_res, shift_j_res);
     /*Check if this is a self interaction.
@@ -162,7 +173,7 @@ __global__ void cuda_launch_density(
       const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
       const double3 shift_jj_res = {shift_ix, shift_iy, shift_iz};
       ///////////////////////////////////////////////////////////////////////
-      cuda_kernel_density(cid, d_parts_send, d_parts_recv, d_a, d_H,
+      cuda_kernel_density(leafid, d_parts_send, d_parts_recv, d_a, d_H,
           cell_starts_ends_read, cell_starts_ends_write,
           space_dim, shift_ii_res, shift_jj_res);
     }
@@ -238,7 +249,7 @@ void gpu_launch_density(const struct gpu_part_send_d *__restrict__ d_parts_send,
                         const int num_blocks_x,
                         const int4 *__restrict__ d_cell_i_j_start_end,
                         const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
-                        const int *__restrict__ d_block_leaf_id,
+                        const int2 *__restrict__ d_block_leaf_id,
                         const int bundle_n_cells, const double3 space_dim) {
 
   /* TODO: Do we want to allocate shared memory here? */
