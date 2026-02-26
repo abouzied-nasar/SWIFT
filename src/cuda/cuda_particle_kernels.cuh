@@ -298,14 +298,14 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
   } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
   /* Write results. */
   /*k is the index of the particle we want to write to within this
-   * cell starting from zero so we need to subtract ci_start from pid and
+   * cell starting from zero so we need to subtract ci_read_start from pid and
    * add it to ci_write_start*/
-  /*We have out-of-bounds barrier (if statement) to ensure we don't try
+  /*We have out-of-bounds barrier (if statement in calling functionm) to ensure we don't try
    * to write outside of this cell's partice range*/
-  const int k = pid - ci_start;
-  d_parts_recv[k + ci_write_start].rho_rhodh_wcount_wcount_dh = res_rho;
-  d_parts_recv[k + ci_write_start].rot_vx_div_v = res_rot;
-  d_parts_recv[k + ci_write_start].n_neighbours = n_neighbours;
+  const int k = pid - ci_start  + ci_write_start;
+  d_parts_recv[k].rho_rhodh_wcount_wcount_dh = res_rho;
+  d_parts_recv[k].rot_vx_div_v = res_rot;
+  d_parts_recv[k].n_neighbours = n_neighbours;
 }
 
 /**

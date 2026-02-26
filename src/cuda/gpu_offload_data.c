@@ -164,6 +164,9 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
   memset(buf->gpu_md.cell_i_j_start_end, 0, sizeof(int4) * pars.pack_size_pair);
   memset(buf->gpu_md.cell_i_j_start_end_non_compact, 0, sizeof(int4) * pars.pack_size_pair);
 
+  /*Data required for identifying what leaf computation each cuda block should work on and
+   * how many blocks should work on a leaf computation. Index x corresponds to the leaf computation id
+   * Index y corresponds to the block id of the first cuda block working on that leaf comp*/
   memset(buf->gpu_md.block_leaf_id, 0, sizeof(int2) * n_blocks);
 
   /* Can't do this from the host side, would need to launch cuda kernel */
