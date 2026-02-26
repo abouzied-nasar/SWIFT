@@ -247,8 +247,8 @@ void *runner_main_cuda(void *data) {
     /*Some bits for output in case of debug*/
     char buf5[20];
     snprintf(buf5, sizeof(buf5), "t%dr%dstep%d", r->cpuid, engine_rank, step);
-    FILE *fgpu_steps;
-    fgpu_steps = fopen(buf5, "w");
+//    FILE *fgpu_steps;
+//    fgpu_steps = fopen(buf5, "w");
     /* TODO: DO WE STILL NEED THIS?? */
 #ifdef CUDA_PROFILER
     if (step == 1)
@@ -744,19 +744,19 @@ void *runner_main_cuda(void *data) {
     } /* Loop while there are tasks */
 
     /*Dump file headers*/
-    fprintf(fgpu_steps, "x, y, z, N\n");
-    for (int tid = 0; tid < e->s->nr_local_cells; tid++) {
-    	struct cell *ctemp = &(e->s->cells_top[tid]);
-    	for(int i = 0; i < ctemp->hydro.count; i++){
-        	struct part *pi = &ctemp->hydro.parts[i];
-        	const double *x = part_get_const_x(pi);
-    		fprintf(fgpu_steps, "%f, %f, %f, %i\n", x[0], x[1], x[2], pi->N_density);
-    		pi->N_density = 0;
-    	}
-    }
-    step++;
-    fflush(fgpu_steps);
-    fclose(fgpu_steps);
+//    fprintf(fgpu_steps, "x, y, z, N\n");
+//    for (int tid = 0; tid < e->s->nr_local_cells; tid++) {
+//    	struct cell *ctemp = &(e->s->cells_top[tid]);
+//    	for(int i = 0; i < ctemp->hydro.count; i++){
+//        	struct part *pi = &ctemp->hydro.parts[i];
+//        	const double *x = part_get_const_x(pi);
+//    		fprintf(fgpu_steps, "%f, %f, %f, %i\n", x[0], x[1], x[2], pi->N_density);
+//    		pi->N_density = 0;
+//    	}
+//    }
+//    step++;
+//    fflush(fgpu_steps);
+//    fclose(fgpu_steps);
 #ifdef CUDA_PROFILER
     if (step == 3)
     	cudaProfilerStop();
