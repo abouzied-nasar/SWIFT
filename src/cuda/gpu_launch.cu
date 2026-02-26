@@ -152,7 +152,8 @@ __global__ void cuda_launch_density(
     const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
     /*Interact parts in ci with parts in cj.
      * Check to see if pid is in-bounds first*/
-    if(pid < ci_end)
+    /*Remember that the last index is used to store cell location*/
+    if(pid < ci_end - 1)
       cuda_kernel_density_p(leafid, d_parts_send, d_parts_recv, d_a, d_H,
         cell_starts_ends_read, cell_starts_ends_write,
         space_dim, shift_i_res, shift_j_res, pid);
@@ -182,7 +183,8 @@ __global__ void cuda_launch_density(
       /*Now find the particle this thread needs to work on*/
       const int pjd = b_id_local * GPU_THREAD_BLOCK_SIZE + threadIdx.x + cj_start;
       ///////////////////////////////////////////////////////////////////////
-      if(pjd < cj_end)
+      /*Remember that the last index is used to store cell location*/
+      if(pjd < cj_end - 1)
       cuda_kernel_density_p(leafid, d_parts_send, d_parts_recv, d_a, d_H,
           cell_starts_ends_read, cell_starts_ends_write,
           space_dim, shift_ii_res, shift_jj_res, pjd);
