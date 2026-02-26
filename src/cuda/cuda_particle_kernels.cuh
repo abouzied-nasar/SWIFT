@@ -209,7 +209,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
   /* First, grab handles for where cells start and end */
   const int ci_start = cell_starts_ends_read.x;
   /*Subtract one to make sure we don't loop over the cell position index*/
-//  const int ci_end = cell_starts_ends_read.y - 1;
   const int cj_start = cell_starts_ends_read.z;
   const int cj_end = cell_starts_ends_read.w - 1;
 
@@ -246,7 +245,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
 	const float xj = pj.x_h.x - shift_j.x;
 	const float yj = pj.x_h.y - shift_j.y;
 	const float zj = pj.x_h.z - shift_j.z;
-	/* const float hj = pj.x_p_h.w; */
 
 	const float vxj = pj.vx_m.x;
 	const float vyj = pj.vx_m.y;

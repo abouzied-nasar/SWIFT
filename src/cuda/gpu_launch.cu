@@ -60,14 +60,13 @@ __global__ void cuda_launch_density(
 	const int2 *__restrict__ d_block_leaf_id, const int bundle_n_cells,
     const double3 space_dim) {
 
-//  const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
-  //get my block id globally in this kernel
+  /*get my block id globally in this kernel*/
   const int bid = blockIdx.x;
-  //Get my leaf computation id
+  /*Get my leaf computation id to find particle data and cell pos*/
   const int leafid = d_block_leaf_id[bid].x;
-  //Get id of first block working on this leaf.
-  //Needed to figure out which range of parts in cell
-  //this block of GPU threads will work on
+  /*Get id of first block working on this leaf computation*/
+  /*needed to figure out which range of parts in cell*/
+  /*this block of GPU threads will work on*/
   const int bid_0 = d_block_leaf_id[bid].y;
   /* Grab handles for where cells start and end */
   int4 cell_starts_ends_read = d_cell_i_j_start_end[leafid];
@@ -77,120 +76,105 @@ __global__ void cuda_launch_density(
    * in cuda_kernel_density()*/
   const int ci_start = cell_starts_ends_read.x;
   const int ci_end = cell_starts_ends_read.y;
-  /*Find the block id for the first block to work with this leaf computation*/
-  /*TODO: Rempove, probz not required*/
-//  const int n_blocks_this_leaf = ((ci_end - ci_start + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE);
 
-  /*Necessary to prevent out of bounds access
-   * for thread ids above what is necessary to
-   * complete computations*/
-  /*TODO: This is probably no longer necessary so look into removing*/
-  if(leafid < bundle_n_cells){
-    /*Find which block this is within the list of blocks acting on
-     * leaf computation leafid*/
-    const int b_id_local = bid - bid_0;
-    /*Now find the particle this thread needs to work on*/
-    const int pid = b_id_local * GPU_THREAD_BLOCK_SIZE + threadIdx.x + ci_start;
-    /*Assign without accounting for ci/cj_end being the index of cell positions.
-     * This will be accounted for in cuda_kernel_density()*/
-//    const int ci_start = cell_starts_ends_read.x;
-//    const int ci_end = cell_starts_ends_read.y;
-    const int cj_start = cell_starts_ends_read.z;
-    const int cj_end = cell_starts_ends_read.w;
+  /*Find which block this is within the list of thread
+   * blocks acting on leaf computation leafid*/
+  const int b_id_local = bid - bid_0;
+  /*Now find the particle this thread needs to work on*/
+  const int pid = b_id_local * GPU_THREAD_BLOCK_SIZE + threadIdx.x + ci_start;
+  /*Assign without accounting for ci/cj_end being the index of cell positions.
+   * This will be accounted for in cuda_kernel_density()*/
+  //TODO: Edit comment. This is no longer the case, we have conditions in this function preventing entry
+  const int cj_start = cell_starts_ends_read.z;
+  const int cj_end = cell_starts_ends_read.w;
 
-//    const int ci_write_start = cell_starts_ends_write.x;
-//    const int ci_write_end = cell_starts_ends_write.y;
-    const int cj_write_start = cell_starts_ends_write.z;
-    const int cj_write_end = cell_starts_ends_write.w;
-
-    /*First things first. Find the shifts in case we're periodic*/
-    /*Step I: Get the cell positions*/
-    if(ci_end <= 0 || cj_end <= 0){
-      printf("indices smaller than zero ci_end %i cj_end %i\n", ci_end, cj_end);
-    }
-    //TODO: This can also possibly be done with shared memory
-    const struct gpu_cell_pos_d ci_loc = d_parts_send[ci_end - 1].c_loc;
-    const struct gpu_cell_pos_d cj_loc = d_parts_send[cj_end - 1].c_loc;
-
-    double3 shift = {0.0, 0.0, 0.0};
-
-    const double distx = cj_loc.x.x - ci_loc.x.x;
-    const double disty = cj_loc.x.y - ci_loc.x.y;
-    const double distz = cj_loc.x.z - ci_loc.x.z;
-
-    /*Fine for now as thread divergence
-     * will be one (three) line of code*/
-    if(distx < -space_dim.x * 0.5)
-      shift.x = space_dim.x;
-    else if(distx > space_dim.x * 0.5)
-      shift.x = -space_dim.x;
-
-    if(disty < -space_dim.y * 0.5)
-      shift.y = space_dim.y;
-    else if(disty > space_dim.y * 0.5)
-      shift.y = -space_dim.y;
-
-    if(distz < -space_dim.z * 0.5)
-      shift.z = space_dim.z;
-    else if (distz > space_dim.z * 0.5)
-      shift.z = -space_dim.z;
-
-    const double cell_dist = sqrt(distx*distx + disty*disty + distz*distz);
-
-    /*Note: Since shift would be zero for self tasks where ci==cj
-     * this is fine as is to avoid divergence*/
-    const double shift_ix = shift.x + cj_loc.x.x;
-    const double shift_iy = shift.y + cj_loc.x.y;
-    const double shift_iz = shift.z + cj_loc.x.z;
+  const int cj_write_start = cell_starts_ends_write.z;
+  const int cj_write_end = cell_starts_ends_write.w;
 
 
-    //  const double shift_ix = ci_loc.x.x;
-    //  const double shift_iy = ci_loc.x.y;
-    //  const double shift_iz = ci_loc.x.z;
+  if(ci_end <= 0 || cj_end <= 0){
+    printf("indices smaller than zero ci_end %i cj_end %i\n", ci_end, cj_end);
+  }
+  /*First things first. Find the shifts in case we're periodic*/
+  /*Step I: Get the cell positions*/
+  /*TODO: This can possibly be done with shared memory.
+   * Unsure if it will give any speedup though*/
+  const struct gpu_cell_pos_d ci_loc = d_parts_send[ci_end - 1].c_loc;
+  const struct gpu_cell_pos_d cj_loc = d_parts_send[cj_end - 1].c_loc;
 
-    const double3 shift_i_res = {shift_ix, shift_iy, shift_iz};
-    const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
-    /*Interact parts in ci with parts in cj.
-     * Check to see if pid is in-bounds first*/
-    /*Remember that the last index is used to store cell location*/
-    if(pid < ci_end - 1)
-      cuda_kernel_density_p(leafid, d_parts_send, d_parts_recv, d_a, d_H,
+  double3 shift = {0.0, 0.0, 0.0};
+
+  const double distx = cj_loc.x.x - ci_loc.x.x;
+  const double disty = cj_loc.x.y - ci_loc.x.y;
+  const double distz = cj_loc.x.z - ci_loc.x.z;
+
+  /*Fine for now as thread divergence
+   * will be three line of code max*/
+  if(distx < -space_dim.x * 0.5)
+    shift.x = space_dim.x;
+  else if(distx > space_dim.x * 0.5)
+    shift.x = -space_dim.x;
+
+  if(disty < -space_dim.y * 0.5)
+    shift.y = space_dim.y;
+  else if(disty > space_dim.y * 0.5)
+    shift.y = -space_dim.y;
+
+  if(distz < -space_dim.z * 0.5)
+    shift.z = space_dim.z;
+  else if (distz > space_dim.z * 0.5)
+    shift.z = -space_dim.z;
+
+  const double cell_dist = sqrt(distx*distx + disty*disty + distz*distz);
+
+  /*Note: Since shift would be zero for self tasks where ci==cj
+   * this is fine as is to avoid divergence*/
+  const double shift_ix = shift.x + cj_loc.x.x;
+  const double shift_iy = shift.y + cj_loc.x.y;
+  const double shift_iz = shift.z + cj_loc.x.z;
+
+  const double3 shift_i_res = {shift_ix, shift_iy, shift_iz};
+  const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
+  /*Interact parts in ci with parts in cj.
+   * Check to see if pid is in-bounds first*/
+  /*Remember that the last index is used to store cell location, subtract 1 for limit*/
+  if(pid < ci_end - 1)
+    cuda_kernel_density_p(leafid, d_parts_send, d_parts_recv, d_a, d_H,
         cell_starts_ends_read, cell_starts_ends_write,
         space_dim, shift_i_res, shift_j_res, pid);
-    /*Check if this is a self interaction.
-     * If it is, skip as we don't need to re-do computations
-     * We could just let threads do this again to avoid
-     * divergence since we only unpack ci once on host
-     * (for it's ci not the dummy cj used for indexing)*/
-    /*TODO: This needs re-working from host code down.
-     * Self tasks are run with pairs so while threads doing selfs have finished
-     * threads doing pairs will be re-doing comp.s for parts in cell j*/
-    if(ci_start != cj_start){
-      //      printf("Doing cj\n");
-      /*We've done ci with cj, now interact cj with ci*/
-      cell_starts_ends_read.x = cj_start;
-      cell_starts_ends_read.y = cj_end;
-      cell_starts_ends_read.z = ci_start;
-      cell_starts_ends_read.w = ci_end;
-      cell_starts_ends_write.x = cj_write_start;
-      cell_starts_ends_write.y = cj_write_end;
-      //TODO: Un-necesary as we only need to write to cj but leave for now///
-      //      cell_starts_ends_write.z = ci_start;
-      //      cell_starts_ends_write.w = ci_end;
-      const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
-      const double3 shift_jj_res = {shift_ix, shift_iy, shift_iz};
-      /*Find pjd*/
-      /*Now find the particle this thread needs to work on*/
-      const int pjd = b_id_local * GPU_THREAD_BLOCK_SIZE + threadIdx.x + cj_start;
-      ///////////////////////////////////////////////////////////////////////
-      /*Remember that the last index is used to store cell location*/
-      if(pjd < cj_end - 1)
+  /*Check if this is a self interaction.
+   * If it is, skip as we don't need to re-do computations
+   * We could just let threads do this again to avoid
+   * divergence since we only unpack ci once on host
+   * (for it's ci not the dummy cj used for indexing)*/
+  /*TODO: This needs re-working from host code down.
+   * Self tasks are run with pairs so while threads doing selfs have finished
+   * threads doing pairs will be re-doing comp.s for parts in cell j*/
+  if(ci_start != cj_start){
+    //      printf("Doing cj\n");
+    /*We've done ci with cj, now interact cj with ci*/
+    cell_starts_ends_read.x = cj_start;
+    cell_starts_ends_read.y = cj_end;
+    cell_starts_ends_read.z = ci_start;
+    cell_starts_ends_read.w = ci_end;
+    cell_starts_ends_write.x = cj_write_start;
+    cell_starts_ends_write.y = cj_write_end;
+    /*Re-calculate shifts*/
+    const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
+    const double3 shift_jj_res = {shift_ix, shift_iy, shift_iz};
+    /*Now find the particle this thread needs to work on from cell j*/
+    /*TODO: Re-work the kernel so that each thread
+     * only does one particle in cell i or cell j. NOT BOTH.
+     * This code is anticipated to give huge load imbalance
+     * when ci is smaller than cj and vice-versa*/
+    const int pjd = b_id_local * GPU_THREAD_BLOCK_SIZE + threadIdx.x + cj_start;
+    ///////////////////////////////////////////////////////////////////////
+    /*Remember that the last index is used to store cell location*/
+    if(pjd < cj_end - 1)
       cuda_kernel_density_p(leafid, d_parts_send, d_parts_recv, d_a, d_H,
           cell_starts_ends_read, cell_starts_ends_write,
           space_dim, shift_ii_res, shift_jj_res, pjd);
-    }
   }
-//  }
 }
 
 /**
