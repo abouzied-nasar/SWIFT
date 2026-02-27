@@ -177,7 +177,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_c(
 //    }
     d_parts_recv[k + ci_write_start].rho_rhodh_wcount_wcount_dh = res_rho;
     d_parts_recv[k + ci_write_start].rot_vx_div_v = res_rot;
-    d_parts_recv[k + ci_write_start].n_neighbours = n_neighbours;
+//    d_parts_recv[k + ci_write_start].n_neighbours = n_neighbours;
 //    if(n_neighbours > 0)
 //      printf("found %i neigbours\n", n_neighbours);
     n_total += n_neighbours;
@@ -219,7 +219,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
   const float xi = pi.x_h.x - shift_i.x;
   const float yi = pi.x_h.y - shift_i.y;
   const float zi = pi.x_h.z - shift_i.z;
-  const float hi = pi.x_h.w;
+  const float hi = (float)pi.x_h.w;
 
   const float vxi = pi.vx_m.x;
   const float vyi = pi.vx_m.y;
@@ -305,7 +305,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
   const int k = pid - ci_start  + ci_write_start;
   d_parts_recv[k].rho_rhodh_wcount_wcount_dh = res_rho;
   d_parts_recv[k].rot_vx_div_v = res_rot;
-  d_parts_recv[k].n_neighbours = n_neighbours;
+//  d_parts_recv[k].n_neighbours = n_neighbours;
 }
 
 /**

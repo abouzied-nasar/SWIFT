@@ -79,7 +79,7 @@ struct gpu_part_recv_d {
   /*! Particle velocity curl; rot_ux and velocity divergence; div_v */
   float4 rot_vx_div_v;
 
-  int n_neighbours;
+//  int n_neighbours;
 
 #endif
 };

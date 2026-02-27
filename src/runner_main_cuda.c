@@ -245,8 +245,8 @@ void *runner_main_cuda(void *data) {
     /*Some bits for output in case of debug*/
 
     /*Some bits for output in case of debug*/
-    char buf5[20];
-    snprintf(buf5, sizeof(buf5), "t%dr%dstep%d", r->cpuid, engine_rank, step);
+//    char buf5[20];
+//    snprintf(buf5, sizeof(buf5), "t%dr%dstep%d", r->cpuid, engine_rank, step);
 //    FILE *fgpu_steps;
 //    fgpu_steps = fopen(buf5, "w");
     /* TODO: DO WE STILL NEED THIS?? */

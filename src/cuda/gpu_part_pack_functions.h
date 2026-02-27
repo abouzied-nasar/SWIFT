@@ -46,7 +46,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
 
   const struct gpu_part_recv_d *parts_recv = &parts_buffer[unpack_ind];
 
-  int n_total = 0;
+//  int n_total = 0;
   for (int i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
@@ -74,8 +74,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
     float div_v = part_get_div_v(p) + pr.rot_vx_div_v.w;
     part_set_div_v(p, div_v);
 
-    p->N_density += pr.n_neighbours;
-    n_total += pr.n_neighbours;
+//    p->N_density += pr.n_neighbours;
+//    n_total += pr.n_neighbours;
 //    if(pr.n_neighbours > 0)
 //    	message("n_neighbours %i", pr.n_neighbours);
   }
