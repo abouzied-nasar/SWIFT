@@ -148,6 +148,10 @@ __device__ void d_kernel_deval(float u, float *__restrict__ W,
       0.f,  0.f,  0.f,  0.f}; /* 1 < u */
   const float *const coeffs = &kernel_coeffs[ind * (kernel_degree + 1)];
   /* First two terms of the polynomial ... */
+  /*TODO: Change this so that we use local register values
+   * or we load float4 instead of loading these one by one.
+   * ncu showing we are loading coeffs[0-3] one by one from global memeory
+   * INEFFICIENT and needs addressing*/
   float w = coeffs[0] * x + coeffs[1];
   float dw_dx = coeffs[0];
 
