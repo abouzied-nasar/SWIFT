@@ -486,7 +486,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       cu_error =
           cudaMemcpy(&buf->parts_recv_d[0],
                           &buf->d_parts_recv_d[0],
-                          md->count_parts * sizeof(struct gpu_part_recv_d),
+                          md->count_parts_unique * sizeof(struct gpu_part_recv_d),
                           cudaMemcpyDeviceToHost);
   }
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets

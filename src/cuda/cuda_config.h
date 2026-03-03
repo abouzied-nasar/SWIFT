@@ -29,9 +29,9 @@
 
 #define GPU_THREAD_BLOCK_SIZE 32
 
-//#ifndef CUDA_PROFILER
-//#define CUDA_PROFILER
-//#endif
+#ifndef CUDA_PROFILER
+#define CUDA_PROFILER
+#endif
 
 /* Config parameters. */
 /* TODO: DO WE STILL NEED THESE??? */

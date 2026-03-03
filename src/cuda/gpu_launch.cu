@@ -178,6 +178,99 @@ __global__ void cuda_launch_density(
 }
 
 /**
+ * @brief Call the particle SPH density kernel.
+ *
+ * @param d_parts_send array on device containing particle data
+ * @param d_parts_recv array on device to write results into
+ * @param d_a current cosmological scale factor
+ * @param d_H current Hubble constant
+ * @param bundle_first_part index of first particle of this bundle in the
+ * d_parts_* arrays
+ * @param bundle_n_parts nr of particles in this bundle
+ */
+__global__ void cuda_launch_reduce_d(
+    const struct gpu_part_send_d *__restrict__ d_parts_send,
+    struct gpu_part_recv_d *__restrict__ d_parts_recv, const float d_a,
+    const float d_H,
+    const int4 *__restrict__ d_cell_i_j_start_end, const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
+    const int2 *__restrict__ d_block_leaf_id, const int bundle_n_cells,
+    const double3 space_dim) {
+
+//  /*get my block id globally in this kernel*/
+//  const int bid = blockIdx.x;
+//  /*Get my leaf computation id to find particle data and cell pos*/
+//  const int leafid = d_block_leaf_id[bid].x;
+//  /*Get id of first block working on this leaf computation*/
+//  /*needed to figure out which range of parts in cell*/
+//  /*this block of GPU threads will work on*/
+//  const int bid_0 = d_block_leaf_id[bid].y;
+//  /* Grab handles for where cells start and end */
+//  /*Nota bene, here we read from partial sums (non-unique entries) and write to unique data*/
+//  int4 cell_starts_ends_read = d_cell_i_j_start_end_non_compact[leafid];
+//  int4 cell_starts_ends_write = d_cell_i_j_start_end[leafid];
+//  /*Assign without accounting for ci/cj_end being the
+//   * index of cell positions. This will be accounted for
+//   * in cuda_kernel_density()*/
+//  const int ci_start = cell_starts_ends_read.x;
+//  const int ci_end = cell_starts_ends_read.y;
+//
+//  /*Find which block this is within the list of thread
+//   * blocks acting on leaf computation leafid*/
+//  const int b_id_local = bid - bid_0;
+//  /*Now find the particle this thread needs to work on*/
+//  const int pid = b_id_local * GPU_THREAD_BLOCK_SIZE + threadIdx.x + ci_start;
+//  /*Assign without accounting for ci/cj_end being the index of cell positions.
+//   * This will be accounted for in cuda_kernel_density()*/
+//  //TODO: Edit comment. This is no longer the case, we have conditions in this function preventing entry
+//  const int cj_start = cell_starts_ends_read.z;
+//  const int cj_end = cell_starts_ends_read.w;
+//
+//  const int cj_write_start = cell_starts_ends_write.z;
+//  const int cj_write_end = cell_starts_ends_write.w;
+//
+//  /*Interact parts in ci with parts in cj.
+//   * Check to see if pid is in-bounds first*/
+//  /*Remember that the last index is used to store cell location, subtract 1 for limit*/
+//  if(pid < ci_end - 1)
+//    cuda_kernel_density_p(leafid, d_parts_send, d_parts_recv, d_a, d_H,
+//        cell_starts_ends_read, cell_starts_ends_write,
+//        space_dim, shift_i_res, shift_j_res, pid);
+//  /*Check if this is a self interaction.
+//   * If it is, skip as we don't need to re-do computations
+//   * We could just let threads do this again to avoid
+//   * divergence since we only unpack ci once on host
+//   * (for it's ci not the dummy cj used for indexing)*/
+//  /*TODO: This needs re-working from host code down.
+//   * Self tasks are run with pairs so while threads doing selfs have finished
+//   * threads doing pairs will be re-doing comp.s for parts in cell j*/
+//  if(ci_start != cj_start){
+//    //      printf("Doing cj\n");
+//    /*We've done ci with cj, now interact cj with ci*/
+//    cell_starts_ends_read.x = cj_start;
+//    cell_starts_ends_read.y = cj_end;
+//    cell_starts_ends_read.z = ci_start;
+//    cell_starts_ends_read.w = ci_end;
+//    cell_starts_ends_write.x = cj_write_start;
+//    cell_starts_ends_write.y = cj_write_end;
+//    /*Re-calculate shifts*/
+//    const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
+//    const double3 shift_jj_res = {shift_ix, shift_iy, shift_iz};
+//    /*Now find the particle this thread needs to work on from cell j*/
+//    /*TODO: Re-work the kernel so that each thread
+//     * only does one particle in cell i or cell j. NOT BOTH.
+//     * This code is anticipated to give huge load imbalance
+//     * when ci is smaller than cj and vice-versa*/
+//    const int pjd = b_id_local * GPU_THREAD_BLOCK_SIZE + threadIdx.x + cj_start;
+//    ///////////////////////////////////////////////////////////////////////
+//    /*Remember that the last index is used to store cell location*/
+//    if(pjd < cj_end - 1)
+//      cuda_kernel_density_p(leafid, d_parts_send, d_parts_recv, d_a, d_H,
+//          cell_starts_ends_read, cell_starts_ends_write,
+//          space_dim, shift_ii_res, shift_jj_res, pjd);
+//  }
+}
+
+/**
  * @brief Call the particle SPH gradient kernel.
  *
  * @param d_parts_send array on device containing particle data

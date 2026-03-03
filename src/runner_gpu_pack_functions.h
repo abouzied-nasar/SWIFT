@@ -394,6 +394,89 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
 }
 
 /**
+ * @brief Generic function to unpack data received from the GPU depending on
+ * the task subtype.
+ *
+ * @param r the #runner
+ * @param s the #scheduler
+ * @param buf the particle data buffers
+ * @param npacked how many (pairs of) leaf cells have been packed during the
+ * current pair task offloading call. May differ from the total number of
+ * packed leaf cell pairs if there have been leftover leaf cell pairs from a
+ * previous task.
+ * @param task_subtype this task's subtype
+ */
+__attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
+    const struct runner *r, struct scheduler *s,
+    struct gpu_offload_data *restrict buf, const int npacked,
+    const enum task_subtypes task_subtype) {
+
+  /* Grab handles */
+  struct gpu_pack_metadata *md = &buf->md;
+  const struct engine *e = r->e;
+
+  /* Keep track which tasks in our list we've unpacked already */
+  char *task_unpacked = malloc(md->tasks_in_list * sizeof(char));
+  for (int i = 0; i < md->tasks_in_list; i++) task_unpacked[i] = 0;
+  int ntasks_unpacked = 0;
+
+  /*Let's unpack the unique particle data first.
+   * We get on to enqueueing dependencies after this*/
+  int unpack_index = 0;
+  for(int i = 0; i < md->n_unique; i++){
+    struct cell * c = md->unique_cells[i];
+    const int count = c->hydro.count;
+    while(cell_locktree(c));
+    gpu_unpack_part_density(c, buf->parts_recv_d, unpack_index,
+                            count, e);
+    unpack_index += count + 1;
+    cell_unlocktree(c);
+  }
+
+  while (ntasks_unpacked < md->tasks_in_list) {
+
+    /* Loop over all tasks that we have offloaded */
+    for (int tid = 0; tid < md->tasks_in_list; tid++) {
+
+      /* Anything to do here? */
+      if (task_unpacked[tid]) continue;
+
+      /* We got it! Mark that. */
+      task_unpacked[tid] = 1;
+      ntasks_unpacked++;
+
+      /* If we haven't finished packing the currently handled task's leaf cells,
+       * we mustn't unlock its dependencies yet. ("Currently handled task" is
+       * the one for which the offloading cycle is currently underway in
+       * runner_gpu_pack_and_launch) */
+      if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves)) {
+        continue;
+      }
+
+      /* If we're here, we're completely done with this task. Mark it as
+       * completed. */
+
+      /* schedule my dependencies */
+      enqueue_dependencies(s, md->task_list[tid]);
+
+      /* Tell the scheduler's bookkeeping that this task is done */
+      pthread_mutex_lock(&s->sleep_mutex);
+      atomic_dec(&s->waiting);
+      pthread_cond_broadcast(&s->sleep_cond);
+      pthread_mutex_unlock(&s->sleep_mutex);
+
+      /* Mark the task as done. */
+      md->task_list[tid]->skip = 1;
+      md->task_list[tid]->done = 1;
+
+    } /* Loop over tasks in list */
+  } /* While there are unpacked tasks */
+
+  /* clean up after yourself */
+  free(task_unpacked);
+}
+
+/**
  * @brief Wrapper to pack data for density tasks on the GPU.
  */
 __attribute__((always_inline)) INLINE static void runner_gpu_pack_density(

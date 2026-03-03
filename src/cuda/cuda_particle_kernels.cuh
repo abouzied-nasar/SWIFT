@@ -303,8 +303,17 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
   /*We have out-of-bounds barrier (if statement in calling functionm) to ensure we don't try
    * to write outside of this cell's partice range*/
   const int k = pid - ci_start  + ci_write_start;
-  d_parts_recv[k].rho_rhodh_wcount_wcount_dh = res_rho;
-  d_parts_recv[k].rot_vx_div_v = res_rot;
+//  d_parts_recv[k].rho_rhodh_wcount_wcount_dh = res_rho;
+//  d_parts_recv[k].rot_vx_div_v = res_rot;
+  /*Testing if atomics really slow things down*/
+  atomicAdd(&d_parts_recv[pid].rho_rhodh_wcount_wcount_dh.x, res_rho.x);
+  atomicAdd(&d_parts_recv[pid].rho_rhodh_wcount_wcount_dh.y, res_rho.y);
+  atomicAdd(&d_parts_recv[pid].rho_rhodh_wcount_wcount_dh.z, res_rho.z);
+  atomicAdd(&d_parts_recv[pid].rho_rhodh_wcount_wcount_dh.w, res_rho.w);
+  atomicAdd(&d_parts_recv[pid].rot_vx_div_v.x, res_rot.x);
+  atomicAdd(&d_parts_recv[pid].rot_vx_div_v.y, res_rot.y);
+  atomicAdd(&d_parts_recv[pid].rot_vx_div_v.z, res_rot.z);
+  atomicAdd(&d_parts_recv[pid].rot_vx_div_v.w, res_rot.w);
 //  d_parts_recv[k].n_neighbours = n_neighbours;
 }
 
