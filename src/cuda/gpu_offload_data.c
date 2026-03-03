@@ -156,7 +156,7 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
   const struct gpu_global_pack_params pars = buf->md.params;
   const struct gpu_pack_metadata md = buf->md;
 
-  const n_blocks = pars->part_buffer_size/GPU_THREAD_BLOCK_SIZE;
+  const int n_blocks = pars.part_buffer_size/GPU_THREAD_BLOCK_SIZE;
 
   memset(buf->parts_send_d, 0, pars.part_buffer_size * md.send_struct_size);
   memset(buf->parts_recv_d, 0, pars.part_buffer_size * md.recv_struct_size);

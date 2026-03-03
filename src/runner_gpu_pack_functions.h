@@ -415,35 +415,24 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
   struct gpu_pack_metadata *md = &buf->md;
   const struct engine *e = r->e;
 
-  /* Keep track which tasks in our list we've unpacked already */
-  char *task_unpacked = malloc(md->tasks_in_list * sizeof(char));
-  for (int i = 0; i < md->tasks_in_list; i++) task_unpacked[i] = 0;
-  int ntasks_unpacked = 0;
-
   /*Let's unpack the unique particle data first.
    * We get on to enqueueing dependencies after this*/
   int unpack_index = 0;
   for(int i = 0; i < md->n_unique; i++){
     struct cell * c = md->unique_cells[i];
     const int count = c->hydro.count;
-    while(cell_locktree(c));
+    while(cell_locktree(c)){
+      ;
+    }
     gpu_unpack_part_density(c, buf->parts_recv_d, unpack_index,
                             count, e);
     unpack_index += count + 1;
     cell_unlocktree(c);
   }
 
-  while (ntasks_unpacked < md->tasks_in_list) {
 
     /* Loop over all tasks that we have offloaded */
     for (int tid = 0; tid < md->tasks_in_list; tid++) {
-
-      /* Anything to do here? */
-      if (task_unpacked[tid]) continue;
-
-      /* We got it! Mark that. */
-      task_unpacked[tid] = 1;
-      ntasks_unpacked++;
 
       /* If we haven't finished packing the currently handled task's leaf cells,
        * we mustn't unlock its dependencies yet. ("Currently handled task" is
@@ -470,10 +459,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
       md->task_list[tid]->done = 1;
 
     } /* Loop over tasks in list */
-  } /* While there are unpacked tasks */
-
-  /* clean up after yourself */
-  free(task_unpacked);
 }
 
 /**
@@ -543,7 +528,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_density(
 
   TIMER_TIC;
 
-  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_density);
+  runner_gpu_unpack_pre_sorted(r, s, buf, npacked, task_subtype_gpu_density);
 
   if (buf->md.is_pair_task)
     TIMER_TOC(timer_dopair_gpu_unpack_d);
