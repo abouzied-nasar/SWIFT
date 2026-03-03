@@ -339,10 +339,10 @@ void gpu_launch_density(const struct gpu_part_send_d *__restrict__ d_parts_send,
                         const int4 *__restrict__ d_cell_i_j_start_end,
                         const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
                         const int2 *__restrict__ d_block_leaf_id,
-                        const int bundle_n_cells, const double3 space_dim) {
+                        const int bundle_n_cells, const double3 space_dim, cudaStream_t stream) {
 
   /* TODO: Do we want to allocate shared memory here? */
-  cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0>>>(
+  cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H,
       d_cell_i_j_start_end, d_cell_i_j_start_end_non_compact,
 	  d_block_leaf_id, bundle_n_cells, space_dim);

@@ -434,10 +434,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   /* Transfer particle data to device */
   if (task_subtype == task_subtype_gpu_density){
       cu_error =
-          cudaMemcpy(&buf->d_parts_send_d[0],
+          cudaMemcpyAsync(&buf->d_parts_send_d[0],
             &buf->parts_send_d[0],
             md->count_parts_unique * sizeof(struct gpu_part_send_d),
-            cudaMemcpyHostToDevice);
+            cudaMemcpyHostToDevice, stream[0]);
       if (cu_error != cudaSuccess) {
         /* If we're here, assume something's messed up with our code, not with
          * CUDA. */
@@ -445,7 +445,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
             "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i ",
             cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
       }
-      cu_error = cudaMemset(&buf->d_parts_recv_d[0], 0, md->count_parts_unique * 8 * sizeof(float));
+      cu_error = cudaMemsetAsync(&buf->d_parts_recv_d[0], 0, md->count_parts_unique * 8 * sizeof(float), stream[0]);
       if (cu_error != cudaSuccess) {
         /* If we're here, assume something's messed up with our code, not with
          * CUDA. */
@@ -457,20 +457,20 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
          * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
          * instead of n_bundle copies */
       cu_error =
-          cudaMemcpy(&buf->gpu_md.d_cell_i_j_start_end[0],
+          cudaMemcpyAsync(&buf->gpu_md.d_cell_i_j_start_end[0],
             &buf->gpu_md.cell_i_j_start_end[0],
             leaves_packed * sizeof(int4),
-            cudaMemcpyHostToDevice);
+            cudaMemcpyHostToDevice, stream[0]);
       cu_error =
-          cudaMemcpy(&buf->gpu_md.d_cell_i_j_start_end_non_compact[0],
+          cudaMemcpyAsync(&buf->gpu_md.d_cell_i_j_start_end_non_compact[0],
             &buf->gpu_md.cell_i_j_start_end_non_compact[0],
             leaves_packed * sizeof(int4),
-            cudaMemcpyHostToDevice);
+            cudaMemcpyHostToDevice, stream[0]);
       cu_error =
-          cudaMemcpy(&buf->gpu_md.d_block_leaf_id[0],
+          cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id[0],
             &buf->gpu_md.block_leaf_id[0],
             md->n_blocks_packed * sizeof(int2),
-            cudaMemcpyHostToDevice);
+            cudaMemcpyHostToDevice, stream[0]);
       if (cu_error != cudaSuccess) {
         /* If we're here, assume something's messed up with our code, not with
          * CUDA. */
@@ -489,13 +489,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 			  gpu_md->d_cell_i_j_start_end,
 			  gpu_md->d_cell_i_j_start_end_non_compact,
 			  gpu_md->d_block_leaf_id,
-			  bundle_n_cells, space_dim);
+			  bundle_n_cells, space_dim, stream[0]);
       /* Copy results back to CPU BUFFERS */
       cu_error =
-          cudaMemcpy(&buf->parts_recv_d[0],
+          cudaMemcpyAsync(&buf->parts_recv_d[0],
                           &buf->d_parts_recv_d[0],
                           md->count_parts_unique * sizeof(struct gpu_part_recv_d),
-                          cudaMemcpyDeviceToHost);
+                          cudaMemcpyDeviceToHost, stream[0]);
+      cu_error =
+          cudaStreamSynchronize(stream[0]);
   }
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
    * its own stream. */
