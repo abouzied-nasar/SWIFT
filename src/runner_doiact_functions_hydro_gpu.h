@@ -878,7 +878,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       /* Record that we have now packed a new leaf cell (pair) & increment number
        * of leaf cells to offload */
       md->n_leaves_packed++;
-      TIMER_TOC(timer_dopair_gpu_pack_d);
+      if (buf->md.is_pair_task)
+        TIMER_TOC(timer_dopair_gpu_pack_d);
+      else
+        TIMER_TOC(timer_doself_gpu_pack_d);
     }
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -930,7 +933,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           gpu_md->cell_i_j_start_end[i].w = md->unique_start_end[index_j].y;
 
         }
-        TIMER_TOC(timer_dopair_gpu_pack_d);
+        if (buf->md.is_pair_task)
+          TIMER_TOC(timer_dopair_gpu_pack_d);
+        else
+          TIMER_TOC(timer_doself_gpu_pack_d);
 
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
