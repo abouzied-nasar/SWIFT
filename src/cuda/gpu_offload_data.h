@@ -92,15 +92,8 @@ struct gpu_offload_data {
 	 * read from in the compact particle buffer (with no
 	 * duplicate data)*/
     int4 *cell_i_j_start_end;
-    /*This contains the indices of where GPU threads should
-	 * write to to avoid race conditions on the GPU
-	 * TODO: Do reduction on GPU to avoid sending back lots
-	 *  of data to CPU*/
-    int4 *cell_i_j_start_end_non_compact;
     /*Allocate device copies*/
     int4 *d_cell_i_j_start_end;
-    int4 *d_cell_i_j_start_end_non_compact;
-
     /*This array is used to tell each cuda block
      * which leaf computation it should work on and the id
      * of the first cuda block which will work on this leaf computation*/
