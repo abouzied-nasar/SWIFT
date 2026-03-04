@@ -841,7 +841,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
          * cells i and j are the same cell here but use the same
          * function as for the pairs*/
         runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
-      }else{/*This is a self task*/
+      }else{/*This is a pair task*/
         /*Get indices for where we unpack to*/
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].x = md->count_parts;
         gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].y = md->count_parts + cii_count;
