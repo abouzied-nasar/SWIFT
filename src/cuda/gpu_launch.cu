@@ -56,8 +56,7 @@ __global__ void cuda_launch_density(
     const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv, const float d_a,
     const float d_H,
-    const int4 *__restrict__ d_cell_i_j_start_end, const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
-	const int2 *__restrict__ d_block_leaf_id, const int bundle_n_cells,
+    const int4 *__restrict__ d_cell_i_j_start_end,	const int2 *__restrict__ d_block_leaf_id,
     const double3 space_dim) {
 
   /*get my block id globally in this kernel*/
@@ -70,7 +69,6 @@ __global__ void cuda_launch_density(
   const int bid_0 = d_block_leaf_id[bid].y;
   /* Grab handles for where cells start and end */
   int4 cell_starts_ends_read = d_cell_i_j_start_end[leafid];
-  int4 cell_starts_ends_write = d_cell_i_j_start_end_non_compact[leafid];
   /*Assign without accounting for ci/cj_end being the
    * index of cell positions. This will be accounted for
    * in cuda_kernel_density()*/
@@ -87,10 +85,6 @@ __global__ void cuda_launch_density(
   //TODO: Edit comment. This is no longer the case, we have conditions in this function preventing entry
   const int cj_start = cell_starts_ends_read.z;
   const int cj_end = cell_starts_ends_read.w;
-
-  const int cj_write_start = cell_starts_ends_write.z;
-  const int cj_write_end = cell_starts_ends_write.w;
-
 
   if(ci_end <= 0 || cj_end <= 0){
     printf("indices smaller than zero ci_end %i cj_end %i\n", ci_end, cj_end);
@@ -140,8 +134,7 @@ __global__ void cuda_launch_density(
   /*Remember that the last index is used to store cell location, subtract 1 for limit*/
   if(pid < ci_end - 1)
     cuda_kernel_density_p(leafid, d_parts_send, d_parts_recv, d_a, d_H,
-        cell_starts_ends_read, cell_starts_ends_write,
-        space_dim, shift_i_res, shift_j_res, pid);
+        cell_starts_ends_read, space_dim, shift_i_res, shift_j_res, pid);
   /*Check if this is a self interaction.
    * If it is, skip as we don't need to re-do computations
    * We could just let threads do this again to avoid
@@ -157,8 +150,6 @@ __global__ void cuda_launch_density(
     cell_starts_ends_read.y = cj_end;
     cell_starts_ends_read.z = ci_start;
     cell_starts_ends_read.w = ci_end;
-    cell_starts_ends_write.x = cj_write_start;
-    cell_starts_ends_write.y = cj_write_end;
     /*Re-calculate shifts*/
     const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
     const double3 shift_jj_res = {shift_ix, shift_iy, shift_iz};
@@ -172,8 +163,7 @@ __global__ void cuda_launch_density(
     /*Remember that the last index is used to store cell location*/
     if(pjd < cj_end - 1)
       cuda_kernel_density_p(leafid, d_parts_send, d_parts_recv, d_a, d_H,
-          cell_starts_ends_read, cell_starts_ends_write,
-          space_dim, shift_ii_res, shift_jj_res, pjd);
+          cell_starts_ends_read, space_dim, shift_ii_res, shift_jj_res, pjd);
   }
 }
 
@@ -337,15 +327,13 @@ void gpu_launch_density(const struct gpu_part_send_d *__restrict__ d_parts_send,
                         const float d_a, const float d_H,
                         const int num_blocks_x,
                         const int4 *__restrict__ d_cell_i_j_start_end,
-                        const int4 *__restrict__ d_cell_i_j_start_end_non_compact,
                         const int2 *__restrict__ d_block_leaf_id,
-                        const int bundle_n_cells, const double3 space_dim, cudaStream_t stream) {
+                        const double3 space_dim, cudaStream_t stream) {
 
   /* TODO: Do we want to allocate shared memory here? */
   cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H,
-      d_cell_i_j_start_end, d_cell_i_j_start_end_non_compact,
-	  d_block_leaf_id, bundle_n_cells, space_dim);
+      d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
 
 /**

@@ -433,39 +433,37 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
   /* Transfer particle data to device */
   if (task_subtype == task_subtype_gpu_density){
+
+    /*What's gone and what's past help. Should be past grief
+     *
+     *Re-set sums to zero on GPU before launching kernel*/
+    cu_error =
+        cudaMemsetAsync(&buf->d_parts_recv_d[0],
+        0, md->count_parts_unique * 8 * sizeof(float),
+        stream[0]);
+    if (cu_error != cudaSuccess) {
+      /* If we're here, assume something's messed up with our code, not with
+       * CUDA. */
+      error(
+          "CUDA memset: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
+    }
+      /*Give to a gracious message a host of tongues
+       *
+       * Copy the unique particle data to the GPU*/
       cu_error =
           cudaMemcpyAsync(&buf->d_parts_send_d[0],
             &buf->parts_send_d[0],
             md->count_parts_unique * sizeof(struct gpu_part_send_d),
             cudaMemcpyHostToDevice, stream[0]);
-      if (cu_error != cudaSuccess) {
-        /* If we're here, assume something's messed up with our code, not with
-         * CUDA. */
-        error(
-            "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i ",
-            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
-      }
-      cu_error = cudaMemsetAsync(&buf->d_parts_recv_d[0], 0, md->count_parts_unique * 8 * sizeof(float), stream[0]);
-      if (cu_error != cudaSuccess) {
-        /* If we're here, assume something's messed up with our code, not with
-         * CUDA. */
-        error(
-            "CUDA memset: CUDA error '%s' for task_subtype %s: cpuid=%i ",
-            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
-      }
-        /*Copy the tasks cell start/end metadata to the GPU. Send it using regular streams for now.
-         * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
-         * instead of n_bundle copies */
+      /*Copy the tasks' metadata to the GPU. Send it using stream[0] for now. N.B. this is not default stream ;).
+         * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens*/
       cu_error =
           cudaMemcpyAsync(&buf->gpu_md.d_cell_i_j_start_end[0],
             &buf->gpu_md.cell_i_j_start_end[0],
             leaves_packed * sizeof(int4),
             cudaMemcpyHostToDevice, stream[0]);
-      cu_error =
-          cudaMemcpyAsync(&buf->gpu_md.d_cell_i_j_start_end_non_compact[0],
-            &buf->gpu_md.cell_i_j_start_end_non_compact[0],
-            leaves_packed * sizeof(int4),
-            cudaMemcpyHostToDevice, stream[0]);
+      /*Finally copy the metadata to GPU telling each cuda block what sections of the unique particle data to work on.*/
       cu_error =
           cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id[0],
             &buf->gpu_md.block_leaf_id[0],
@@ -478,24 +476,30 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
             "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i ",
             cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
       }
-      /* Get the cell count for this bundle */
-      const int bundle_n_cells = leaves_packed;
-//      const int num_blocks_x_cells =
-//          (bundle_n_cells + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
-      const int n_blocks_parts = md->n_blocks_packed;
+      /*Number of cuda blocks we need to launch*/
+      const int n_blocks = md->n_blocks_packed;
+
+      /*Once more unto the breach dear friends, once more!
+       *
+       *Issue instruction to launch GPU computations*/
       gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
-              n_blocks_parts,
+              n_blocks,
 			  gpu_md->d_cell_i_j_start_end,
-			  gpu_md->d_cell_i_j_start_end_non_compact,
-			  gpu_md->d_block_leaf_id,
-			  bundle_n_cells, space_dim, stream[0]);
-      /* Copy results back to CPU BUFFERS */
+			  gpu_md->d_block_leaf_id, space_dim, stream[0]);
+
+      /*Full circle.
+       *
+       *  Copy results back to CPU BUFFERS */
       cu_error =
           cudaMemcpyAsync(&buf->parts_recv_d[0],
                           &buf->d_parts_recv_d[0],
                           md->count_parts_unique * sizeof(struct gpu_part_recv_d),
                           cudaMemcpyDeviceToHost, stream[0]);
+
+      /*All things are ready, if our mind be so...
+       *
+       * Synchronise with CPU before moving on*/
       cu_error =
           cudaStreamSynchronize(stream[0]);
   }
@@ -657,14 +661,34 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_density(
     const struct runner *r, struct gpu_offload_data *restrict buf,
     cudaStream_t *stream, const float d_a, const float d_H) {
 
+  /*Expand the start/end list from only the unique_start_end array into
+   * the full metadata required by GPU threads.
+   * This counts as packing but can only be done once we're ready to launch*/
+  const struct gpu_pack_metadata *md = &buf->md;
+  struct gpu_md *gpu_md = &buf->gpu_md;
+  /*Use tic for packing and tic2 for launch timing*/
   TIMER_TIC;
+  for(int i = 0; i < md->n_leaves_packed; i++){
+    int index_i = md->my_index[i].x;
+    int index_j = md->my_index[i].y;
+    gpu_md->cell_i_j_start_end[i].x = md->unique_start_end[index_i].x;
+    gpu_md->cell_i_j_start_end[i].y = md->unique_start_end[index_i].y;
+    gpu_md->cell_i_j_start_end[i].z = md->unique_start_end[index_j].x;
+    gpu_md->cell_i_j_start_end[i].w = md->unique_start_end[index_j].y;
+  }
+  if (md->is_pair_task)
+    TIMER_TOC(timer_dopair_gpu_pack_d);
+  else
+    TIMER_TOC(timer_doself_gpu_pack_d);
+
+  TIMER_TIC2;
 
   runner_gpu_launch(r, buf, stream, d_a, d_H, task_subtype_gpu_density);
 
   if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_launch_d);
+    TIMER_TOC2(timer_dopair_gpu_launch_d);
   else
-    TIMER_TOC(timer_doself_gpu_launch_d);
+    TIMER_TOC2(timer_doself_gpu_launch_d);
 }
 
 /**
@@ -816,59 +840,50 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     if(t->subtype == task_subtype_gpu_density){
       TIMER_TIC;
       if(cii == cjj){
-        /*Get indices for where we unpack to*/
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].x = md->count_parts;
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].y = md->count_parts + cii_count;
-        //TODO: Add a debug check in unpacking to make sure we never touch this!
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].z = -1;
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].w = -1;
-
+        /*How many blocks have we packed so far?
+         * Each cell is split into count/BS chunks so that
+         * multiple cuda blocks work on particles in same cell if cell is big enough*/
         const int n_blocks_packed = md->n_blocks_packed;
+        /*How many blocks will the current cell be split into*/
         const int n_blocks_current = (cii_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+        /*Let the cuda blocks know what parts of the data we send they need to work on*/
         for(int b = 0; b < n_blocks_current; b++){
-        	/*TODO: FIX THIS -> This is running over the limit
-        	 * somehow and writing to other members of gpu_md*/
+        	/*Which leaf computation will this block work on?*/
         	gpu_md->block_leaf_id[n_blocks_packed + b].x = n_leaves_packed;
-        	/*Save the id of the first block acting on this leaf comp.*/
+        	/*Save the id of the first block acting on this leaf comp.
+        	 * Needed for indexing in kernel*/
         	gpu_md->block_leaf_id[n_blocks_packed + b].y = n_blocks_packed;
         }
+        /*Check to see we've not somehow gone over the number of blocks we allocated*/
+        /*TODO: Put in debug checks ifdef. Leave for now while dev'ing*/
+        ///////////////////////////////////////////////////////////////////////
         int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
         md->n_blocks_packed += n_blocks_current;
         if(md->n_blocks_packed > n_blocks_max)
         	error("exceeded n_block_max");
-
+        ///////////////////////////////////////////////////////////////////////
         /* Test to see if cells i and j have already been packed
          * cells i and j are the same cell here but use the same
          * function as for the pairs*/
         runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
       }else{/*This is a pair task*/
-        /*Get indices for where we unpack to*/
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].x = md->count_parts;
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].y = md->count_parts + cii_count;
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].z = md->count_parts + cii_count;
-        gpu_md->cell_i_j_start_end_non_compact[n_leaves_packed].w = md->count_parts + cii_count + cjj_count;
-
+        /*Same logic as self tasks. See comments above*/
         const int n_blocks_packed = md->n_blocks_packed;
         const int n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
         for(int b = 0; b < n_blocks_current; b++){
-        	/*TODO: FIX THIS -> This is running over the limit
-        	 * somehow and writing to other members of gpu_md*/
         	gpu_md->block_leaf_id[n_blocks_packed + b].x = n_leaves_packed;
-        	/*Save the id of the first block acting on this leaf comp.*/
         	gpu_md->block_leaf_id[n_blocks_packed + b].y = n_blocks_packed;
         }
         int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
         md->n_blocks_packed += n_blocks_current;
         if(md->n_blocks_packed > n_blocks_max)
         	error("exceeded n_block_max");
-
         /* Test to see if cells i and j have already been packed.
-         * If not, pack them, increment counters and create an
+         * If not, pack them, increment unique cell counters and create an
          * index for them in metadata*/
         runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
       }
-      /* Now finish up the bookkeeping. */
-
+      /* Now finish up bookkeeping*/
       /* Update incremented pack length accordingly */
       if (cii == cjj) {
         /* We packed a self interaction */
@@ -921,25 +936,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         (md->launch_leftovers && (npacked == md->task_n_leaves))) {
 
       if (t->subtype == task_subtype_gpu_density) {
-        /*Expand the start/end list from only the unique_start_end array into
-         * the full metadata required by GPU threads*/
-    	/*TODO: Move into launch function*/
-        TIMER_TIC;
-        for(int i = 0; i < md->n_leaves_packed; i++){
-
-          int index_i = md->my_index[i].x;
-          int index_j = md->my_index[i].y;
-          gpu_md->cell_i_j_start_end[i].x = md->unique_start_end[index_i].x;
-          gpu_md->cell_i_j_start_end[i].y = md->unique_start_end[index_i].y;
-          gpu_md->cell_i_j_start_end[i].z = md->unique_start_end[index_j].x;
-          gpu_md->cell_i_j_start_end[i].w = md->unique_start_end[index_j].y;
-
-        }
-        if (buf->md.is_pair_task)
-          TIMER_TOC(timer_dopair_gpu_pack_d);
-        else
-          TIMER_TOC(timer_doself_gpu_pack_d);
-
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
 

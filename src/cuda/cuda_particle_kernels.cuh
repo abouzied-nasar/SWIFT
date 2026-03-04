@@ -201,7 +201,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
     int cid, const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv, float d_a, float d_H,
     const int4 __restrict__ cell_starts_ends_read,
-    const int4 __restrict__ cell_starts_ends_write,
 	const double3 space_dim, const double3 shift_i, const double3 shift_j, const int pid) {
 
   /*TODO:These could and should be shared variables.
@@ -212,8 +211,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
   const int cj_start = cell_starts_ends_read.z;
   const int cj_end = cell_starts_ends_read.w - 1;
 
-  const int ci_write_start = cell_starts_ends_write.x;
-  const int ci_write_end = cell_starts_ends_write.y;
   int n_total = 0;
   const struct gpu_part_data_d pi = d_parts_send[pid].p_data;
   const float xi = pi.x_h.x - shift_i.x;
@@ -295,16 +292,10 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
       res_rot.z += faci * curlvrz;
       res_rot.w -= faci * dvdr;
 	}
-  } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
+  } /*Loop through parts in cell j*/
   /* Write results. */
-  /*k is the index of the particle we want to write to within this
-   * cell starting from zero so we need to subtract ci_read_start from pid and
-   * add it to ci_write_start*/
-  /*We have out-of-bounds barrier (if statement in calling functionm) to ensure we don't try
+  /*We have out-of-bounds barrier (if statement in calling function) to ensure we don't try
    * to write outside of this cell's partice range*/
-  const int k = pid - ci_start  + ci_write_start;
-//  d_parts_recv[k].rho_rhodh_wcount_wcount_dh = res_rho;
-//  d_parts_recv[k].rot_vx_div_v = res_rot;
   /*Testing if atomics really slow things down*/
   atomicAdd(&d_parts_recv[pid].rho_rhodh_wcount_wcount_dh.x, res_rho.x);
   atomicAdd(&d_parts_recv[pid].rho_rhodh_wcount_wcount_dh.y, res_rho.y);
@@ -314,7 +305,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
   atomicAdd(&d_parts_recv[pid].rot_vx_div_v.y, res_rot.y);
   atomicAdd(&d_parts_recv[pid].rot_vx_div_v.z, res_rot.z);
   atomicAdd(&d_parts_recv[pid].rot_vx_div_v.w, res_rot.w);
-//  d_parts_recv[k].n_neighbours = n_neighbours;
 }
 
 /**
