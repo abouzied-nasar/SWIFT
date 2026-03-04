@@ -146,7 +146,8 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
   const struct gpu_global_pack_params pars = buf->md.params;
   const struct gpu_pack_metadata md = buf->md;
 
-  const int n_blocks = pars.part_buffer_size/GPU_THREAD_BLOCK_SIZE;
+  /*A rough estimate of how many CUDA blocks we will need to process part_buffer_size*/
+  const int n_blocks = (pars.part_buffer_size + GPU_THREAD_BLOCK_SIZE -1)/GPU_THREAD_BLOCK_SIZE;
 
   memset(buf->parts_send_d, 0, pars.part_buffer_size * md.send_struct_size);
   memset(buf->parts_recv_d, 0, pars.part_buffer_size * md.recv_struct_size);
@@ -159,7 +160,8 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
    * Index y corresponds to the block id of the first cuda block working on that leaf comp*/
   memset(buf->gpu_md.block_leaf_id, 0, sizeof(int2) * n_blocks);
 
-  /* Can't do this from the host side, would need to launch cuda kernel */
+  /* Can't do this from the host side, would need to launch cuda kernel
+   * TODO: We can, cudaMemSet() would do the trick*/
   /* bzero(buf->d_parts_recv_d, pars.part_buffer_size *
    * sizeof(md.send_struct_size)); */
   /* bzero(buf->d_parts_send_d, pars.part_buffer_size) *

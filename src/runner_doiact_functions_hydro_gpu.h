@@ -203,15 +203,7 @@ static void runner_doself_gpu_recurse(const struct runner *r,
   if (timer) TIMER_TOC(timer_doself_gpu_recurse);
 }
 
-bool is_unique(const struct cell *cii, struct cell *unique[], int unique_count) {
-    for (int i = 0; i < unique_count; i++) {
-        if (unique[i] == cii) {
-            return false;
-        }
-    }
-    return true;
-}
-
+/*TODO: Move all hash_table code into hash_cell_pointers.c or something*/
 // Simple hash function for pointers
 static inline int hash_func(const struct cell *ptr, const int hash_size) {
     return ((uintptr_t)ptr) % hash_size;
