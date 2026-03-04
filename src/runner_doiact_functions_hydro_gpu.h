@@ -280,7 +280,10 @@ void hash_lookup(struct cell *c, const int hash_size,
     /*Store where ci ends*/
     md->unique_start_end[unique_count].y = md->count_parts_unique + c_count + 1;
     /*Now pack the particles since this cell is unique*/
-    gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
+    if(task_subtype == task_subtype_gpu_density)
+      gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
+    else if(task_subtype == task_subtype_gpu_force)
+      gpu_pack_part_unique_force(c, buf->parts_send_f, md->count_parts_unique);
     /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
     md->count_parts_unique += c_count + 1;
   }
@@ -295,7 +298,10 @@ void hash_lookup(struct cell *c, const int hash_size,
     /*Store where ci ends*/
     md->unique_start_end[unique_count].y = md->count_parts_unique + c_count + 1;
     /*Now pack the particles since this cell is unique*/
-    gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
+    if(task_subtype == task_subtype_gpu_density)
+      gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
+    else if(task_subtype == task_subtype_gpu_force)
+      gpu_pack_part_unique_force(c, buf->parts_send_f, md->count_parts_unique);
     /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
     md->count_parts_unique += c_count + 1;
   }
@@ -496,6 +502,78 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       cu_error =
           cudaStreamSynchronize(stream[0]);
   }
+  /* Transfer particle data to device */
+  if (task_subtype == task_subtype_gpu_force){
+
+    /*What's gone and what's past help. Should be past grief
+     *
+     *Re-set sums to zero on GPU before launching kernel*/
+    cu_error =
+        cudaMemsetAsync(&buf->d_parts_recv_f[0],
+        0, md->count_parts_unique * 8 * sizeof(float),
+        stream[0]);
+    if (cu_error != cudaSuccess) {
+      /* If we're here, assume something's messed up with our code, not with
+       * CUDA. */
+      error(
+          "CUDA memset: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
+    }
+      /*Give to a gracious message a host of tongues
+       *
+       * Copy the unique particle data to the GPU*/
+      cu_error =
+          cudaMemcpyAsync(&buf->d_parts_send_f[0],
+            &buf->parts_send_f[0],
+            md->count_parts_unique * sizeof(struct gpu_part_send_f),
+            cudaMemcpyHostToDevice, stream[0]);
+      /*Copy the tasks' metadata to the GPU. Send it using stream[0] for now. N.B. this is not default stream ;).
+         * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens*/
+      cu_error =
+          cudaMemcpyAsync(&buf->gpu_md.d_cell_i_j_start_end[0],
+            &buf->gpu_md.cell_i_j_start_end[0],
+            leaves_packed * sizeof(int4),
+            cudaMemcpyHostToDevice, stream[0]);
+      /*Finally copy the metadata to GPU telling each cuda block what sections of the unique particle data to work on.*/
+      cu_error =
+          cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id[0],
+            &buf->gpu_md.block_leaf_id[0],
+            md->n_blocks_packed * sizeof(int2),
+            cudaMemcpyHostToDevice, stream[0]);
+      if (cu_error != cudaSuccess) {
+        /* If we're here, assume something's messed up with our code, not with
+         * CUDA. */
+        error(
+            "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
+      }
+
+      /*Number of cuda blocks we need to launch*/
+      const int n_blocks = md->n_blocks_packed;
+
+      /*Once more unto the breach dear friends, once more!
+       *
+       *Issue instruction to launch GPU computations*/
+      gpu_launch_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
+              n_blocks,
+              gpu_md->d_cell_i_j_start_end,
+              gpu_md->d_block_leaf_id, space_dim, stream[0]);
+
+      /*Full circle.
+       *
+       *  Copy results back to CPU BUFFERS */
+      cu_error =
+          cudaMemcpyAsync(&buf->parts_recv_f[0],
+                          &buf->d_parts_recv_f[0],
+                          md->count_parts_unique * sizeof(struct gpu_part_recv_f),
+                          cudaMemcpyDeviceToHost, stream[0]);
+
+      /*All things are ready, if our mind be so...
+       *
+       * Synchronise with CPU before moving on*/
+      cu_error =
+          cudaStreamSynchronize(stream[0]);
+  }
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
    * its own stream. */
   for (int bid = 0; bid < n_bundles; bid++) {
@@ -518,12 +596,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
                           cudaMemcpyHostToDevice, stream[bid]);
 
     } else if (task_subtype == task_subtype_gpu_force) {
-
-      cu_error =
-          cudaMemcpyAsync(&buf->d_parts_send_f[bundle_first_part],
-                          &buf->parts_send_f[bundle_first_part],
-                          bundle_n_parts * sizeof(struct gpu_part_send_f),
-                          cudaMemcpyHostToDevice, stream[bid]);
+//
+//      cu_error =
+//          cudaMemcpyAsync(&buf->d_parts_send_f[bundle_first_part],
+//                          &buf->parts_send_f[bundle_first_part],
+//                          bundle_n_parts * sizeof(struct gpu_part_send_f),
+//                          cudaMemcpyHostToDevice, stream[bid]);
     }
 #ifdef SWIFT_DEBUG_CHECKS
     else {
@@ -562,9 +640,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
     } else if (task_subtype == task_subtype_gpu_force) {
 
-      gpu_launch_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
-                       stream[bid], num_blocks_x, num_blocks_y,
-                       bundle_first_part, bundle_n_parts);
+//      gpu_launch_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
+//                       stream[bid], num_blocks_x, num_blocks_y,
+//                       bundle_first_part, bundle_n_parts);
     }
 #ifdef SWIFT_DEBUG_CHECKS
     else {
@@ -596,11 +674,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
     } else if (task_subtype == task_subtype_gpu_force) {
 
-      cu_error =
-          cudaMemcpyAsync(&buf->parts_recv_f[bundle_first_part],
-                          &buf->d_parts_recv_f[bundle_first_part],
-                          bundle_n_parts * sizeof(struct gpu_part_recv_f),
-                          cudaMemcpyDeviceToHost, stream[bid]);
+//      cu_error =
+//          cudaMemcpyAsync(&buf->parts_recv_f[bundle_first_part],
+//                          &buf->d_parts_recv_f[bundle_first_part],
+//                          bundle_n_parts * sizeof(struct gpu_part_recv_f),
+//                          cudaMemcpyDeviceToHost, stream[bid]);
     }
 #ifdef SWIFT_DEBUG_CHECKS
     else {
@@ -616,7 +694,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     }
 
     /* Issue event to be recorded by GPU after copy back to CPU */
-    if (task_subtype != task_subtype_gpu_density){
+    if (task_subtype != task_subtype_gpu_density && task_subtype != task_subtype_gpu_force){
       cu_error = cudaEventRecord(event_end[bid], stream[bid]);
       swift_assert(cu_error == cudaSuccess);
     }
@@ -628,7 +706,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
    * this way with unpacking done separately */
   /* TODO Abouzied: Is the comment above still appropriate? */
   for (int bid = 0; bid < n_bundles; bid++) {
-    if (task_subtype != task_subtype_gpu_density){
+    if (task_subtype != task_subtype_gpu_density  && task_subtype != task_subtype_gpu_force){
       cu_error = cudaEventSynchronize(event_end[bid]);
       if (cu_error != cudaSuccess) {
         error(
@@ -830,7 +908,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     int cjj_count = cjj->hydro.count;
 
     /*Figure out where cells start for controlling GPU computations*/
-    if(t->subtype == task_subtype_gpu_density){
+    /*TODO: This does not need to be withing t->subtype conditional. Can be re-used for all subtypes*/
+    if(t->subtype == task_subtype_gpu_density /* || t->subtype == task_subtype_gpu_force*/){
       TIMER_TIC;
       if(cii == cjj){
         /*How many blocks have we packed so far?
@@ -910,7 +989,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     if (t->subtype == task_subtype_gpu_gradient) {
       runner_gpu_pack_gradient(r, buf, cii, cjj);
     } else if (t->subtype == task_subtype_gpu_force) {
-      runner_gpu_pack_force(r, buf, cii, cjj);
+//      runner_gpu_pack_force(r, buf, cii, cjj);
     }
 
     /* record how many leaves we've packed in total during this while loop */

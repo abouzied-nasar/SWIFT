@@ -116,13 +116,8 @@ struct gpu_part_recv_g {
 
 #endif
 };
-
-/*! Container for particle data required for force calcs */
-struct gpu_part_send_f {
+struct gpu_part_data_f{
 #ifdef WITH_CUDA
-
-  /* Data required for the calculation: Values read to local GPU memory */
-
   /*! Particle positions, smoothing length */
   float4 x_h;
 
@@ -143,6 +138,27 @@ struct gpu_part_send_f {
 
 #endif
 };
+/*TODO: This does not need to be redeclared as gpu_cell_pos_f. One variable "gpu_cell_pos"
+ * can be used for all task subtypes*/
+struct gpu_cell_pos_f{
+#ifdef WITH_CUDA
+  /*! Cell position. This is set as the last entry in the
+   * range of particles contained within a cell (i.e
+   * N+1 contains info for cell position)*/
+  double3 x;
+#endif
+};
+/*! Container for particle data required for force calcs */
+struct gpu_part_send_f {
+#ifdef WITH_CUDA
+  union {
+    /*! Container for particle data required for density calcs */
+    struct gpu_part_data_d p_data;
+    /*! Container for cell positions for density calcs */
+    struct gpu_cell_pos_d c_loc;
+  };
+#endif
+}
 
 /*! Container for particle data sent back to CPU for force calcs */
 struct gpu_part_recv_f {
