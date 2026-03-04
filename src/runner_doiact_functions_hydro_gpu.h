@@ -225,7 +225,8 @@ void hash_insert(struct cell *c, int unique_count, const int h_id, struct hash_e
 
 // Lookup in hash table
 void hash_lookup(struct cell *c, const int hash_size,
-		struct hash_entry * ht, struct gpu_offload_data *buf, const int ij) {
+		struct hash_entry * ht, struct gpu_offload_data *buf, const int ij,
+		const enum task_subtypes task_subtype) {
 
   /*Get the hash using the cell's pointer address*/
   struct gpu_pack_metadata *md = &buf->md;
@@ -319,7 +320,7 @@ static void runner_gpu_filter_data(const struct runner *r,
                                       const struct scheduler *s,
                                       struct gpu_offload_data *buf,
                                       const char timer, const struct task * t, struct cell *cii,
-                                      struct cell *cjj) {
+                                      struct cell *cjj, const enum task_subtypes task_subtype) {
 
   //TODO: Inline this function
 
@@ -356,11 +357,11 @@ static void runner_gpu_filter_data(const struct runner *r,
    * Otherwise, add cell to hash table*/
   /*Flag that we're testing ci*/
   int ij = 0;
-  hash_lookup(cii, hash_size, ht, buf, ij);
+  hash_lookup(cii, hash_size, ht, buf, ij, task_subtype);
   /*Same for cj. For self tasks this will point to ci's location*/
 	/*Flag that we're testing cj*/
   ij = 1;
-  hash_lookup(cjj, hash_size, ht, buf, ij);
+  hash_lookup(cjj, hash_size, ht, buf, ij, task_subtype);
 //  }
 }
 
@@ -857,7 +858,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Test to see if cells i and j have already been packed
          * cells i and j are the same cell here but use the same
          * function as for the pairs*/
-        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
+        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
       }else{/*This is a pair task*/
         /*Same logic as self tasks. See comments above*/
         const int n_blocks_packed = md->n_blocks_packed;
@@ -873,7 +874,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Test to see if cells i and j have already been packed.
          * If not, pack them, increment unique cell counters and create an
          * index for them in metadata*/
-        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj);
+        runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
       }
       /* Now finish up bookkeeping*/
       /* Update incremented pack length accordingly */
