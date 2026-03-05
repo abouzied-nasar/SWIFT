@@ -1038,9 +1038,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       if (t->subtype == task_subtype_gpu_density) {
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
+        message("Launched dens");
 
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_density(r, s, buf, npacked);
+        message("Unpacked dens");
 
       } else if (t->subtype == task_subtype_gpu_gradient) {
 
@@ -1055,8 +1057,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Launch the GPU offload */
         runner_gpu_launch_force(r, buf, stream, d_a, d_H);
 
+        message("launched force");
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_force(r, s, buf, npacked);
+        message("Unpacked force");
 
       }
 #ifdef SWIFT_DEBUG_CHECKS
