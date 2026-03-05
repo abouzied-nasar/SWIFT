@@ -435,34 +435,34 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
   }
 
 
-    /* Loop over all tasks that we have offloaded */
-    for (int tid = 0; tid < md->tasks_in_list; tid++) {
+  /* Loop over all tasks that we have offloaded */
+  for (int tid = 0; tid < md->tasks_in_list; tid++) {
 
-      /* If we haven't finished packing the currently handled task's leaf cells,
-       * we mustn't unlock its dependencies yet. ("Currently handled task" is
-       * the one for which the offloading cycle is currently underway in
-       * runner_gpu_pack_and_launch) */
-      if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves)) {
-        continue;
-      }
+    /* If we haven't finished packing the currently handled task's leaf cells,
+     * we mustn't unlock its dependencies yet. ("Currently handled task" is
+     * the one for which the offloading cycle is currently underway in
+     * runner_gpu_pack_and_launch) */
+    if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves)) {
+      continue;
+    }
 
-      /* If we're here, we're completely done with this task. Mark it as
-       * completed. */
+    /* If we're here, we're completely done with this task. Mark it as
+     * completed. */
 
-      /* schedule my dependencies */
-      enqueue_dependencies(s, md->task_list[tid]);
+    /* schedule my dependencies */
+    enqueue_dependencies(s, md->task_list[tid]);
 
-      /* Tell the scheduler's bookkeeping that this task is done */
-      pthread_mutex_lock(&s->sleep_mutex);
-      atomic_dec(&s->waiting);
-      pthread_cond_broadcast(&s->sleep_cond);
-      pthread_mutex_unlock(&s->sleep_mutex);
+    /* Tell the scheduler's bookkeeping that this task is done */
+    pthread_mutex_lock(&s->sleep_mutex);
+    atomic_dec(&s->waiting);
+    pthread_cond_broadcast(&s->sleep_cond);
+    pthread_mutex_unlock(&s->sleep_mutex);
 
-      /* Mark the task as done. */
-      md->task_list[tid]->skip = 1;
-      md->task_list[tid]->done = 1;
+    /* Mark the task as done. */
+    md->task_list[tid]->skip = 1;
+    md->task_list[tid]->done = 1;
 
-    } /* Loop over tasks in list */
+  } /* Loop over tasks in list */
 }
 
 /**

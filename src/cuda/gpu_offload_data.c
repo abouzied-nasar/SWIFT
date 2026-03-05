@@ -149,11 +149,11 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
   /*A rough estimate of how many CUDA blocks we will need to process part_buffer_size*/
   const int n_blocks = (pars.part_buffer_size + GPU_THREAD_BLOCK_SIZE -1)/GPU_THREAD_BLOCK_SIZE;
 
+  /*TODO: Needs fixing because this only resets density buffers not gradient and force*/
   memset(buf->parts_send_d, 0, pars.part_buffer_size * md.send_struct_size);
   memset(buf->parts_recv_d, 0, pars.part_buffer_size * md.recv_struct_size);
 
   memset(buf->gpu_md.cell_i_j_start_end, 0, sizeof(int4) * pars.pack_size_pair);
-  memset(buf->gpu_md.cell_i_j_start_end_non_compact, 0, sizeof(int4) * pars.pack_size_pair);
 
   /*Data required for identifying what leaf computation each cuda block should work on and
    * how many blocks should work on a leaf computation. Index x corresponds to the leaf computation id

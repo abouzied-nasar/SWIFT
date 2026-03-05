@@ -758,7 +758,7 @@ void *runner_main_cuda(void *data) {
 //    fflush(fgpu_steps);
 //    fclose(fgpu_steps);
 #ifdef CUDA_PROFILER
-    if (step == 3)
+    if (step == 2)
     	cudaProfilerStop();
 #endif
   } /* main loop. */

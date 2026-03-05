@@ -438,7 +438,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
      *Re-set sums to zero on GPU before launching kernel*/
     cu_error =
         cudaMemsetAsync(&buf->d_parts_recv_d[0],
-        0, md->count_parts_unique * 8 * sizeof(float),
+        0, md->count_parts_unique * sizeof(struct gpu_part_recv_d),
         stream[0]);
     if (cu_error != cudaSuccess) {
       /* If we're here, assume something's messed up with our code, not with
@@ -503,7 +503,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
           cudaStreamSynchronize(stream[0]);
   }
   /* Transfer particle data to device */
-  if (task_subtype == task_subtype_gpu_force){
+  else if (task_subtype == task_subtype_gpu_force){
 
     /*What's gone and what's past help. Should be past grief
      *
@@ -694,7 +694,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     }
 
     /* Issue event to be recorded by GPU after copy back to CPU */
-    if (task_subtype != task_subtype_gpu_density && task_subtype != task_subtype_gpu_force){
+    if (task_subtype == task_subtype_gpu_gradient){
       cu_error = cudaEventRecord(event_end[bid], stream[bid]);
       swift_assert(cu_error == cudaSuccess);
     }
@@ -705,7 +705,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
    * Should swap with one cuda Device Synchronise really if we decide to go
    * this way with unpacking done separately */
   /* TODO Abouzied: Is the comment above still appropriate? */
-  if (task_subtype != task_subtype_gpu_density  && task_subtype != task_subtype_gpu_force){
+  if (task_subtype == task_subtype_gpu_gradient){
     for (int bid = 0; bid < n_bundles; bid++) {
       cu_error = cudaEventSynchronize(event_end[bid]);
       if (cu_error != cudaSuccess) {
@@ -958,6 +958,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
          * cells i and j are the same cell here but use the same
          * function as for the pairs*/
         runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
+        /*TODO: Move bits that are the same outside of if (cii == cjj) condition*/
       }else{/*This is a pair task*/
         /*Same logic as self tasks. See comments above*/
         const int n_blocks_packed = md->n_blocks_packed;
@@ -1054,7 +1055,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Launch the GPU offload */
         runner_gpu_launch_force(r, buf, stream, d_a, d_H);
 
-        message("launched force");
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_force(r, s, buf, npacked);
 
