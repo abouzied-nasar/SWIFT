@@ -424,7 +424,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
     while(cell_locktree(c)){
       ;
     }
-    gpu_unpack_part_density(c, buf->parts_recv_d, unpack_index,
+    if(task_subtype == task_subtype_gpu_density)
+      gpu_unpack_part_density(c, buf->parts_recv_d, unpack_index,
+                            count, e);
+    else if(task_subtype == task_subtype_gpu_force)
+      gpu_unpack_part_force(c, buf->parts_recv_f, unpack_index,
                             count, e);
     unpack_index += count + 1;
     cell_unlocktree(c);
@@ -570,14 +574,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_gradient(
  * pair task offloading call. May differ from the total number of packed leaf
  * cell pairs if there have been leftover leaf cell pairs from a previous task.
  */
-__attribute__((always_inline)) INLINE static void
-runner_dopair_gpu_unpack_force(const struct runner *r, struct scheduler *s,
-                               struct gpu_offload_data *restrict buf,
-                               const int npacked) {
+__attribute__((always_inline)) INLINE static void runner_gpu_unpack_force(
+    const struct runner *r, struct scheduler *s,
+    struct gpu_offload_data *restrict buf, const int npacked) {
 
   TIMER_TIC;
 
-  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_force);
+  runner_gpu_unpack_pre_sorted(r, s, buf, npacked, task_subtype_gpu_force);
 
   if (buf->md.is_pair_task)
     TIMER_TOC(timer_dopair_gpu_unpack_f);

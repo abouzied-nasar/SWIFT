@@ -269,7 +269,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_unique_force(
 
   const int count = ci->hydro.count;
   const struct part *parts = ci->hydro.parts;
-  struct gpu_part_send_f *ps = &parts_buffer[pack_ind];
+  struct gpu_part_data_f *ps = &parts_buffer[pack_ind].p_data;
 
   for (int i = 0; i < count; i++) {
 
@@ -324,7 +324,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
 
   const int count = ci->hydro.count;
   const struct part *parts = ci->hydro.parts;
-  struct gpu_part_send_f *ps = &parts_buffer[pack_ind];
+  struct gpu_part_data_f *ps = &parts_buffer[pack_ind].p_data;
 
   for (int i = 0; i < count; i++) {
 

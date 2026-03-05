@@ -153,12 +153,12 @@ struct gpu_part_send_f {
 #ifdef WITH_CUDA
   union {
     /*! Container for particle data required for density calcs */
-    struct gpu_part_data_d p_data;
+    struct gpu_part_data_f p_data;
     /*! Container for cell positions for density calcs */
-    struct gpu_cell_pos_d c_loc;
+    struct gpu_cell_pos_f c_loc;
   };
 #endif
-}
+};
 
 /*! Container for particle data sent back to CPU for force calcs */
 struct gpu_part_recv_f {

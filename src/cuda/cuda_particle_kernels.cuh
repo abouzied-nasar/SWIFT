@@ -64,7 +64,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_c(
   const int cj_end = cell_starts_ends_read.w - 1;
 
   const int ci_write_start = cell_starts_ends_write.x;
-  const int ci_write_end = cell_starts_ends_write.y;
 
 //  printf("count_read %i count_write %i\n", ci_end - ci_start, ci_write_end - ci_write_start);
 
@@ -206,12 +205,10 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
   /*TODO:These could and should be shared variables.
   Their value is the same for entire block*/
   /* First, grab handles for where cells start and end */
-  const int ci_start = cell_starts_ends_read.x;
   /*Subtract one to make sure we don't loop over the cell position index*/
   const int cj_start = cell_starts_ends_read.z;
   const int cj_end = cell_starts_ends_read.w - 1;
 
-  int n_total = 0;
   const struct gpu_part_data_d pi = d_parts_send[pid].p_data;
   const float xi = pi.x_h.x - shift_i.x;
   const float yi = pi.x_h.y - shift_i.y;
@@ -448,7 +445,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
     struct gpu_part_recv_f *__restrict__ d_parts_recv, float d_a, float d_H) {
 
   /* First, grab handles */
-  const struct gpu_part_send_f pi = d_parts_send[pid];
+  const struct gpu_part_data_f pi = d_parts_send[pid].p_data;
 
   const float xi = pi.x_h.x;
   const float yi = pi.x_h.y;
@@ -492,7 +489,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
   for (int j = pj_start; j < pj_end; j++) {
 
     /* First, grab handles. */
-    const struct gpu_part_send_f pj = d_parts_send[j];
+    const struct gpu_part_data_f pj = d_parts_send[j].p_data;
 
     const float xj = pj.x_h.x;
     const float yj = pj.x_h.y;
@@ -651,22 +648,22 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
  * @param d_a current cosmological expansion factor
  * @param d_H current Hubble constant
  */
+//TODO: When changing the file cuda_particle_kernels.cuh and then recompiling the compiler doesn't realise the file has changed
 __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
-    int pid, const struct gpu_part_send_f *__restrict__ d_parts_send,
-    struct gpu_part_recv_f *__restrict__ d_parts_recv, float d_a, float d_H) {
+    int cid, const struct gpu_part_send_f *__restrict__ d_parts_send,
+    struct gpu_part_recv_f *__restrict__ d_parts_recv, float d_a, float d_H,
+    const int4 __restrict__ cell_starts_ends_read,
+    const double3 space_dim, const double3 shift_i, const double3 shift_j, const int pid) {
 
   /*TODO:These could and should be shared variables.
   Their value is the same for entire block*/
   /* First, grab handles for where cells start and end */
-  const int ci_start = cell_starts_ends_read.x;
   /*Subtract one to make sure we don't loop over the cell position index*/
   const int cj_start = cell_starts_ends_read.z;
   const int cj_end = cell_starts_ends_read.w - 1;
 
-  int n_total = 0;
-
   /* First, grab handles */
-  const struct gpu_part_send_f pi = d_parts_send[pid];
+  const struct gpu_part_data_f pi = d_parts_send[pid].p_data;
 
   const float xi = pi.x_h.x - shift_i.x;
   const float yi = pi.x_h.y - shift_i.y;
@@ -690,8 +687,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
 
   /* const int tbi = pi.timebin_minngbtimebin_pjs_pje.x; */
   const int min_ngb_tbi = pi.timebin_minngbtimebin_pjs_pje.y;
-  const int pj_start = pi.timebin_minngbtimebin_pjs_pje.z;
-  const int pj_end = pi.timebin_minngbtimebin_pjs_pje.w;
 
   /* Some auxiliary computations */
   const float hig2 = hi * hi * kernel_gamma2;
@@ -710,7 +705,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
   for (int j = cj_start; j < cj_end; j++) {
 
     /* First, grab handles. */
-    const struct gpu_part_send_f pj = d_parts_send[j];
+    const struct gpu_part_data_f pj = d_parts_send[j].p_data;
 
     const float xj = pj.x_h.x;
     const float yj = pj.x_h.y;
@@ -864,11 +859,11 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
   /*Testing if atomics really slow things down*/
   atomicAdd(&d_parts_recv[pid].udt_hdt_minngbtb.z, res_udt_hdt.x);
   atomicAdd(&d_parts_recv[pid].udt_hdt_minngbtb.y, res_udt_hdt.y);
-  atomicAdd(&d_parts_recv[pid].udt_hdt_minngbtb.z, res_udt_hdt.z);
+  atomicAdd(&d_parts_recv[pid].udt_hdt_minngbtb.z, (float)res_min_ngb_timebin);
 
-  atomicAdd(&d_parts_recv[pid].a_hydro, res_ahydro.x);
-  atomicAdd(&d_parts_recv[pid].a_hydro, res_ahydro.y);
-  atomicAdd(&d_parts_recv[pid].a_hydro, res_ahydro.z);
+  atomicAdd(&d_parts_recv[pid].a_hydro.x, res_ahydro.x);
+  atomicAdd(&d_parts_recv[pid].a_hydro.y, res_ahydro.y);
+  atomicAdd(&d_parts_recv[pid].a_hydro.z, res_ahydro.z);
 }
 
 #ifdef __cplusplus
