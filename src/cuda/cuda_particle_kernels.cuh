@@ -859,9 +859,11 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
   /*Testing if atomics really slow things down*/
   atomicAdd(&d_parts_recv[pid].udt_hdt.x, res_udt_hdt.x);
   atomicAdd(&d_parts_recv[pid].udt_hdt.y, res_udt_hdt.y);
-//  if(d_parts_recv[pid].minngbtb == 0)
-//    atomicExch(&d_parts_recv[pid].minngbtb, res_min_ngb_timebin);
+  /*Check to make sure we're not comparing with zero.
+   * If so replace it with timebin calculated here*/
   atomicCAS(&d_parts_recv[pid].minngbtb, 0, res_min_ngb_timebin);
+  /*In case time bin for i not zero, compare with current value
+   * to find min*/
   atomicMin(&d_parts_recv[pid].minngbtb, res_min_ngb_timebin);
   atomicAdd(&d_parts_recv[pid].a_hydro.x, res_ahydro.x);
   atomicAdd(&d_parts_recv[pid].a_hydro.y, res_ahydro.y);

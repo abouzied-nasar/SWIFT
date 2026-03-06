@@ -302,6 +302,10 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_unique_force(
     int mintbin = (int)part_get_timestep_limiter_min_ngb_time_bin(p);
     ps[i].timebin_minngbtimebin_pjs_pje.y = mintbin;
   }
+  /*We've packed all the particles. Now insert the cell position into the count index*/
+  parts_buffer[pack_ind + count].c_loc.x.x = ci->loc[0];
+  parts_buffer[pack_ind + count].c_loc.x.y = ci->loc[1];
+  parts_buffer[pack_ind + count].c_loc.x.z = ci->loc[2];
 }
 
 /**

@@ -146,6 +146,12 @@ struct gpu_cell_pos_f{
    * range of particles contained within a cell (i.e
    * N+1 contains info for cell position)*/
   double3 x;
+  /*Un-necessary dummy values. Testing for now but
+   * TODO: Remove these*/
+  float2 d0;
+  float4 d1;
+  float4 d2;
+  int4 d3;
 #endif
 };
 /*! Container for particle data required for force calcs */
