@@ -93,8 +93,8 @@ __global__ void cuda_launch_density(
   /*Step I: Get the cell positions*/
   /*TODO: This can possibly be done with shared memory.
    * Unsure if it will give any speedup though*/
-  const struct gpu_cell_pos_d ci_loc = d_parts_send[ci_end - 1].c_loc;
-  const struct gpu_cell_pos_d cj_loc = d_parts_send[cj_end - 1].c_loc;
+  const struct gpu_cell_pos ci_loc = d_parts_send[ci_end - 1].c_loc;
+  const struct gpu_cell_pos cj_loc = d_parts_send[cj_end - 1].c_loc;
 
   double3 shift = {0.0, 0.0, 0.0};
 
@@ -243,8 +243,8 @@ __global__ void cuda_launch_unique_force(
   /*Step I: Get the cell positions*/
   /*TODO: This can possibly be done with shared memory.
    * Unsure if it will give any speedup though*/
-  const struct gpu_cell_pos_f ci_loc = d_parts_send[ci_end - 1].c_loc;
-  const struct gpu_cell_pos_f cj_loc = d_parts_send[cj_end - 1].c_loc;
+  const struct gpu_cell_pos ci_loc = d_parts_send[ci_end - 1].c_loc;
+  const struct gpu_cell_pos cj_loc = d_parts_send[cj_end - 1].c_loc;
 
   double3 shift = {0.0, 0.0, 0.0};
 

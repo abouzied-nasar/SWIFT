@@ -47,15 +47,13 @@ struct gpu_part_data_d {
 };
 
 /*! Container for cell positions for density calcs */
-struct gpu_cell_pos_d {
+struct gpu_cell_pos {
 #ifdef WITH_CUDA
 
   /*! Cell position. This is set as the last entry in the
    * range of particles contained within a cell (i.e
    * N+1 contains info for cell position)*/
   double3 x;
-  /*! Dummy container to ensure data is same size as gpu_part_data_d*/
-  float2 vx_m;
 
 #endif
 };
@@ -66,7 +64,7 @@ struct gpu_part_send_d{
 	/*! Container for particle data required for density calcs */
     struct gpu_part_data_d p_data;
     /*! Container for cell positions for density calcs */
-	struct gpu_cell_pos_d c_loc;
+	struct gpu_cell_pos c_loc;
   };
 };
 /*! Container for particle data sent back to CPU for density calcs */
@@ -138,22 +136,7 @@ struct gpu_part_data_f{
 
 #endif
 };
-/*TODO: This does not need to be redeclared as gpu_cell_pos_f. One variable "gpu_cell_pos"
- * can be used for all task subtypes*/
-struct gpu_cell_pos_f{
-#ifdef WITH_CUDA
-  /*! Cell position. This is set as the last entry in the
-   * range of particles contained within a cell (i.e
-   * N+1 contains info for cell position)*/
-  double3 x;
-  /*Un-necessary dummy values. Testing for now but
-   * TODO: Remove these*/
-  float2 d0;
-  float4 d1;
-  float4 d2;
-  int4 d3;
-#endif
-};
+
 /*! Container for particle data required for force calcs */
 struct gpu_part_send_f {
 #ifdef WITH_CUDA
@@ -161,7 +144,7 @@ struct gpu_part_send_f {
     /*! Container for particle data required for density calcs */
     struct gpu_part_data_f p_data;
     /*! Container for cell positions for density calcs */
-    struct gpu_cell_pos_f c_loc;
+    struct gpu_cell_pos c_loc;
   };
 #endif
 };
