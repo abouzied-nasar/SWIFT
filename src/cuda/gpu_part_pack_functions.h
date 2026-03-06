@@ -151,6 +151,9 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
     float h_dt = pr.udt_hdt.y + part_get_h_dt(p);
     part_set_h_dt(p, h_dt);
 
+    /*TODO: Check if this is correct. Should we be comparing with
+     * existing values to find the min instead of plain assignment?
+     * Also, remove the +0.5f*/
     timebin_t mintbin = (timebin_t)(pr.minngbtb + 0.5f);
     part_set_timestep_limiter_min_ngb_time_bin(p, mintbin);
   }
