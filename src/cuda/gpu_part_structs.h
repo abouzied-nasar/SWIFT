@@ -165,7 +165,9 @@ struct gpu_part_recv_f {
 #ifdef WITH_CUDA
 
   /*! change of u and h with dt, v_sig */
-  float3 udt_hdt_minngbtb;
+  float2 udt_hdt;
+
+  int minngbtb;
 
   /*! Particle acceleration vector */
   float3 a_hydro;

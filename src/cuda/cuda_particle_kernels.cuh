@@ -209,6 +209,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
   const int cj_start = cell_starts_ends_read.z;
   const int cj_end = cell_starts_ends_read.w - 1;
 
+  /* First, grab handles */
   const struct gpu_part_data_d pi = d_parts_send[pid].p_data;
   const float xi = pi.x_h.x - shift_i.x;
   const float yi = pi.x_h.y - shift_i.y;
@@ -634,8 +635,8 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
     }
   } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
 
-  d_parts_recv[pid].udt_hdt_minngbtb = {res_udt_hdt.x, res_udt_hdt.y,
-                                        (float)res_min_ngb_timebin};
+  d_parts_recv[pid].udt_hdt = {res_udt_hdt.x, res_udt_hdt.y};
+  d_parts_recv[pid].minngbtb = res_min_ngb_timebin;
   d_parts_recv[pid].a_hydro = res_ahydro;
 }
 
@@ -664,7 +665,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
 
   /* First, grab handles */
   const struct gpu_part_data_f pi = d_parts_send[pid].p_data;
-
   const float xi = pi.x_h.x - shift_i.x;
   const float yi = pi.x_h.y - shift_i.y;
   const float zi = pi.x_h.z - shift_i.z;
@@ -686,6 +686,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
   const float adiffi = pi.c_u_avisc_adiff.w;
 
   /* const int tbi = pi.timebin_minngbtimebin_pjs_pje.x; */
+  const int tbj = pi.timebin_minngbtimebin_pjs_pje.x;
   const int min_ngb_tbi = pi.timebin_minngbtimebin_pjs_pje.y;
 
   /* Some auxiliary computations */
@@ -707,9 +708,9 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
     /* First, grab handles. */
     const struct gpu_part_data_f pj = d_parts_send[j].p_data;
 
-    const float xj = pj.x_h.x;
-    const float yj = pj.x_h.y;
-    const float zj = pj.x_h.z;
+    const float xj = pj.x_h.x - shift_j.x;
+    const float yj = pj.x_h.y - shift_j.y;
+    const float zj = pj.x_h.z - shift_j.z;
     const float hj = pj.x_h.w;
 
     const float vxj = pj.vx_m.x;
@@ -727,7 +728,6 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
     const float aviscj = pj.c_u_avisc_adiff.z;
     const float adiffj = pj.c_u_avisc_adiff.w;
 
-    const int tbj = pi.timebin_minngbtimebin_pjs_pje.x;
     /* const int min_ngb_tbj = pi.timebin_minngbtimebin_pjs_pje.y; */
 
     /* Now get stuff done. */
@@ -857,10 +857,12 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
   /*We have out-of-bounds barrier (if statement in calling function) to ensure we don't try
    * to write outside of this cell's partice range*/
   /*Testing if atomics really slow things down*/
-  atomicAdd(&d_parts_recv[pid].udt_hdt_minngbtb.z, res_udt_hdt.x);
-  atomicAdd(&d_parts_recv[pid].udt_hdt_minngbtb.y, res_udt_hdt.y);
-  atomicAdd(&d_parts_recv[pid].udt_hdt_minngbtb.z, (float)res_min_ngb_timebin);
-
+  atomicAdd(&d_parts_recv[pid].udt_hdt.x, res_udt_hdt.x);
+  atomicAdd(&d_parts_recv[pid].udt_hdt.y, res_udt_hdt.y);
+//  if(d_parts_recv[pid].minngbtb == 0)
+//    atomicExch(&d_parts_recv[pid].minngbtb, res_min_ngb_timebin);
+  atomicCAS(&d_parts_recv[pid].minngbtb, 0, res_min_ngb_timebin);
+  atomicMin(&d_parts_recv[pid].minngbtb, res_min_ngb_timebin);
   atomicAdd(&d_parts_recv[pid].a_hydro.x, res_ahydro.x);
   atomicAdd(&d_parts_recv[pid].a_hydro.y, res_ahydro.y);
   atomicAdd(&d_parts_recv[pid].a_hydro.z, res_ahydro.z);

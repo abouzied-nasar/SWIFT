@@ -145,13 +145,13 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
     a[1] += pr.a_hydro.y;
     a[2] += pr.a_hydro.z;
 
-    float u_dt = pr.udt_hdt_minngbtb.x + part_get_u_dt(p);
+    float u_dt = pr.udt_hdt.x + part_get_u_dt(p);
     part_set_u_dt(p, u_dt);
 
-    float h_dt = pr.udt_hdt_minngbtb.y + part_get_h_dt(p);
+    float h_dt = pr.udt_hdt.y + part_get_h_dt(p);
     part_set_h_dt(p, h_dt);
 
-    timebin_t mintbin = (timebin_t)(pr.udt_hdt_minngbtb.z + 0.5f);
+    timebin_t mintbin = (timebin_t)(pr.minngbtb + 0.5f);
     part_set_timestep_limiter_min_ngb_time_bin(p, mintbin);
   }
 }
