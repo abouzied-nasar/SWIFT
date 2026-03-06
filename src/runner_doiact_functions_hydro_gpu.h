@@ -574,6 +574,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       cu_error =
           cudaStreamSynchronize(stream[0]);
   }
+  else if(task_subtype == task_subtype_gpu_gradient){
   /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
    * its own stream. */
   for (int bid = 0; bid < n_bundles; bid++) {
@@ -705,7 +706,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
    * Should swap with one cuda Device Synchronise really if we decide to go
    * this way with unpacking done separately */
   /* TODO Abouzied: Is the comment above still appropriate? */
-  if (task_subtype == task_subtype_gpu_gradient){
     for (int bid = 0; bid < n_bundles; bid++) {
       cu_error = cudaEventSynchronize(event_end[bid]);
       if (cu_error != cudaSuccess) {
@@ -1038,11 +1038,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       if (t->subtype == task_subtype_gpu_density) {
         /* Launch the GPU offload */
         runner_gpu_launch_density(r, buf, stream, d_a, d_H);
-        message("Launched dens");
 
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_density(r, s, buf, npacked);
-        message("Unpacked dens");
 
       } else if (t->subtype == task_subtype_gpu_gradient) {
 
@@ -1057,10 +1055,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* Launch the GPU offload */
         runner_gpu_launch_force(r, buf, stream, d_a, d_H);
 
-        message("launched force");
         /* Unpack the results into CPU memory */
         runner_gpu_unpack_force(r, s, buf, npacked);
-        message("Unpacked force");
 
       }
 #ifdef SWIFT_DEBUG_CHECKS

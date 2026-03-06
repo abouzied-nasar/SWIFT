@@ -418,20 +418,31 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
   /*Let's unpack the unique particle data first.
    * We get on to enqueueing dependencies after this*/
   int unpack_index = 0;
-  for(int i = 0; i < md->n_unique; i++){
-    struct cell * c = md->unique_cells[i];
-    const int count = c->hydro.count;
-    while(cell_locktree(c)){
-      ;
-    }
-    if(task_subtype == task_subtype_gpu_density)
+  if(task_subtype == task_subtype_gpu_density){
+    for(int i = 0; i < md->n_unique; i++){
+      struct cell * c = md->unique_cells[i];
+      const int count = c->hydro.count;
+      while(cell_locktree(c)){
+        ;
+      }
       gpu_unpack_part_density(c, buf->parts_recv_d, unpack_index,
-                            count, e);
-    else if(task_subtype == task_subtype_gpu_force)
+          count, e);
+      unpack_index += count + 1;
+      cell_unlocktree(c);
+    }
+  }
+  else if(task_subtype == task_subtype_gpu_force){
+    for(int i = 0; i < md->n_unique; i++){
+      struct cell * c = md->unique_cells[i];
+      const int count = c->hydro.count;
+      while(cell_locktree(c)){
+        ;
+      }
       gpu_unpack_part_force(c, buf->parts_recv_f, unpack_index,
-                            count, e);
-    unpack_index += count + 1;
-    cell_unlocktree(c);
+          count, e);
+      unpack_index += count + 1;
+      cell_unlocktree(c);
+    }
   }
 
 
@@ -443,6 +454,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
      * the one for which the offloading cycle is currently underway in
      * runner_gpu_pack_and_launch) */
     if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves)) {
+//      if(task_subtype == task_subtype_gpu_force)
+//        message("FORCE tid %i npacked %i n_leaves %i", tid, npacked, md->task_n_leaves);
+//      else
+//        message("DENS tid %i npacked %i n_leaves %i", tid, npacked, md->task_n_leaves);
       continue;
     }
 

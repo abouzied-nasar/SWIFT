@@ -761,6 +761,7 @@ void *runner_main_cuda(void *data) {
     if (step == 2)
     	cudaProfilerStop();
 #endif
+    message("Scheduler wait %i", sched->waiting);
   } /* main loop. */
 
   /* Release the bytes back into the wilderness */
