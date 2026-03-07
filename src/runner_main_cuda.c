@@ -256,7 +256,6 @@ void *runner_main_cuda(void *data) {
 
     step++;
 #endif
-    int dens_launches = 0;
 
     /* Loop while there are tasks... */
     while (1) {
@@ -396,7 +395,7 @@ void *runner_main_cuda(void *data) {
 #ifdef GPUOFFLOAD_DENSITY
             runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_self_dens, t,
                                       stream_pairs, d_a, d_H);
-            dens_launches++;
+            
 //            if (dens_launches > 3 * gpu_buf_pair_dens.md.params.pack_size_pair)
 //            	error("Packed 3 times");
 #endif
