@@ -83,7 +83,7 @@ struct gpu_part_recv_d {
 };
 
 /*! Container for particle data required for gradient calcs */
-struct gpu_part_send_g {
+struct gpu_part_data_g {
 #ifdef WITH_CUDA
 
   /*! Particle position & smoothing length */
@@ -104,7 +104,15 @@ struct gpu_part_send_g {
 
 #endif
 };
-
+/*Particle and cell position data required for GPU density computations*/
+struct gpu_part_send_g{
+  union {
+    /*! Container for particle data required for density calcs */
+    struct gpu_part_data_g p_data;
+    /*! Container for cell positions for density calcs */
+    struct gpu_cell_pos c_loc;
+  };
+};
 /*! Container for particle data sent back to CPU for gradient calcs */
 struct gpu_part_recv_g {
 #ifdef WITH_CUDA

@@ -444,6 +444,19 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
       cell_unlocktree(c);
     }
   }
+  else if(task_subtype == task_subtype_gpu_gradient){
+    for(int i = 0; i < md->n_unique; i++){
+      struct cell * c = md->unique_cells[i];
+      const int count = c->hydro.count;
+      while(cell_locktree(c)){
+        ;
+      }
+      gpu_unpack_part_gradient(c, buf->parts_recv_g, unpack_index,
+          count, e);
+      unpack_index += count + 1;
+      cell_unlocktree(c);
+    }
+  }
 
 
   /* Loop over all tasks that we have offloaded */
@@ -571,7 +584,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_gradient(
 
   TIMER_TIC;
 
-  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_gradient);
+  runner_gpu_unpack_pre_sorted(r, s, buf, npacked, task_subtype_gpu_gradient);
 
   if (buf->md.is_pair_task)
     TIMER_TOC(timer_dopair_gpu_unpack_g);

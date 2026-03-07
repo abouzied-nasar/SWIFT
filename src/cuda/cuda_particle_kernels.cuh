@@ -319,7 +319,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
     struct gpu_part_recv_g *__restrict__ d_parts_recv, float d_a, float d_H) {
 
   /* First, grab handles. */
-  const struct gpu_part_send_g pi = d_parts_send[pid];
+  const struct gpu_part_data_g pi = d_parts_send[pid].p_data;
 
   const float xi = pi.x_h.x;
   const float yi = pi.x_h.y;
@@ -355,7 +355,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
   for (int j = pj_start; j < pj_end; j++) {
 
     /* First, grab handles. */
-    const struct gpu_part_send_g pj = d_parts_send[pid];
+    const struct gpu_part_data_g pj = d_parts_send[pid].p_data;
 
     const float xj = pj.x_h.x;
     const float yj = pj.x_h.y;
@@ -430,6 +430,157 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient(
 
   /* Write results. */
   d_parts_recv[pid].vsig_lapu_aviscmax = res_vsig_lapu_avisci;
+}
+
+__device__ float atomicMaxFloat(float* addr, float val) {
+    // 1. Convert the float bit-pattern to an integer
+    int val_as_int = __float_as_int(val);
+
+    // 2. Handle the 'Negative Problem when the lexocographical order fails.
+    // If the number is negative, we flip the bits (except the sign bit)
+    // to ensure that -5.0 is "smaller" than -2.0 in integer space.
+    int transformed = (val_as_int >= 0) ? val_as_int : (0x80000000 - val_as_int);
+
+    // 3. Perform the atomic operation on the transformed integer
+    int old_int = atomicMax((int*)addr, transformed);
+
+    // 4. Transform the result back to the original float scale
+    int original_old = (old_int >= 0) ? old_int : (0x80000000 - old_int);
+
+    return __int_as_float(original_old);
+}
+
+/**
+ * @brief Naive kernel computing the gradient interactions of a single particle
+ *
+ * @param pid index of particle to compute density for in the data arrays
+ * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_recv array of particle data to write results into
+ * @param d_a current cosmological expansion factor
+ * @param d_H current Hubble constant
+ */
+__device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient_p(
+    int cid, const struct gpu_part_send_g *__restrict__ d_parts_send,
+    struct gpu_part_recv_g *__restrict__ d_parts_recv, float d_a, float d_H,
+    const int4 __restrict__ cell_starts_ends_read,
+    const double3 space_dim, const double3 shift_i, const double3 shift_j, const int pid) {
+
+  /*TODO:These could and should be shared variables.
+  Their value is the same for entire block*/
+  /* First, grab handles for where cells start and end */
+  /*Subtract one to make sure we don't loop over the cell position index*/
+  const int cj_start = cell_starts_ends_read.z;
+  const int cj_end = cell_starts_ends_read.w - 1;
+
+  /* First, grab handles. */
+  const struct gpu_part_data_g pi = d_parts_send[pid].p_data;
+
+  const float xi = pi.x_h.x - shift_i.x;
+  const float yi = pi.x_h.y - shift_i.y;
+  const float zi = pi.x_h.z - shift_i.z;
+  const float hi = (float)pi.x_h.w;
+
+  const float vxi = pi.vx_m.x;
+  const float vyi = pi.vx_m.y;
+  const float vzi = pi.vx_m.z;
+  /* const float mi = pi.vx_m.w; */
+
+  /* const float rhoi = pi.rho_avisc_u_c.x; */
+  /* const float avisci = pi.rho_avisc_u_c.y; */
+  const float energyi = pi.rho_avisc_u_c.z;
+  const float ci = pi.rho_avisc_u_c.w;
+
+  const float vsigi = pi.vsig_lapu_aviscmax.x;
+  const float lapui = pi.vsig_lapu_aviscmax.y;
+  const float avisc_maxi = pi.vsig_lapu_aviscmax.z;
+
+  /* Do some auxiliary computations */
+  const float hig2 = hi * hi * kernel_gamma2;
+  const float hi_inv = 1.f / hi;
+
+  /* Prep output */
+  /* v_sig, laplace_u, a_viscosity_max */
+  float3 res_vsig_lapu_avisci = {vsigi, lapui, avisc_maxi};
+
+  /* Start the neighbour interactions */
+  for (int j = cj_start; j < cj_end; j++) {
+
+    /* First, grab handles. */
+    const struct gpu_part_data_g pj = d_parts_send[j].p_data;
+
+    const float xj = pj.x_h.x - shift_j.x;
+    const float yj = pj.x_h.y - shift_j.y;
+    const float zj = pj.x_h.z - shift_j.z;
+    /* const float hj = pj.x_h.w; */
+
+    const float vxj = pj.vx_m.x;
+    const float vyj = pj.vx_m.y;
+    const float vzj = pj.vx_m.z;
+    const float mj = pj.vx_m.w;
+
+    const float rhoj = pj.rho_avisc_u_c.x;
+    const float aviscj = pj.rho_avisc_u_c.y;
+    const float energyj = pj.rho_avisc_u_c.z;
+    const float cj = pj.rho_avisc_u_c.w;
+
+    /* const float vsigj = pj.vsig_lapu_aviscmax.x; */
+    /* const float lapuj = pj.vsig_lapu_aviscmax.y; */
+    /* const float avisc_maxj = pj.vsig_lapu_aviscmax.z; */
+
+    /* Now get stuff done. */
+    const float xij = xi - xj;
+    const float yij = yi - yj;
+    const float zij = zi - zj;
+
+    const float r2 = xij * xij + yij * yij + zij * zij;
+
+    if ((r2 < hig2) && (j != pid)) {
+      /* (j != pid): Exclude self contribution. This happens at a later step. */
+
+      const float r = sqrtf(r2);
+      const float r_inv = r ? 1.0f/r : 0.0f;
+
+      /* Cosmology terms for the signal velocity */
+      const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
+      const float a2_Hubble = d_a * d_a * d_H;
+
+      /* Compute dv dot r */
+      float dvx = vxi - vxj;
+      float dvy = vyi - vyj;
+      float dvz = vzi - vzj;
+      const float dvdr = dvx * xij + dvy * yij + dvz * zij;
+
+      /* Add Hubble flow */
+      const float dvdr_Hubble = dvdr + a2_Hubble * r2;
+
+      /* Are the particles moving towards each others ? */
+      const float omega_ij = fminf(dvdr_Hubble, 0.f);
+      const float mu_ij = fac_mu * r_inv * omega_ij; /* This is 0 or negative */
+
+      /* Signal velocity */
+      const float new_v_sig = ci + cj - const_viscosity_beta * mu_ij;
+
+      /* Update if we need to */
+      res_vsig_lapu_avisci.x = fmaxf(vsigi, new_v_sig);
+
+      /* Calculate Del^2 u for the thermal diffusion coefficient. */
+      /* Need to get some kernel values F_ij = wi_dx */
+      float wi;
+      float wi_dx;
+      const float ui = r * hi_inv;
+      d_kernel_deval(ui, &wi, &wi_dx);
+
+      const float delta_u_factor = (energyi - energyj) * r_inv;
+      res_vsig_lapu_avisci.y += mj * delta_u_factor * wi_dx / rhoj;
+
+      /* Set the maximal alpha from the previous step over the neighbours
+       * (this is used to limit the diffusion in hydro_prepare_force) */
+      res_vsig_lapu_avisci.z = fmaxf(res_vsig_lapu_avisci.z, aviscj);
+    }
+  } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
+  atomicAdd(&d_parts_recv[pid].vsig_lapu_aviscmax.x, res_vsig_lapu_avisci.x);
+  atomicAdd(&d_parts_recv[pid].vsig_lapu_aviscmax.y, res_vsig_lapu_avisci.y);
+  atomicMaxFloat(&d_parts_recv[pid].vsig_lapu_aviscmax.z, res_vsig_lapu_avisci.z);
 }
 
 /**
@@ -711,7 +862,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
     const float xj = pj.x_h.x - shift_j.x;
     const float yj = pj.x_h.y - shift_j.y;
     const float zj = pj.x_h.z - shift_j.z;
-    const float hj = pj.x_h.w;
+    const float hj = (float)pj.x_h.w;
 
     const float vxj = pj.vx_m.x;
     const float vyj = pj.vx_m.y;

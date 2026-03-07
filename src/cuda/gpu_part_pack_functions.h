@@ -46,7 +46,6 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
 
   const struct gpu_part_recv_d *parts_recv = &parts_buffer[unpack_ind];
 
-//  int n_total = 0;
   for (int i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
@@ -73,13 +72,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
 
     float div_v = part_get_div_v(p) + pr.rot_vx_div_v.w;
     part_set_div_v(p, div_v);
-
-//    p->N_density += pr.n_neighbours;
-//    n_total += pr.n_neighbours;
-//    if(pr.n_neighbours > 0)
-//    	message("n_neighbours %i", pr.n_neighbours);
   }
-//  message("n_neighbours %i", n_total);
 }
 
 /**
@@ -196,12 +189,12 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     ps[i].vx_m.y = v[1];
     ps[i].vx_m.z = v[2];
     ps[i].vx_m.w = part_get_mass(p);
+
   }
   /*We've packed all the particles. Now insert the cell position into the count index*/
   parts_buffer[pack_ind + count].c_loc.x.x = c->loc[0];
   parts_buffer[pack_ind + count].c_loc.x.y = c->loc[1];
   parts_buffer[pack_ind + count].c_loc.x.z = c->loc[2];
-
 }
 
 /**
@@ -225,7 +218,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
   /* Grab handles */
   const int count = ci->hydro.count;
   const struct part *parts = ci->hydro.parts;
-  struct gpu_part_send_g *ps = &parts_buffer[pack_ind];
+  struct gpu_part_data_g *ps = &parts_buffer[pack_ind].p_data;
 
   for (int i = 0; i < count; i++) {
 
@@ -251,6 +244,56 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     ps[i].pjs_pje.x = cjstart;
     ps[i].pjs_pje.y = cjend;
   }
+}
+
+/**
+ * @brief Packs the cell particle data for pair gradient interactions into the
+ * CPU-side buffers.
+ *
+ * @param ci the #cell
+ * @param parts_buffer the buffer to pack into
+ * @param pack_ind the first free index in the buffer arrays to copy data into
+ * @param shift periodic boundary shift
+ * @param cjstart start index of cell cj's particles (which cell ci is to be
+ * interacted with) in buffer
+ * @param cjend end index of cell cj's particles (which cell ci is to be
+ * interacted with) in buffer
+ */
+__attribute__((always_inline)) INLINE static void gpu_pack_part_unique_gradient(
+    const struct cell *restrict c,
+    struct gpu_part_send_g *restrict parts_buffer, const int pack_ind) {
+
+  /* Grab handles */
+  const int count = c->hydro.count;
+  const struct part *parts = c->hydro.parts;
+  struct gpu_part_data_g *ps = &parts_buffer[pack_ind].p_data;
+
+  for (int i = 0; i < count; i++) {
+
+    const struct part *p = &parts[i];
+
+    const double *x = part_get_const_x(p);
+    ps[i].x_h.x = x[0];
+    ps[i].x_h.y = x[1];
+    ps[i].x_h.z = x[2];
+    ps[i].x_h.w = part_get_h(p);
+
+    const float *v = part_get_const_v(p);
+    ps[i].vx_m.x = v[0];
+    ps[i].vx_m.y = v[1];
+    ps[i].vx_m.z = v[2];
+    ps[i].vx_m.w = part_get_mass(p);
+
+    ps[i].rho_avisc_u_c.x = part_get_rho(p);
+    ps[i].rho_avisc_u_c.y = part_get_alpha_av(p);
+    ps[i].rho_avisc_u_c.z = part_get_u(p);
+    ps[i].rho_avisc_u_c.w = part_get_soundspeed(p);
+
+  }
+  /*We've packed all the particles. Now insert the cell position into the count index*/
+  parts_buffer[pack_ind + count].c_loc.x.x = c->loc[0];
+  parts_buffer[pack_ind + count].c_loc.x.y = c->loc[1];
+  parts_buffer[pack_ind + count].c_loc.x.z = c->loc[2];
 }
 
 /**
@@ -312,7 +355,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_unique_force(
 }
 
 /**
- * @brief Packs the cell particle data for pair gradient interactions into the
+ * @brief Packs the cell particle data for pair force interactions into the
  * CPU-side buffers.
  *
  * @param ci the #cell
