@@ -34,7 +34,7 @@ extern "C" {
 #include "../timeline.h"
 
 /*! Container for particle data required for density calcs */
-struct gpu_part_data_d {
+struct __align__(8) gpu_part_data_d {
 #ifdef WITH_CUDA
 //TODO: This needs changing to doubles too. Darn it...
 /*! Particle position and h -> x, y, z, h */
@@ -66,7 +66,7 @@ struct gpu_part_send_d{
     /*! Container for cell positions for density calcs */
 	struct gpu_cell_pos c_loc;
   };
-};
+} ;
 /*! Container for particle data sent back to CPU for density calcs */
 struct gpu_part_recv_d {
 #ifdef WITH_CUDA
@@ -83,7 +83,7 @@ struct gpu_part_recv_d {
 };
 
 /*! Container for particle data required for gradient calcs */
-struct gpu_part_data_g {
+struct __align__(8) gpu_part_data_g {
 #ifdef WITH_CUDA
 
   /*! Particle position & smoothing length */
@@ -96,7 +96,7 @@ struct gpu_part_data_g {
   float4 rho_avisc_u_c;
 
   /*! viscosity information results */
-  float3 vsig_lapu_aviscmax;
+  float4 vsig_lapu_aviscmax;
 
   /*! Start and end index of particles to be interacted with in particle
    * buffer arrays */
@@ -112,7 +112,7 @@ struct gpu_part_send_g{
     /*! Container for cell positions for density calcs */
     struct gpu_cell_pos c_loc;
   };
-};
+} ;
 /*! Container for particle data sent back to CPU for gradient calcs */
 struct gpu_part_recv_g {
 #ifdef WITH_CUDA
@@ -122,7 +122,7 @@ struct gpu_part_recv_g {
 
 #endif
 };
-struct gpu_part_data_f{
+struct __align__(8) gpu_part_data_f{
 #ifdef WITH_CUDA
   /*! Particle positions, smoothing length */
   float4 x_h;
@@ -155,7 +155,7 @@ struct gpu_part_send_f {
     struct gpu_cell_pos c_loc;
   };
 #endif
-};
+} ;
 
 /*! Container for particle data sent back to CPU for force calcs */
 struct gpu_part_recv_f {

@@ -174,7 +174,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
   const struct part *parts = c->hydro.parts;
   struct gpu_part_data_d *ps = &parts_buffer[pack_ind].p_data;
 
-  for (int i = 0; i < count; i++) {
+#pragma omp simd
+for (int i = 0; i < count; i++) {
+  __builtin_prefetch(&parts[i + 8], 0, 0);
 
     const struct part *p = &parts[i];
 
@@ -268,8 +270,10 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_unique_gradient(
   const struct part *parts = c->hydro.parts;
   struct gpu_part_data_g *ps = &parts_buffer[pack_ind].p_data;
 
+//  #pragma GCC ivdep
+  #pragma omp simd
   for (int i = 0; i < count; i++) {
-
+    __builtin_prefetch(&parts[i + 8], 0, 0);
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
@@ -317,7 +321,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_unique_force(
   const struct part *parts = ci->hydro.parts;
   struct gpu_part_data_f *ps = &parts_buffer[pack_ind].p_data;
 
-  for (int i = 0; i < count; i++) {
+#pragma omp simd
+for (int i = 0; i < count; i++) {
+  __builtin_prefetch(&parts[i + 8], 0, 0);
 
     const struct part *p = &parts[i];
 
