@@ -205,27 +205,22 @@ static void runner_doself_gpu_recurse(const struct runner *r,
 
 /*TODO: Move all hash_table code into hash_cell_pointers.c or something*/
 // Simple hash function for pointers
-static inline int hash_func(const struct cell *ptr, const int hash_size) {
+__attribute__((always_inline)) INLINE static int hash_func(const struct cell *ptr, const int hash_size) {
     return ((uintptr_t)ptr) % hash_size;
-}
-
-// Simple hash function for pointers
-static inline int lin_probe(const struct cell *ptr, const int hash_size) {
-    return ((uintptr_t)ptr + 1) % hash_size;
 }
 
 /* Insert into hash table. No need for probing as we will
  * only store one cell in each index of hash table*/
-void hash_insert(struct cell *c, int unique_count, const int h_id, struct hash_entry * ht) {
-    ht[h_id].c = c;
+__attribute__((always_inline)) INLINE static void hash_insert(const struct cell *restrict c, const int unique_count, const int h_id, struct hash_entry * ht) {
+    ht[h_id].c = (struct cell*)c;
     /*This is where the cell will be located in the unique_cells array*/
     ht[h_id].index = unique_count;
     ht[h_id].occupied = 1;
 }
 
 // Lookup in hash table
-void hash_lookup(struct cell *c, const int hash_size,
-		struct hash_entry * ht, struct gpu_offload_data *buf, const int ij,
+__attribute__((always_inline)) INLINE static void hash_lookup(const struct cell *restrict c, const int hash_size,
+		struct hash_entry *restrict ht, struct gpu_offload_data *restrict buf, const int ij,
 		const enum task_subtypes task_subtype) {
 
   /*Get the hash using the cell's pointer address*/
@@ -246,12 +241,10 @@ void hash_lookup(struct cell *c, const int hash_size,
 	  /*Check if this is ci*/
 	  if(ij == 0){
 		md->my_index[n_leaves_packed].x = ht[h_id].index;
-		md->pack_ci[n_leaves_packed] = 0;
 	  }
 	  /*cell is cj*/
 	  else{
 		md->my_index[n_leaves_packed].y = ht[h_id].index;
-		md->pack_cj[n_leaves_packed] = 0;
 	  }
 	  return;
 	}
@@ -266,19 +259,19 @@ void hash_lookup(struct cell *c, const int hash_size,
   /*unique_cells is different from hash table.
    * This is just an array to keep track of
    * unique cells*/
-  md->unique_cells[unique_count] = c;
+  md->unique_cells[unique_count] = (struct cell *)c;
   md->hash_table.count++;
   int c_count = c->hydro.count;
+  /*Store where ci starts*/
+  md->unique_start_end[unique_count].x = md->count_parts_unique;
+  /*Store where ci ends*/
+  md->unique_start_end[unique_count].y = md->count_parts_unique + c_count + 1;
+
   if(ij == 0){ /*This is ci and it is unique*/
-	md->pack_ci[n_leaves_packed] = 1;
 	/*This cell has not been found yet.
 	 * Add to unique_cells and store it's index ascending
 	 * from index where we last inserted a unique cell*/
 	md->my_index[n_leaves_packed].x = unique_count;
-    /*Store where ci starts*/
-    md->unique_start_end[unique_count].x = md->count_parts_unique;
-    /*Store where ci ends*/
-    md->unique_start_end[unique_count].y = md->count_parts_unique + c_count + 1;
     /*Now pack the particles since this cell is unique*/
     if(task_subtype == task_subtype_gpu_density)
       gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
@@ -290,15 +283,10 @@ void hash_lookup(struct cell *c, const int hash_size,
     md->count_parts_unique += c_count + 1;
   }
   else{ /*This is cj and it is unique*/
-	md->pack_cj[n_leaves_packed] = 1;
 	/*This cell has not been found yet.
 	 * Add to unique_cells and store it's index ascending
 	 * from index where we last inserted a unique cell*/
 	md->my_index[n_leaves_packed].y = unique_count;
-    /*Store where ci starts*/
-    md->unique_start_end[unique_count].x = md->count_parts_unique;
-    /*Store where ci ends*/
-    md->unique_start_end[unique_count].y = md->count_parts_unique + c_count + 1;
     /*Now pack the particles since this cell is unique*/
     if(task_subtype == task_subtype_gpu_density)
       gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
@@ -326,18 +314,17 @@ void hash_lookup(struct cell *c, const int hash_size,
  * @param depth current recursion depth
  * @param timer are we timing this?
  */
-static void runner_gpu_filter_data(const struct runner *r,
+__attribute__((always_inline)) INLINE static void runner_gpu_filter_data(const struct runner *r,
                                       const struct scheduler *s,
-                                      struct gpu_offload_data *buf,
-                                      const char timer, const struct task * t, struct cell *cii,
-                                      struct cell *cjj, const enum task_subtypes task_subtype) {
+                                      struct gpu_offload_data *restrict buf,
+                                      const char timer, const struct task * t, const struct cell *restrict cii,
+                                      const struct cell *restrict cjj, const enum task_subtypes task_subtype) {
 
   //TODO: Inline this function
 
   /* Grab some handles. */
   /* packing data and metadata */
   struct gpu_pack_metadata *md = &buf->md;
-  const int n_leaves_packed = md->n_leaves_packed;
  /* TODO: Use this to replace array when checking as we no longer need to track this for the entire list of cells*/
 //  int2 pack = {0, 0};
 
@@ -354,12 +341,6 @@ static void runner_gpu_filter_data(const struct runner *r,
   /*None of these should be NULL. Even for selfs where cjj = cii*/
   if (cii == NULL || cjj == NULL)
 	  error("Error: working on NULL cells");
-
-  /*TODO: No longer needed so remove
-   * Set the flag to pack this cell to false.
-   * Re-set .x to true later if cell i or cj are unique*/
-  md->pack_ci[n_leaves_packed] = 0;
-  md->pack_cj[n_leaves_packed] = 0;
 
   /*Check if ci has already been found.
    * If so, return where it's unique copy
