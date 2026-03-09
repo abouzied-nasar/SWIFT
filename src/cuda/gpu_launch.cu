@@ -41,8 +41,12 @@ extern "C" {
 /* #include <cuda_profiler_api.h> */
 /* #include <cuda_runtime.h> */
 
+// Tunables: start with BLOCK_SIZE=128..256, TILE_J=128..256 depending on SM resources.
+#ifndef BLOCK_SIZE
+#define BLOCK_SIZE 64
+#endif
 #ifndef TILE_J
-#define TILE_J 64
+#define TILE_J 16
 #endif
 
 /**
