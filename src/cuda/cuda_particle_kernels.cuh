@@ -252,6 +252,10 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_density_p(
 	const float zij = zi - zj;
 	const float r2 = xij * xij + yij * yij + zij * zij;
 
+    // r^2 using FMAs
+//    const float r2 = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+
+
 	if ((r2 < hig2) && (j != pid)) {
 	  /* j != pid: Exclude self contribution. This happens at a later step. */
 
