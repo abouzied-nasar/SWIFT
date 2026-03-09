@@ -188,6 +188,8 @@ void process_range_tiled_noasync(
 {
     // Shared memory for one tile of J: positions and velocities
     extern __shared__ __align__(16) unsigned char smem[];
+    //TODO: Check if this is safe and/or required. We're casting from float4 to float4
+    //Also, we need positions to be double so this may need re-working!
     float4* s_pos4 = reinterpret_cast<float4*>(smem);                   // [TILE_J]
     float4* s_vel4 = reinterpret_cast<float4*>(s_pos4 + TILE_J);        // [TILE_J]
 
@@ -240,7 +242,7 @@ void process_range_tiled_noasync(
             for (int t = 0; t < tileCount; ++t)
             {
                 const int j_idx = base + t;
-                if (j_idx == i_idx) continue;  // self for self-pairs
+                if (j_idx == i_idx) continue;  // We do not add i contribution. This is done in ghost tasks
 
                 const float4 pj_pos = s_pos4[t]; // unshifted
                 const float4 pj_vel = s_vel4[t];
@@ -250,10 +252,13 @@ void process_range_tiled_noasync(
                 const float yij = yi - (pj_pos.y - (float)shift_j_d.y);
                 const float zij = zi - (pj_pos.z - (float)shift_j_d.z);
 
+                //fmaf -> fused multiply addition operator
                 const float r2 = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
                 if (r2 >= hig2) continue;
 
+                //Clever Co-Pilot
                 const float inv_r = rsqrtf(r2 + eps);
+                //Very clever Co-Pilot, multiply instead of divide
                 const float r     = r2 * inv_r;
                 const float ui    = r * hi_inv;
 
@@ -304,15 +309,15 @@ void process_range_tiled_noasync(
     }
 }
 
-__global__ __launch_bounds__(BLOCK_SIZE, 2)
+__global__ __launch_bounds__(BLOCK_SIZE, 2 /*min number of blocks we launch per SM*/)
 void cuda_launch_density_tiled_noasync(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     struct gpu_part_recv_d* __restrict__ d_parts_recv,
     const float d_a, const float d_H,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
-    const double3 space_dim)
-{
+    const double3 space_dim){
+
     const int bid     = blockIdx.x;
     const int leafid  = d_block_leaf_id[bid].x;
     const int bid_0   = d_block_leaf_id[bid].y;
@@ -321,12 +326,12 @@ void cuda_launch_density_tiled_noasync(
     const int ci_start = cell_se.x;
     const int ci_end   = cell_se.y; // cell pos at index [ci_end-1]
     const int cj_start = cell_se.z;
-    const int cj_end   = cell_se.w;
+    const int cj_end   = cell_se.w; // cell pos at index [cj_end-1]
 
     const int b_id_local = bid - bid_0;
     const int tid = threadIdx.x;
 
-    // Periodic shift (as in your original code)
+    // Let's get the cell positions
     const auto ci_loc = d_parts_send[ci_end - 1].c_loc;
     const auto cj_loc = d_parts_send[cj_end - 1].c_loc;
 
@@ -380,206 +385,14 @@ void gpu_launch_density_tiled_noasync(
     const double3 space_dim,
     cudaStream_t stream)
 {
-    // Shared memory: one buffer for pos4 + one buffer for vel4
-    const size_t shmem = TILE_J * (sizeof(float4) + sizeof(float4)); // 2048 bytes when TILE_J=64
+    // Shared memory allocation
+    const size_t shmem = TILE_J * (sizeof(struct gpu_part_data_d));//(sizeof(float4) + sizeof(float4)); // 2048 bytes when TILE_J=64
 
     cuda_launch_density_tiled_noasync<<<num_blocks_x, BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
         d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
 ///////////////////////////
-
-// Kernel with shared-memory tiling of the J cell for both passes (ci<-cj) and (cj<-ci)
-__global__ void cuda_launch_density_tiled(
-    const struct gpu_part_send_d* __restrict__ d_parts_send,
-    struct gpu_part_recv_d* __restrict__ d_parts_recv,
-    const float d_a, const float d_H,
-    const int4* __restrict__ d_cell_i_j_start_end,
-    const int2* __restrict__ d_block_leaf_id,
-    const double3 space_dim)
-{
-    const int bid     = blockIdx.x;
-    const int leafid  = d_block_leaf_id[bid].x;
-    const int bid_0   = d_block_leaf_id[bid].y;
-    int4 cell_se      = d_cell_i_j_start_end[leafid];
-
-    const int ci_start = cell_se.x;
-    const int ci_end   = cell_se.y; // last index stores cell loc; effective end is ci_end-1
-    const int cj_start = cell_se.z;
-    const int cj_end   = cell_se.w;
-
-    const int b_id_local = bid - bid_0;
-
-    // Compute shifts (periodic) once per block
-    // Load cell positions (stored at last slot of each cell range)
-    const struct gpu_cell_pos ci_loc = d_parts_send[ci_end - 1].c_loc;
-    const struct gpu_cell_pos cj_loc = d_parts_send[cj_end - 1].c_loc;
-
-    double3 shift = {0.0, 0.0, 0.0};
-    const double distx = cj_loc.x.x - ci_loc.x.x;
-    const double disty = cj_loc.x.y - ci_loc.x.y;
-    const double distz = cj_loc.x.z - ci_loc.x.z;
-
-    if (distx < -space_dim.x * 0.5) shift.x =  space_dim.x;
-    else if (distx >  space_dim.x * 0.5) shift.x = -space_dim.x;
-
-    if (disty < -space_dim.y * 0.5) shift.y =  space_dim.y;
-    else if (disty >  space_dim.y * 0.5) shift.y = -space_dim.y;
-
-    if (distz < -space_dim.z * 0.5) shift.z =  space_dim.z;
-    else if (distz >  space_dim.z * 0.5) shift.z = -space_dim.z;
-
-    // Shifts for each pass
-    const double3 shift_i_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
-    const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
-
-    // Shared memory tiles for J particles
-    extern __shared__ unsigned char smem[];
-    float4* s_pos4 = reinterpret_cast<float4*>(smem);                   // size TILE_J
-    float4* s_vel4 = reinterpret_cast<float4*>(s_pos4 + TILE_J);        // size TILE_J
-
-    const int tid = threadIdx.x;
-
-    auto process_i_range_against_j_range = [&](int i_start, int i_end_excl,
-                                               int j_start, int j_end_excl,
-                                               const double3 shift_i_d, const double3 shift_j_d)
-    {
-        const int i_idx = b_id_local * BLOCK_SIZE + tid + i_start;
-        if (i_idx >= i_end_excl) return;
-
-        // Load i once
-        const auto pi = d_parts_send[i_idx].p_data;
-        const float xi = (float)(pi.x_h.x - shift_i_d.x);
-        const float yi = (float)(pi.x_h.y - shift_i_d.y);
-        const float zi = (float)(pi.x_h.z - shift_i_d.z);
-        const float hi = (float)(pi.x_h.w);
-
-        const float vxi = pi.vx_m.x;
-        const float vyi = pi.vx_m.y;
-        const float vzi = pi.vx_m.z;
-
-        const float hig2   = (hi * hi) * kernel_gamma2;
-        const float hi_inv = 1.0f / hi;
-
-        float4 res_rho = make_float4(0.f, 0.f, 0.f, 0.f);
-        float4 res_rot = make_float4(0.f, 0.f, 0.f, 0.f);
-
-        constexpr float eps = 1e-24f;
-
-        // Tile over J cell
-        for (int base = j_start; base < j_end_excl; base += TILE_J)
-        {
-            const int tileCount = min(TILE_J, j_end_excl - base);
-
-            // Cooperative load of J tile into shared memory
-            for (int t = tid; t < tileCount; t += BLOCK_SIZE)
-            {
-                const auto pj = d_parts_send[base + t].p_data;
-                // Pack pos - shift_j and h in w
-                s_pos4[t] = make_float4(
-                    (float)(pj.x_h.x - shift_j_d.x),
-                    (float)(pj.x_h.y - shift_j_d.y),
-                    (float)(pj.x_h.z - shift_j_d.z),
-                    pj.x_h.w
-                );
-                // Pack (vx, vy, vz, m)
-                s_vel4[t] = pj.vx_m;
-            }
-            __syncthreads();
-
-            // Compute interactions with staged tile
-#pragma unroll 4
-            for (int t = 0; t < tileCount; ++t)
-            {
-                const int j_idx = base + t;
-
-                // Self-skip only relevant for self tasks
-                if (j_idx == i_idx) continue;
-
-                const float4 pj_pos = s_pos4[t];
-                const float4 pj_vel = s_vel4[t];
-
-                const float xij = xi - pj_pos.x;
-                const float yij = yi - pj_pos.y;
-                const float zij = zi - pj_pos.z;
-
-                const float r2 = fmaf(xij, xij, fmaf(yij, yij,   zij * zij));
-                if (r2 >= hig2) continue;
-
-                const float vxj = pj_vel.x;
-                const float vyj = pj_vel.y;
-                const float vzj = pj_vel.z;
-                const float mj  = pj_vel.w;
-
-                const float inv_r = rsqrtf(r2 + eps);
-                const float r     = r2 * inv_r;
-
-                const float ui = r * hi_inv;
-
-                float wi, wi_dx;
-                d_kernel_deval(ui, &wi, &wi_dx);
-
-                const float tmp = (hydro_dimension * wi + ui * wi_dx);
-
-                res_rho.x += mj * wi;
-                res_rho.y -= mj * tmp;
-                res_rho.z += wi;
-                res_rho.w -= tmp;
-
-                const float faci = mj * wi_dx * inv_r;
-
-                const float dvx = vxi - vxj;
-                const float dvy = vyi - vyj;
-                const float dvz = vzi - vzj;
-
-                const float dvdr   = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij));
-                const float curlrx = fmaf(dvy, zij, -dvz * yij);
-                const float curlry = fmaf(dvz, xij, -dvx * zij);
-                const float curlrz = fmaf(dvx, yij, -dvy * xij);
-
-                res_rot.x = fmaf(faci,  curlrx, res_rot.x);
-                res_rot.y = fmaf(faci,  curlry, res_rot.y);
-                res_rot.z = fmaf(faci,  curlrz, res_rot.z);
-                res_rot.w = fmaf(-faci, dvdr,    res_rot.w);
-            }
-            __syncthreads();
-        }
-
-        // Atomically add results for this i
-        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.x, res_rho.x);
-        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.y, res_rho.y);
-        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.z, res_rho.z);
-        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.w, res_rho.w);
-
-        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.x, res_rot.x);
-        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.y, res_rot.y);
-        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.z, res_rot.z);
-        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.w, res_rot.w);
-    };
-
-    // Pass 1: ci <- cj
-    {
-        const int i_end_excl = ci_end - 1;
-        const int j_end_excl = cj_end - 1;
-        process_i_range_against_j_range(ci_start, i_end_excl, cj_start, j_end_excl,
-                                        shift_i_res, shift_j_res);
-    }
-
-    // Pass 2: cj <- ci (only if not self)
-    if (ci_start != cj_start)
-    {
-        // swap roles
-        const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
-        const double3 shift_jj_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
-
-        const int i_end_excl = cj_end - 1;
-        const int j_end_excl = ci_end - 1;
-
-        // Reuse the same mapping for thread → i in the swapped range
-        process_i_range_against_j_range(cj_start, i_end_excl, ci_start, j_end_excl,
-                                        shift_ii_res, shift_jj_res);
-    }
-}
 
 /**
  * @brief Call the particle SPH gradient kernel.
@@ -911,23 +724,6 @@ void gpu_launch_density(const struct gpu_part_send_d *__restrict__ d_parts_send,
       d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
 
-void gpu_launch_density_tiled(const struct gpu_part_send_d* __restrict__ d_parts_send,
-                        struct gpu_part_recv_d* __restrict__ d_parts_recv,
-                        const float d_a, const float d_H,
-                        const int num_blocks_x,
-                        const int4* __restrict__ d_cell_i_j_start_end,
-                        const int2* __restrict__ d_block_leaf_id,
-                        const double3 space_dim,
-                        cudaStream_t stream)
-{
-    // Shared memory size: two float4 tiles of size TILE_J
-    const size_t shmem = (sizeof(float4) * TILE_J) * 2;
-
-    cuda_launch_density_tiled<<<num_blocks_x, BLOCK_SIZE, shmem, stream>>>(
-        d_parts_send, d_parts_recv, d_a, d_H,
-        d_cell_i_j_start_end, d_block_leaf_id, space_dim);
-}
-
 /**
  * @brief Launch the gradient computation on the GPU for a bundle of leaf cells.
  *
@@ -982,6 +778,271 @@ void gpu_launch_gradient(
       d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
 }
 
+// ---- constants_compat (paste near top of the .cu) ----
+#ifdef kernel_gamma2
+  #define KERNEL_GAMMA2 (kernel_gamma2)
+#else
+  extern __device__ float kernel_gamma2;
+  #define KERNEL_GAMMA2 kernel_gamma2
+#endif
+
+#ifdef const_viscosity_beta
+  #define CONST_VISCOSITY_BETA (const_viscosity_beta)
+#else
+  extern __device__ float const_viscosity_beta;
+  #define CONST_VISCOSITY_BETA const_viscosity_beta
+#endif
+
+// Your device helpers/constants already in your code base:
+__device__ void  d_kernel_deval(float u, float* w, float* wdx);
+__device__ float d_pow_three_gamma_minus_five_over_two(float a);
+
+// Compute i-range against j-range using shared-memory tiles (no async prefetch)
+__device__ __forceinline__
+void process_range_gradient_tiled_noasync(
+    const struct gpu_part_send_g* __restrict__ d_parts_send,
+    struct gpu_part_recv_g*      __restrict__ d_parts_recv,
+    // ranges (end_excl excludes the cell-position slot at [end-1])
+    int i_start, int i_end_excl,
+    int j_start, int j_end_excl,
+    // periodic shifts
+    const double3 shift_i_d, const double3 shift_j_d,
+    // mapping
+    int b_id_local, int tid,
+    // cosmology
+    float d_a, float d_H)
+{
+    // Shared memory tile for J: pos/h, vel/m, rho/avisc/u/c
+    extern __shared__ __align__(16) unsigned char smem[];
+    float4* s_pos4 = reinterpret_cast<float4*>(smem);                    // [TILE_J] (xj,yj,zj,hj)
+    float4* s_vel4 = reinterpret_cast<float4*>(s_pos4 + TILE_J);         // [TILE_J] (vxj,vyj,vzj,mj)
+    float4* s_rac4 = reinterpret_cast<float4*>(s_vel4 + TILE_J);         // [TILE_J] (rhoj,aviscj,energyj,cj)
+
+    // Map this thread to its i-particle; keep all threads in lockstep (no early return)
+    const int  i_idx    = b_id_local * BLOCK_SIZE + tid + i_start;
+    const bool i_active = (i_idx < i_end_excl);
+
+    // Per-i data (only load if active)
+    float xi=0.f, yi=0.f, zi=0.f, hi=1.f;
+    float vxi=0.f, vyi=0.f, vzi=0.f;
+    float energyi=0.f, ci=0.f;
+    float vsigi=0.f, lapui=0.f, avisc_maxi=0.f;
+
+    float hi_inv=1.f, hig2=0.f;
+
+    if (i_active) {
+        const auto pi = d_parts_send[i_idx].p_data;
+
+        xi = (float)(pi.x_h.x - shift_i_d.x);
+        yi = (float)(pi.x_h.y - shift_i_d.y);
+        zi = (float)(pi.x_h.z - shift_i_d.z);
+        hi = (float)(pi.x_h.w);
+
+        vxi = pi.vx_m.x;  vyi = pi.vx_m.y;  vzi = pi.vx_m.z;
+
+        // rho_avisc_u_c: (rho, avisc, u, c)
+        energyi = pi.rho_avisc_u_c.z;
+        ci      = pi.rho_avisc_u_c.w;
+
+        // vsig_lapu_aviscmax: (vsig, laplace_u, avisc_max)
+        vsigi       = pi.vsig_lapu_aviscmax.x;
+        lapui       = pi.vsig_lapu_aviscmax.y;
+        avisc_maxi  = pi.vsig_lapu_aviscmax.z;
+
+        hi_inv = 1.0f / hi;
+        hig2   = (hi * hi) * KERNEL_GAMMA2;
+    }
+
+    // Accumulators
+    // Start from the i-side stored values (as in your original), then update over neighbors
+    float3 res_vsig_lapu_avisci = {vsigi, lapui, avisc_maxi};
+
+    // Cosmology terms
+    const float fac_mu    = d_pow_three_gamma_minus_five_over_two(d_a);
+    const float a2_Hubble = d_a * d_a * d_H;
+
+    constexpr float eps = 1e-24f;
+
+    // ---- Tile over J ----
+    for (int base = j_start; base < j_end_excl; base += TILE_J)
+    {
+        const int tileCount = min(TILE_J, j_end_excl - base);
+
+        // Cooperative load of this J tile into shared memory
+        for (int t = tid; t < tileCount; t += BLOCK_SIZE)
+        {
+            const int gj = base + t;
+            const auto pj = d_parts_send[gj].p_data;
+            s_pos4[t] = pj.x_h;              // (xj,yj,zj,hj)  (unshifted)
+            s_vel4[t] = pj.vx_m;             // (vxj,vyj,vzj,mj)
+            s_rac4[t] = pj.rho_avisc_u_c;    // (rhoj,aviscj,energyj,cj)
+        }
+        __syncthreads();
+
+        if (i_active)
+        {
+#pragma unroll 4
+            for (int t = 0; t < tileCount; ++t)
+            {
+                const int j_idx = base + t;
+                if (j_idx == i_idx) continue; // self for self-pairs
+
+                // Unpack J tile
+                const float4 pj_pos = s_pos4[t];
+                const float4 pj_vel = s_vel4[t];
+                const float4 pj_rac = s_rac4[t];
+
+                const float xj = (float)(pj_pos.x - (float)shift_j_d.x);
+                const float yj = (float)(pj_pos.y - (float)shift_j_d.y);
+                const float zj = (float)(pj_pos.z - (float)shift_j_d.z);
+                // const float hj = pj_pos.w; // (hj not used in this gradient kernel)
+
+                const float vxj = pj_vel.x, vyj = pj_vel.y, vzj = pj_vel.z, mj = pj_vel.w;
+
+                const float rhoj    = pj_rac.x;
+                const float aviscj  = pj_rac.y;
+                const float energyj = pj_rac.z;
+                const float cj      = pj_rac.w;
+
+                // Geometry
+                const float xij = xi - xj;
+                const float yij = yi - yj;
+                const float zij = zi - zj;
+
+                const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+                if (!(r2 < hig2)) continue;  // kernel support on h_i only (matches your code)
+
+                // Distances / normals
+                const float inv_r = rsqrtf(r2 + eps);
+                const float r     = r2 * inv_r;
+
+                // Cosmology-adjusted dv·r
+                const float dvx  = vxi - vxj;
+                const float dvy  = vyi - vyj;
+                const float dvz  = vzi - vzj;
+                const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij));
+                const float dvdr_Hubble = dvdr + a2_Hubble * r2;
+
+                // Approaching?
+                const float omega_ij = fminf(dvdr_Hubble, 0.f);
+                const float mu_ij    = fac_mu * inv_r * omega_ij; // <= 0
+
+                // Signal velocity (update running max across neighbors; init was vsigi)
+                const float new_v_sig = ci + cj - CONST_VISCOSITY_BETA * mu_ij;
+                res_vsig_lapu_avisci.x = fmaxf(res_vsig_lapu_avisci.x, new_v_sig);
+
+                // Kernel (derivative wrt r/hi); only wi_dx needed here
+                float wi, wi_dx;
+                const float ui = r * hi_inv;
+                d_kernel_deval(ui, &wi, &wi_dx);
+
+                // Laplacian(u) accumulation
+                // delta_u_factor = (u_i - u_j) / r
+                const float delta_u_factor = (energyi - energyj) * inv_r;
+                // + mj * (Δu / r) * wi_dx / rhoj
+                res_vsig_lapu_avisci.y += mj * delta_u_factor * wi_dx * (1.0f / rhoj);
+
+                // Max alpha_visc from neighbors (used downstream)
+                res_vsig_lapu_avisci.z = fmaxf(res_vsig_lapu_avisci.z, aviscj);
+            }
+        }
+
+        __syncthreads(); // all threads reach the same number of barriers
+    }
+
+    // Atomics only for active i (semantics preserved)
+    if (i_active) {
+        atomicAdd(&d_parts_recv[i_idx].vsig_lapu_aviscmax.x, res_vsig_lapu_avisci.x);
+        atomicAdd(&d_parts_recv[i_idx].vsig_lapu_aviscmax.y, res_vsig_lapu_avisci.y);
+        atomicMaxFloat(&d_parts_recv[i_idx].vsig_lapu_aviscmax.z, res_vsig_lapu_avisci.z);
+    }
+}
+
+__global__ __launch_bounds__(BLOCK_SIZE, 2)
+void cuda_launch_gradient_tiled_noasync(
+    const struct gpu_part_send_g* __restrict__ d_parts_send,
+    struct gpu_part_recv_g*      __restrict__ d_parts_recv,
+    const float d_a, const float d_H,
+    const int4* __restrict__ d_cell_i_j_start_end,
+    const int2* __restrict__ d_block_leaf_id,
+    const double3 space_dim)
+{
+    const int bid     = blockIdx.x;
+    const int leafid  = d_block_leaf_id[bid].x;
+    const int bid_0   = d_block_leaf_id[bid].y;
+    int4 cell_se      = d_cell_i_j_start_end[leafid];
+
+    const int ci_start = cell_se.x;
+    const int ci_end   = cell_se.y; // cell position at [ci_end-1]
+    const int cj_start = cell_se.z;
+    const int cj_end   = cell_se.w;
+
+    const int b_id_local = bid - bid_0;
+    const int tid        = threadIdx.x;
+
+    // Periodic shift (same as your other kernels)
+    const auto ci_loc = d_parts_send[ci_end - 1].c_loc;
+    const auto cj_loc = d_parts_send[cj_end - 1].c_loc;
+
+    double3 shift = {0.0, 0.0, 0.0};
+    const double distx = cj_loc.x.x - ci_loc.x.x;
+    const double disty = cj_loc.x.y - ci_loc.x.y;
+    const double distz = cj_loc.x.z - ci_loc.x.z;
+
+    if (distx < -space_dim.x * 0.5)      shift.x =  space_dim.x;
+    else if (distx >  space_dim.x * 0.5)  shift.x = -space_dim.x;
+    if (disty < -space_dim.y * 0.5)      shift.y =  space_dim.y;
+    else if (disty >  space_dim.y * 0.5)  shift.y = -space_dim.y;
+    if (distz < -space_dim.z * 0.5)      shift.z =  space_dim.z;
+    else if (distz >  space_dim.z * 0.5)  shift.z = -space_dim.z;
+
+    const double3 shift_i_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
+    const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
+
+    // Pass 1: ci <- cj (exclude the cell-position slot at end-1)
+    process_range_gradient_tiled_noasync(
+        d_parts_send, d_parts_recv,
+        ci_start, ci_end - 1,
+        cj_start, cj_end - 1,
+        shift_i_res, shift_j_res,
+        b_id_local, tid,
+        d_a, d_H
+    );
+
+    // Pass 2: cj <- ci (only if not self)
+    if (ci_start != cj_start) {
+        const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
+        const double3 shift_jj_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
+
+        process_range_gradient_tiled_noasync(
+            d_parts_send, d_parts_recv,
+            cj_start, cj_end - 1,
+            ci_start, ci_end - 1,
+            shift_ii_res, shift_jj_res,
+            b_id_local, tid,
+            d_a, d_H
+        );
+    }
+}
+
+void gpu_launch_gradient_tiled_noasync(
+    const struct gpu_part_send_g* __restrict__ d_parts_send,
+    struct gpu_part_recv_g*      __restrict__ d_parts_recv,
+    const float d_a, const float d_H,
+    int num_blocks_x,
+    const int4* __restrict__ d_cell_i_j_start_end,
+    const int2* __restrict__ d_block_leaf_id,
+    const double3 space_dim,
+    cudaStream_t stream)
+{
+    // Shared memory: pos4 + vel4 + rac4
+    const size_t shmem = TILE_J * (sizeof(float4) * 3);  // 3072 bytes when TILE_J=64
+
+    cuda_launch_gradient_tiled_noasync<<<num_blocks_x, BLOCK_SIZE, shmem, stream>>>(
+        d_parts_send, d_parts_recv, d_a, d_H,
+        d_cell_i_j_start_end, d_block_leaf_id, space_dim);
+}
+
 /**
  * @brief Launch the force computation on the GPU for a bundle of leaf cells.
  *
@@ -1033,6 +1094,338 @@ void gpu_launch_force(const struct gpu_part_send_f *__restrict__ d_parts_send,
   /* TODO: Do we want to allocate shared memory here? */
   cuda_launch_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
+}
+
+//Safe version////////////////
+
+// ===== Tunables =====
+#ifndef BLOCK_SIZE
+#define BLOCK_SIZE 128      // try 128 or 256; pick the best after profiling
+#endif
+#ifndef TILE_J
+#define TILE_J     64       // matches ~64 particles per cell
+#endif
+
+// ===== Device functions / constants you already have =====
+__device__ void d_kernel_deval(float u, float* w, float* wdx);
+__device__ float d_pow_dimension_plus_one(float x);
+__device__ float d_pow_three_gamma_minus_five_over_two(float a);
+
+__device__ __forceinline__
+void process_range_force_tiled_noasync(
+    const struct gpu_part_send_f* __restrict__ d_parts_send,
+    struct gpu_part_recv_f*      __restrict__ d_parts_recv,
+    // ranges (end_excl excludes the cell-position slot at [end-1])
+    int i_start, int i_end_excl,
+    int j_start, int j_end_excl,
+    // periodic shifts
+    const double3 shift_i_d, const double3 shift_j_d,
+    // mapping
+    int b_id_local, int tid,
+    // cosmology
+    float d_a, float d_H)
+{
+    // Shared memory tile for J: pos/h, vel/m, f/bals/rho/p, c/u/avisc/adiff
+    extern __shared__ __align__(16) unsigned char smem[];
+    float4* s_pos4  = reinterpret_cast<float4*>(smem);                      // [TILE_J]
+    float4* s_vel4  = reinterpret_cast<float4*>(s_pos4  + TILE_J);          // [TILE_J]
+    float4* s_fbrp4 = reinterpret_cast<float4*>(s_vel4  + TILE_J);          // [TILE_J]
+    float4* s_cuid4 = reinterpret_cast<float4*>(s_fbrp4 + TILE_J);          // [TILE_J]
+
+    // Map this thread to its i-particle (keep all threads in lockstep → no early return)
+    const int  i_idx     = b_id_local * BLOCK_SIZE + tid + i_start;
+    const bool i_active  = (i_idx < i_end_excl);
+
+    // Per-i data (only loaded if active)
+    float xi=0.f, yi=0.f, zi=0.f, hi=1.f;
+    float vxi=0.f, vyi=0.f, vzi=0.f, mi=1.f;
+    float fi=0.f, balsi=0.f, rhoi=1.f, pressurei=0.f;
+    float ci=0.f, energyi=0.f, avisci=0.f, adiffi=0.f;
+    int   tbj=0, min_ngb_tbi=0;     // follows your original variable usage
+
+    float hi_inv=1.f, hid_inv=1.f, mi_inv=1.f, rhoi_inv=1.f, rhoi_inv2=1.f, hig2=0.f;
+
+    if (i_active) {
+        const auto pi = d_parts_send[i_idx].p_data;
+
+        xi = (float)(pi.x_h.x - shift_i_d.x);
+        yi = (float)(pi.x_h.y - shift_i_d.y);
+        zi = (float)(pi.x_h.z - shift_i_d.z);
+        hi = (float)(pi.x_h.w);
+
+        vxi = pi.vx_m.x;  vyi = pi.vx_m.y;  vzi = pi.vx_m.z;  mi  = pi.vx_m.w;
+
+        fi = pi.f_bals_rho_p.x;  balsi = pi.f_bals_rho_p.y;
+        rhoi = pi.f_bals_rho_p.z; pressurei = pi.f_bals_rho_p.w;
+
+        ci = pi.c_u_avisc_adiff.x;     energyi = pi.c_u_avisc_adiff.y;
+        avisci = pi.c_u_avisc_adiff.z; adiffi  = pi.c_u_avisc_adiff.w;
+
+        tbj         = pi.timebin_minngbtimebin_pjs_pje.x;
+        min_ngb_tbi = pi.timebin_minngbtimebin_pjs_pje.y;
+
+        hi_inv   = 1.0f / hi;
+        hid_inv  = d_pow_dimension_plus_one(hi_inv);
+        mi_inv   = 1.0f / mi;
+        rhoi_inv = 1.0f / rhoi;
+        rhoi_inv2= rhoi_inv * rhoi_inv;
+        hig2     = (hi * hi) * kernel_gamma2;
+    }
+
+    // Accumulators
+    float3 res_ahydro  = {0.f, 0.f, 0.f};
+    float2 res_udt_hdt = {0.f, 0.f};
+    int    res_min_ngb_timebin = i_active ? min_ngb_tbi : 0;
+
+    // Cosmology (same for all threads; computing per-thread is fine)
+    const float fac_mu    = d_pow_three_gamma_minus_five_over_two(d_a);
+    const float a2_Hubble = d_a * d_a * d_H;
+
+    constexpr float eps = 1e-24f;
+
+    // ---- Tile over J ----
+    for (int base = j_start; base < j_end_excl; base += TILE_J)
+    {
+        const int tileCount = min(TILE_J, j_end_excl - base);
+
+        // Cooperative load of this J tile into shared memory
+        for (int t = tid; t < tileCount; t += BLOCK_SIZE)
+        {
+            const int gj = base + t;
+            const auto pj = d_parts_send[gj].p_data;
+            s_pos4[t]  = pj.x_h;             // (xj,yj,zj,hj) — unshifted
+            s_vel4[t]  = pj.vx_m;            // (vxj,vyj,vzj,mj)
+            s_fbrp4[t] = pj.f_bals_rho_p;    // (fj,balsj,rhoj,pressurej)
+            s_cuid4[t] = pj.c_u_avisc_adiff; // (cj,energyj,aviscj,adiffj)
+        }
+        __syncthreads();
+
+        if (i_active)
+        {
+#pragma unroll 4
+            for (int t = 0; t < tileCount; ++t)
+            {
+                const int j_idx = base + t;
+                if (j_idx == i_idx) continue; // self for self-pairs
+
+                // Unpack J tile
+                const float4 pj_pos  = s_pos4[t];
+                const float4 pj_vel  = s_vel4[t];
+                const float4 pj_fbrp = s_fbrp4[t];
+                const float4 pj_cuid = s_cuid4[t];
+
+                const float xj = (float)(pj_pos.x - (float)shift_j_d.x);
+                const float yj = (float)(pj_pos.y - (float)shift_j_d.y);
+                const float zj = (float)(pj_pos.z - (float)shift_j_d.z);
+                const float hj = pj_pos.w;
+
+                const float vxj = pj_vel.x, vyj = pj_vel.y, vzj = pj_vel.z, mj = pj_vel.w;
+
+                const float fj = pj_fbrp.x, balsj = pj_fbrp.y;
+                const float rhoj = pj_fbrp.z, pressurej = pj_fbrp.w;
+
+                const float cj  = pj_cuid.x, energyj = pj_cuid.y;
+                const float aviscj = pj_cuid.z, adiffj = pj_cuid.w;
+
+                // Geometry
+                const float xij = xi - xj;
+                const float yij = yi - yj;
+                const float zij = zi - zj;
+
+                const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+                const float hjg2= (hj * hj) * kernel_gamma2;
+
+                if (!((r2 < hig2) || (r2 < hjg2))) continue;
+
+                const float inv_r = rsqrtf(r2 + eps);
+                const float r     = r2 * inv_r;
+
+                // Kernels for i and j
+                float wi, wi_dx, wj, wj_dx;
+
+                const float ui = r * hi_inv;   // r / hi
+                d_kernel_deval(ui, &wi, &wi_dx);
+                const float wi_dr = hid_inv * wi_dx;
+
+                const float hj_inv  = 1.0f / hj;
+                const float hjd_inv = d_pow_dimension_plus_one(hj_inv);
+                const float uj      = r * hj_inv; // r / hj
+                d_kernel_deval(uj, &wj, &wj_dx);
+                const float wj_dr = hjd_inv * wj_dx;
+
+                // Velocity diffs
+                const float dvx = vxi - vxj;
+                const float dvy = vyi - vyj;
+                const float dvz = vzi - vzj;
+
+                const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij)); // dv · r
+
+                // Hubble augmentation for dv·r
+                const float dvdr_Hubble = dvdr + a2_Hubble * r2;
+
+                // Are they approaching?
+                const float omega_ij = fminf(dvdr_Hubble, 0.f);
+                const float mu_ij    = fac_mu * inv_r * omega_ij; // <= 0
+
+                // Signal velocity and grad-h terms
+                const float v_sig = ci + cj - const_viscosity_beta * mu_ij;
+
+                // NOTE: f_ij = 1 - fi/mj ; f_ji = 1 - fj/mi
+                const float f_ij = 1.f - fi * (1.f / mj);
+                const float f_ji = 1.f - fj * mi_inv;
+
+                // Viscosity
+                const float rhoij      = rhoi + rhoj;
+                const float rhoij_inv  = 1.f / rhoij;
+                const float alpha      = avisci + aviscj;
+                const float visc       = -0.25f * alpha * v_sig * mu_ij * (balsi + balsj) * rhoij_inv;
+
+                const float visc_acc_term = 0.5f * visc * (wi_dr * f_ij + wj_dr * f_ji) * inv_r;
+
+                // Pressure
+                const float rhoj2         = rhoj * rhoj;
+                const float rhoj_inv      = 1.f / rhoj;
+                const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
+                const float P_over_rho2_j = pressurej * (1.f / rhoj2) * f_ji;
+
+                const float sph_acc_term  = (P_over_rho2_i * wi_dr + P_over_rho2_j * wj_dr) * inv_r;
+
+                const float acc = sph_acc_term + visc_acc_term;
+
+                // Acceleration accumulation
+                res_ahydro.x -= mj * acc * xij;
+                res_ahydro.y -= mj * acc * yij;
+                res_ahydro.z -= mj * acc * zij;
+
+                // du/dt terms
+                const float sph_du_term_i = P_over_rho2_i * dvdr * inv_r * wi_dr;
+                const float visc_du_term  = 0.5f * visc_acc_term * dvdr_Hubble;
+
+                // Diffusion
+                float alpha_diff = (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
+                // if (fabsf(pressurei + pressurej) < 1e-10f) alpha_diff = 0.f; // optional
+
+                const float v_diff = alpha_diff * 0.5f *
+                    (sqrtf(2.f * fabsf(pressurei - pressurej) * rhoij_inv) +
+                     fabsf(fac_mu * inv_r * dvdr_Hubble));
+
+                const float diff_du_term = v_diff * (energyi - energyj) *
+                    (f_ij * wi_dr * rhoi_inv + f_ji * wj_dr * rhoj_inv);
+
+                const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
+
+                // Accumulate energy & h-derivative
+                res_udt_hdt.x += du_dt_i * mj;
+                res_udt_hdt.y -= mj * dvdr * inv_r * rhoj_inv * wi_dr;
+            }
+        }
+
+        __syncthreads(); // all threads must reach the same number of barriers
+    }
+
+    // Min neighbor timebin (your original logic used tbj from i)
+    if (i_active && tbj > 0) {
+        res_min_ngb_timebin = min(res_min_ngb_timebin, tbj);
+    }
+
+    // Atomics only for active i
+    if (i_active) {
+        atomicAdd(&d_parts_recv[i_idx].udt_hdt.x, res_udt_hdt.x);
+        atomicAdd(&d_parts_recv[i_idx].udt_hdt.y, res_udt_hdt.y);
+
+        // If timebin is zero, set it; then take min
+        atomicCAS(&d_parts_recv[i_idx].minngbtb, 0, res_min_ngb_timebin);
+        atomicMin(&d_parts_recv[i_idx].minngbtb, res_min_ngb_timebin);
+
+        atomicAdd(&d_parts_recv[i_idx].a_hydro.x, res_ahydro.x);
+        atomicAdd(&d_parts_recv[i_idx].a_hydro.y, res_ahydro.y);
+        atomicAdd(&d_parts_recv[i_idx].a_hydro.z, res_ahydro.z);
+    }
+}
+
+__global__ __launch_bounds__(BLOCK_SIZE, 2)
+void cuda_launch_force_tiled_noasync(
+    const struct gpu_part_send_f* __restrict__ d_parts_send,
+    struct gpu_part_recv_f*      __restrict__ d_parts_recv,
+    const float d_a, const float d_H,
+    const int4* __restrict__ d_cell_i_j_start_end,
+    const int2* __restrict__ d_block_leaf_id,
+    const double3 space_dim)
+{
+    const int bid     = blockIdx.x;
+    const int leafid  = d_block_leaf_id[bid].x;
+    const int bid_0   = d_block_leaf_id[bid].y;
+    int4 cell_se      = d_cell_i_j_start_end[leafid];
+
+    const int ci_start = cell_se.x;
+    const int ci_end   = cell_se.y; // cell position at [ci_end-1]
+    const int cj_start = cell_se.z;
+    const int cj_end   = cell_se.w;
+
+    const int b_id_local = bid - bid_0;
+    const int tid = threadIdx.x;
+
+    // Periodic shift (same as your density wrapper)
+    const auto ci_loc = d_parts_send[ci_end - 1].c_loc;
+    const auto cj_loc = d_parts_send[cj_end - 1].c_loc;
+
+    double3 shift = {0.0, 0.0, 0.0};
+    const double distx = cj_loc.x.x - ci_loc.x.x;
+    const double disty = cj_loc.x.y - ci_loc.x.y;
+    const double distz = cj_loc.x.z - ci_loc.x.z;
+
+    if (distx < -space_dim.x * 0.5)      shift.x =  space_dim.x;
+    else if (distx >  space_dim.x * 0.5)  shift.x = -space_dim.x;
+    if (disty < -space_dim.y * 0.5)      shift.y =  space_dim.y;
+    else if (disty >  space_dim.y * 0.5)  shift.y = -space_dim.y;
+    if (distz < -space_dim.z * 0.5)      shift.z =  space_dim.z;
+    else if (distz >  space_dim.z * 0.5)  shift.z = -space_dim.z;
+
+    const double3 shift_i_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
+    const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
+
+    // Pass 1: ci <- cj (exclude cell-position slot at end-1)
+    process_range_force_tiled_noasync(
+        d_parts_send, d_parts_recv,
+        ci_start, ci_end - 1,
+        cj_start, cj_end - 1,
+        shift_i_res, shift_j_res,
+        b_id_local, tid,
+        d_a, d_H
+    );
+
+    // Pass 2: cj <- ci (only if not self)
+    if (ci_start != cj_start) {
+        const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
+        const double3 shift_jj_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
+
+        process_range_force_tiled_noasync(
+            d_parts_send, d_parts_recv,
+            cj_start, cj_end - 1,
+            ci_start, ci_end - 1,
+            shift_ii_res, shift_jj_res,
+            b_id_local, tid,
+            d_a, d_H
+        );
+    }
+}
+
+void gpu_launch_force_tiled_noasync(
+    const struct gpu_part_send_f* __restrict__ d_parts_send,
+    struct gpu_part_recv_f*      __restrict__ d_parts_recv,
+    const float d_a, const float d_H,
+    int num_blocks_x,
+    const int4* __restrict__ d_cell_i_j_start_end,
+    const int2* __restrict__ d_block_leaf_id,
+    const double3 space_dim,
+    cudaStream_t stream)
+{
+    // Shared memory: pos4 + vel4 + fbrp4 + cuid4
+    const size_t shmem = TILE_J * (sizeof(float4) * 4); // 4096 B when TILE_J=64
+
+    cuda_launch_force_tiled_noasync<<<num_blocks_x, BLOCK_SIZE, shmem, stream>>>(
+        d_parts_send, d_parts_recv, d_a, d_H,
+        d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
 
 #ifdef __cplusplus

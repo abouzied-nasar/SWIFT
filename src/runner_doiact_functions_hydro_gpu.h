@@ -499,7 +499,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
       /*"Once more unto the breach dear friends, once more!"
        *Issue instruction to launch GPU computations*/
-      gpu_launch_unique_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H,
+      gpu_launch_gradient_tiled_noasync(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H,
               n_blocks,
               gpu_md->d_cell_i_j_start_end,
               gpu_md->d_block_leaf_id, space_dim, stream[0]);
@@ -569,7 +569,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       /*Once more unto the breach dear friends, once more!
        *
        *Issue instruction to launch GPU computations*/
-      gpu_launch_unique_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
+      gpu_launch_force_tiled_noasync(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
               n_blocks,
               gpu_md->d_cell_i_j_start_end,
               gpu_md->d_block_leaf_id, space_dim, stream[0]);
