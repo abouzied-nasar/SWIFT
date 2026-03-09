@@ -231,9 +231,9 @@ void *runner_main_cuda(void *data) {
     gpu_data_buffers_init_step(&gpu_buf_self_dens);
     gpu_data_buffers_init_step(&gpu_buf_self_grad);
     gpu_data_buffers_init_step(&gpu_buf_self_forc);
-    gpu_data_buffers_init_step(&gpu_buf_pair_dens);
-    gpu_data_buffers_init_step(&gpu_buf_pair_grad);
-    gpu_data_buffers_init_step(&gpu_buf_pair_forc);
+//    gpu_data_buffers_init_step(&gpu_buf_pair_dens);
+//    gpu_data_buffers_init_step(&gpu_buf_pair_grad);
+//    gpu_data_buffers_init_step(&gpu_buf_pair_forc);
 
     /* Get some global variables' values for this step */
     const float d_a = e->cosmology->a;
