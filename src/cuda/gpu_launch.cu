@@ -41,6 +41,10 @@ extern "C" {
 /* #include <cuda_profiler_api.h> */
 /* #include <cuda_runtime.h> */
 
+#ifndef TILE_J
+#define TILE_J 64
+#endif
+
 /**
  * @brief Call the particle SPH density kernel.
  *
@@ -166,15 +170,6 @@ __global__ void cuda_launch_density(
           cell_starts_ends_read, space_dim, shift_ii_res, shift_jj_res, pjd);
   }
 }
-
-
-// Tunables: start with BLOCK_SIZE=128..256, TILE_J=128..256 depending on SM resources.
-#ifndef BLOCK_SIZE
-#define BLOCK_SIZE 256
-#endif
-#ifndef TILE_J
-#define TILE_J 16
-#endif
 
 //Safe version////////////////
 __device__ __forceinline__
