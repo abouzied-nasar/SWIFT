@@ -191,15 +191,15 @@ void *runner_main_cuda(void *data) {
   gpu_data_buffers_init(&gpu_buf_self_forc, &gpu_pack_params,
                         sizeof(struct gpu_part_send_f),
                         sizeof(struct gpu_part_recv_f), /*is_pair_task=*/0);
-  gpu_data_buffers_init(&gpu_buf_pair_dens, &gpu_pack_params,
-                        sizeof(struct gpu_part_send_d),
-                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
-  gpu_data_buffers_init(&gpu_buf_pair_grad, &gpu_pack_params,
-                        sizeof(struct gpu_part_send_g),
-                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/1);
-  gpu_data_buffers_init(&gpu_buf_pair_forc, &gpu_pack_params,
-                        sizeof(struct gpu_part_send_f),
-                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
+//  gpu_data_buffers_init(&gpu_buf_pair_dens, &gpu_pack_params,
+//                        sizeof(struct gpu_part_send_d),
+//                        sizeof(struct gpu_part_recv_d), /*is_pair_task=*/1);
+//  gpu_data_buffers_init(&gpu_buf_pair_grad, &gpu_pack_params,
+//                        sizeof(struct gpu_part_send_g),
+//                        sizeof(struct gpu_part_recv_g), /*is_pair_task=*/1);
+//  gpu_data_buffers_init(&gpu_buf_pair_forc, &gpu_pack_params,
+//                        sizeof(struct gpu_part_send_f),
+//                        sizeof(struct gpu_part_recv_f), /*is_pair_task=*/1);
 
   /* Create streams so that we can off-load different batches of work in
    * different streams and get some con-CURRENCY! Events used to maximise
