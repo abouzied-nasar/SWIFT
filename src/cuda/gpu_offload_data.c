@@ -78,7 +78,10 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                             size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
-  const size_t n_blocks = (part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+  /*Since we have unique sorting this should be quite a bit less than
+   * the space needed to store enough blocks to work on part_buffer_size
+   * particles. Possibly problematic as 10 pulled out of the air...*/
+  const size_t n_blocks = (part_buffer_size/10 + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
 
   /*Allocate memory for array containing
    * leaf_computation_id for each cuda block*/
