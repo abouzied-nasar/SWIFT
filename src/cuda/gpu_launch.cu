@@ -41,14 +41,6 @@ extern "C" {
 /* #include <cuda_profiler_api.h> */
 /* #include <cuda_runtime.h> */
 
-// Tunables: start with BLOCK_SIZE=128..256, TILE_J=128..256 depending on SM resources.
-#ifndef BLOCK_SIZE
-#define BLOCK_SIZE 64
-#endif
-#ifndef TILE_J
-#define TILE_J 16
-#endif
-
 /**
  * @brief Call the particle SPH density kernel.
  *
@@ -177,7 +169,7 @@ __global__ void cuda_launch_density(
 
 //Safe version////////////////
 __device__ __forceinline__
-void process_range_tiled_noasync(
+void process_range_tiled_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     struct gpu_part_recv_d* __restrict__ d_parts_recv,
     int i_start, int i_end_excl,
@@ -193,15 +185,15 @@ void process_range_tiled_noasync(
     float4* s_vel4 = reinterpret_cast<float4*>(s_pos4 + TILE_J);        // [TILE_J]
 
     // Map this thread to its i-particle
-    const int i_idx = b_id_local * BLOCK_SIZE + tid + i_start;
-    const bool i_active = (i_idx < i_end_excl);
+    const int i_idx = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+    const bool i_in_range = (i_idx < i_end_excl);
 
     // Declare i-data, initialize safely; only load if active
     float xi = 0.f, yi = 0.f, zi = 0.f, hi = 1.f;
     float vxi = 0.f, vyi = 0.f, vzi = 0.f;
     float hig2 = 0.f, hi_inv = 1.f;
 
-    if (i_active) {
+    if (i_in_range) {
         const auto pi = d_parts_send[i_idx].p_data;
         xi = (float)(pi.x_h.x - shift_i_d.x);
         yi = (float)(pi.x_h.y - shift_i_d.y);
@@ -223,10 +215,12 @@ void process_range_tiled_noasync(
     // Tile over J
     for (int base = j_start; base < j_end_excl; base += TILE_J)
     {
+      /*Figure out if we're doing a full tile of j particles of
+       * we only have leftovers ( < a full tile )*/
         const int tileCount = min(TILE_J, j_end_excl - base);
 
         // Cooperative load of this J tile into shared memory
-        for (int t = tid; t < tileCount; t += BLOCK_SIZE)
+        for (int t = tid; t < tileCount; t += GPU_THREAD_BLOCK_SIZE)
         {
             const int gj = base + t;
             s_pos4[t] = d_parts_send[gj].p_data.x_h;  // (x,y,z,hj) unshifted
@@ -235,7 +229,7 @@ void process_range_tiled_noasync(
         __syncthreads();
 
         // Compute only if this thread owns a valid i
-        if (i_active)
+        if (i_in_range)
         {
 #pragma unroll 4
             for (int t = 0; t < tileCount; ++t)
@@ -295,7 +289,7 @@ void process_range_tiled_noasync(
     }
 
     // Atomics only if active
-    if (i_active) {
+    if (i_in_range) {
         atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.x, res_rho.x);
         atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.y, res_rho.y);
         atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.z, res_rho.z);
@@ -308,8 +302,8 @@ void process_range_tiled_noasync(
     }
 }
 
-__global__ __launch_bounds__(BLOCK_SIZE, 2 /*min number of blocks we launch per SM*/)
-void cuda_launch_density_tiled_noasync(
+__global__ __launch_bounds__(GPU_THREAD_BLOCK_SIZE, 2 /*min number of blocks we launch per SM*/)
+void cuda_launch_tiled_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     struct gpu_part_recv_d* __restrict__ d_parts_recv,
     const float d_a, const float d_H,
@@ -350,7 +344,7 @@ void cuda_launch_density_tiled_noasync(
     const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
 
     // Pass 1: ci <- cj
-    process_range_tiled_noasync(
+    process_range_tiled_density(
         d_parts_send, d_parts_recv,
         ci_start, ci_end - 1,
         cj_start, cj_end - 1,
@@ -363,7 +357,7 @@ void cuda_launch_density_tiled_noasync(
         const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
         const double3 shift_jj_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
 
-        process_range_tiled_noasync(
+        process_range_tiled_density(
             d_parts_send, d_parts_recv,
             cj_start, cj_end - 1,
             ci_start, ci_end - 1,
@@ -374,7 +368,7 @@ void cuda_launch_density_tiled_noasync(
 }
 
 
-void gpu_launch_density_tiled_noasync(
+void gpu_launch_tiled_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     struct gpu_part_recv_d* __restrict__ d_parts_recv,
     const float d_a, const float d_H,
@@ -385,9 +379,9 @@ void gpu_launch_density_tiled_noasync(
     cudaStream_t stream)
 {
     // Shared memory allocation
-    const size_t shmem = TILE_J * (sizeof(struct gpu_part_data_d));//(sizeof(float4) + sizeof(float4)); // 2048 bytes when TILE_J=64
+    const size_t shmem = TILE_J * (sizeof(struct gpu_part_recv_d));//(sizeof(float4) + sizeof(float4)); // 2048 bytes when TILE_J=64
 
-    cuda_launch_density_tiled_noasync<<<num_blocks_x, BLOCK_SIZE, shmem, stream>>>(
+    cuda_launch_tiled_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
         d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
@@ -818,8 +812,8 @@ void process_range_gradient_tiled_noasync(
     float4* s_rac4 = reinterpret_cast<float4*>(s_vel4 + TILE_J);         // [TILE_J] (rhoj,aviscj,energyj,cj)
 
     // Map this thread to its i-particle; keep all threads in lockstep (no early return)
-    const int  i_idx    = b_id_local * BLOCK_SIZE + tid + i_start;
-    const bool i_active = (i_idx < i_end_excl);
+    const int  i_idx    = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+    const bool i_in_range = (i_idx < i_end_excl);
 
     // Per-i data (only load if active)
     float xi=0.f, yi=0.f, zi=0.f, hi=1.f;
@@ -829,7 +823,7 @@ void process_range_gradient_tiled_noasync(
 
     float hi_inv=1.f, hig2=0.f;
 
-    if (i_active) {
+    if (i_in_range) {
         const auto pi = d_parts_send[i_idx].p_data;
 
         xi = (float)(pi.x_h.x - shift_i_d.x);
@@ -868,7 +862,7 @@ void process_range_gradient_tiled_noasync(
         const int tileCount = min(TILE_J, j_end_excl - base);
 
         // Cooperative load of this J tile into shared memory
-        for (int t = tid; t < tileCount; t += BLOCK_SIZE)
+        for (int t = tid; t < tileCount; t += GPU_THREAD_BLOCK_SIZE)
         {
             const int gj = base + t;
             const auto pj = d_parts_send[gj].p_data;
@@ -878,7 +872,7 @@ void process_range_gradient_tiled_noasync(
         }
         __syncthreads();
 
-        if (i_active)
+        if (i_in_range)
         {
 #pragma unroll 4
             for (int t = 0; t < tileCount; ++t)
@@ -950,14 +944,14 @@ void process_range_gradient_tiled_noasync(
     }
 
     // Atomics only for active i (semantics preserved)
-    if (i_active) {
+    if (i_in_range) {
         atomicAdd(&d_parts_recv[i_idx].vsig_lapu_aviscmax.x, res_vsig_lapu_avisci.x);
         atomicAdd(&d_parts_recv[i_idx].vsig_lapu_aviscmax.y, res_vsig_lapu_avisci.y);
         atomicMaxFloat(&d_parts_recv[i_idx].vsig_lapu_aviscmax.z, res_vsig_lapu_avisci.z);
     }
 }
 
-__global__ __launch_bounds__(BLOCK_SIZE, 2)
+__global__ __launch_bounds__(GPU_THREAD_BLOCK_SIZE, 2)
 void cuda_launch_gradient_tiled_noasync(
     const struct gpu_part_send_g* __restrict__ d_parts_send,
     struct gpu_part_recv_g*      __restrict__ d_parts_recv,
@@ -1037,7 +1031,7 @@ void gpu_launch_gradient_tiled_noasync(
     // Shared memory: pos4 + vel4 + rac4
     const size_t shmem = TILE_J * (sizeof(float4) * 3);  // 3072 bytes when TILE_J=64
 
-    cuda_launch_gradient_tiled_noasync<<<num_blocks_x, BLOCK_SIZE, shmem, stream>>>(
+    cuda_launch_gradient_tiled_noasync<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
         d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
@@ -1097,14 +1091,6 @@ void gpu_launch_force(const struct gpu_part_send_f *__restrict__ d_parts_send,
 
 //Safe version////////////////
 
-// ===== Tunables =====
-#ifndef BLOCK_SIZE
-#define BLOCK_SIZE 128      // try 128 or 256; pick the best after profiling
-#endif
-#ifndef TILE_J
-#define TILE_J     64       // matches ~64 particles per cell
-#endif
-
 // ===== Device functions / constants you already have =====
 __device__ void d_kernel_deval(float u, float* w, float* wdx);
 __device__ float d_pow_dimension_plus_one(float x);
@@ -1132,8 +1118,8 @@ void process_range_force_tiled_noasync(
     float4* s_cuid4 = reinterpret_cast<float4*>(s_fbrp4 + TILE_J);          // [TILE_J]
 
     // Map this thread to its i-particle (keep all threads in lockstep → no early return)
-    const int  i_idx     = b_id_local * BLOCK_SIZE + tid + i_start;
-    const bool i_active  = (i_idx < i_end_excl);
+    const int  i_idx     = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+    const bool i_in_range  = (i_idx < i_end_excl);
 
     // Per-i data (only loaded if active)
     float xi=0.f, yi=0.f, zi=0.f, hi=1.f;
@@ -1144,7 +1130,7 @@ void process_range_force_tiled_noasync(
 
     float hi_inv=1.f, hid_inv=1.f, mi_inv=1.f, rhoi_inv=1.f, rhoi_inv2=1.f, hig2=0.f;
 
-    if (i_active) {
+    if (i_in_range) {
         const auto pi = d_parts_send[i_idx].p_data;
 
         xi = (float)(pi.x_h.x - shift_i_d.x);
@@ -1174,7 +1160,7 @@ void process_range_force_tiled_noasync(
     // Accumulators
     float3 res_ahydro  = {0.f, 0.f, 0.f};
     float2 res_udt_hdt = {0.f, 0.f};
-    int    res_min_ngb_timebin = i_active ? min_ngb_tbi : 0;
+    int    res_min_ngb_timebin = i_in_range ? min_ngb_tbi : 0;
 
     // Cosmology (same for all threads; computing per-thread is fine)
     const float fac_mu    = d_pow_three_gamma_minus_five_over_two(d_a);
@@ -1188,7 +1174,7 @@ void process_range_force_tiled_noasync(
         const int tileCount = min(TILE_J, j_end_excl - base);
 
         // Cooperative load of this J tile into shared memory
-        for (int t = tid; t < tileCount; t += BLOCK_SIZE)
+        for (int t = tid; t < tileCount; t += GPU_THREAD_BLOCK_SIZE)
         {
             const int gj = base + t;
             const auto pj = d_parts_send[gj].p_data;
@@ -1199,7 +1185,7 @@ void process_range_force_tiled_noasync(
         }
         __syncthreads();
 
-        if (i_active)
+        if (i_in_range)
         {
 #pragma unroll 4
             for (int t = 0; t < tileCount; ++t)
@@ -1323,12 +1309,12 @@ void process_range_force_tiled_noasync(
     }
 
     // Min neighbor timebin (your original logic used tbj from i)
-    if (i_active && tbj > 0) {
+    if (i_in_range && tbj > 0) {
         res_min_ngb_timebin = min(res_min_ngb_timebin, tbj);
     }
 
     // Atomics only for active i
-    if (i_active) {
+    if (i_in_range) {
         atomicAdd(&d_parts_recv[i_idx].udt_hdt.x, res_udt_hdt.x);
         atomicAdd(&d_parts_recv[i_idx].udt_hdt.y, res_udt_hdt.y);
 
@@ -1342,7 +1328,7 @@ void process_range_force_tiled_noasync(
     }
 }
 
-__global__ __launch_bounds__(BLOCK_SIZE, 2)
+__global__ __launch_bounds__(GPU_THREAD_BLOCK_SIZE, 2)
 void cuda_launch_force_tiled_noasync(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
     struct gpu_part_recv_f*      __restrict__ d_parts_recv,
@@ -1422,7 +1408,7 @@ void gpu_launch_force_tiled_noasync(
     // Shared memory: pos4 + vel4 + fbrp4 + cuid4
     const size_t shmem = TILE_J * (sizeof(float4) * 4); // 4096 B when TILE_J=64
 
-    cuda_launch_force_tiled_noasync<<<num_blocks_x, BLOCK_SIZE, shmem, stream>>>(
+    cuda_launch_force_tiled_noasync<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
         d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }

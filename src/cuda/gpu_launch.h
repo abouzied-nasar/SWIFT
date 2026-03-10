@@ -42,7 +42,7 @@ void gpu_launch_density_tiled(const struct gpu_part_send_d* __restrict__ d_parts
                         const int2* __restrict__ d_block_leaf_id,
                         const double3 space_dim,
                         cudaStream_t stream);
-void gpu_launch_density_tiled_noasync(
+void gpu_launch_tiled_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     struct gpu_part_recv_d* __restrict__ d_parts_recv,
     const float d_a, const float d_H,

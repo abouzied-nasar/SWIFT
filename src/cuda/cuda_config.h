@@ -26,8 +26,14 @@
  * @brief Temporary file to store all macro definitions relating to
  * configuring the cuda setup/run until we sort everything out cleanly.
  */
-
+#ifndef GPU_THREAD_BLOCK_SIZE
 #define GPU_THREAD_BLOCK_SIZE 64
+#endif
+
+/*TODO: Investigate if there is any positive to keeping this different from BLOCK_SIZE*/
+#ifndef TILE_J
+#define TILE_J 64
+#endif
 
 #ifndef CUDA_PROFILER
 #define CUDA_PROFILER
