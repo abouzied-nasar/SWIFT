@@ -186,7 +186,7 @@ void process_range_tiled_noasync(
     int b_id_local, int tid)
 {
     // Shared memory for one tile of J: positions and velocities
-    extern __shared__ __align__(16) unsigned char smem[];
+    extern __shared__ unsigned char smem[];
     //TODO: Check if this is safe and/or required. We're casting from float4 to float4
     //Also, we need positions to be double so this may need re-working!
     float4* s_pos4 = reinterpret_cast<float4*>(smem);                   // [TILE_J]
@@ -812,7 +812,7 @@ void process_range_gradient_tiled_noasync(
     float d_a, float d_H)
 {
     // Shared memory tile for J: pos/h, vel/m, rho/avisc/u/c
-    extern __shared__ __align__(16) unsigned char smem[];
+    extern __shared__ unsigned char smem[];
     float4* s_pos4 = reinterpret_cast<float4*>(smem);                    // [TILE_J] (xj,yj,zj,hj)
     float4* s_vel4 = reinterpret_cast<float4*>(s_pos4 + TILE_J);         // [TILE_J] (vxj,vyj,vzj,mj)
     float4* s_rac4 = reinterpret_cast<float4*>(s_vel4 + TILE_J);         // [TILE_J] (rhoj,aviscj,energyj,cj)
@@ -1125,7 +1125,7 @@ void process_range_force_tiled_noasync(
     float d_a, float d_H)
 {
     // Shared memory tile for J: pos/h, vel/m, f/bals/rho/p, c/u/avisc/adiff
-    extern __shared__ __align__(16) unsigned char smem[];
+    extern __shared__ unsigned char smem[];
     float4* s_pos4  = reinterpret_cast<float4*>(smem);                      // [TILE_J]
     float4* s_vel4  = reinterpret_cast<float4*>(s_pos4  + TILE_J);          // [TILE_J]
     float4* s_fbrp4 = reinterpret_cast<float4*>(s_vel4  + TILE_J);          // [TILE_J]
