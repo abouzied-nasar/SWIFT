@@ -24,6 +24,10 @@
  * called from within runner_main.c
  ******************************************************************************/
 
+#include <cuda_pipeline.h>
+#include <cooperative_groups.h>
+#include <cuda_awbarrier_primitives.h>
+#include <cuda/barrier>
 /* ifdef __cplusplus prevents name mangling. C code sees exact names
  of functions rather than mangled template names produced by C++ */
 #ifdef __cplusplus
@@ -167,7 +171,6 @@ __global__ void cuda_launch_density(
   }
 }
 
-//Safe version////////////////
 __device__ __forceinline__
 void process_range_tiled_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
@@ -194,7 +197,7 @@ void process_range_tiled_density(
     float hig2 = 0.f, hi_inv = 1.f;
 
     if (i_in_range) {
-        const auto pi = d_parts_send[i_idx].p_data;
+        const struct gpu_part_data_d pi = d_parts_send[i_idx].p_data;
         xi = (float)(pi.x_h.x - shift_i_d.x);
         yi = (float)(pi.x_h.y - shift_i_d.y);
         zi = (float)(pi.x_h.z - shift_i_d.z);
@@ -223,9 +226,203 @@ void process_range_tiled_density(
         for (int t = tid; t < tileCount; t += GPU_THREAD_BLOCK_SIZE)
         {
             const int gj = base + t;
-            s_pos4[t] = d_parts_send[gj].p_data.x_h;  // (x,y,z,hj) unshifted
-            s_vel4[t] = d_parts_send[gj].p_data.vx_m; // (vx,vy,vz,m)
+            __pipeline_memcpy_async(&s_pos4[t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+            __pipeline_memcpy_async(&s_vel4[t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+//            s_pos4[t] = d_parts_send[gj].p_data.x_h;  // (x,y,z,hj) unshifted
+//            s_vel4[t] = d_parts_send[gj].p_data.vx_m; // (vx,vy,vz,m)
         }
+        __pipeline_commit();
+        __pipeline_wait_prior(0);
+        __syncthreads();
+
+        // Compute only if this thread owns a valid i
+        if (i_in_range)
+        {
+#pragma unroll 4
+            for (int t = 0; t < tileCount; ++t)
+            {
+                const int j_idx = base + t;
+                if (j_idx == i_idx) continue;  // We do not add i contribution. This is done in ghost tasks
+
+                const float4 pj_pos = s_pos4[t]; // unshifted
+                const float4 pj_vel = s_vel4[t];
+
+                // Apply j shift on-the-fly
+                const float xij = xi - (pj_pos.x - (float)shift_j_d.x);
+                const float yij = yi - (pj_pos.y - (float)shift_j_d.y);
+                const float zij = zi - (pj_pos.z - (float)shift_j_d.z);
+
+                //fmaf -> fused multiply addition operator
+                const float r2 = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+                if (r2 >= hig2) continue;
+
+                //Clever Co-Pilot
+                const float inv_r = rsqrtf(r2 + eps);
+                //Very clever Co-Pilot, multiply instead of divide
+                const float r     = r2 * inv_r;
+                const float ui    = r * hi_inv;
+
+                float wi, wi_dx;
+                d_kernel_deval(ui, &wi, &wi_dx);
+
+                const float mj  = pj_vel.w;
+                const float tmp = (hydro_dimension * wi + ui * wi_dx);
+
+                // rho, rho_dh, wcount, wcount_dh
+                res_rho.x += mj * wi;
+                res_rho.y -= mj * tmp;
+                res_rho.z += wi;
+                res_rho.w -= tmp;
+
+                const float faci = mj * wi_dx * inv_r;
+
+                const float dvx = vxi - pj_vel.x;
+                const float dvy = vyi - pj_vel.y;
+                const float dvz = vzi - pj_vel.z;
+
+                const float dvdr   = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij));
+                const float curlrx = fmaf(dvy, zij, -dvz * yij);
+                const float curlry = fmaf(dvz, xij, -dvx * zij);
+                const float curlrz = fmaf(dvx, yij, -dvy * xij);
+
+                res_rot.x = fmaf(faci,  curlrx, res_rot.x);
+                res_rot.y = fmaf(faci,  curlry, res_rot.y);
+                res_rot.z = fmaf(faci,  curlrz, res_rot.z);
+                res_rot.w = fmaf(-faci, dvdr,    res_rot.w);
+            }
+        }
+
+        __syncthreads(); // all threads sync before next tile
+    }
+
+    // Atomics only if active
+    if (i_in_range) {
+        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.x, res_rho.x);
+        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.y, res_rho.y);
+        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.z, res_rho.z);
+        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.w, res_rho.w);
+
+        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.x, res_rot.x);
+        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.y, res_rot.y);
+        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.z, res_rot.z);
+        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.w, res_rot.w);
+    }
+}
+
+__global__ void prefetch_kernel(int* global_out, int const* global_in, size_t size, size_t batch_size) {
+    auto grid = cooperative_groups::this_grid();
+    auto block = cooperative_groups::this_thread_block();
+    assert(size == batch_size * grid.size()); // Assume input size fits batch_size * grid_size
+
+
+    constexpr size_t num_stages = 2;
+    constexpr size_t pending_batches = num_stages - 1;
+
+    __pipeline_wait_prior<pending_batches>();
+
+    extern __shared__ int shared[]; // num_stages * block.size() * sizeof(int) bytes
+    size_t shared_offset[num_stages];
+    for (int s = 0; s < num_stages; ++s) shared_offset[s] = s * block.size();
+    const int tid = threadIdx.x;
+    auto block_batch = [&](size_t batch) -> int {
+        return block.group_index().x * block.size() + grid.size() * batch;
+    };
+
+    // Fill the pipeline with the first ``num_stages`` batches.
+    for (int s = 0; s < num_stages; ++s) {
+        __pipeline_memcpy_async(shared + shared_offset[s] + tid, global_in + block_batch(s)+ tid, cuda::aligned_size_t<4>(sizeof(int)));
+        __pipeline_commit();
+    }
+
+    // compute_batch: next batch to process
+    // fetch_batch:   next batch to fetch from global memory
+    for (size_t compute_batch = 0, fetch_batch = num_stages; compute_batch < batch_size; ++compute_batch, ++fetch_batch) {
+        // Wait for the first requested stage to complete.
+//        constexpr size_t pending_batches = num_stages - 1;
+        __pipeline_wait_prior<pending_batches>();
+        __syncthreads(); // Not required if each thread works on the data it copied.
+
+        // Compute on the current batch.
+        compute(global_out + block_batch(compute_batch) + tid, shared + shared_offset[stage] + tid);
+
+        __syncthreads(); // Not required if each thread works on the data it copied.
+
+        // Load future stage ``num_stages`` ahead of current compute batch.
+        if (fetch_batch < batch_size) {
+            __pipeline_memcpy_async(shared + shared_offset[stage] + tid, global_in + block_batch(fetch_batch) + tid, cuda::aligned_size_t<4>(sizeof(int)));
+        }
+        __pipeline_commit();
+        stage = (stage + 1) % num_stages;
+    }
+}
+
+__device__ __forceinline__
+void process_range_tiled_prefetch_density(
+    const struct gpu_part_send_d* __restrict__ d_parts_send,
+    struct gpu_part_recv_d* __restrict__ d_parts_recv,
+    int i_start, int i_end_excl,
+    int j_start, int j_end_excl,
+    const double3 shift_i_d, const double3 shift_j_d,
+    int b_id_local, int tid)
+{
+  auto grid = cooperative_groups::this_grid();
+  auto block = cooperative_groups::this_thread_block();
+  const size_t batch_size = GPU_THREAD_BLOCK_SIZE;
+  const size_t size = TILE_J;
+  assert(size == batch_size * grid.size()); // Assume input size fits batch_size * grid_size
+    // Shared memory for one tile of J: positions and velocities
+    extern __shared__ unsigned char smem[];
+    //TODO: Check if this is safe and/or required. We're casting from float4 to float4
+    //Also, we need positions to be double so this may need re-working!
+    float4* s_pos4 = reinterpret_cast<float4*>(smem);                   // [TILE_J]
+    float4* s_vel4 = reinterpret_cast<float4*>(s_pos4 + TILE_J);        // [TILE_J]
+
+    // Map this thread to its i-particle
+    const int i_idx = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+    const bool i_in_range = (i_idx < i_end_excl);
+
+    // Declare i-data, initialize safely; only load if active
+    float xi = 0.f, yi = 0.f, zi = 0.f, hi = 1.f;
+    float vxi = 0.f, vyi = 0.f, vzi = 0.f;
+    float hig2 = 0.f, hi_inv = 1.f;
+
+    if (i_in_range) {
+        const struct gpu_part_data_d pi = d_parts_send[i_idx].p_data;
+        xi = (float)(pi.x_h.x - shift_i_d.x);
+        yi = (float)(pi.x_h.y - shift_i_d.y);
+        zi = (float)(pi.x_h.z - shift_i_d.z);
+        hi = (float)(pi.x_h.w);
+
+        vxi = pi.vx_m.x;
+        vyi = pi.vx_m.y;
+        vzi = pi.vx_m.z;
+
+        hig2   = (hi * hi) * kernel_gamma2;
+        hi_inv = 1.0f / hi;
+    }
+
+    float4 res_rho = make_float4(0.f, 0.f, 0.f, 0.f);
+    float4 res_rot = make_float4(0.f, 0.f, 0.f, 0.f);
+    constexpr float eps = 1e-24f;
+
+    // Tile over J
+    for (int base = j_start; base < j_end_excl; base += TILE_J)
+    {
+      /*Figure out if we're doing a full tile of j particles of
+       * we only have leftovers ( < a full tile )*/
+        const int tileCount = min(TILE_J, j_end_excl - base);
+
+        // Cooperative load of this J tile into shared memory
+        for (int t = tid; t < tileCount; t += GPU_THREAD_BLOCK_SIZE)
+        {
+            const int gj = base + t;
+            __pipeline_memcpy_async(&s_pos4[t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+            __pipeline_memcpy_async(&s_vel4[t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+//            s_pos4[t] = d_parts_send[gj].p_data.x_h;  // (x,y,z,hj) unshifted
+//            s_vel4[t] = d_parts_send[gj].p_data.vx_m; // (vx,vy,vz,m)
+        }
+        __pipeline_commit();
+        __pipeline_wait_prior(0);
         __syncthreads();
 
         // Compute only if this thread owns a valid i

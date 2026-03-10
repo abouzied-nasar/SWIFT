@@ -34,14 +34,14 @@ extern "C" {
 #include "../timeline.h"
 
 /*! Container for particle data required for density calcs */
-struct __align__(8) gpu_part_data_d {
+struct gpu_part_data_d {
 #ifdef WITH_CUDA
 //TODO: This needs changing to doubles too. Darn it...
 /*! Particle position and h -> x, y, z, h */
-  float4 x_h;
+  float4 __align__(16) x_h;
 
   /*! Particle predicted velocity and mass -> ux, uy, uz, m */
-  float4 vx_m;
+  float4 __align__(16) vx_m;
 
 #endif
 };
