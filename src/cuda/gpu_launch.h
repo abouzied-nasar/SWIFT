@@ -72,6 +72,15 @@ void gpu_launch_gradient_tiled_noasync(
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim,
     cudaStream_t stream);
+void gpu_launch_gradient_tiled(
+    const struct gpu_part_send_g* __restrict__ d_parts_send,
+    struct gpu_part_recv_g*      __restrict__ d_parts_recv,
+    const float d_a, const float d_H,
+    int num_blocks_x,
+    const int4* __restrict__ d_cell_i_j_start_end,
+    const int2* __restrict__ d_block_leaf_id,
+    const double3 space_dim,
+    cudaStream_t stream);
 void gpu_launch_force(const struct gpu_part_send_f *restrict d_parts_send,
                       struct gpu_part_recv_f *restrict d_parts_recv,
                       const float d_a, const float d_H, cudaStream_t stream,
