@@ -1195,10 +1195,10 @@ __device__ __forceinline__ void process_range_tiled_force(
           if (j_idx == i_idx) continue; // self for self-pairs
 
           // Unpack J tile
-          const float4 pj_pos  = s_pos4[t];
-          const float4 pj_vel  = s_vel4[t];
-          const float4 pj_fbrp = s_fbrp4[t];
-          const float4 pj_cuid = s_cuid4[t];
+          const float4 pj_pos  = s_pos4[buf * TILE_J + t];
+          const float4 pj_vel  = s_vel4[buf * TILE_J + t];
+          const float4 pj_fbrp = s_fbrp4[buf * TILE_J + t];
+          const float4 pj_cuid = s_cuid4[buf * TILE_J + t];
 
           const float xj = (float)(pj_pos.x - (float)shift_j_d.x);
           const float yj = (float)(pj_pos.y - (float)shift_j_d.y);
