@@ -7,7 +7,7 @@ InternalUnitSystem:
   UnitTemp_in_cgs:     1   # Kelvin
 
 Scheduler:
-i  gpu_self_pack_size:       8192
+  gpu_self_pack_size:        8192
   gpu_self_bundle_size:      8192
   gpu_pair_pack_size:        8192
   gpu_pair_bundle_size:      8192
