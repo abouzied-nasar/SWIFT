@@ -387,7 +387,7 @@ void gpu_launch_gradient_tiled(
         d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
 
-__global__ void cuda_launch_force_tiled_noasync(
+__global__ void cuda_launch_tiled_force(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
     struct gpu_part_recv_f*      __restrict__ d_parts_recv,
     const float d_a, const float d_H,
@@ -466,7 +466,7 @@ void gpu_launch_force_tiled_noasync(
     // Shared memory: pos4 + vel4 + fbrp4 + cuid4
     const size_t shmem = 2 * TILE_J * sizeof(struct gpu_part_data_f); // 4096 B when TILE_J=64
 
-    cuda_launch_force_tiled_noasync<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
+    cuda_launch_tiled_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
         d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
