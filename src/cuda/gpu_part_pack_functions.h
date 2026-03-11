@@ -243,8 +243,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     ps[i].rho_avisc_u_c.z = part_get_u(p);
     ps[i].rho_avisc_u_c.w = part_get_soundspeed(p);
 
-    ps[i].pjs_pje.x = cjstart;
-    ps[i].pjs_pje.y = cjend;
   }
 }
 

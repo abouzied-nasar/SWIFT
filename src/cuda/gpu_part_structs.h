@@ -83,24 +83,20 @@ struct gpu_part_recv_d {
 };
 
 /*! Container for particle data required for gradient calcs */
-struct __align__(8) gpu_part_data_g {
+struct gpu_part_data_g {
 #ifdef WITH_CUDA
 
   /*! Particle position & smoothing length */
-  float4 x_h;
+  float4 __align__(16) x_h;
 
   /*! Particle velocity and mass */
-  float4 vx_m;
+  float4 __align__(16) vx_m;
 
   /*! Particle density alpha visc internal energy u and speed of sound c */
-  float4 rho_avisc_u_c;
+  float4 __align__(16) rho_avisc_u_c;
 
   /*! viscosity information results */
-  float4 vsig_lapu_aviscmax;
-
-  /*! Start and end index of particles to be interacted with in particle
-   * buffer arrays */
-  int2 pjs_pje;
+  float4 __align__(16) vsig_lapu_aviscmax;
 
 #endif
 };
@@ -122,20 +118,20 @@ struct gpu_part_recv_g {
 
 #endif
 };
-struct __align__(8) gpu_part_data_f{
+struct gpu_part_data_f{
 #ifdef WITH_CUDA
   /*! Particle positions, smoothing length */
-  float4 x_h;
+  float4 __align__(16) x_h;
 
   /*! Particle predicted velocity and mass */
-  float4 vx_m;
+  float4 __align__(16) vx_m;
 
   /*! Variable smoothing length term f, balsara, density, pressure */
-  float4 f_bals_rho_p;
+  float4 __align__(16) f_bals_rho_p;
 
   /*! Particle speed of sound, internal energy, alpha constants for
    * viscosity and diffusion */
-  float4 c_u_avisc_adiff;
+  float4 __align__(16) c_u_avisc_adiff;
 
   /*! Particle timebin, initial value of min neighbour timebin, start
    * and end index of particles to be interacted with in particle buffer
