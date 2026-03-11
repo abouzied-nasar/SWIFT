@@ -587,6 +587,171 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_gradient_p(
   atomicMaxFloat(&d_parts_recv[pid].vsig_lapu_aviscmax.z, res_vsig_lapu_avisci.z);
 }
 
+
+__device__ __forceinline__
+void process_range_tiled_density(
+    const struct gpu_part_send_d* __restrict__ d_parts_send,
+    struct gpu_part_recv_d* __restrict__ d_parts_recv,
+    int i_start, int i_end_excl,
+    int j_start, int j_end_excl,
+    const double3 shift_i_d, const double3 shift_j_d,
+    int b_id_local, int tid)
+{
+    // Shared memory for one tile of J: positions and velocities
+    extern __shared__ unsigned char smem[];
+    //TODO: Check if this is safe and/or required. We're casting from float4 to float4
+    //Also, we need positions to be double so this may need re-working!
+    float4* s_pos4 = reinterpret_cast<float4*>(smem);                   // [0 to 2 * TILE_J]
+    float4* s_vel4 = reinterpret_cast<float4*>(s_pos4 + 2 * TILE_J);        // [2 * TILE_J to 4 * TILE_J]
+
+    // Map this thread to its i-particle
+    const int i_idx = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+    const bool i_in_range = (i_idx < i_end_excl);
+
+    // Declare i-data, initialize safely; only load if active
+    float xi = 0.f, yi = 0.f, zi = 0.f, hi = 1.f;
+    float vxi = 0.f, vyi = 0.f, vzi = 0.f;
+    float hig2 = 0.f, hi_inv = 1.f;
+
+    if (i_in_range) {
+        const struct gpu_part_data_d pi = d_parts_send[i_idx].p_data;
+        xi = (float)(pi.x_h.x - shift_i_d.x);
+        yi = (float)(pi.x_h.y - shift_i_d.y);
+        zi = (float)(pi.x_h.z - shift_i_d.z);
+        hi = (float)(pi.x_h.w);
+
+        vxi = pi.vx_m.x;
+        vyi = pi.vx_m.y;
+        vzi = pi.vx_m.z;
+
+        hig2   = (hi * hi) * kernel_gamma2;
+        hi_inv = 1.0f / hi;
+    }
+
+    float4 res_rho = make_float4(0.f, 0.f, 0.f, 0.f);
+    float4 res_rot = make_float4(0.f, 0.f, 0.f, 0.f);
+    constexpr float eps = 1e-24f;
+
+    // Number of tiles
+    const int numTiles = (j_end_excl - j_start + TILE_J - 1) / TILE_J;
+
+    // === Prefetch tile 0 into buffer 0 ===
+    if (numTiles > 0) {
+        const int base0      = j_start;
+        const int tileCount0 = min(TILE_J, j_end_excl - base0);
+
+        for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
+            const int gj = base0 + t;
+            __pipeline_memcpy_async(&s_pos4[0 * TILE_J + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+            __pipeline_memcpy_async(&s_vel4[0 * TILE_J + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+        }
+        __pipeline_commit();
+    }
+
+    // === Tile over J with prefetch of "next" tile while computing "current" ===
+    for (int tile = 0; tile < numTiles; ++tile)
+    {
+        const int buf       = tile & 1;  // 0 or 1 (ping-pong)
+        const int base      = j_start + tile * TILE_J;
+        const int tileCount = min(TILE_J, j_end_excl - base);
+
+        // Make sure the current tile (already committed) is resident in shared memory
+        __pipeline_wait_prior(0);
+        __syncthreads();
+
+        // --- Kick off prefetch for the next tile (overlaps with compute below) ---
+        const int nextTile = tile + 1;
+        if (nextTile < numTiles)
+        {
+          /*If nextTile & 1 == 0. nextTile is even. If nextTile & 1 == 1, nextTile is odd*/
+          const int nextBuf  = nextTile & 1;
+          const int nextBase = j_start + nextTile * TILE_J;
+          const int nextCnt  = min(TILE_J, j_end_excl - nextBase);
+
+          for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
+            const int gj = nextBase + t;
+            __pipeline_memcpy_async(&s_pos4[nextBuf * TILE_J + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+            __pipeline_memcpy_async(&s_vel4[nextBuf * TILE_J + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+          }
+          __pipeline_commit();
+        }
+
+        // --- Compute on the current tile (buf) ---
+        if (i_in_range)
+        {
+        #pragma unroll 4
+            for (int t = 0; t < tileCount; ++t)
+            {
+                const int j_idx = base + t;
+                if (j_idx == i_idx) continue;  // ghost task handles i==j
+
+                const float4 pj_pos = s_pos4[buf * TILE_J + t]; // unshifted
+                const float4 pj_vel = s_vel4[buf * TILE_J + t];
+
+                // Apply j shift on-the-fly
+                const float xij = xi - (pj_pos.x - (float)shift_j_d.x);
+                const float yij = yi - (pj_pos.y - (float)shift_j_d.y);
+                const float zij = zi - (pj_pos.z - (float)shift_j_d.z);
+
+                // fmaf -> fused multiply-add
+                const float r2 = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+                if (r2 >= hig2) continue;
+
+                // Clever Co-Pilot
+                const float inv_r = rsqrtf(r2 + eps);
+                // Very clever Co-Pilot, multiply instead of divide
+                const float r     = r2 * inv_r;
+                const float ui    = r * hi_inv;
+
+                float wi, wi_dx;
+                d_kernel_deval(ui, &wi, &wi_dx);
+
+                const float mj  = pj_vel.w;
+                const float tmp = (hydro_dimension * wi + ui * wi_dx);
+
+                // rho, rho_dh, wcount, wcount_dh
+                res_rho.x += mj * wi;
+                res_rho.y -= mj * tmp;
+                res_rho.z += wi;
+                res_rho.w -= tmp;
+
+                const float faci = mj * wi_dx * inv_r;
+
+                const float dvx = vxi - pj_vel.x;
+                const float dvy = vyi - pj_vel.y;
+                const float dvz = vzi - pj_vel.z;
+
+                const float dvdr   = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij));
+                const float curlrx = fmaf(dvy, zij, -dvz * yij);
+                const float curlry = fmaf(dvz, xij, -dvx * zij);
+                const float curlrz = fmaf(dvx, yij, -dvy * xij);
+
+                res_rot.x = fmaf(faci,  curlrx, res_rot.x);
+                res_rot.y = fmaf(faci,  curlry, res_rot.y);
+                res_rot.z = fmaf(faci,  curlrz, res_rot.z);
+                res_rot.w = fmaf(-faci, dvdr,    res_rot.w);
+            }
+        }
+
+        // Ensure no thread is still reading from the current buffer before it may be overwritten next
+        __syncthreads();
+    }
+
+    // === Atomics (unchanged) ===
+    if (i_in_range) {
+        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.x, res_rho.x);
+        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.y, res_rho.y);
+        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.z, res_rho.z);
+        atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.w, res_rho.w);
+
+        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.x, res_rot.x);
+        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.y, res_rot.y);
+        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.z, res_rot.z);
+        atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.w, res_rot.w);
+    }
+
+}
+
 /**
  * @brief Naive kernel computing the force interactions of a single particle
  *
