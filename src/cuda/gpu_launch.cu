@@ -428,7 +428,7 @@ __global__ void cuda_launch_force_tiled_noasync(
     const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
 
     // Pass 1: ci <- cj (exclude cell-position slot at end-1)
-    process_range_tiled_noasync_force(
+    process_range_tiled_force(
         d_parts_send, d_parts_recv,
         ci_start, ci_end - 1,
         cj_start, cj_end - 1,
@@ -442,7 +442,7 @@ __global__ void cuda_launch_force_tiled_noasync(
         const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
         const double3 shift_jj_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
 
-        process_range_tiled_noasync_force(
+        process_range_tiled_force(
             d_parts_send, d_parts_recv,
             cj_start, cj_end - 1,
             ci_start, ci_end - 1,
@@ -464,7 +464,7 @@ void gpu_launch_force_tiled_noasync(
     cudaStream_t stream)
 {
     // Shared memory: pos4 + vel4 + fbrp4 + cuid4
-    const size_t shmem = TILE_J * (sizeof(float4) * 4); // 4096 B when TILE_J=64
+    const size_t shmem = 2 * TILE_J * sizeof(struct gpu_part_data_f); // 4096 B when TILE_J=64
 
     cuda_launch_force_tiled_noasync<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,

@@ -1072,7 +1072,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force_p(
   atomicAdd(&d_parts_recv[pid].a_hydro.z, res_ahydro.z);
 }
 
-__device__ __forceinline__ void process_range_tiled_noasync_force(
+__device__ __forceinline__ void process_range_tiled_force(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
     struct gpu_part_recv_f*      __restrict__ d_parts_recv,
     // ranges (end_excl excludes the cell-position slot at [end-1])
@@ -1083,14 +1083,13 @@ __device__ __forceinline__ void process_range_tiled_noasync_force(
     // mapping
     int b_id_local, int tid,
     // cosmology
-    float d_a, float d_H)
-{
-    // Shared memory tile for J: pos/h, vel/m, f/bals/rho/p, c/u/avisc/adiff
+    float d_a, float d_H){
+  // Shared memory tile for J: pos/h, vel/m, f/bals/rho/p, c/u/avisc/adiff
     extern __shared__ unsigned char smem[];
     float4* s_pos4  = reinterpret_cast<float4*>(smem);                      // [TILE_J]
-    float4* s_vel4  = reinterpret_cast<float4*>(s_pos4  + TILE_J);          // [TILE_J]
-    float4* s_fbrp4 = reinterpret_cast<float4*>(s_vel4  + TILE_J);          // [TILE_J]
-    float4* s_cuid4 = reinterpret_cast<float4*>(s_fbrp4 + TILE_J);          // [TILE_J]
+    float4* s_vel4  = reinterpret_cast<float4*>(s_pos4  + 2 * TILE_J);          // [TILE_J]
+    float4* s_fbrp4 = reinterpret_cast<float4*>(s_vel4  + 2 * TILE_J);          // [TILE_J]
+    float4* s_cuid4 = reinterpret_cast<float4*>(s_fbrp4 + 2 * TILE_J);          // [TILE_J]
 
     // Map this thread to its i-particle (keep all threads in lockstep → no early return)
     const int  i_idx     = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
@@ -1143,144 +1142,171 @@ __device__ __forceinline__ void process_range_tiled_noasync_force(
 
     constexpr float eps = 1e-24f;
 
-    // ---- Tile over J ----
-    for (int base = j_start; base < j_end_excl; base += TILE_J)
-    {
-        const int tileCount = min(TILE_J, j_end_excl - base);
+    // Number of tiles
+    const int numTiles = (j_end_excl - j_start + TILE_J - 1) / TILE_J;
 
-        // Cooperative load of this J tile into shared memory
-        for (int t = tid; t < tileCount; t += GPU_THREAD_BLOCK_SIZE)
-        {
-            const int gj = base + t;
-            const auto pj = d_parts_send[gj].p_data;
-            s_pos4[t]  = pj.x_h;             // (xj,yj,zj,hj) — unshifted
-            s_vel4[t]  = pj.vx_m;            // (vxj,vyj,vzj,mj)
-            s_fbrp4[t] = pj.f_bals_rho_p;    // (fj,balsj,rhoj,pressurej)
-            s_cuid4[t] = pj.c_u_avisc_adiff; // (cj,energyj,aviscj,adiffj)
+    // === Prefetch tile 0 into buffer 0 ===
+    if (numTiles > 0){
+      const int base0      = j_start;
+      const int tileCount0 = min(TILE_J, j_end_excl - base0);
+
+      for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
+        const int gj = base0 + t;
+        __pipeline_memcpy_async(&s_pos4[0 * TILE_J + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+        __pipeline_memcpy_async(&s_vel4[0 * TILE_J + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+        __pipeline_memcpy_async(&s_fbrp4[0 * TILE_J + t], &d_parts_send[gj].p_data.f_bals_rho_p, sizeof(float4));
+        __pipeline_memcpy_async(&s_cuid4[0 * TILE_J + t], &d_parts_send[gj].p_data.c_u_avisc_adiff, sizeof(float4));
+      }
+      __pipeline_commit();
+    }
+    // === Tile over J with prefetch of "next" tile while computing "current" ===
+    for (int tile = 0; tile < numTiles; ++tile){
+
+      const int buf       = tile & 1;  // 0 or 1 (ping-pong)
+      const int base      = j_start + tile * TILE_J;
+      const int tileCount = min(TILE_J, j_end_excl - base);
+
+      // Make sure the current tile (already committed) is resident in shared memory
+      __pipeline_wait_prior(0);
+      __syncthreads();
+
+      // --- Kick off prefetch for the next tile (overlaps with compute below) ---
+      const int nextTile = tile + 1;
+      if (nextTile < numTiles){
+        /*If nextTile & 1 == 0. nextTile is even. If nextTile & 1 == 1, nextTile is odd*/
+        const int nextBuf  = nextTile & 1;
+        const int nextBase = j_start + nextTile * TILE_J;
+        const int nextCnt  = min(TILE_J, j_end_excl - nextBase);
+
+        for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
+          const int gj = nextBase + t;
+          __pipeline_memcpy_async(&s_pos4[nextBuf * TILE_J + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+          __pipeline_memcpy_async(&s_vel4[nextBuf * TILE_J + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+          __pipeline_memcpy_async(&s_fbrp4[nextBuf * TILE_J + t], &d_parts_send[gj].p_data.f_bals_rho_p, sizeof(float4));
+          __pipeline_memcpy_async(&s_cuid4[nextBuf * TILE_J + t], &d_parts_send[gj].p_data.c_u_avisc_adiff, sizeof(float4));
         }
-        __syncthreads();
-
-        if (i_in_range)
-        {
+        __pipeline_commit();
+      }
+      if (i_in_range)
+      {
 #pragma unroll 4
-            for (int t = 0; t < tileCount; ++t)
-            {
-                const int j_idx = base + t;
-                if (j_idx == i_idx) continue; // self for self-pairs
+        for (int t = 0; t < tileCount; ++t){
+          const int j_idx = base + t;
+          if (j_idx == i_idx) continue; // self for self-pairs
 
-                // Unpack J tile
-                const float4 pj_pos  = s_pos4[t];
-                const float4 pj_vel  = s_vel4[t];
-                const float4 pj_fbrp = s_fbrp4[t];
-                const float4 pj_cuid = s_cuid4[t];
+          // Unpack J tile
+          const float4 pj_pos  = s_pos4[t];
+          const float4 pj_vel  = s_vel4[t];
+          const float4 pj_fbrp = s_fbrp4[t];
+          const float4 pj_cuid = s_cuid4[t];
 
-                const float xj = (float)(pj_pos.x - (float)shift_j_d.x);
-                const float yj = (float)(pj_pos.y - (float)shift_j_d.y);
-                const float zj = (float)(pj_pos.z - (float)shift_j_d.z);
-                const float hj = pj_pos.w;
+          const float xj = (float)(pj_pos.x - (float)shift_j_d.x);
+          const float yj = (float)(pj_pos.y - (float)shift_j_d.y);
+          const float zj = (float)(pj_pos.z - (float)shift_j_d.z);
+          const float hj = pj_pos.w;
 
-                const float vxj = pj_vel.x, vyj = pj_vel.y, vzj = pj_vel.z, mj = pj_vel.w;
+          const float vxj = pj_vel.x, vyj = pj_vel.y, vzj = pj_vel.z, mj = pj_vel.w;
 
-                const float fj = pj_fbrp.x, balsj = pj_fbrp.y;
-                const float rhoj = pj_fbrp.z, pressurej = pj_fbrp.w;
+          const float fj = pj_fbrp.x, balsj = pj_fbrp.y;
+          const float rhoj = pj_fbrp.z, pressurej = pj_fbrp.w;
 
-                const float cj  = pj_cuid.x, energyj = pj_cuid.y;
-                const float aviscj = pj_cuid.z, adiffj = pj_cuid.w;
+          const float cj  = pj_cuid.x, energyj = pj_cuid.y;
+          const float aviscj = pj_cuid.z, adiffj = pj_cuid.w;
 
-                // Geometry
-                const float xij = xi - xj;
-                const float yij = yi - yj;
-                const float zij = zi - zj;
+          // Geometry
+          const float xij = xi - xj;
+          const float yij = yi - yj;
+          const float zij = zi - zj;
 
-                const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
-                const float hjg2= (hj * hj) * kernel_gamma2;
+          const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+          const float hjg2= (hj * hj) * kernel_gamma2;
 
-                if (!((r2 < hig2) || (r2 < hjg2))) continue;
+          if (!((r2 < hig2) || (r2 < hjg2))) continue;
 
-                const float inv_r = rsqrtf(r2 + eps);
-                const float r     = r2 * inv_r;
+          const float inv_r = rsqrtf(r2 + eps);
+          const float r     = r2 * inv_r;
 
-                // Kernels for i and j
-                float wi, wi_dx, wj, wj_dx;
+          // Kernels for i and j
+          float wi, wi_dx, wj, wj_dx;
 
-                const float ui = r * hi_inv;   // r / hi
-                d_kernel_deval(ui, &wi, &wi_dx);
-                const float wi_dr = hid_inv * wi_dx;
+          const float ui = r * hi_inv;   // r / hi
+          d_kernel_deval(ui, &wi, &wi_dx);
+          const float wi_dr = hid_inv * wi_dx;
 
-                const float hj_inv  = 1.0f / hj;
-                const float hjd_inv = d_pow_dimension_plus_one(hj_inv);
-                const float uj      = r * hj_inv; // r / hj
-                d_kernel_deval(uj, &wj, &wj_dx);
-                const float wj_dr = hjd_inv * wj_dx;
+          const float hj_inv  = 1.0f / hj;
+          const float hjd_inv = d_pow_dimension_plus_one(hj_inv);
+          const float uj      = r * hj_inv; // r / hj
+          d_kernel_deval(uj, &wj, &wj_dx);
+          const float wj_dr = hjd_inv * wj_dx;
 
-                // Velocity diffs
-                const float dvx = vxi - vxj;
-                const float dvy = vyi - vyj;
-                const float dvz = vzi - vzj;
+          // Velocity diffs
+          const float dvx = vxi - vxj;
+          const float dvy = vyi - vyj;
+          const float dvz = vzi - vzj;
 
-                const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij)); // dv · r
+          const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij)); // dv · r
 
-                // Hubble augmentation for dv·r
-                const float dvdr_Hubble = dvdr + a2_Hubble * r2;
+          // Hubble augmentation for dv·r
+          const float dvdr_Hubble = dvdr + a2_Hubble * r2;
 
-                // Are they approaching?
-                const float omega_ij = fminf(dvdr_Hubble, 0.f);
-                const float mu_ij    = fac_mu * inv_r * omega_ij; // <= 0
+          // Are they approaching?
+          const float omega_ij = fminf(dvdr_Hubble, 0.f);
+          const float mu_ij    = fac_mu * inv_r * omega_ij; // <= 0
 
-                // Signal velocity and grad-h terms
-                const float v_sig = ci + cj - const_viscosity_beta * mu_ij;
+          // Signal velocity and grad-h terms
+          const float v_sig = ci + cj - const_viscosity_beta * mu_ij;
 
-                // NOTE: f_ij = 1 - fi/mj ; f_ji = 1 - fj/mi
-                const float f_ij = 1.f - fi * (1.f / mj);
-                const float f_ji = 1.f - fj * mi_inv;
+          // NOTE: f_ij = 1 - fi/mj ; f_ji = 1 - fj/mi
+          const float f_ij = 1.f - fi * (1.f / mj);
+          const float f_ji = 1.f - fj * mi_inv;
 
-                // Viscosity
-                const float rhoij      = rhoi + rhoj;
-                const float rhoij_inv  = 1.f / rhoij;
-                const float alpha      = avisci + aviscj;
-                const float visc       = -0.25f * alpha * v_sig * mu_ij * (balsi + balsj) * rhoij_inv;
+          // Viscosity
+          const float rhoij      = rhoi + rhoj;
+          const float rhoij_inv  = 1.f / rhoij;
+          const float alpha      = avisci + aviscj;
+          const float visc       = -0.25f * alpha * v_sig * mu_ij * (balsi + balsj) * rhoij_inv;
 
-                const float visc_acc_term = 0.5f * visc * (wi_dr * f_ij + wj_dr * f_ji) * inv_r;
+          const float visc_acc_term = 0.5f * visc * (wi_dr * f_ij + wj_dr * f_ji) * inv_r;
 
-                // Pressure
-                const float rhoj2         = rhoj * rhoj;
-                const float rhoj_inv      = 1.f / rhoj;
-                const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
-                const float P_over_rho2_j = pressurej * (1.f / rhoj2) * f_ji;
+          // Pressure
+          const float rhoj2         = rhoj * rhoj;
+          const float rhoj_inv      = 1.f / rhoj;
+          const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
+          const float P_over_rho2_j = pressurej * (1.f / rhoj2) * f_ji;
 
-                const float sph_acc_term  = (P_over_rho2_i * wi_dr + P_over_rho2_j * wj_dr) * inv_r;
+          const float sph_acc_term  = (P_over_rho2_i * wi_dr + P_over_rho2_j * wj_dr) * inv_r;
 
-                const float acc = sph_acc_term + visc_acc_term;
+          const float acc = sph_acc_term + visc_acc_term;
 
-                // Acceleration accumulation
-                res_ahydro.x -= mj * acc * xij;
-                res_ahydro.y -= mj * acc * yij;
-                res_ahydro.z -= mj * acc * zij;
+          // Acceleration accumulation
+          res_ahydro.x -= mj * acc * xij;
+          res_ahydro.y -= mj * acc * yij;
+          res_ahydro.z -= mj * acc * zij;
 
-                // du/dt terms
-                const float sph_du_term_i = P_over_rho2_i * dvdr * inv_r * wi_dr;
-                const float visc_du_term  = 0.5f * visc_acc_term * dvdr_Hubble;
+          // du/dt terms
+          const float sph_du_term_i = P_over_rho2_i * dvdr * inv_r * wi_dr;
+          const float visc_du_term  = 0.5f * visc_acc_term * dvdr_Hubble;
 
-                // Diffusion
-                float alpha_diff = (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
-                // if (fabsf(pressurei + pressurej) < 1e-10f) alpha_diff = 0.f; // optional
+          // Diffusion
+          float alpha_diff = (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
+          // if (fabsf(pressurei + pressurej) < 1e-10f) alpha_diff = 0.f; // optional
 
-                const float v_diff = alpha_diff * 0.5f *
-                    (sqrtf(2.f * fabsf(pressurei - pressurej) * rhoij_inv) +
-                     fabsf(fac_mu * inv_r * dvdr_Hubble));
+          const float v_diff = alpha_diff * 0.5f *
+              (sqrtf(2.f * fabsf(pressurei - pressurej) * rhoij_inv) +
+                  fabsf(fac_mu * inv_r * dvdr_Hubble));
 
-                const float diff_du_term = v_diff * (energyi - energyj) *
-                    (f_ij * wi_dr * rhoi_inv + f_ji * wj_dr * rhoj_inv);
+          const float diff_du_term = v_diff * (energyi - energyj) *
+              (f_ij * wi_dr * rhoi_inv + f_ji * wj_dr * rhoj_inv);
 
-                const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
+          const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
 
-                // Accumulate energy & h-derivative
-                res_udt_hdt.x += du_dt_i * mj;
-                res_udt_hdt.y -= mj * dvdr * inv_r * rhoj_inv * wi_dr;
-            }
+          // Accumulate energy & h-derivative
+          res_udt_hdt.x += du_dt_i * mj;
+          res_udt_hdt.y -= mj * dvdr * inv_r * rhoj_inv * wi_dr;
         }
+      }
 
-        __syncthreads(); // all threads must reach the same number of barriers
+      __syncthreads(); // all threads must reach the same number of barriers
     }
 
     // Min neighbor timebin (your original logic used tbj from i)
