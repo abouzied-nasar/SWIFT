@@ -1085,7 +1085,7 @@ __device__ __forceinline__ void process_range_tiled_force(
     // cosmology
     float d_a, float d_H){
   // Shared memory tile for J: pos/h, vel/m, f/bals/rho/p, c/u/avisc/adiff
-    extern __shared__ unsigned char smem[];
+    extern __shared__ __align__(16) unsigned char smem[];
     float4* s_pos4  = reinterpret_cast<float4*>(smem);                      // [TILE_J]
     float4* s_vel4  = reinterpret_cast<float4*>(s_pos4  + 2 * TILE_J);          // [TILE_J]
     float4* s_fbrp4 = reinterpret_cast<float4*>(s_vel4  + 2 * TILE_J);          // [TILE_J]
