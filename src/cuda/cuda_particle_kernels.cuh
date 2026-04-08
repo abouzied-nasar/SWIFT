@@ -1105,7 +1105,7 @@ __device__ __forceinline__ void process_range_tiled_force(
     float hi_inv=1.f, hid_inv=1.f, mi_inv=1.f, rhoi_inv=1.f, rhoi_inv2=1.f, hig2=0.f;
 
     if (i_in_range) {
-        const auto pi = d_parts_send[i_idx].p_data;
+        const struct gpu_part_data_f pi = d_parts_send[i_idx].p_data;
 
         xi = (float)(pi.x_h.x - shift_i_d.x);
         yi = (float)(pi.x_h.y - shift_i_d.y);
