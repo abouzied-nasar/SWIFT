@@ -169,6 +169,9 @@ enum {
   timer_dopair_gpu_launch_g,
   timer_dopair_gpu_launch_f,
   timer_dopair_gpu_recurse,
+  timer_gpu_hash_d,
+  timer_gpu_hash_g,
+  timer_gpu_hash_f,
   timer_count,
 };
 

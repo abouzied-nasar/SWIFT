@@ -229,7 +229,9 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
   int start = h_id;
   const int n_leaves_packed = md->n_leaves_packed;
   int unique_count = md->n_unique;
-  /*Do a linear probe of hash table*/
+  /*Do a linear probe of hash table
+   * TODO: If this becomes a large overhead look into
+   * optimising the hashing*/
   while(ht[h_id].occupied){
 	/*If we already have a cell hashed to h_id.
 	 * Return it's index in the array of

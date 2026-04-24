@@ -169,6 +169,9 @@ const char* timers_names[timer_count] = {
     "gpu_pair_launch_gradient",
     "gpu_pair_launch_force",
     "gpu_pair_recurse",
+	"gpu_hash_d",
+	"gpu_hash_g",
+	"gpu_hash_f",
 };
 
 /* File to store the timers */
