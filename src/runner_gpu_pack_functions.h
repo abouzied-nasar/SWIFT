@@ -43,180 +43,6 @@
 #endif
 
 /**
- * @brief Generic function to pack data of a single (pair of) leaf cells into
- * CPU-side buffers destined for GPU offloading
- *
- * @param r the #runner
- * @param buf the CPU-side buffer to copy into
- * @param ci first leaf #cell
- * @param cj second leaf #cell.
- * @param task_subtype this task's subtype
- */
-__attribute__((always_inline)) INLINE static void runner_gpu_pack(
-    const struct runner *r, struct gpu_offload_data *restrict buf,
-    const struct cell *ci, const struct cell *cj,
-    const enum task_subtypes task_subtype) {
-
-  /* Grab handles */
-  const struct engine *e = r->e;
-  struct gpu_pack_metadata *md = &buf->md;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  if (ci == NULL) error("Got NULL cell ci?");
-  if (cj == NULL) error("Got NULL cell cj?");
-#endif
-
-  const int count_ci = ci->hydro.count;
-  const int count_cj = cj->hydro.count;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  /* Anything to do here? */
-  if (count_ci == 0 || count_cj == 0)
-    error("Empty cells should've been excluded during the recursion.");
-#endif
-
-  /* Get how many particles we've packed until now */
-  int pack_ind = md->count_parts;
-  int pack_ind_unique = md->count_parts_unique;
-
-#ifdef SWIFT_DEBUG_CHECKS
-  int last_ind = pack_ind + count_ci;
-  if (ci != cj) last_ind += count_cj; /* packing pair interaction */
-  if (last_ind >= md->params.part_buffer_size) {
-    error(
-        "Exceeded particle buffer size. Increase "
-        "Scheduler:gpu_part_buffer_size."
-        "ind=%d, counts=%d %d, buffer_size=%d, task_subtype=%s, is self "
-        "task?=%d",
-        pack_ind, count_ci, count_cj, md->params.part_buffer_size,
-        subtaskID_names[task_subtype], ci == cj);
-  }
-#endif
-
-  /* Get first and last particles of cell i */
-  const int cis = pack_ind;
-  const int cie = pack_ind + count_ci;
-  const int n_leaves_packed = md->n_leaves_packed;
-  if (ci == cj) { /* This is a self interaction. */
-
-    const double shift[3] = {0.0, 0.0, 0.0};
-
-    /* Pack the data into the CPU-side buffers for offloading. */
-    if (task_subtype == task_subtype_gpu_density) {
-      /*Check to see if the cell is unique and we should pack it*/
-      if(md->pack_ci[n_leaves_packed]==1){
-    	  error("Shouldn't be in here");
-        gpu_pack_part_density(ci, buf->parts_send_d, pack_ind_unique);
-      }
-    } else if (task_subtype == task_subtype_gpu_gradient) {
-      gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift, cis, cie);
-    } else if (task_subtype == task_subtype_gpu_force) {
-      gpu_pack_part_force(ci, buf->parts_send_f, pack_ind, shift, cis, cie);
-    }
-#ifdef SWIFT_DEBUG_CHECKS
-    else {
-      error("Unknown task subtype %s", subtaskID_names[task_subtype]);
-    }
-#endif
-
-  } else { /* This is a pair interaction. */
-
-    /* Get the relative distance between the pairs and apply wrapping in case
-     * of periodic boundary conditions */
-    double shift[3] = {0., 0., 0.};
-    for (int k = 0; k < 3; k++) {
-      if (cj->loc[k] - ci->loc[k] < -e->s->dim[k] * 0.5) {
-        shift[k] = e->s->dim[k];
-      } else if (cj->loc[k] - ci->loc[k] > e->s->dim[k] * 0.5) {
-        shift[k] = -e->s->dim[k];
-      }
-    }
-
-    /* Get the shift for cell i */
-    const double shift_i[3] = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
-                               shift[2] + cj->loc[2]};
-
-    /* Get first and last particles of cell j */
-    const int cjs = pack_ind + count_ci;
-    const int cje = pack_ind + count_ci + count_cj;
-
-    /* Pack cell i */
-    if (task_subtype == task_subtype_gpu_density) {
-      if(md->pack_ci[n_leaves_packed]==1){
-    	error("Shouldn't be in here");
-        /*Check to see if cell i is unique and we should pack it*/
-        gpu_pack_part_density(ci, buf->parts_send_d, pack_ind_unique);
-      }
-    } else if (task_subtype == task_subtype_gpu_gradient) {
-      gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift_i, cjs,
-                             cje);
-    } else if (task_subtype == task_subtype_gpu_force) {
-      gpu_pack_part_force(ci, buf->parts_send_f, pack_ind, shift_i, cjs, cje);
-    }
-#ifdef SWIFT_DEBUG_CHECKS
-    else {
-      error("Unknown task subtype %s", subtaskID_names[task_subtype]);
-    }
-#endif
-
-    /* Update the packed particles counter */
-    /* Note: md->count_parts will be increased later */
-    pack_ind += count_ci;
-
-    /* Do the same for cj */
-    const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
-
-    if (task_subtype == task_subtype_gpu_density) {
-      /*Check to see if cell j is unique and we should pack it*/
-      if(md->pack_cj[n_leaves_packed]==1){
-    	error("Shouldn't be in here");
-        gpu_pack_part_density(cj, buf->parts_send_d, pack_ind);
-      }
-    } else if (task_subtype == task_subtype_gpu_gradient) {
-      gpu_pack_part_gradient(cj, buf->parts_send_g, pack_ind, shift_j, cis,
-                             cie);
-    } else if (task_subtype == task_subtype_gpu_force) {
-      gpu_pack_part_force(cj, buf->parts_send_f, pack_ind, shift_j, cis, cie);
-    }
-#ifdef SWIFT_DEBUG_CHECKS
-    else {
-      error("Unknown task subtype %s", subtaskID_names[task_subtype]);
-    }
-#endif
-  }
-
-  /* Now finish up the bookkeeping. */
-
-  /* Get the index for the leaf cell */
-  const int lid = md->n_leaves_packed;
-
-  /*TODO: Do we still need this? We're now working with cells not particles*/
-  /* Identify first particle for each bundle of tasks */
-  const int bundle_size =
-      md->is_pair_task ? md->params.bundle_size_pair : md->params.bundle_size;
-  if (lid % bundle_size == 0) {
-    int bid = lid / bundle_size;
-    /* Store this before we increment md->count_parts */
-    md->bundle_first_part[bid] = md->count_parts;
-    /* Store this before we increment md->count_parts */
-    md->bundle_first_cell[bid] = lid;
-  }
-
-  /* Update incremented pack length accordingly */
-  if (ci == cj) {
-    /* We packed a self interaction */
-    md->count_parts += count_ci;
-  } else {
-    /* We packed a pair interaction */
-    md->count_parts += count_ci + count_cj;
-  }
-
-  /* Record that we have now packed a new leaf cell (pair) & increment number
-   * of leaf cells to offload */
-  md->n_leaves_packed++;
-};
-
-/**
  * @brief Generic function to unpack data received from the GPU depending on
  * the task subtype.
  *
@@ -248,12 +74,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
   for (int i = 0; i < md->tasks_in_list; i++) task_unpacked[i] = 0;
   int ntasks_unpacked = 0;
 
-//  if(task_subtype == task_subtype_gpu_density){
-//	  for(int i = 0; i < md->count_parts; i++){
-//		  if(buf->parts_recv_d[i].n_neighbours > 0)
-//			  message("UP found %i neighbours", buf->parts_recv_d[i].n_neighbours);
-//	  }
-//  }
   while (ntasks_unpacked < md->tasks_in_list) {
 
     /* Loop over all tasks that we have offloaded */
@@ -466,13 +286,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
      * we mustn't unlock its dependencies yet. ("Currently handled task" is
      * the one for which the offloading cycle is currently underway in
      * runner_gpu_pack_and_launch) */
-    if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves)) {
-//      if(task_subtype == task_subtype_gpu_force)
-//        message("FORCE tid %i npacked %i n_leaves %i", tid, npacked, md->task_n_leaves);
-//      else
-//        message("DENS tid %i npacked %i n_leaves %i", tid, npacked, md->task_n_leaves);
-      continue;
-    }
+    if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves))
+    	continue;
 
     /* If we're here, we're completely done with this task. Mark it as
      * completed. */
@@ -491,57 +306,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
     md->task_list[tid]->done = 1;
 
   } /* Loop over tasks in list */
-}
-
-/**
- * @brief Wrapper to pack data for density tasks on the GPU.
- */
-__attribute__((always_inline)) INLINE static void runner_gpu_pack_density(
-    const struct runner *r, struct gpu_offload_data *restrict buf,
-    const struct cell *ci, const struct cell *cj) {
-
-  TIMER_TIC;
-
-  runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_density);
-
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_pack_d);
-  else
-    TIMER_TOC(timer_doself_gpu_pack_d);
-}
-
-/**
- * @brief Wrapper to pack data for gradient tasks on the GPU.
- */
-__attribute__((always_inline)) INLINE static void runner_gpu_pack_gradient(
-    const struct runner *r, struct gpu_offload_data *restrict buf,
-    const struct cell *ci, const struct cell *cj) {
-
-  TIMER_TIC;
-
-  runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_gradient);
-
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_pack_g);
-  else
-    TIMER_TOC(timer_doself_gpu_pack_g);
-}
-
-/**
- * @brief Wrapper to pack data for force tasks on the GPU.
- */
-__attribute__((always_inline)) INLINE static void runner_gpu_pack_force(
-    const struct runner *r, struct gpu_offload_data *restrict buf,
-    const struct cell *ci, const struct cell *cj) {
-
-  TIMER_TIC;
-
-  runner_gpu_pack(r, buf, ci, cj, task_subtype_gpu_force);
-
-  if (buf->md.is_pair_task)
-    TIMER_TOC(timer_dopair_gpu_pack_f);
-  else
-    TIMER_TOC(timer_doself_gpu_pack_f);
 }
 
 /**

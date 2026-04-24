@@ -219,7 +219,7 @@ __attribute__((always_inline)) INLINE static void hash_insert(const struct cell 
 }
 
 // Lookup in hash table
-__attribute__((always_inline)) INLINE static void hash_lookup(const struct cell *restrict c, const int hash_size,
+__attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const struct cell *restrict c, const int hash_size,
 		struct hash_entry *restrict ht, struct gpu_offload_data *restrict buf, const int ij,
 		const enum task_subtypes task_subtype) {
 
@@ -276,9 +276,9 @@ __attribute__((always_inline)) INLINE static void hash_lookup(const struct cell 
     if(task_subtype == task_subtype_gpu_density)
       gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
     else if(task_subtype == task_subtype_gpu_gradient)
-      gpu_pack_part_unique_gradient(c, buf->parts_send_g, md->count_parts_unique);
+      gpu_pack_part_gradient(c, buf->parts_send_g, md->count_parts_unique);
     else if(task_subtype == task_subtype_gpu_force)
-      gpu_pack_part_unique_force(c, buf->parts_send_f, md->count_parts_unique);
+      gpu_pack_part_force(c, buf->parts_send_f, md->count_parts_unique);
     /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
     md->count_parts_unique += c_count + 1;
   }
@@ -291,9 +291,9 @@ __attribute__((always_inline)) INLINE static void hash_lookup(const struct cell 
     if(task_subtype == task_subtype_gpu_density)
       gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
     else if(task_subtype == task_subtype_gpu_gradient)
-      gpu_pack_part_unique_gradient(c, buf->parts_send_g, md->count_parts_unique);
+      gpu_pack_part_gradient(c, buf->parts_send_g, md->count_parts_unique);
     else if(task_subtype == task_subtype_gpu_force)
-      gpu_pack_part_unique_force(c, buf->parts_send_f, md->count_parts_unique);
+      gpu_pack_part_force(c, buf->parts_send_f, md->count_parts_unique);
     /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
     md->count_parts_unique += c_count + 1;
   }
@@ -314,7 +314,7 @@ __attribute__((always_inline)) INLINE static void hash_lookup(const struct cell 
  * @param depth current recursion depth
  * @param timer are we timing this?
  */
-__attribute__((always_inline)) INLINE static void runner_gpu_filter_data(const struct runner *r,
+__attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_list(const struct runner *r,
                                       const struct scheduler *s,
                                       struct gpu_offload_data *restrict buf,
                                       const char timer, const struct task * t, const struct cell *restrict cii,
@@ -325,12 +325,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_filter_data(const s
   /* Grab some handles. */
   /* packing data and metadata */
   struct gpu_pack_metadata *md = &buf->md;
- /* TODO: Use this to replace array when checking as we no longer need to track this for the entire list of cells*/
+ /* TODO: Use this local copy to replace array carried when
+  * checking as we no longer need to track this for the
+  * entire list of cells*/
 //  int2 pack = {0, 0};
-
-  /**TODO: Check if this needs to be here*/
-  if(md->task_n_leaves == 0)
-	  error("We shouldn't be in here if we have no leaves");
 
   /*Get a pointer to the full hash table and it's size
    * TODO: Make this a dynamically sized hash table
@@ -338,22 +336,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_filter_data(const s
   struct hash_entry * ht = md->hash_table.entry;
   const int hash_size = md->hash_size;
 
-  /*None of these should be NULL. Even for selfs where cjj = cii*/
-  if (cii == NULL || cjj == NULL)
-	  error("Error: working on NULL cells");
-
   /*Check if ci has already been found.
    * If so, return where it's unique copy
    * is found in the hash table
    * Otherwise, add cell to hash table*/
   /*Flag that we're testing ci*/
   int ij = 0;
-  hash_lookup(cii, hash_size, ht, buf, ij, task_subtype);
+  hash_lookup_and_pack(cii, hash_size, ht, buf, ij, task_subtype);
   /*Same for cj. For self tasks this will point to ci's location*/
 	/*Flag that we're testing cj*/
   ij = 1;
-  hash_lookup(cjj, hash_size, ht, buf, ij, task_subtype);
-//  }
+  hash_lookup_and_pack(cjj, hash_size, ht, buf, ij, task_subtype);
 }
 
 /**
@@ -385,6 +378,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   const struct gpu_md *gpu_md = &buf->gpu_md;
   cudaError_t cu_error = cudaSuccess;
 
+  /*TODO: Refactor this*/
   if (task_subtype == task_subtype_gpu_density){
 
     /*"What's gone and what's past help. Should be past grief"
@@ -433,7 +427,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
       /*"Once more unto the breach dear friends, once more!"
        *Issue instruction to launch GPU computations*/
-      gpu_launch_tiled_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
+      gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
               n_blocks,
 			  gpu_md->d_cell_i_j_start_end,
 			  gpu_md->d_block_leaf_id, space_dim, stream[0]);
@@ -499,7 +493,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
       /*"Once more unto the breach dear friends, once more!"
        *Issue instruction to launch GPU computations*/
-      gpu_launch_gradient_tiled(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H,
+      gpu_launch_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H,
               n_blocks,
               gpu_md->d_cell_i_j_start_end,
               gpu_md->d_block_leaf_id, space_dim, stream[0]);
@@ -569,7 +563,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       /*Once more unto the breach dear friends, once more!
        *
        *Issue instruction to launch GPU computations*/
-      gpu_launch_force_tiled_noasync(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
+      gpu_launch_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
               n_blocks,
               gpu_md->d_cell_i_j_start_end,
               gpu_md->d_block_leaf_id, space_dim, stream[0]);
@@ -819,7 +813,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     int cii_count = cii->hydro.count;
     int cjj_count = cjj->hydro.count;
 
-    /*TODO: This does not need to be withing t->subtype conditional. Can be re-used for all subtypes*/
     TIMER_TIC;
 
     /*Figure out where cells start for controlling GPU computations*/
@@ -859,7 +852,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
      * function as for the pairs.
      * If cells are already packed, keep track of where
      * they're packed (index). If not, pack and store their index as unique*/
-    runner_gpu_filter_data(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
+    pack_cell_particles_in_unique_list(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
 
     /* Now finish up bookkeeping*/
     /* Update incremented pack length accordingly */

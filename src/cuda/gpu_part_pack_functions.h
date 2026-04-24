@@ -174,10 +174,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
   const struct part *parts = c->hydro.parts;
   struct gpu_part_data_d *ps = &parts_buffer[pack_ind].p_data;
 
-//#pragma omp simd
 for (int i = 0; i < count; i++) {
-  __builtin_prefetch(&parts[i + 8], 0, 0);
-
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
@@ -213,53 +210,6 @@ for (int i = 0; i < count; i++) {
  * interacted with) in buffer
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
-    const struct cell *restrict ci,
-    struct gpu_part_send_g *restrict parts_buffer, const int pack_ind,
-    const double shift[3], const int cjstart, const int cjend) {
-
-  /* Grab handles */
-  const int count = ci->hydro.count;
-  const struct part *parts = ci->hydro.parts;
-  struct gpu_part_data_g *ps = &parts_buffer[pack_ind].p_data;
-
-  for (int i = 0; i < count; i++) {
-
-    const struct part *p = &parts[i];
-
-    const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0] - shift[0];
-    ps[i].x_h.y = x[1] - shift[1];
-    ps[i].x_h.z = x[2] - shift[2];
-    ps[i].x_h.w = part_get_h(p);
-
-    const float *v = part_get_const_v(p);
-    ps[i].vx_m.x = v[0];
-    ps[i].vx_m.y = v[1];
-    ps[i].vx_m.z = v[2];
-    ps[i].vx_m.w = part_get_mass(p);
-
-    ps[i].rho_avisc_u_c.x = part_get_rho(p);
-    ps[i].rho_avisc_u_c.y = part_get_alpha_av(p);
-    ps[i].rho_avisc_u_c.z = part_get_u(p);
-    ps[i].rho_avisc_u_c.w = part_get_soundspeed(p);
-
-  }
-}
-
-/**
- * @brief Packs the cell particle data for pair gradient interactions into the
- * CPU-side buffers.
- *
- * @param ci the #cell
- * @param parts_buffer the buffer to pack into
- * @param pack_ind the first free index in the buffer arrays to copy data into
- * @param shift periodic boundary shift
- * @param cjstart start index of cell cj's particles (which cell ci is to be
- * interacted with) in buffer
- * @param cjend end index of cell cj's particles (which cell ci is to be
- * interacted with) in buffer
- */
-__attribute__((always_inline)) INLINE static void gpu_pack_part_unique_gradient(
     const struct cell *restrict c,
     struct gpu_part_send_g *restrict parts_buffer, const int pack_ind) {
 
@@ -311,7 +261,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_unique_gradient(
  * @param cjend end index of cell cj's particles (which cell ci is to be
  * interacted with) in buffer
  */
-__attribute__((always_inline)) INLINE static void gpu_pack_part_unique_force(
+__attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     const struct cell *restrict ci,
     struct gpu_part_send_f *restrict parts_buffer, const int pack_ind) {
 
@@ -356,62 +306,6 @@ for (int i = 0; i < count; i++) {
   parts_buffer[pack_ind + count].c_loc.x.x = ci->loc[0];
   parts_buffer[pack_ind + count].c_loc.x.y = ci->loc[1];
   parts_buffer[pack_ind + count].c_loc.x.z = ci->loc[2];
-}
-
-/**
- * @brief Packs the cell particle data for pair force interactions into the
- * CPU-side buffers.
- *
- * @param ci the #cell
- * @param parts_buffer the buffer to pack into
- * @param pack_ind the first free index in the buffer arrays to copy data into
- * @param shift periodic boundary shift
- * @param cjstart start index of cell cj's particles (which cell ci is to be
- * interacted with) in buffer
- * @param cjend end index of cell cj's particles (which cell ci is to be
- * interacted with) in buffer
- */
-__attribute__((always_inline)) INLINE static void gpu_pack_part_force(
-    const struct cell *restrict ci,
-    struct gpu_part_send_f *restrict parts_buffer, const int pack_ind,
-    const double shift[3], const int cjstart, const int cjend) {
-
-  const int count = ci->hydro.count;
-  const struct part *parts = ci->hydro.parts;
-  struct gpu_part_data_f *ps = &parts_buffer[pack_ind].p_data;
-
-  for (int i = 0; i < count; i++) {
-
-    const struct part *p = &parts[i];
-
-    const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0] - shift[0];
-    ps[i].x_h.y = x[1] - shift[1];
-    ps[i].x_h.z = x[2] - shift[2];
-    ps[i].x_h.w = part_get_h(p);
-
-    const float *v = part_get_const_v(p);
-    ps[i].vx_m.x = v[0];
-    ps[i].vx_m.y = v[1];
-    ps[i].vx_m.z = v[2];
-    ps[i].vx_m.w = part_get_mass(p);
-
-    ps[i].f_bals_rho_p.x = part_get_f_gradh(p);
-    ps[i].f_bals_rho_p.y = part_get_balsara(p);
-    ps[i].f_bals_rho_p.z = part_get_rho(p);
-    ps[i].f_bals_rho_p.w = part_get_pressure(p);
-
-    ps[i].c_u_avisc_adiff.x = part_get_soundspeed(p);
-    ps[i].c_u_avisc_adiff.y = part_get_u(p);
-    ps[i].c_u_avisc_adiff.z = part_get_alpha_av(p);
-    ps[i].c_u_avisc_adiff.w = part_get_alpha_diff(p);
-
-    ps[i].timebin_minngbtimebin_pjs_pje.x = (int)part_get_time_bin(p);
-    int mintbin = (int)part_get_timestep_limiter_min_ngb_time_bin(p);
-    ps[i].timebin_minngbtimebin_pjs_pje.y = mintbin;
-    ps[i].timebin_minngbtimebin_pjs_pje.z = cjstart;
-    ps[i].timebin_minngbtimebin_pjs_pje.w = cjend;
-  }
 }
 
 #endif /* GPU_PART_PACK_FUNCTIONS_H */
