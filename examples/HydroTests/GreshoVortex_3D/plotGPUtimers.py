@@ -186,6 +186,9 @@ timer_names = [
     "gpu_pair_launch_gradient",
     "gpu_pair_launch_force",
     "gpu_pair_recurse",
+    "gpu_hash_d",
+    "gpu_hash_g",
+    "gpu_hash_f",
 ]
 
 
@@ -211,6 +214,9 @@ cols_to_use.append(timer_names.index("gpu_pair_launch_density") + 1)
 cols_to_use.append(timer_names.index("gpu_pair_launch_gradient") + 1)
 cols_to_use.append(timer_names.index("gpu_pair_launch_force") + 1)
 cols_to_use.append(timer_names.index("gpu_pair_recurse") + 1)
+cols_to_use.append(timer_names.index("gpu_hash_d") + 1)
+cols_to_use.append(timer_names.index("gpu_hash_g") + 1)
+cols_to_use.append(timer_names.index("gpu_hash_f") + 1)
 
 
 data = np.loadtxt(args.timer_file, usecols=cols_to_use)
