@@ -801,6 +801,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
   /* We do not need the lock on this cell as we are packing read-only data
    * unlock here but lock when unpacking to prevent race ;)*/
+  /*TODO: Revert this back to retaining lock when porting code to gpu_master*/
   cell_unlocktree(t->ci);
   if (t->cj != NULL) cell_unlocktree(t->cj);
 
