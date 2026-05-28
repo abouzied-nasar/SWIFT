@@ -862,7 +862,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
     md->n_blocks_packed += n_blocks_current;
     if(md->n_blocks_packed > n_blocks_max)
-      error("exceeded n_block_max");
+      error("exceeded n_block_max due to insufficient gpu_part_buffer_size. Increase gpu_part_buffer_size in your *.yml file");
 
     ///////////////////////////////////////////////////////////////////////
     /* Test to see if cells i and j have already been packed
