@@ -32,17 +32,51 @@ extern "C" {
 
 #include "config.h"
 #include "gpu_pack_params.h"
-
+#include <cuda_runtime.h>
 #include <stddef.h>
+
+/* Hash table entry. TODO: Move declaration to a separate file maybe?
+ * Used to construct a hash table (array) to find unique cells */
+struct hash_entry {
+    /*We use the cell pointer as the key for the hash*/
+    struct cell *c;
+    /*This cell's index in the array of unique_cells*/
+    int index;
+    /*Is this index occupied by another hash?*/
+    int occupied;
+};
 
 /*! struct holding bookkeeping meta-data required for offloading;
  * does not depend on cuda/hip et al. */
 struct gpu_pack_metadata {
 
-  /*! Lists of leaf cell pairs (ci, cj) which are to be interacted. May contain
-   * entries of multiple tasks' leaf cells. */
+  /*! Lists of leaf cell pairs (ci, cj) each constituting a leaf computation (see Nasar et al. 2026).
+   * May contain entries of multiple tasks' leaf cells. */
   struct cell **ci_leaves;
   struct cell **cj_leaves;
+
+  /*Data required for unique sorting*/
+  /*list of unique cells we extract in the leaf cell lists above*/
+  struct cell **unique_cells;
+
+  /*For a cell stored in unique_cells, where do its particles start/end
+   * in the particle data buffer array offloaded to GPU*/
+  int2 *unique_start_end;
+
+  /*Hash table used to find unique cells*/
+  struct hash_table{
+    struct hash_entry * entry;
+    int capacity;
+    int count;
+  } hash_table;
+
+  /*Array to guide each leaf computation to it's cell's/s' index in the
+   * array of unique cells. my_index.x -> ci, my_index.y -> cj
+   * For self computations, ci==cj*/
+  int2 *my_index;
+
+  /*number of unique cells we find*/
+  int n_unique;
 
   /*! Number of leaf cells which require interactions found during recursive
    * search for a single task */
@@ -72,13 +106,20 @@ struct gpu_pack_metadata {
   /*! How many particles have been packed */
   int count_parts;
 
+  /*! How many particles have been packed */
+  int count_parts_unique;
+
   /*! How many (pairs of) leaf cells we have alread packed (their particle data
    * copied) into the buffers */
   int n_leaves_packed;
 
-  /*! Total number of leaf cells which require interactions found during
-   * recursive searches since last offload cycle */
+  /*! Total number of leaf computations which require interactions found during
+   * recursive searches since last offload cycle. See Nasar et. al. (2026) */
   int n_leaves;
+
+  /*How many blocks of cuda threads do we need to process the packed
+   *  computations*/
+  int n_blocks_packed;
 
   /*! Are these buffers ready to trigger launch on GPU? */
   char launch;
@@ -88,6 +129,10 @@ struct gpu_pack_metadata {
 
   /*! Global (fixed) packing parameters */
   struct gpu_global_pack_params params;
+
+  /*Size of our hash table. Typically set to a multiple of pack sze to ensure
+   * we do not over-fill the hash table keeping it efficient*/
+  int hash_size;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Size of the send_part struct used */
