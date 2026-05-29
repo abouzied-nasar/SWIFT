@@ -53,6 +53,32 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
       (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
   for (size_t i = 0; i < leaf_buffer_size; i++) md->cj_leaves[i] = 0;
 
+  /*Allocate memory for unique cells.
+   * 2x size of ci_leaves just in case all leaves are unique*/
+  md->unique_cells =
+      (struct cell **)malloc(2 * leaf_buffer_size * sizeof(struct cell *));
+  for (size_t i = 0; i < 2 * leaf_buffer_size; i++) md->unique_cells[i] = 0;
+
+  md->unique_start_end =
+      (int2 *)malloc(leaf_buffer_size * sizeof(int2));
+  for (size_t i = 0; i < leaf_buffer_size; i++){
+    md->unique_start_end[i].x = 0;
+    md->unique_start_end[i].y = 0;
+  }
+
+  /* Allocate hash table. For now using pack_size * 10 (a reasonable estimate)*/
+  /*TODO: */
+  size_t hash_size = params->pack_size * 10;
+  md->hash_table.entry = calloc(hash_size, sizeof(struct hash_entry));
+  for (size_t i = 0; i < hash_size; i++){
+    md->hash_table.entry[i].c = 0;
+    md->hash_table.entry[i].index = 0;
+    md->hash_table.entry[i].occupied = 0;
+  }
+
+  /*This is used to tell each cell in a pair where it's index is in the uniquely sorted array*/
+  md->my_index = (int2 *)malloc(sizeof(int2) * params->pack_size);
+
   md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
   for (size_t i = 0; i < pack_size; i++) md->task_list[i] = NULL;
 
@@ -68,6 +94,10 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
   md->bundle_first_part = (int *)malloc(n_bundles * sizeof(int));
   for (size_t i = 0; i < n_bundles; i++) md->bundle_first_part[i] = 0;
 
+  /*Initialise metadata*/
+  md->hash_table.capacity = hash_size;
+  md->hash_table.count = 0;
+  md->hash_size = hash_size;
   md->task_n_leaves = 0;
   md->tasks_in_list = 0;
   md->count_parts = 0;
