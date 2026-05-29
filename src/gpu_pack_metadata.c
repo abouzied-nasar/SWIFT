@@ -134,10 +134,30 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
   /* md->task_n_leaves = 0;  */ /* Don't reset this! */
   md->tasks_in_list = 0;
   md->count_parts = 0;
+  md->count_parts_unique = 0;
   md->n_leaves_packed = 0;
   md->n_leaves = 0;
   md->launch = 0;
   md->launch_leftovers = 0;
+  md->n_unique = 0;
+  md->hash_table.capacity = md->hash_size;
+  md->hash_table.count = 0;
+  md->n_blocks_packed = 0;
+
+  for(int i = 0; i < md->hash_size; i++){
+      md->hash_table.entry[i].occupied = 0;
+      md->hash_table.entry[i].c = NULL;
+      md->hash_table.entry[i].index = 0;
+  }
+  for(int i = 0; i < md->params.pack_size; i++){
+    md->my_index[i].x = 0;
+    md->my_index[i].y = 0;
+    md->unique_start_end[i].x = 0;
+    md->unique_start_end[i].y = 0;
+  }
+  for(int i = 0; i < 2 * md->params.pack_size; i++){
+    md->unique_cells[i] = NULL;
+  }
 
 #ifdef SWIFT_DEBUG_CHECKS
   const struct gpu_global_pack_params pars = md->params;
