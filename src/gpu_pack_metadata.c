@@ -184,11 +184,15 @@ void gpu_pack_metadata_free(struct gpu_pack_metadata *md) {
 
   free((void *)md->ci_leaves);
   free((void *)md->cj_leaves);
+  free((void *)md->unique_cells);
+  free((void *)md->unique_start_end);
+  free((void *)md->my_index);
   free((void *)md->task_list);
-  free(md->task_first_packed_leaf);
-  free(md->task_last_packed_leaf);
-  free(md->task_first_packed_part);
-  free(md->bundle_first_part);
+  free((void *)md->task_first_packed_leaf);
+  free((void *)md->task_last_packed_leaf);
+  free((void *)md->task_first_packed_part);
+  free((void *)md->bundle_first_part);
+  free((void *)md->hash_table.entry);
 }
 
 #ifdef __cplusplus
