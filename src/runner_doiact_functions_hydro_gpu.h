@@ -252,7 +252,7 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
       return;
     }
     //Add one to the cells pointer after converting to int and hash again
-    h_id = (h_id + 1) % hash_size;// lin_probe(c, hash_size);
+    h_id = (h_id + 1) % hash_size;
     if(h_id == start)
         error("hash table full");
   }
@@ -261,7 +261,8 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 
   /*unique_cells is different from hash table.
    * This is just an array to keep track of
-   * unique cells*/
+   * unique cells. Used for debugging but no longer necessary
+   * TODO: Remove unique_cells if no longer needed*/
   md->unique_cells[unique_count] = (struct cell *)c;
   md->hash_table.count++;
   int c_count = c->hydro.count;
@@ -310,6 +311,7 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
   }
 
   TIMER_TIC2;
+  /*Store pointers for this unique cell, update it's unique index in array of unique cells*/
   hash_insert(c, unique_count, h_id, ht);
   md->n_unique++;
   if(task_subtype == task_subtype_gpu_density)
