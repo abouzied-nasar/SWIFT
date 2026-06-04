@@ -58,7 +58,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     const enum task_subtypes task_subtype) {
 
   /* Grab handles */
-  const struct engine *e = r->e;
+//  const struct engine *e = r->e;
   struct gpu_pack_metadata *md = &buf->md;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -91,20 +91,20 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
   }
 
   /* Get first and last particles of cell i */
-  const int cis = pack_ind;
-  const int cie = pack_ind + count_ci;
+//  const int cis = pack_ind;
+//  const int cie = pack_ind + count_ci;
 
   if (ci == cj) { /* This is a self interaction. */
 
-    const double shift[3] = {0.0, 0.0, 0.0};
+//    const double shift[3] = {0.0, 0.0, 0.0};
 
     /* Pack the data into the CPU-side buffers for offloading. */
     if (task_subtype == task_subtype_gpu_density) {
-      gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift, cis, cie);
+//      gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift, cis, cie);
     } else if (task_subtype == task_subtype_gpu_gradient) {
-      gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift, cis, cie);
+//      gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift, cis, cie);
     } else if (task_subtype == task_subtype_gpu_force) {
-      gpu_pack_part_force(ci, buf->parts_send_f, pack_ind, shift, cis, cie);
+//      gpu_pack_part_force(ci, buf->parts_send_f, pack_ind, shift, cis, cie);
     }
 #ifdef SWIFT_DEBUG_CHECKS
     else {
@@ -116,31 +116,31 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
 
     /* Get the relative distance between the pairs and apply wrapping in case
      * of periodic boundary conditions */
-    double shift[3] = {0., 0., 0.};
-    for (int k = 0; k < 3; k++) {
-      if (cj->loc[k] - ci->loc[k] < -e->s->dim[k] * 0.5) {
-        shift[k] = e->s->dim[k];
-      } else if (cj->loc[k] - ci->loc[k] > e->s->dim[k] * 0.5) {
-        shift[k] = -e->s->dim[k];
-      }
-    }
+//    double shift[3] = {0., 0., 0.};
+//    for (int k = 0; k < 3; k++) {
+//      if (cj->loc[k] - ci->loc[k] < -e->s->dim[k] * 0.5) {
+//        shift[k] = e->s->dim[k];
+//      } else if (cj->loc[k] - ci->loc[k] > e->s->dim[k] * 0.5) {
+//        shift[k] = -e->s->dim[k];
+//      }
+//    }
 
     /* Get the shift for cell i */
-    const double shift_i[3] = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
-                               shift[2] + cj->loc[2]};
+//    const double shift_i[3] = {shift[0] + cj->loc[0], shift[1] + cj->loc[1],
+//                               shift[2] + cj->loc[2]};
 
     /* Get first and last particles of cell j */
-    const int cjs = pack_ind + count_ci;
-    const int cje = pack_ind + count_ci + count_cj;
+//    const int cjs = pack_ind + count_ci;
+//    const int cje = pack_ind + count_ci + count_cj;
 
     /* Pack cell i */
     if (task_subtype == task_subtype_gpu_density) {
-      gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs, cje);
+//      gpu_pack_part_density(ci, buf->parts_send_d, pack_ind, shift_i, cjs, cje);
     } else if (task_subtype == task_subtype_gpu_gradient) {
-      gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift_i, cjs,
-                             cje);
+//      gpu_pack_part_gradient(ci, buf->parts_send_g, pack_ind, shift_i, cjs,
+//                             cje);
     } else if (task_subtype == task_subtype_gpu_force) {
-      gpu_pack_part_force(ci, buf->parts_send_f, pack_ind, shift_i, cjs, cje);
+//      gpu_pack_part_force(ci, buf->parts_send_f, pack_ind, shift_i, cjs, cje);
     }
 #ifdef SWIFT_DEBUG_CHECKS
     else {
@@ -153,15 +153,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
     pack_ind += count_ci;
 
     /* Do the same for cj */
-    const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
+//    const double shift_j[3] = {cj->loc[0], cj->loc[1], cj->loc[2]};
 
     if (task_subtype == task_subtype_gpu_density) {
-      gpu_pack_part_density(cj, buf->parts_send_d, pack_ind, shift_j, cis, cie);
+//      gpu_pack_part_density(cj, buf->parts_send_d, pack_ind, shift_j, cis, cie);
     } else if (task_subtype == task_subtype_gpu_gradient) {
-      gpu_pack_part_gradient(cj, buf->parts_send_g, pack_ind, shift_j, cis,
-                             cie);
+//      gpu_pack_part_gradient(cj, buf->parts_send_g, pack_ind, shift_j, cis,
+//                             cie);
     } else if (task_subtype == task_subtype_gpu_force) {
-      gpu_pack_part_force(cj, buf->parts_send_f, pack_ind, shift_j, cis, cie);
+//      gpu_pack_part_force(cj, buf->parts_send_f, pack_ind, shift_j, cis, cie);
     }
 #ifdef SWIFT_DEBUG_CHECKS
     else {
