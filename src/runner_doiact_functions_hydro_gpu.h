@@ -203,6 +203,124 @@ static void runner_doself_gpu_recurse(const struct runner *r,
   if (timer) TIMER_TOC(timer_gpu_self_recurse);
 }
 
+/*TODO: Move all hash_table code into hash_cell_pointers.c or something*/
+/* Simple hash function for pointers */
+__attribute__((always_inline)) INLINE static int hash_func(const struct cell *ptr, const int hash_size) {
+    return ((uintptr_t)ptr) % hash_size;
+}
+
+/* Insert into hash table. No need for probing as we will
+ * only store one cell in each index of hash table*/
+__attribute__((always_inline)) INLINE static void hash_insert(const struct cell *restrict c, const int unique_count, const int h_id, struct hash_entry * ht) {
+    ht[h_id].c = (struct cell*)c;
+    /*This is where the cell will be located in the unique_cells array*/
+    ht[h_id].index = unique_count;
+    ht[h_id].occupied = 1;
+}
+
+/* Lookup in hash table */
+__attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const struct cell *restrict c, const int hash_size,
+        struct hash_entry *restrict ht, struct gpu_offload_data *restrict buf, const int ij,
+        const enum task_subtypes task_subtype) {
+
+  TIMER_TIC;
+  /*Get the hash using the cell's pointer address*/
+  struct gpu_pack_metadata *md = &buf->md;
+  int h_id = hash_func(c, hash_size);
+  int start = h_id;
+  const int n_leaves_packed = md->n_leaves_packed;
+  int unique_count = md->n_unique;
+  /*Do a linear probe of hash table
+   * TODO: If this becomes a large overhead look into
+   * optimising the hashing*/
+  while(ht[h_id].occupied){
+    /*If we already have a cell hashed to h_id.
+     * Return it's index in the array of
+     * unique cells*/
+    if (ht[h_id].c == c){
+      /*We found this cell's hash value exists -> Not unique.
+       * The hash_lookup returns it's position in the sorted list
+       * (not in the hash table)*/
+      /*Check if this is ci*/
+      if(ij == 0){
+        md->my_index[n_leaves_packed].x = ht[h_id].index;
+      }
+      /*cell is cj*/
+      else{
+        md->my_index[n_leaves_packed].y = ht[h_id].index;
+      }
+      return;
+    }
+    //Add one to the cells pointer after converting to int and hash again
+    h_id = (h_id + 1) % hash_size;// lin_probe(c, hash_size);
+    if(h_id == start)
+        error("hash table full");
+  }
+  if(h_id > hash_size)
+      error("Ran over hash table");
+
+  /*unique_cells is different from hash table.
+   * This is just an array to keep track of
+   * unique cells*/
+  md->unique_cells[unique_count] = (struct cell *)c;
+  md->hash_table.count++;
+  int c_count = c->hydro.count;
+  /*Store where ci starts*/
+  md->unique_start_end[unique_count].x = md->count_parts_unique;
+  /*Store where ci ends*/
+  md->unique_start_end[unique_count].y = md->count_parts_unique + c_count + 1;
+
+  if(task_subtype == task_subtype_gpu_density)
+      TIMER_TOC(timer_gpu_hash_d);
+  else if(task_subtype == task_subtype_gpu_gradient)
+      TIMER_TOC(timer_gpu_hash_g);
+  else if(task_subtype == task_subtype_gpu_force)
+      TIMER_TOC(timer_gpu_hash_f);
+
+
+  if(ij == 0){ /*This is ci and it is unique*/
+    /*This cell has not been found yet.
+     * Add to unique_cells and store it's index ascending
+     * from index where we last inserted a unique cell*/
+    md->my_index[n_leaves_packed].x = unique_count;
+    /*Now pack the particles since this cell is unique*/
+    if(task_subtype == task_subtype_gpu_density)
+      gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
+    else if(task_subtype == task_subtype_gpu_gradient)
+      gpu_pack_part_gradient(c, buf->parts_send_g, md->count_parts_unique);
+    else if(task_subtype == task_subtype_gpu_force)
+      gpu_pack_part_force(c, buf->parts_send_f, md->count_parts_unique);
+    /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
+    md->count_parts_unique += c_count + 1;
+  }
+  else{ /*This is cj and it is unique*/
+    /*This cell has not been found yet.
+     * Add to unique_cells and store it's index ascending
+     * from index where we last inserted a unique cell*/
+    md->my_index[n_leaves_packed].y = unique_count;
+    /*Now pack the particles since this cell is unique*/
+    if(task_subtype == task_subtype_gpu_density)
+      gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
+    else if(task_subtype == task_subtype_gpu_gradient)
+      gpu_pack_part_gradient(c, buf->parts_send_g, md->count_parts_unique);
+    else if(task_subtype == task_subtype_gpu_force)
+      gpu_pack_part_force(c, buf->parts_send_f, md->count_parts_unique);
+    /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
+    md->count_parts_unique += c_count + 1;
+  }
+
+  TIMER_TIC2;
+  hash_insert(c, unique_count, h_id, ht);
+  md->n_unique++;
+  if(task_subtype == task_subtype_gpu_density)
+      TIMER_TOC2(timer_gpu_hash_d);
+  else if(task_subtype == task_subtype_gpu_gradient)
+      TIMER_TOC2(timer_gpu_hash_g);
+  else if(task_subtype == task_subtype_gpu_force)
+      TIMER_TOC2(timer_gpu_hash_f);
+
+}
+
 /**
  * @brief Generic function to launch GPU computations: Copies CPU buffer data
  * asynchronously over to the GPU, calls the solver, then copies data back.
