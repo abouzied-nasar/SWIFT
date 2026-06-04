@@ -164,8 +164,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     const struct cell *restrict c,
-    struct gpu_part_send_d *restrict parts_buffer, const int pack_ind,
-    const double shift[3], const int cjstart, const int cjend) {
+    struct gpu_part_send_d *restrict parts_buffer, const int pack_ind) {
 
   /* Grab handles */
   const int count = c->hydro.count;
@@ -177,9 +176,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0] - shift[0];
-    ps[i].x_h.y = x[1] - shift[1];
-    ps[i].x_h.z = x[2] - shift[2];
+    ps[i].x_h.x = x[0];
+    ps[i].x_h.y = x[1];
+    ps[i].x_h.z = x[2];
     ps[i].x_h.w = part_get_h(p);
 
     const float *v = part_get_const_v(p);
@@ -188,8 +187,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     ps[i].vx_m.z = v[2];
     ps[i].vx_m.w = part_get_mass(p);
 
-    ps[i].pjs_pje.x = cjstart;
-    ps[i].pjs_pje.y = cjend;
   }
 }
 
@@ -208,8 +205,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     const struct cell *restrict ci,
-    struct gpu_part_send_g *restrict parts_buffer, const int pack_ind,
-    const double shift[3], const int cjstart, const int cjend) {
+    struct gpu_part_send_g *restrict parts_buffer, const int pack_ind) {
 
   /* Grab handles */
   const int count = ci->hydro.count;
@@ -221,9 +217,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0] - shift[0];
-    ps[i].x_h.y = x[1] - shift[1];
-    ps[i].x_h.z = x[2] - shift[2];
+    ps[i].x_h.x = x[0];
+    ps[i].x_h.y = x[1];
+    ps[i].x_h.z = x[2];
     ps[i].x_h.w = part_get_h(p);
 
     const float *v = part_get_const_v(p);
@@ -241,8 +237,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     ps[i].avisc_vsig_lapu.y = part_get_v_sig(p);
     ps[i].avisc_vsig_lapu.z = part_get_laplace_u(p);
 
-    ps[i].pjs_pje.x = cjstart;
-    ps[i].pjs_pje.y = cjend;
   }
 }
 
@@ -261,8 +255,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     const struct cell *restrict ci,
-    struct gpu_part_send_f *restrict parts_buffer, const int pack_ind,
-    const double shift[3], const int cjstart, const int cjend) {
+    struct gpu_part_send_f *restrict parts_buffer, const int pack_ind) {
 
   const int count = ci->hydro.count;
   const struct part *parts = ci->hydro.parts;
@@ -273,9 +266,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0] - shift[0];
-    ps[i].x_h.y = x[1] - shift[1];
-    ps[i].x_h.z = x[2] - shift[2];
+    ps[i].x_h.x = x[0];
+    ps[i].x_h.y = x[1];
+    ps[i].x_h.z = x[2];
     ps[i].x_h.w = part_get_h(p);
 
     const float *v = part_get_const_v(p);
@@ -297,8 +290,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     ps[i].timebin_minngbtimebin_pjs_pje.x = (int)part_get_time_bin(p);
     int mintbin = (int)part_get_timestep_limiter_min_ngb_time_bin(p);
     ps[i].timebin_minngbtimebin_pjs_pje.y = mintbin;
-    ps[i].timebin_minngbtimebin_pjs_pje.z = cjstart;
-    ps[i].timebin_minngbtimebin_pjs_pje.w = cjend;
+
   }
 }
 
