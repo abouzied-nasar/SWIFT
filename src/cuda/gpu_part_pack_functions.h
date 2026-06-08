@@ -188,7 +188,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     ps[i].vx_m.w = part_get_mass(p);
 
   }
-  /*We've packed all the particles. Now insert the cell position into the count index*/
+  /*We've packed all the particles. Now insert the cell position
+   *  into the count index*/
   parts_buffer[pack_ind + count].c_loc.x.x = c->loc[0];
   parts_buffer[pack_ind + count].c_loc.x.y = c->loc[1];
   parts_buffer[pack_ind + count].c_loc.x.z = c->loc[2];
@@ -208,13 +209,13 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
  * interacted with) in buffer
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
-    const struct cell *restrict ci,
+    const struct cell *restrict c,
     struct gpu_part_send_g *restrict parts_buffer, const int pack_ind) {
 
   /* Grab handles */
-  const int count = ci->hydro.count;
-  const struct part *parts = ci->hydro.parts;
-  struct gpu_part_send_g *ps = &parts_buffer[pack_ind];
+  const int count = c->hydro.count;
+  const struct part *parts = c->hydro.parts;
+  struct gpu_part_data_g *ps = &parts_buffer[pack_ind].p_data;
 
   for (int i = 0; i < count; i++) {
 
@@ -242,6 +243,10 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     ps[i].avisc_vsig_lapu.z = part_get_laplace_u(p);
 
   }
+  /*We've packed all the particles. Now insert the cell position into the count index*/
+  parts_buffer[pack_ind + count].c_loc.x.x = c->loc[0];
+  parts_buffer[pack_ind + count].c_loc.x.y = c->loc[1];
+  parts_buffer[pack_ind + count].c_loc.x.z = c->loc[2];
 }
 
 /**

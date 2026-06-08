@@ -86,27 +86,33 @@ struct gpu_part_recv_d {
 };
 
 /*! Container for particle data required for gradient calcs */
-struct gpu_part_send_g {
+struct gpu_part_data_g {
 #ifdef WITH_CUDA
 
   /*! Particle position & smoothing length */
-  float4 x_h;
+  float4 __align__(16) x_h;
 
   /*! Particle velocity and mass */
-  float4 vx_m;
+  float4 __align__(16) vx_m;
 
-  /*! Particle density, alpha visc, internal energy u, and speed of sound c */
-  float4 u_rho_c_aviscmax;
+  /*! Particle density alpha visc internal energy u and speed of sound c */
+  float4 __align__(16) u_rho_c_aviscmax;
 
   /*! viscosity information results */
-  float3 avisc_vsig_lapu;
-
-  /*! Start and end index of particles to be interacted with in particle
-   * buffer arrays */
-  int2 pjs_pje;
+  float4 __align__(16) avisc_vsig_lapu;
 
 #endif
 };
+
+/*Particle and cell position data required for GPU density computations*/
+struct gpu_part_send_g{
+  union {
+    /*! Container for particle data required for density calcs */
+    struct gpu_part_data_g p_data;
+    /*! Container for cell positions for density calcs */
+    struct gpu_cell_pos c_loc;
+  };
+} ;
 
 /*! Container for particle data sent back to CPU for gradient calcs */
 struct gpu_part_recv_g {
