@@ -323,6 +323,35 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 
 }
 
+__attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_list(const struct runner *r,
+                                      const struct scheduler *s,
+                                      struct gpu_offload_data *restrict buf,
+                                      const char timer, const struct task * t, const struct cell *restrict cii,
+                                      const struct cell *restrict cjj, const enum task_subtypes task_subtype) {
+
+  /* Grab some handles. */
+  /* packing data and metadata */
+  struct gpu_pack_metadata *md = &buf->md;
+
+  /*Get a pointer to the full hash table and it's size
+   * TODO: Make this a dynamically sized hash table
+   * to use load factor to resize so that it is only ever 50% full*/
+  struct hash_entry * ht = md->hash_table.entry;
+  const int hash_size = md->hash_size;
+
+  /*Check if ci has already been found.
+   * If so, return where it's unique copy is found in the hash table
+   *  and do not pack as it is already packed. Otherwise, add cell
+   *  to hash table and pack its particles into a buffer*/
+  /*Flag that we're testing ci setting ij to 0*/
+  int ij = 0;
+  hash_lookup_and_pack(cii, hash_size, ht, buf, ij, task_subtype);
+  /*Same for cj. For self tasks this will point to ci's location*/
+    /*Flag that we're testing cj*/
+  ij = 1;
+  hash_lookup_and_pack(cjj, hash_size, ht, buf, ij, task_subtype);
+}
+
 /**
  * @brief Generic function to launch GPU computations: Copies CPU buffer data
  * asynchronously over to the GPU, calls the solver, then copies data back.
