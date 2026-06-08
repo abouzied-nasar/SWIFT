@@ -370,7 +370,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
   /* Grab handles */
   struct gpu_pack_metadata *md = &buf->md;
-  cudaEvent_t *event_end = buf->event_end;
 
   /* How many leaves have we packed? */
   const int leaves_packed = md->n_leaves_packed;
