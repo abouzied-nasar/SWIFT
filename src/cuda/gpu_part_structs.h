@@ -125,31 +125,44 @@ struct gpu_part_recv_g {
 };
 
 /*! Container for particle data required for force calcs */
-struct gpu_part_send_f {
+struct gpu_part_data_f {
 #ifdef WITH_CUDA
 
   /* Data required for the calculation: Values read to local GPU memory */
 
   /*! Particle positions, smoothing length */
-  float4 x_h;
+  float4 __align__(16) x_h;
 
   /*! Particle predicted velocity and mass */
-  float4 vx_m;
+  float4 __align__(16) vx_m;
 
   /*! Variable smoothing length term f, balsara, density, pressure */
-  float4 u_rho_f_p;
+  float4 __align__(16) u_rho_f_p;
 
   /*! Particle speed of sound, internal energy, alpha constants for
    * viscosity and diffusion */
-  float4 bals_c_avisc_adiff;
+  float4 __align__(16) bals_c_avisc_adiff;
 
   /*! Particle timebin, initial value of min neighbour timebin, start
    * and end index of particles to be interacted with in particle buffer
    * arrays */
-  int4 timebin_minngbtimebin_pjs_pje;
+  /*TODO: Change this to remove pjs and pje as will no longer be required*/
+  int4 __align__(16) timebin_minngbtimebin_pjs_pje;
 
 #endif
 };
+
+/*! Container for particle data required for force calcs */
+struct gpu_part_send_f {
+#ifdef WITH_CUDA
+  union {
+    /*! Container for particle data required for density calcs */
+    struct gpu_part_data_f p_data;
+    /*! Container for cell positions for density calcs */
+    struct gpu_cell_pos c_loc;
+  };
+#endif
+} ;
 
 /*! Container for particle data sent back to CPU for force calcs */
 struct gpu_part_recv_f {

@@ -268,7 +268,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
 
   const int count = ci->hydro.count;
   const struct part *parts = ci->hydro.parts;
-  struct gpu_part_send_f *ps = &parts_buffer[pack_ind];
+  struct gpu_part_data_f *ps = &parts_buffer[pack_ind].p_data;
 
   for (int i = 0; i < count; i++) {
 
@@ -301,6 +301,10 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     ps[i].timebin_minngbtimebin_pjs_pje.y = mintbin;
 
   }
+  /*We've packed all the particles. Now insert the cell position into the count index*/
+  parts_buffer[pack_ind + count].c_loc.x.x = ci->loc[0];
+  parts_buffer[pack_ind + count].c_loc.x.y = ci->loc[1];
+  parts_buffer[pack_ind + count].c_loc.x.z = ci->loc[2];
 }
 
 #endif /* GPU_PART_PACK_FUNCTIONS_H */
