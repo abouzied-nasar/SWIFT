@@ -375,185 +375,223 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   /* How many leaves have we packed? */
   const int leaves_packed = md->n_leaves_packed;
 
-  /* How many leaves should be in a bundle? */
-  const int bundle_size = md->params.bundle_size;
+  /*Send to GPU to have an idea of space size for periodics*/
+  double3 space_dim;
+  space_dim.x = r->e->s->dim[0];
+  space_dim.y = r->e->s->dim[1];
+  space_dim.z = r->e->s->dim[2];
 
-  /* Identify the number of GPU bundles to run in ideal case */
-  int n_bundles = md->params.n_bundles;
+  /*Grab a pointer to GPU destined metadata*/
+  const struct gpu_md *gpu_md = &buf->gpu_md;
 
-  /* Special case for incomplete bundles (when having not enough leftover leafs
-   * to fill a bundle) */
-  if (md->launch_leftovers) {
+  /* initialise to just some meaningless value to silence the compiler */
+  cudaError_t cu_error = cudaErrorMemoryAllocation;
 
-    n_bundles = (leaves_packed + bundle_size - 1) / bundle_size;
+  /*Copy the tasks' metadata to the GPU. Send it using stream[0] for now. N.B. this is not default stream ;).
+   * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
+   * NOTE: This could be removed outside conditionals since it's name, type and size are the same
+   *  for all task subtypes*/
+  cu_error =
+      cudaMemcpyAsync(&buf->gpu_md.d_cell_i_j_start_end[0],
+          &buf->gpu_md.cell_i_j_start_end[0],
+          leaves_packed * sizeof(int4),
+          cudaMemcpyHostToDevice, stream[0]);
 
-#ifdef SWIFT_DEBUG_CHECKS
-    if (n_bundles > md->params.n_bundles) {
-      error("Launching leftovers with too many bundles? Target size=%d, got=%d",
-            md->params.n_bundles, n_bundles);
-    }
-    if (n_bundles == 0) {
-      error("Got 0 bundles. leaves_packed=%d, bundle_size=%d", leaves_packed,
-            bundle_size);
-    }
-#endif
-  }
+  /*Copy the metadata to GPU telling each cuda block what sections of the unique particle data to work on.*/
+  cu_error =
+      cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id[0],
+          &buf->gpu_md.block_leaf_id[0],
+          md->n_blocks_packed * sizeof(int2),
+          cudaMemcpyHostToDevice, stream[0]);
 
-  /* Launch the copies for each bundle and run the GPU kernel. Each bundle gets
-   * its own stream. */
-  for (int bid = 0; bid < n_bundles; bid++) {
+  /*Get the number of cuda blocks we need to launch. No need for calculation here as
+   * this is calculated while we pack*/
+  const int n_blocks = md->n_blocks_packed;
 
-    /* Get the particle count for this bundle */
-    const int bundle_first_part = md->bundle_first_part[bid];
-    const int bundle_last_part = bid < (n_bundles - 1)
-                                     ? md->bundle_first_part[bid + 1]
-                                     : md->count_parts;
-    const int bundle_n_parts = bundle_last_part - bundle_first_part;
+  /*TODO: Refactor this if at all possible*/
+  if (task_subtype == task_subtype_gpu_density){
 
-    /* initialise to just some meaningless value to silence the compiler */
-    cudaError_t cu_error = cudaErrorMemoryAllocation;
-
-    /* Transfer memory to device */
-    if (task_subtype == task_subtype_gpu_density) {
-
-      cu_error =
-          cudaMemcpyAsync(&buf->d_parts_send_d[bundle_first_part],
-                          &buf->parts_send_d[bundle_first_part],
-                          bundle_n_parts * sizeof(struct gpu_part_send_d),
-                          cudaMemcpyHostToDevice, stream[bid]);
-
-    } else if (task_subtype == task_subtype_gpu_gradient) {
-
-      cu_error =
-          cudaMemcpyAsync(&buf->d_parts_send_g[bundle_first_part],
-                          &buf->parts_send_g[bundle_first_part],
-                          bundle_n_parts * sizeof(struct gpu_part_send_g),
-                          cudaMemcpyHostToDevice, stream[bid]);
-
-    } else if (task_subtype == task_subtype_gpu_force) {
-
-      cu_error =
-          cudaMemcpyAsync(&buf->d_parts_send_f[bundle_first_part],
-                          &buf->parts_send_f[bundle_first_part],
-                          bundle_n_parts * sizeof(struct gpu_part_send_f),
-                          cudaMemcpyHostToDevice, stream[bid]);
-    }
-#ifdef SWIFT_DEBUG_CHECKS
-    else {
-      error("Unknown task subtype %s", subtaskID_names[task_subtype]);
-    }
-#endif
+    /*"What's gone and what's past help. Should be past grief"
+     *Re-set sums to zero on GPU before launching kernel*/
+    cu_error =
+        cudaMemsetAsync(&buf->d_parts_recv_d[0],
+        0, md->count_parts_unique * sizeof(struct gpu_part_recv_d),
+        stream[0]);
 
     if (cu_error != cudaSuccess) {
       /* If we're here, assume something's messed up with our code, not with
        * CUDA. */
       error(
-          "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i "
-          "first_part=%d bundle_n_parts=%d",
-          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
-          bundle_first_part, bundle_n_parts);
+          "CUDA memset: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
     }
 
-    /* Launch the GPU kernels for ci & cj as a 1D grid */
-    /* TODO: num_blocks_y is not used anymore. Purge it. */
-    const int num_blocks_x =
-        (bundle_n_parts + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
-    const int num_blocks_y = 0;
+    /*"Give to a gracious message a host of tongues"
+     * Copy the unique particle data to the GPU*/
+    cu_error =
+        cudaMemcpyAsync(&buf->d_parts_send_d[0],
+            &buf->parts_send_d[0],
+            md->count_parts_unique * sizeof(struct gpu_part_send_d),
+            cudaMemcpyHostToDevice, stream[0]);
 
-    /* Launch the kernel for ci using data for ci and cj */
-    if (task_subtype == task_subtype_gpu_density) {
+    if (cu_error != cudaSuccess) {
+      /* If we're here, assume something's messed up with our code, not with
+       * CUDA. */
+      error(
+          "H2D memcpy: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
+    }
 
-      gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
-                         stream[bid], num_blocks_x, num_blocks_y,
-                         bundle_first_part, bundle_n_parts);
+    /*"Once more unto the breach dear friends, once more!"
+     *Issue instruction to launch GPU computations*/
+    gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
+        n_blocks,
+        gpu_md->d_cell_i_j_start_end,
+        gpu_md->d_block_leaf_id, space_dim, stream[0]);
 
-    } else if (task_subtype == task_subtype_gpu_gradient) {
+    /*"The wheel is come full circle; I am here"
+     *  Results are ready to copy back to CPU BUFFERS */
+    cu_error =
+        cudaMemcpyAsync(&buf->parts_recv_d[0],
+            &buf->d_parts_recv_d[0],
+            md->count_parts_unique * sizeof(struct gpu_part_recv_d),
+            cudaMemcpyDeviceToHost, stream[0]);
+  }
+  else if (task_subtype == task_subtype_gpu_gradient){
 
+    /*"What's gone and what's past help. Should be past grief"
+     *Re-set sums to zero on GPU before launching kernel*/
+    cu_error =
+        cudaMemsetAsync(&buf->d_parts_recv_g[0],
+        0, md->count_parts_unique * sizeof(struct gpu_part_recv_g),
+        stream[0]);
+    if (cu_error != cudaSuccess) {
+      /* If we're here, assume something's messed up with our code, not with
+       * CUDA. */
+      error(
+          "CUDA memset: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
+    }
+      /*"Give to a gracious message a host of tongues"
+       * Copy the unique particle data to the GPU*/
+      cu_error =
+          cudaMemcpyAsync(&buf->d_parts_send_g[0],
+            &buf->parts_send_g[0],
+            md->count_parts_unique * sizeof(struct gpu_part_send_g),
+            cudaMemcpyHostToDevice, stream[0]);
+
+      if (cu_error != cudaSuccess) {
+        /* If we're here, assume something's messed up with our code, not with
+         * CUDA. */
+        error(
+            "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
+      }
+
+      /*"Once more unto the breach dear friends, once more!"
+       *Issue instruction to launch GPU computations*/
       gpu_launch_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H,
-                          stream[bid], num_blocks_x, num_blocks_y,
-                          bundle_first_part, bundle_n_parts);
+              n_blocks,
+              gpu_md->d_cell_i_j_start_end,
+              gpu_md->d_block_leaf_id, space_dim, stream[0]);
 
-    } else if (task_subtype == task_subtype_gpu_force) {
+      /*"The wheel is come full circle; I am here"
+       *  Results are ready to copy back to CPU BUFFERS */
+      cu_error =
+          cudaMemcpyAsync(&buf->parts_recv_g[0],
+                          &buf->d_parts_recv_g[0],
+                          md->count_parts_unique * sizeof(struct gpu_part_recv_g),
+                          cudaMemcpyDeviceToHost, stream[0]);
 
-      gpu_launch_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
-                       stream[bid], num_blocks_x, num_blocks_y,
-                       bundle_first_part, bundle_n_parts);
-    }
-#ifdef SWIFT_DEBUG_CHECKS
-    else {
-      error("Unknown task subtype %s", subtaskID_names[task_subtype]);
-    }
-#endif
+  }
+  else if (task_subtype == task_subtype_gpu_force){
 
-    cu_error = cudaGetLastError();
+    /*What's gone and what's past help. Should be past grief
+     *Re-set sums to zero on GPU before launching kernel*/
+    cu_error =
+        cudaMemsetAsync(&buf->d_parts_recv_f[0],
+        0, md->count_parts_unique * sizeof(struct gpu_part_recv_f),
+        stream[0]);
     if (cu_error != cudaSuccess) {
       /* If we're here, assume something's messed up with our code, not with
        * CUDA. */
       error(
-          "kernel launch pair: CUDA error '%s' for task_subtype %s: cpuid=%i "
-          "nbx=%i nby=%i",
-          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
-          num_blocks_x, num_blocks_y);
+          "CUDA memset: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
     }
 
-    /* Copy results back to CPU BUFFERS */
-    if (task_subtype == task_subtype_gpu_density) {
-
-      cu_error =
-          cudaMemcpyAsync(&buf->parts_recv_d[bundle_first_part],
-                          &buf->d_parts_recv_d[bundle_first_part],
-                          bundle_n_parts * sizeof(struct gpu_part_recv_d),
-                          cudaMemcpyDeviceToHost, stream[bid]);
-
-    } else if (task_subtype == task_subtype_gpu_gradient) {
-
-      cu_error =
-          cudaMemcpyAsync(&buf->parts_recv_g[bundle_first_part],
-                          &buf->d_parts_recv_g[bundle_first_part],
-                          bundle_n_parts * sizeof(struct gpu_part_recv_g),
-                          cudaMemcpyDeviceToHost, stream[bid]);
-
-    } else if (task_subtype == task_subtype_gpu_force) {
-
-      cu_error =
-          cudaMemcpyAsync(&buf->parts_recv_f[bundle_first_part],
-                          &buf->d_parts_recv_f[bundle_first_part],
-                          bundle_n_parts * sizeof(struct gpu_part_recv_f),
-                          cudaMemcpyDeviceToHost, stream[bid]);
-    }
-#ifdef SWIFT_DEBUG_CHECKS
-    else {
-      error("Unknown task subtype %s", subtaskID_names[task_subtype]);
-    }
-#endif
+    /*"Give to a gracious message a host of tongues"
+     *Copy the unique particle data to the GPU*/
+    cu_error =
+        cudaMemcpyAsync(&buf->d_parts_send_f[0],
+            &buf->parts_send_f[0],
+            md->count_parts_unique * sizeof(struct gpu_part_send_f),
+            cudaMemcpyHostToDevice, stream[0]);
 
     if (cu_error != cudaSuccess) {
-      /* If we're here, something's messed up with our code, not with CUDA. */
-      error("D2H async memcpy: CUDA error '%s' for task_subtype %s: cpuid=%i",
-            cudaGetErrorString(cu_error), subtaskID_names[task_subtype],
-            r->cpuid);
-    }
-
-    /* Issue event to be recorded by GPU after copy back to CPU */
-    cu_error = cudaEventRecord(event_end[bid], stream[bid]);
-    swift_assert(cu_error == cudaSuccess);
-
-  } /* End of looping over bundles to launch in streams */
-
-  /* Issue synchronisation commands for all events recorded by GPU
-   * Should swap with one cuda Device Synchronise really if we decide to go
-   * this way with unpacking done separately */
-  /* TODO Abouzied: Is the comment above still appropriate? */
-  for (int bid = 0; bid < n_bundles; bid++) {
-    cudaError_t cu_error = cudaEventSynchronize(event_end[bid]);
-    if (cu_error != cudaSuccess) {
+      /* If we're here, assume something's messed up with our code, not with
+       * CUDA. */
       error(
-          "cudaEventSynchronize failed: '%s' for task subtype %s,"
-          " cpuid=%d, bundle=%d",
-          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
-          bid);
+          "H2D memcpy pair: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
+    }
+
+    /*"Once more unto the breach dear friends, once more!"
+     *Issue instruction to launch GPU computations*/
+    gpu_launch_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
+        n_blocks,
+        gpu_md->d_cell_i_j_start_end,
+        gpu_md->d_block_leaf_id, space_dim, stream[0]);
+
+    /*"The wheel is come full circle; I am here."
+     * Copy results back to CPU BUFFERS */
+    cu_error =
+        cudaMemcpyAsync(&buf->parts_recv_f[0],
+            &buf->d_parts_recv_f[0],
+            md->count_parts_unique * sizeof(struct gpu_part_recv_f),
+            cudaMemcpyDeviceToHost, stream[0]);
+    if (cu_error != cudaSuccess) {
+      /* If we're here, assume something's messed up with our code, not with
+       * CUDA. */
+      error(
+          "D2H memcpy: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
     }
   }
+  /*"All things are ready, if our mind be so..."
+   * Make sure CPU has synchronised with GPU before moving on*/
+  cu_error =
+      cudaStreamSynchronize(stream[0]);
+#ifdef SWIFT_DEBUG_CHECKS
+  else {
+    error("Unknown GPU task subtype %s", subtaskID_names[task_subtype]);
+  }
+#endif
+
+  if (cu_error != cudaSuccess) {
+    /* If we're here, assume something's messed up with our code, not with
+     * CUDA. */
+    error(
+        "Stream synchronize: CUDA error '%s' for task_subtype %s: cpuid=%i "
+        "first_part=%d bundle_n_parts=%d",
+        cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
+        bundle_first_part, bundle_n_parts);
+  }
+
+  /*Check to see if the kernel returned any errors.
+   * If we get here without crashing due to "error" call
+   * Then the error is not related to memcpys or memsets*/
+  cu_error = cudaGetLastError();
+  if (cu_error != cudaSuccess) {
+    /* If we're here, assume something's messed up with our code, not with
+     * CUDA. */
+    error(
+        "kernel launch: CUDA error '%s' for task_subtype %s: cpuid=%i "
+        "n_blocks=%i",
+        cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
+        n_blocks);
+  }
+
 }
 
 /**
