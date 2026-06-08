@@ -169,7 +169,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
   /* Grab handles */
   const int count = c->hydro.count;
   const struct part *parts = c->hydro.parts;
-  struct gpu_part_send_d *ps = &parts_buffer[pack_ind];
+  struct gpu_part_data_d *ps = &parts_buffer[pack_ind].p_data;
 
   for (int i = 0; i < count; i++) {
 
@@ -188,6 +188,10 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     ps[i].vx_m.w = part_get_mass(p);
 
   }
+  /*We've packed all the particles. Now insert the cell position into the count index*/
+  parts_buffer[pack_ind + count].c_loc.x.x = c->loc[0];
+  parts_buffer[pack_ind + count].c_loc.x.y = c->loc[1];
+  parts_buffer[pack_ind + count].c_loc.x.z = c->loc[2];
 }
 
 /**

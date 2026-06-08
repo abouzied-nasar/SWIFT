@@ -34,19 +34,41 @@ extern "C" {
 #include "../timeline.h"
 
 /*! Container for particle data required for density calcs */
-struct gpu_part_send_d {
+struct gpu_part_data_d {
+#ifdef WITH_CUDA
+//TODO: This needs changing to doubles too. Darn it...
+/*! Particle position and h -> x, y, z, h */
+  float4 __align__(16) x_h;
+
+  /*! Particle predicted velocity and mass -> ux, uy, uz, m */
+  float4 __align__(16) vx_m;
+
+#endif
+};
+
+/*! Container for cell positions */
+struct gpu_cell_pos {
 #ifdef WITH_CUDA
 
-  /*! Particle position and h -> x, y, z, h */
-  float4 x_h;
+  /*! Cell position. This is set as the last entry in the
+   * range of particles contained within a cell (i.e
+   * N+1 contains info for cell position)*/
+  double4 x;
 
-  /*! Particle predicted velocity and mass -> vx, vy, vz, m */
-  float4 vx_m;
+#endif
+};
 
-  /*! Start and end index of particles to be interacted with in particle
-   * buffer arrays */
-  int2 pjs_pje;
-
+/*! Over-arching union used to switch
+ * between particle data and cell position. Saves us copying
+ * cell positions to GPU individually*/
+struct gpu_part_send_d {
+#ifdef WITH_CUDA
+  union {
+    /*! Container for particle data required for density calcs */
+    struct gpu_part_data_d p_data;
+    /*! Container for cell positions for density calcs */
+    struct gpu_cell_pos c_loc;
+  };
 #endif
 };
 
