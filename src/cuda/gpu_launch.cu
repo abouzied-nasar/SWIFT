@@ -24,6 +24,11 @@
  * called from within runner_main.c
  ******************************************************************************/
 
+/*TODO: Figure out why this only works when included from here.
+ * When included in cuda_particle_kernels.cuh compiler complains with
+ * error: this declaration may not have extern "C" linkage */
+#include <cuda_pipeline.h>
+
 /* ifdef __cplusplus prevents name mangling. C code sees exact names
  of functions rather than mangled template names produced by C++ */
 #ifdef __cplusplus
@@ -42,78 +47,6 @@ extern "C" {
 /* #include <cuda_runtime.h> */
 
 /**
- * @brief Call the particle SPH density kernel.
- *
- * @param d_parts_send array on device containing particle data
- * @param d_parts_recv array on device to write results into
- * @param d_a current cosmological scale factor
- * @param d_H current Hubble constant
- * @param bundle_first_part index of first particle of this bundle in the
- * d_parts_* arrays
- * @param bundle_n_parts nr of particles in this bundle
- */
-__global__ void cuda_launch_density(
-    const struct gpu_part_send_d *__restrict__ d_parts_send,
-    struct gpu_part_recv_d *__restrict__ d_parts_recv, const float d_a,
-    const float d_H, const int bundle_first_part, const int bundle_n_parts) {
-
-  const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
-  const int pid = bundle_first_part + threadid;
-
-  if (pid < bundle_first_part + bundle_n_parts) {
-    cuda_kernel_density(pid, d_parts_send, d_parts_recv, d_a, d_H);
-  }
-}
-
-/**
- * @brief Call the particle SPH gradient kernel.
- *
- * @param d_parts_send array on device containing particle data
- * @param d_parts_recv array on device to write results into
- * @param d_a current cosmological scale factor
- * @param d_H current Hubble constant
- * @param bundle_first_part index of first particle of this bundle in the
- * d_parts_* arrays
- * @param bundle_n_parts nr of particles in this bundle
- */
-__global__ void cuda_launch_gradient(
-    const struct gpu_part_send_g *__restrict__ d_parts_send,
-    struct gpu_part_recv_g *__restrict__ d_parts_recv, float d_a, float d_H,
-    int bundle_first_part, int bundle_n_parts) {
-
-  const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
-  const int pid = bundle_first_part + threadid;
-
-  if (pid < bundle_first_part + bundle_n_parts) {
-    cuda_kernel_gradient(pid, d_parts_send, d_parts_recv, d_a, d_H);
-  }
-}
-
-/**
- * @brief Call the particle SPH force kernel.
- *
- * @param d_parts_send array on device containing particle data
- * @param d_parts_recv array on device to write results into
- * @param d_a current cosmological scale factor
- * @param d_H current Hubble constant
- * @param bundle_first_part index of first particle of this bundle in the
- * d_parts_* arrays
- * @param bundle_n_parts nr of particles in this bundle
- */
-__global__ void cuda_launch_force(
-    const struct gpu_part_send_f *__restrict__ d_parts_send,
-    struct gpu_part_recv_f *__restrict__ d_parts_recv, float d_a, float d_H,
-    int bundle_first_part, int bundle_n_parts) {
-
-  const int threadid = blockDim.x * blockIdx.x + threadIdx.x;
-  const int pid = bundle_first_part + threadid;
-
-  if (pid < bundle_first_part + bundle_n_parts) {
-    cuda_kernel_force(pid, d_parts_send, d_parts_recv, d_a, d_H);
-  }
-}
-
-/**
  * @brief Launch the density computation on the GPU for a bundle of leaf cells.
  *
  * @param d_parts_send array on device containing particle data
@@ -127,15 +60,24 @@ __global__ void cuda_launch_force(
  * d_parts_* arrays
  * @param bundle_n_parts nr of particles in this bundle
  */
-void gpu_launch_density(const struct gpu_part_send_d *__restrict__ d_parts_send,
-                        struct gpu_part_recv_d *__restrict__ d_parts_recv,
-                        const float d_a, const float d_H, cudaStream_t stream,
-                        const int num_blocks_x, const int num_blocks_y,
-                        const int bundle_first_part, const int bundle_n_parts) {
+void gpu_launch_density(
+    const struct gpu_part_send_d* __restrict__ d_parts_send,
+    struct gpu_part_recv_d* __restrict__ d_parts_recv,
+    const float d_a, const float d_H,
+    int num_blocks_x,
+    const int4* __restrict__ d_cell_i_j_start_end,
+    const int2* __restrict__ d_block_leaf_id,
+    const double3 space_dim,
+    cudaStream_t stream){
 
-  /* TODO: Do we want to allocate shared memory here? */
-  cuda_launch_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
-      d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
+  /* Shared memory allocation. Need two tiles as another tile (1) is
+   used for prefetching while tile 0 is used for computations and vice-versa*/
+  const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * (sizeof(struct gpu_part_recv_d));//(sizeof(float4) + sizeof(float4)); // 2048 bytes when TILE_J=64
+
+  cuda_kernel_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
+      d_parts_send, d_parts_recv, d_a, d_H,
+      d_cell_i_j_start_end, d_block_leaf_id, space_dim);
+
 }
 
 /**
@@ -153,15 +95,22 @@ void gpu_launch_density(const struct gpu_part_send_d *__restrict__ d_parts_send,
  * @param bundle_n_parts nr of particles in this bundle
  */
 void gpu_launch_gradient(
-    const struct gpu_part_send_g *__restrict__ d_parts_send,
-    struct gpu_part_recv_g *__restrict__ d_parts_recv, const float d_a,
-    const float d_H, cudaStream_t stream, const int num_blocks_x,
-    const int num_blocks_y, const int bundle_first_part,
-    const int bundle_n_parts) {
+    const struct gpu_part_send_g* __restrict__ d_parts_send,
+    struct gpu_part_recv_g*      __restrict__ d_parts_recv,
+    const float d_a, const float d_H,
+    int num_blocks_x,
+    const int4* __restrict__ d_cell_i_j_start_end,
+    const int2* __restrict__ d_block_leaf_id,
+    const double3 space_dim,
+    cudaStream_t stream)
+{
+  /* Shared memory allocation. Need two tiles as another tile (1) is
+     used for prefetching while tile 0 is used for computations and vice-versa*/
+    const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_g);  // 3072 bytes when TILE_J=64
 
-  /* TODO: Do we want to allocate shared memory here? */
-  cuda_launch_gradient<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
-      d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
+    cuda_kernel_gradient<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
+        d_parts_send, d_parts_recv, d_a, d_H,
+        d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
 
 /**
@@ -178,15 +127,23 @@ void gpu_launch_gradient(
  * d_parts_* arrays
  * @param bundle_n_parts nr of particles in this bundle
  */
-void gpu_launch_force(const struct gpu_part_send_f *__restrict__ d_parts_send,
-                      struct gpu_part_recv_f *__restrict__ d_parts_recv,
-                      const float d_a, const float d_H, cudaStream_t stream,
-                      const int num_blocks_x, const int num_blocks_y,
-                      const int bundle_first_part, const int bundle_n_parts) {
+void gpu_launch_force(
+    const struct gpu_part_send_f* __restrict__ d_parts_send,
+    struct gpu_part_recv_f*      __restrict__ d_parts_recv,
+    const float d_a, const float d_H,
+    int num_blocks_x,
+    const int4* __restrict__ d_cell_i_j_start_end,
+    const int2* __restrict__ d_block_leaf_id,
+    const double3 space_dim,
+    cudaStream_t stream)
+{
+  /* Shared memory allocation. Need two tiles as another tile (1) is
+       used for prefetching while tile 0 is used for computations and vice-versa*/
+    const size_t shmem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_f);
 
-  /* TODO: Do we want to allocate shared memory here? */
-  cuda_launch_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(
-      d_parts_send, d_parts_recv, d_a, d_H, bundle_first_part, bundle_n_parts);
+    cuda_kernel_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
+        d_parts_send, d_parts_recv, d_a, d_H,
+        d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
 
 #ifdef __cplusplus
