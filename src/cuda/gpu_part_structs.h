@@ -96,11 +96,14 @@ struct gpu_part_data_g {
   float4 __align__(16) vx_m;
 
   /*TODO: aviscmax is no longer needed as we do not use it on GPU. Remove!*/
-  /*! Particle internal energy u, density speed of sound and alpha visc*/
+  /*! Particle internal energy u, density speed of sound and alpha visc
+   * Better to use float4 than float3 even if we only need space for 3 vars*/
   float4 __align__(16) u_rho_c_aviscmax;
 
   /*! viscosity information required for particle i when comparing to neighbours*/
-  float4 __align__(16) avisc_vsig_lapu;
+  /*Leave as float4 for now. Gives best perf for pipeline async prefetching in kernel
+   * due to __align__(16) filling bus*/
+  float4 __align__(16) avisc_vsig;
 
 #endif
 };
@@ -119,8 +122,9 @@ struct gpu_part_send_g{
 struct gpu_part_recv_g {
 #ifdef WITH_CUDA
 
-  /*! viscosity information results */
-  float3 aviscmax_vsig_lapu;
+  /*! viscosity information results. Better to use float4 than float3
+   * even if we have 3 vars */
+  float4 aviscmax_vsig_lapu;
 
 #endif
 };
@@ -137,10 +141,10 @@ struct gpu_part_data_f {
   /*! Particle predicted velocity and mass */
   float4 __align__(16) vx_m;
 
-  /*! Variable smoothing length term f, balsara, density, pressure */
+  /*! internal energy, density, variable smoothing length term f, pressure */
   float4 __align__(16) u_rho_f_p;
 
-  /*! Particle speed of sound, internal energy, alpha constants for
+  /*! balsara, Particle speed of sound, alpha constants for
    * viscosity and diffusion */
   float4 __align__(16) bals_c_avisc_adiff;
 
@@ -148,7 +152,7 @@ struct gpu_part_data_f {
    * and end index of particles to be interacted with in particle buffer
    * arrays */
   /*TODO: Change this to remove pjs and pje as will no longer be required*/
-  int4 __align__(16) timebin_minngbtimebin_pjs_pje;
+  int4 __align__(16) timebin_minngbtimebin;
 
 #endif
 };
@@ -172,8 +176,13 @@ struct gpu_part_recv_f {
   /*! Particle acceleration vector */
   float3 a_hydro;
 
+  /*Note: Needed to revert back to float2 and int
+   * due to CUDA atomicMin requiring int*/
   /*! change of u and h with dt, v_sig */
-  float3 udt_hdt_minngbtb;
+  float2 udt_hdt;
+
+  /*! change of u and h with dt, v_sig */
+  int minngbtb;
 
 #endif
 };

@@ -571,10 +571,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     /* If we're here, assume something's messed up with our code, not with
      * CUDA. */
     error(
-        "Stream synchronize: CUDA error '%s' for task_subtype %s: cpuid=%i "
-        "first_part=%d bundle_n_parts=%d",
-        cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
-        bundle_first_part, bundle_n_parts);
+        "Stream synchronize: CUDA error '%s' for task_subtype %s: cpuid=%i ",
+        cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
   }
 
   /*Check to see if the kernel returned any errors.

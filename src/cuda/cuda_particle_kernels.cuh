@@ -310,73 +310,76 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
   /*Declare a variable to use up allocated shared memory*/
   extern __shared__ unsigned char smem[];
   /* TODO: we need positions to be double so this needs re-working in the near future!*/
+  /* TODO: Should add float2 in shared for avisc and vsig*/
   /*Assign range of memory to use for x, y, z and h*/
   float4* s_x_h = reinterpret_cast<float4*>(smem);
   /*Assign range of memory to use for velocity (u, v, w) and mass*/
   float4* s_vx_m = reinterpret_cast<float4*>(s_x_h + 2 * GPU_THREAD_BLOCK_SIZE);
   /*Assign range of memory to use for energy u, density rho, speed of sound c, alpha visc*/
   float4* s_u_rho_c_aviscmax = reinterpret_cast<float4*>(s_vx_m + 2 * GPU_THREAD_BLOCK_SIZE);
+  /*Assign range of memory to use for energy u, density rho, speed of sound c, alpha visc*/
+  float4* s_avisc_vsig = reinterpret_cast<float4*>(s_u_rho_c_aviscmax + 2 * GPU_THREAD_BLOCK_SIZE);
 
   /*Map this thread to its i-particle*/
   const int  i_id    = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
   /*Is the id in the cell we need to work on?*/
   const bool i_in_range = (i_id < i_end);
 
-  /* Initialise particle i's data */
-  float xi=0.f, yi=0.f, zi=0.f, hi=1.f;
+  /* Initialise particle i's data. Needed since we require definition
+   * before checking if i_in_range below */
+  float xi=0.f, yi=0.f, zi=0.f, hi=0.f;
   float vxi=0.f, vyi=0.f, vzi=0.f;
   float energyi=0.f, ci=0.f;
   float vsigi=0.f, lapui=0.f, avisc_maxi=0.f;
-  float hi_inv=1.f, hig2=0.f;
+  float hi_inv=0.f, hig2=0.f;
 
   /*Do not do any calculation if i_id is not in cell i range of particles*/
   if (i_in_range) {
 
-    /*Load particle i*/
+	/* First, grab handles. */
     const struct gpu_part_data_g pi = d_parts_send[i_id].p_data;
 
     /*Calculate i's position local to the cell*/
     xi = (float)(pi.x_h.x - shift_i_d.x);
     yi = (float)(pi.x_h.y - shift_i_d.y);
     zi = (float)(pi.x_h.z - shift_i_d.z);
-    /*i smoothing length*/
+    /*Get particle i smoothing length*/
     hi = (float)(pi.x_h.w);
     /*Find my velocities, mass not needed for particle i*/
     vxi = pi.vx_m.x;
     vyi = pi.vx_m.y;
     vzi = pi.vx_m.z;
 
-    /*Now get energy i and speed of sound from u_rho_c_aviscmax (u, rho, c, avisc)*/
+    /*Now get energy i and speed of sound from u_rho_c_aviscmax (u, rho, c, aviscmax)
+     * rho not needed*/
     energyi = pi.u_rho_c_aviscmax.x;
-    ci      = pi.rho_avisc_u_c.w;
-
-    /* Prep output */
-    /* Get previous value of avisc_vsig_lapu. vsig and lapu will be incremented while
-     * for avisc we want to find the maximum*/
-    avisc_maxi  = pi.avisc_vsig_lapu.x;
-    /*TODO: Double check whether I've introduced a bug here and if we actually need this.
-     * lapui should be set to zero I think since we atomically add them at the end*/
-    vsigi       = pi.avisc_vsig_lapu.y;
-    lapui       = 0.f//pi.avisc_vsig_lapu.z;
-
+    /*rhoi  = pi.u_rho_c_aviscmax.y;*/
+    ci      = pi.u_rho_c_aviscmax.z;
+    /* Get previous value of avisc and vsig. lapu will be incremented while
+     * for avisc we want to find the maximum. Set lapu to zero. We read the actula avisc for i here
+     * not aviscmax*/
+    avisc_maxi  = pi.u_rho_c_aviscmax.w;
+    /*Now get vsigi. avisc i not needed since we use aviscmax above*/
+    vsigi       = pi.avisc_vsig.y;
+    /*lapui incremeneted at the end. Initialise to zero for j loop*/
+    lapui       = 0.f;
+    /*Calculate smoothing length related parameters*/
     hi_inv = 1.0f / hi;
     hig2   = (hi * hi) * kernel_gamma2;
   }
 
-  // Accumulators
-  // Start from the i-side stored values (as in your original), then update over neighbours
-  float3 res_aviscmax_vsig_lapui = {avisc_maxi, vsigi, lapui};
-
-  // Cosmology terms
+  /* Cosmology terms for the signal velocity */
   const float fac_mu    = d_pow_three_gamma_minus_five_over_two(d_a);
   const float a2_Hubble = d_a * d_a * d_H;
 
+  /*const to avoid div by zero*/
   constexpr float eps = 1e-24f;
 
-  // Number of tiles
+  /* Number of tiles. How many times to de we need to load GPU_
+   * THREAD_BLOCK_SIZE particles to get through this cell? */
   const int numTiles = (j_end - j_start + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
-  // === Prefetch tile 0 into buffer 0 ===
+  /* Prefetch tile 0 into buffer 0 */
   if (numTiles > 0){
     const int base0      = j_start;
     const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, j_end - base0);
@@ -386,56 +389,70 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
       __pipeline_memcpy_async(&s_x_h[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
       __pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
       __pipeline_memcpy_async(&s_u_rho_c_aviscmax[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_c_aviscmax, sizeof(float4));
+      __pipeline_memcpy_async(&s_avisc_vsig[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.avisc_vsig, sizeof(float4));
     }
     __pipeline_commit();
   }
-  // === Tile over J with prefetch of "next" tile while computing "current" ===
+  /* Loop over tiles prefetching of "next" tile while computing "current" */
   for (int tile = 0; tile < numTiles; ++tile){
 
-    const int buf       = tile & 1;  // 0 or 1 (ping-pong)
+	/*Is this tile 0 or 1 (ping-pong tile execution and prefetching)*/
+    const int buf       = tile & 1;
     const int base      = j_start + tile * GPU_THREAD_BLOCK_SIZE;
     const int tileCount = min(GPU_THREAD_BLOCK_SIZE, j_end - base);
 
-    // Make sure the current tile (already committed) is resident in shared memory
+    /* Make sure the current tile (already committed) is resident in shared memory */
     __pipeline_wait_prior(0);
     __syncthreads();
 
-    // --- Kick off prefetch for the next tile (overlaps with compute below) ---
+    /* Initiate prefetch for the next tile (overlaps with compute further in the loop) */
     const int nextTile = tile + 1;
     if (nextTile < numTiles){
       /*If nextTile & 1 == 0. nextTile is even. If nextTile & 1 == 1, nextTile is odd*/
       const int nextBuf  = nextTile & 1;
+      /*Where does the next tile begin in the buffer array?*/
       const int nextBase = j_start + nextTile * GPU_THREAD_BLOCK_SIZE;
+      /*What is the number of required threads in the next tile? If we are at the end of
+       * cell j's range in the buffer only read to the end of the range*/
       const int nextCnt  = min(GPU_THREAD_BLOCK_SIZE, j_end - nextBase);
 
+      /*Now issue pre-fetch for next data set*/
       for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
         const int gj = nextBase + t;
         __pipeline_memcpy_async(&s_x_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
         __pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
         __pipeline_memcpy_async(&s_u_rho_c_aviscmax[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_c_aviscmax, sizeof(float4));
+        __pipeline_memcpy_async(&s_avisc_vsig[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.avisc_vsig, sizeof(float4));
       }
+      /*Commit but don't sync, syncing is done at the end of computations*/
       __pipeline_commit();
     }
-    // --- Compute on the current tile (buf) ---
+    /* Run computations on the current tile (buf)*/
     if (i_in_range){
       /* Start the neighbour interactions */
 #pragma unroll 4
       for (int t = 0; t < tileCount; ++t){
+
+    	/* We need to construct the maximal signal velocity between our particle
+    	 * and all of it's neighbours */
+    	/*grab the particle's index in the buffer array*/
         const int j_idx = base + t;
-        /* j != pid: Exclude self contribution. This happens at a later step. */
+        /* Exclude self contribution. This happens at a later step. */
         if (j_idx == i_id) continue;
 
         /* First, grab handles. */
-        const float4 pj_x_h = s_x_h[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
+        const float4 pj_x_h = s_x_h[buf * GPU_THREAD_BLOCK_SIZE + t];
         const float4 pj_vx_m = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
         /*Get rho, visc, energy and speed of sound*/
         const float4 pj_u_rho_c_aviscmax = s_u_rho_c_aviscmax[buf * GPU_THREAD_BLOCK_SIZE + t];
+        /*TODO: This is over-kill for since we only need avisc for particles j
+         *  but leave as-is for now until I work out a better data arrangement:
+         *  We need vsig from CPU for particle i but not it's neighbours
+         *  and we need aviscmax and vsig for particle i and not it's neighbours*/
+        const float4 pj_avisc_vsig = s_avisc_vsig[buf * GPU_THREAD_BLOCK_SIZE + t];
         const float xj = (float)(pj_x_h.x - (float)shift_j_d.x);
         const float yj = (float)(pj_x_h.y - (float)shift_j_d.y);
         const float zj = (float)(pj_x_h.z - (float)shift_j_d.z);
-        // const float hj = pj_x_h.w; // (hj not used in this gradient kernel)
-
-//        const float aviscj  = pj_u_rho_c_aviscmax.w;
 
         /*Find particle distances*/
         const float xij = xi - xj;
@@ -450,38 +467,39 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
         const float energyj = pj_u_rho_c_aviscmax.x;
         const float rhoj    = pj_u_rho_c_aviscmax.y;
         const float cj      = pj_u_rho_c_aviscmax.z;
-        /*TODO: avisc_vsig_lapu should be changed to float 2 since we only need avisc and vsig for comparison. Lapu is accumulator*/
-        const float aviscj  = pj.avisc_vsig_lapu.x;
-        res_aviscmax_vsig_lapui.x = fmaxf(res_aviscmax_vsig_lapui.x, aviscj);
+
+        const float aviscj  = pj_avisc_vsig.x;
+
+        avisc_maxi = fmaxf(avisc_maxi, aviscj);
         const float inv_r = rsqrtf(r2 + eps);
         const float r     = r2 * inv_r;
 
-        // Cosmology-adjusted dv·r
+        /**/
         const float dvx  = vxi - vxj;
         const float dvy  = vyi - vyj;
         const float dvz  = vzi - vzj;
+
         const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij));
         const float dvdr_Hubble = dvdr + a2_Hubble * r2;
 
-        // Approaching?
+        /* Are the particles moving towards each others ? */
         const float omega_ij = fminf(dvdr_Hubble, 0.f);
-        const float mu_ij    = fac_mu * inv_r * omega_ij; // <= 0
+        const float mu_ij    = fac_mu * inv_r * omega_ij; /* This is 0 or negative */
 
 
-        // Signal velocity (update running max across neighbors; initialised as vsigi)
+        /* Signal velocity (update running max across neighbors; initialised as vsigi) */
         const float new_v_sig = ci + cj - const_viscosity_beta * mu_ij;
-        res_aviscmax_vsig_lapui.y = fmaxf(res_aviscmax_vsig_lapui.y, new_v_sig);
+        /* Update if we need to */
+        vsigi = fmaxf(vsigi, new_v_sig);
 
-        // Kernel (derivative wrt r/hi); only wi_dx needed here
+        /* Calculate Del^2 u for the thermal diffusion coefficient. */
+        /* Need to get some kernel values F_ij = wi_dx */
         float wi, wi_dx;
         const float ui = r * hi_inv;
         d_kernel_deval(ui, &wi, &wi_dx);
 
-        // Laplacian(u) accumulation
-        // delta_u_factor = (u_i - u_j) / r
-        /*Energy calculations*/
         const float delta_u_factor = (energyi - energyj) * inv_r;
-        res_aviscmax_vsig_lapui.z += mj * delta_u_factor * wi_dx * (1.0f / rhoj);
+        lapui += mj * delta_u_factor * wi_dx * (1.0f / rhoj);
 
       }
     }
@@ -491,12 +509,12 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
 
   /*Conditional to prevent writing out of bounds of this computation*/
   if (i_in_range) {
-    //aviscmax
-    atomicMaxFloat(&d_parts_recv[i_id].avisc_vsig_lapu.y, vsigi);
-    //vsig
-    atomicMaxFloat(&d_parts_recv[i_id].avisc_vsig_lapu.x, res_aviscmax_vsig_lapui.x);
-    //lapu
-    atomicAdd(&d_parts_recv[i_id].avisc_vsig_lapu.z, res_aviscmax_vsig_lapui.z);
+    /*aviscmax*/
+	atomicMaxFloat(&d_parts_recv[i_id].aviscmax_vsig_lapu.x, avisc_maxi);
+	/*vsig*/
+    atomicMaxFloat(&d_parts_recv[i_id].aviscmax_vsig_lapu.y, vsigi);
+    /*lapu*/
+    atomicAdd(&d_parts_recv[i_id].aviscmax_vsig_lapu.z, lapui);
   }
 
 }
@@ -567,6 +585,268 @@ __global__ void cuda_kernel_gradient(
     }
 }
 
+/**
+ * @brief Naive kernel computing the force interactions of a single particle
+ *
+ * @param pid index of particle to compute density for in the data arrays
+ * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_recv array of particle data to write results into
+ * @param d_a current cosmological expansion factor
+ * @param d_H current Hubble constant
+ */
+__device__ __forceinline__ void neighbour_interactions_force(
+    const struct gpu_part_send_f* __restrict__ d_parts_send,
+    struct gpu_part_recv_f*      __restrict__ d_parts_recv,
+    int i_start, int i_end_excl, int j_start, int j_end_excl,
+    const double3 shift_i_d, const double3 shift_j_d, int b_id_local,
+	int tid, float d_a, float d_H) {
+
+    // Shared memory tile for J: pos/h, vel/m, f/bals/rho/p, c/u/avisc/adiff
+	extern __shared__ __align__(16) unsigned char smem[];
+	float4* s_pos4  = reinterpret_cast<float4*>(smem);                      // [GPU_THREAD_BLOCK_SIZE]
+	float4* s_vel4  = reinterpret_cast<float4*>(s_pos4  + 2 * GPU_THREAD_BLOCK_SIZE);          // [GPU_THREAD_BLOCK_SIZE]
+	float4* s_fbrp4 = reinterpret_cast<float4*>(s_vel4  + 2 * GPU_THREAD_BLOCK_SIZE);          // [GPU_THREAD_BLOCK_SIZE]
+	float4* s_cuid4 = reinterpret_cast<float4*>(s_fbrp4 + 2 * GPU_THREAD_BLOCK_SIZE);          // [GPU_THREAD_BLOCK_SIZE]
+
+	// Map this thread to its i-particle (keep all threads in lockstep → no early return)
+	const int  i_idx     = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+	const bool i_in_range  = (i_idx < i_end_excl);
+
+	// Per-i data (only loaded if active)
+	float xi=0.f, yi=0.f, zi=0.f, hi=1.f;
+	float vxi=0.f, vyi=0.f, vzi=0.f, mi=1.f;
+	float fi=0.f, balsi=0.f, rhoi=1.f, pressurei=0.f;
+	float ci=0.f, energyi=0.f, avisci=0.f, adiffi=0.f;
+	int   tbj=0, min_ngb_tbi=0;     // follows your original variable usage
+
+	float hi_inv=1.f, hid_inv=1.f, mi_inv=1.f, rhoi_inv=1.f, rhoi_inv2=1.f, hig2=0.f;
+
+	if (i_in_range) {
+		const struct gpu_part_data_f pi = d_parts_send[i_idx].p_data;
+
+		xi = (float)(pi.x_h.x - shift_i_d.x);
+		yi = (float)(pi.x_h.y - shift_i_d.y);
+		zi = (float)(pi.x_h.z - shift_i_d.z);
+		hi = (float)(pi.x_h.w);
+
+		vxi = pi.vx_m.x;  vyi = pi.vx_m.y;  vzi = pi.vx_m.z;  mi  = pi.vx_m.w;
+
+		fi = pi.u_rho_f_p.x;  balsi = pi.u_rho_f_p.y;
+		rhoi = pi.u_rho_f_p.z; pressurei = pi.u_rho_f_p.w;
+
+		ci = pi.bals_c_avisc_adiff.x;     energyi = pi.bals_c_avisc_adiff.y;
+		avisci = pi.bals_c_avisc_adiff.z; adiffi  = pi.bals_c_avisc_adiff.w;
+
+		tbj         = pi.timebin_minngbtimebin.x;
+		min_ngb_tbi = pi.timebin_minngbtimebin.y;
+
+		hi_inv   = 1.0f / hi;
+		hid_inv  = d_pow_dimension_plus_one(hi_inv);
+		mi_inv   = 1.0f / mi;
+		rhoi_inv = 1.0f / rhoi;
+		rhoi_inv2= rhoi_inv * rhoi_inv;
+		hig2     = (hi * hi) * kernel_gamma2;
+	}
+
+	// Accumulators
+	float3 res_ahydro  = {0.f, 0.f, 0.f};
+	float2 res_udt_hdt = {0.f, 0.f};
+	int    res_min_ngb_timebin = i_in_range ? min_ngb_tbi : 0;
+
+	// Cosmology (same for all threads; computing per-thread is fine)
+	const float fac_mu    = d_pow_three_gamma_minus_five_over_two(d_a);
+	const float a2_Hubble = d_a * d_a * d_H;
+
+	constexpr float eps = 1e-24f;
+
+	// Number of tiles
+	const int numTiles = (j_end_excl - j_start + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+
+	// === Prefetch tile 0 into buffer 0 ===
+	if (numTiles > 0){
+		const int base0      = j_start;
+		const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, j_end_excl - base0);
+
+		for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
+			const int gj = base0 + t;
+			__pipeline_memcpy_async(&s_pos4[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+			__pipeline_memcpy_async(&s_vel4[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+			__pipeline_memcpy_async(&s_fbrp4[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
+			__pipeline_memcpy_async(&s_cuid4[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
+		}
+		__pipeline_commit();
+	}
+	// === Tile over J with prefetch of "next" tile while computing "current" ===
+	for (int tile = 0; tile < numTiles; ++tile){
+
+		const int buf       = tile & 1;  // 0 or 1 (ping-pong)
+		const int base      = j_start + tile * GPU_THREAD_BLOCK_SIZE;
+		const int tileCount = min(GPU_THREAD_BLOCK_SIZE, j_end_excl - base);
+
+		// Make sure the current tile (already committed) is resident in shared memory
+		__pipeline_wait_prior(0);
+		__syncthreads();
+
+		// --- Kick off prefetch for the next tile (overlaps with compute below) ---
+		const int nextTile = tile + 1;
+		if (nextTile < numTiles){
+			/*If nextTile & 1 == 0. nextTile is even. If nextTile & 1 == 1, nextTile is odd*/
+			const int nextBuf  = nextTile & 1;
+			const int nextBase = j_start + nextTile * GPU_THREAD_BLOCK_SIZE;
+			const int nextCnt  = min(GPU_THREAD_BLOCK_SIZE, j_end_excl - nextBase);
+
+			for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
+				const int gj = nextBase + t;
+				__pipeline_memcpy_async(&s_pos4[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+				__pipeline_memcpy_async(&s_vel4[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+				__pipeline_memcpy_async(&s_fbrp4[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
+				__pipeline_memcpy_async(&s_cuid4[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
+			}
+			__pipeline_commit();
+		}
+		if (i_in_range)
+		{
+#pragma unroll 4
+			for (int t = 0; t < tileCount; ++t){
+				const int j_idx = base + t;
+				if (j_idx == i_idx) continue; // self for self-pairs
+
+				// Unpack J tile
+				const float4 pj_pos  = s_pos4[buf * GPU_THREAD_BLOCK_SIZE + t];
+				const float4 pj_vel  = s_vel4[buf * GPU_THREAD_BLOCK_SIZE + t];
+				const float4 pj_fbrp = s_fbrp4[buf * GPU_THREAD_BLOCK_SIZE + t];
+				const float4 pj_cuid = s_cuid4[buf * GPU_THREAD_BLOCK_SIZE + t];
+
+				const float xj = (float)(pj_pos.x - (float)shift_j_d.x);
+				const float yj = (float)(pj_pos.y - (float)shift_j_d.y);
+				const float zj = (float)(pj_pos.z - (float)shift_j_d.z);
+				const float hj = pj_pos.w;
+
+				const float vxj = pj_vel.x, vyj = pj_vel.y, vzj = pj_vel.z, mj = pj_vel.w;
+
+				const float fj = pj_fbrp.x, balsj = pj_fbrp.y;
+				const float rhoj = pj_fbrp.z, pressurej = pj_fbrp.w;
+
+				const float cj  = pj_cuid.x, energyj = pj_cuid.y;
+				const float aviscj = pj_cuid.z, adiffj = pj_cuid.w;
+
+				// Geometry
+				const float xij = xi - xj;
+				const float yij = yi - yj;
+				const float zij = zi - zj;
+
+				const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+				const float hjg2= (hj * hj) * kernel_gamma2;
+
+				if (!((r2 < hig2) || (r2 < hjg2))) continue;
+
+				const float inv_r = rsqrtf(r2 + eps);
+				const float r     = r2 * inv_r;
+
+				// Kernels for i and j
+				float wi, wi_dx, wj, wj_dx;
+
+				const float ui = r * hi_inv;   // r / hi
+				d_kernel_deval(ui, &wi, &wi_dx);
+				const float wi_dr = hid_inv * wi_dx;
+
+				const float hj_inv  = 1.0f / hj;
+				const float hjd_inv = d_pow_dimension_plus_one(hj_inv);
+				const float uj      = r * hj_inv; // r / hj
+				d_kernel_deval(uj, &wj, &wj_dx);
+				const float wj_dr = hjd_inv * wj_dx;
+
+				// Velocity diffs
+				const float dvx = vxi - vxj;
+				const float dvy = vyi - vyj;
+				const float dvz = vzi - vzj;
+
+				const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij)); // dv · r
+
+				// Hubble augmentation for dv·r
+				const float dvdr_Hubble = dvdr + a2_Hubble * r2;
+
+				// Are they approaching?
+				const float omega_ij = fminf(dvdr_Hubble, 0.f);
+				const float mu_ij    = fac_mu * inv_r * omega_ij; // <= 0
+
+				// Signal velocity and grad-h terms
+				const float v_sig = ci + cj - const_viscosity_beta * mu_ij;
+
+				// NOTE: f_ij = 1 - fi/mj ; f_ji = 1 - fj/mi
+				const float f_ij = 1.f - fi * (1.f / mj);
+				const float f_ji = 1.f - fj * mi_inv;
+
+				// Viscosity
+				const float rhoij      = rhoi + rhoj;
+				const float rhoij_inv  = 1.f / rhoij;
+				const float alpha      = avisci + aviscj;
+				const float visc       = -0.25f * alpha * v_sig * mu_ij * (balsi + balsj) * rhoij_inv;
+
+				const float visc_acc_term = 0.5f * visc * (wi_dr * f_ij + wj_dr * f_ji) * inv_r;
+
+				// Pressure
+				const float rhoj2         = rhoj * rhoj;
+				const float rhoj_inv      = 1.f / rhoj;
+				const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
+				const float P_over_rho2_j = pressurej * (1.f / rhoj2) * f_ji;
+
+				const float sph_acc_term  = (P_over_rho2_i * wi_dr + P_over_rho2_j * wj_dr) * inv_r;
+
+				const float acc = sph_acc_term + visc_acc_term;
+
+				// Acceleration accumulation
+				res_ahydro.x -= mj * acc * xij;
+				res_ahydro.y -= mj * acc * yij;
+				res_ahydro.z -= mj * acc * zij;
+
+				// du/dt terms
+				const float sph_du_term_i = P_over_rho2_i * dvdr * inv_r * wi_dr;
+				const float visc_du_term  = 0.5f * visc_acc_term * dvdr_Hubble;
+
+				// Diffusion
+				float alpha_diff = (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
+				// if (fabsf(pressurei + pressurej) < 1e-10f) alpha_diff = 0.f; // optional
+
+				const float v_diff = alpha_diff * 0.5f *
+						(sqrtf(2.f * fabsf(pressurei - pressurej) * rhoij_inv) +
+								fabsf(fac_mu * inv_r * dvdr_Hubble));
+
+				const float diff_du_term = v_diff * (energyi - energyj) *
+						(f_ij * wi_dr * rhoi_inv + f_ji * wj_dr * rhoj_inv);
+
+				const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
+
+				// Accumulate energy & h-derivative
+				res_udt_hdt.x += du_dt_i * mj;
+				res_udt_hdt.y -= mj * dvdr * inv_r * rhoj_inv * wi_dr;
+			}
+		}
+
+		__syncthreads(); // all threads must reach the same number of barriers
+	}
+
+	// Min neighbor timebin (your original logic used tbj from i)
+	if (i_in_range && tbj > 0) {
+		res_min_ngb_timebin = min(res_min_ngb_timebin, tbj);
+	}
+
+	// Atomics only for active i
+	if (i_in_range) {
+		atomicAdd(&d_parts_recv[i_idx].a_hydro.x, res_ahydro.x);
+		atomicAdd(&d_parts_recv[i_idx].a_hydro.y, res_ahydro.y);
+		atomicAdd(&d_parts_recv[i_idx].a_hydro.z, res_ahydro.z);
+
+		atomicAdd(&d_parts_recv[i_idx].udt_hdt.x, res_udt_hdt.x);
+		atomicAdd(&d_parts_recv[i_idx].udt_hdt.y, res_udt_hdt.y);
+
+		// If timebin is zero, set it; then take min
+		atomicCAS(&d_parts_recv[i_idx].minngbtb, 0, res_min_ngb_timebin);
+		atomicMin(&d_parts_recv[i_idx].minngbtb, res_min_ngb_timebin);
+	}
+}
+
+
 __global__ void cuda_kernel_force(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
     struct gpu_part_recv_f*      __restrict__ d_parts_recv,
@@ -631,219 +911,6 @@ __global__ void cuda_kernel_force(
             d_a, d_H
         );
     }
-}
-
-/**
- * @brief Naive kernel computing the force interactions of a single particle
- *
- * @param pid index of particle to compute density for in the data arrays
- * @param d_pars_send array of particle data received from CPU
- * @param d_parts_recv array of particle data to write results into
- * @param d_a current cosmological expansion factor
- * @param d_H current Hubble constant
- */
-__device__ __attribute__((always_inline)) INLINE void neighbour_interactions_force(
-    int pid, const struct gpu_part_send_f *__restrict__ d_parts_send,
-    struct gpu_part_recv_f *__restrict__ d_parts_recv, float d_a, float d_H) {
-
-  /* First, grab handles */
-  const struct gpu_part_data_f pi = d_parts_send[pid];
-
-  const float xi = pi.x_h.x;
-  const float yi = pi.x_h.y;
-  const float zi = pi.x_h.z;
-  const float hi = pi.x_h.w;
-
-  const float vxi = pi.vx_m.x;
-  const float vyi = pi.vx_m.y;
-  const float vzi = pi.vx_m.z;
-  const float mi = pi.vx_m.w;
-
-  const float energyi = pi.u_rho_f_p.x;
-  const float rhoi = pi.u_rho_f_p.y;
-  const float fi = pi.u_rho_f_p.z;
-  const float pressurei = pi.u_rho_f_p.w;
-
-  const float balsi = pi.bals_c_avisc_adiff.x;
-  const float ci = pi.bals_c_avisc_adiff.y;
-  const float avisci = pi.bals_c_avisc_adiff.z;
-  const float adiffi = pi.bals_c_avisc_adiff.w;
-
-  /* const int tbi = pi.timebin_minngbtimebin_pjs_pje.x; */
-  const int min_ngb_tbi = pi.timebin_minngbtimebin_pjs_pje.y;
-  const int pj_start = pi.timebin_minngbtimebin_pjs_pje.z;
-  const int pj_end = pi.timebin_minngbtimebin_pjs_pje.w;
-
-  /* Some auxiliary computations */
-  const float hig2 = hi * hi * kernel_gamma2;
-  const float hi_inv = 1.f / hi;
-  const float hid_inv = d_pow_dimension_plus_one(hi_inv); /* 1/h^(d+1) */
-  const float mi_inv = 1.f / mi;
-  const float rhoi_inv = 1.f / rhoi;
-  const float rhoi_inv2 = rhoi_inv * rhoi_inv;
-
-  /* Prep output */
-  float3 res_ahydro = {0.f, 0.f, 0.f};
-  float2 res_udt_hdt = {0.f, 0.f};
-  int res_min_ngb_timebin = min_ngb_tbi;
-
-  /* Start the neighbour interactions */
-  for (int j = pj_start; j < pj_end; j++) {
-
-    /* First, grab handles. */
-    const struct gpu_part_data_f pj = d_parts_send[j];
-
-    const float xj = pj.x_h.x;
-    const float yj = pj.x_h.y;
-    const float zj = pj.x_h.z;
-    const float hj = pj.x_h.w;
-
-    const float vxj = pj.vx_m.x;
-    const float vyj = pj.vx_m.y;
-    const float vzj = pj.vx_m.z;
-    const float mj = pj.vx_m.w;
-
-    const float energyj = pj.u_rho_f_p.x;
-    const float rhoj = pj.u_rho_f_p.y;
-    const float fj = pj.u_rho_f_p.z;
-    const float pressurej = pj.u_rho_f_p.w;
-
-    const float balsj = pj.bals_c_avisc_adiff.x;
-    const float cj = pj.bals_c_avisc_adiff.y;
-    const float aviscj = pj.bals_c_avisc_adiff.z;
-    const float adiffj = pj.bals_c_avisc_adiff.w;
-
-    const int tbj = pj.timebin_minngbtimebin_pjs_pje.x;
-    /* const int min_ngb_tbj = pj.timebin_minngbtimebin_pjs_pje.y; */
-
-    /* Now get stuff done. */
-    const float xij = xi - xj;
-    const float yij = yi - yj;
-    const float zij = zi - zj;
-    const float r2 = xij * xij + yij * yij + zij * zij;
-    const float hjg2 = hj * hj * kernel_gamma2;
-
-    /* (j != pid): Exclude self contribution. This happens at a later step. */
-    const bool iact_condition = ((r2 < hig2) || (r2 < hjg2)) && (j != pid);
-    const float mask = iact_condition ? 1.f : 0.f;
-    const int tbj_masked =
-        iact_condition && (tbj > 0) ? tbj : res_min_ngb_timebin;
-
-    /* Cosmology terms for the signal velocity */
-    const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
-    const float a2_Hubble = d_a * d_a * d_H;
-
-    const float r = sqrtf(r2);
-    /* r == 0 can happen for self-interaction, which we're masking out,
-     * but it'll produce NaNs through division by zero, so handle that. */
-    const float r_inv = r > 0.f ? (1.f / r) : 1.f;
-
-    /* Get the kernel for hi. */
-    const float qi = r * hi_inv;
-    float wi;
-    float wi_dx;
-    d_kernel_deval(qi, &wi, &wi_dx);
-    const float wi_dr = hid_inv * wi_dx;
-
-    /* Get the kernel for hj. */
-    const float hj_inv = 1.0f / hj;
-    const float hjd_inv = d_pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
-    const float qj = r * hj_inv;
-    float wj;
-    float wj_dx;
-    d_kernel_deval(qj, &wj, &wj_dx);
-    const float wj_dr = hjd_inv * wj_dx;
-
-    /* Compute dv dot r */
-    float dvx = vxi - vxj;
-    float dvy = vyi - vyj;
-    float dvz = vzi - vzj;
-    const float dvdr = dvx * xij + dvy * yij + dvz * zij;
-
-    /* Add Hubble flow; not used for du/dt */
-    const float dvdr_Hubble = dvdr + a2_Hubble * r2;
-
-    /* Are the particles moving towards each others ? */
-    const float omega_ij = min(dvdr_Hubble, 0.f);
-    const float mu_ij = fac_mu * r_inv * omega_ij; /* This is 0 or negative */
-
-    /* Signal velocity */
-    const float v_sig = ci + cj - const_viscosity_beta * mu_ij;
-
-    /* Variable smoothing length term */
-    const float f_ij = 1.f - fi / mj;
-    const float f_ji = 1.f - fj * mi_inv;
-
-    /* Construct the full viscosity term */
-    const float rhoij = rhoi + rhoj;
-    const float rhoij_inv = 1.f / rhoij;
-    const float alpha = avisci + aviscj;
-    const float visc =
-        -0.25f * alpha * v_sig * mu_ij * (balsi + balsj) * rhoij_inv;
-
-    /* Convolve with the kernel */
-    const float visc_acc_term =
-        0.5f * visc * (wi_dr * f_ij + wj_dr * f_ji) * r_inv;
-
-    /* Compute gradient terms */
-    const float rhoj2 = rhoj * rhoj;
-    const float rhoj_inv = 1.f / rhoj;
-    const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
-    const float P_over_rho2_j = pressurej / (rhoj2) * f_ji;
-
-    /* SPH acceleration term */
-    const float sph_acc_term =
-        (P_over_rho2_i * wi_dr + P_over_rho2_j * wj_dr) * r_inv;
-
-    /* Assemble the acceleration */
-    const float acc = sph_acc_term + visc_acc_term;
-
-    /* Use the force Luke ! */
-    res_ahydro.x -= mj * acc * xij * mask;
-    res_ahydro.y -= mj * acc * yij * mask;
-    res_ahydro.z -= mj * acc * zij * mask;
-
-    /* Get the time derivative for u. */
-    const float sph_du_term_i = P_over_rho2_i * dvdr * r_inv * wi_dr;
-
-    /* Viscosity term */
-    const float visc_du_term = 0.5f * visc_acc_term * dvdr_Hubble;
-
-    /* Diffusion term */
-    /* Combine the alpha_diff into a pressure-based switch -- this allows the
-     * alpha from the highest pressure particle to dominate, so that the
-     * diffusion limited particles always take precedence - another trick to
-     * allow the scheme to work with thermal feedback. */
-    float alpha_diff =
-        (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
-    /* if (fabsf(pressurei + pressurej) < 1e-10) alpha_diff = 0.f; */
-
-    const float v_diff =
-        alpha_diff * 0.5f *
-        (sqrtf(2.f * fabsf(pressurei - pressurej) * rhoij_inv) +
-         fabsf(fac_mu * r_inv * dvdr_Hubble));
-
-    /* wi_dx + wj_dx / 2 is F_ij */
-    const float diff_du_term =
-        v_diff * (energyi - energyj) *
-        (f_ij * wi_dr * rhoi_inv + f_ji * wj_dr * rhoj_inv);
-
-    /* Assemble the energy equation term */
-    const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
-
-    /* Internal energy time derivative */
-    res_udt_hdt.x += du_dt_i * mj * mask;
-
-    /* Get the time derivative for h. */
-    res_udt_hdt.y -= mj * dvdr * r_inv * rhoj_inv * wi_dr * mask;
-
-    /* tbj > 0 check is included in mask */
-    res_min_ngb_timebin = min(res_min_ngb_timebin, tbj_masked);
-  }
-
-  d_parts_recv[pid].udt_hdt_minngbtb = {res_udt_hdt.x, res_udt_hdt.y,
-                                        (float)res_min_ngb_timebin};
-  d_parts_recv[pid].a_hydro = res_ahydro;
 }
 
 #ifdef __cplusplus

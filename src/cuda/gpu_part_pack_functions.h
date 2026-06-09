@@ -138,13 +138,14 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
     a[1] += pr.a_hydro.y;
     a[2] += pr.a_hydro.z;
 
-    float u_dt = pr.udt_hdt_minngbtb.x + part_get_u_dt(p);
+    float u_dt = pr.udt_hdt.x + part_get_u_dt(p);
     part_set_u_dt(p, u_dt);
 
-    float h_dt = pr.udt_hdt_minngbtb.y + part_get_h_dt(p);
+    float h_dt = pr.udt_hdt.y + part_get_h_dt(p);
     part_set_h_dt(p, h_dt);
 
-    timebin_t mintbin = (timebin_t)(pr.udt_hdt_minngbtb.z + 0.5f);
+//    timebin_t mintbin = (timebin_t)(pr.minngbtb.z + 0.5f);
+    timebin_t mintbin = min(part_get_timestep_limiter_min_ngb_time_bin(p), pr.minngbtb);
     part_set_timestep_limiter_min_ngb_time_bin(p, mintbin);
   }
 }
@@ -238,9 +239,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     ps[i].u_rho_c_aviscmax.z = part_get_soundspeed(p);
     ps[i].u_rho_c_aviscmax.w = part_get_alpha_visc_max_ngb(p);
 
-    ps[i].avisc_vsig_lapu.x = part_get_alpha_av(p);
-    ps[i].avisc_vsig_lapu.y = part_get_v_sig(p);
-    ps[i].avisc_vsig_lapu.z = part_get_laplace_u(p);
+    ps[i].avisc_vsig.x = part_get_alpha_av(p);
+    ps[i].avisc_vsig.y = part_get_v_sig(p);
 
   }
   /*We've packed all the particles. Now insert the cell position into the count index*/
@@ -296,9 +296,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     ps[i].bals_c_avisc_adiff.z = part_get_alpha_av(p);
     ps[i].bals_c_avisc_adiff.w = part_get_alpha_diff(p);
 
-    ps[i].timebin_minngbtimebin_pjs_pje.x = (int)part_get_time_bin(p);
+    ps[i].timebin_minngbtimebin.x = (int)part_get_time_bin(p);
     int mintbin = (int)part_get_timestep_limiter_min_ngb_time_bin(p);
-    ps[i].timebin_minngbtimebin_pjs_pje.y = mintbin;
+    ps[i].timebin_minngbtimebin.y = mintbin;
 
   }
   /*We've packed all the particles. Now insert the cell position into the count index*/
