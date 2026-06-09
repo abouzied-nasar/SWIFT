@@ -50,8 +50,8 @@ extern "C" {
 __device__ __forceinline__ void neighbour_interactions_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     struct gpu_part_recv_d* __restrict__ d_parts_recv,
-    int i_start, int i_end_excl,
-    int j_start, int j_end_excl,
+    int i_start, int i_end,
+    int j_start, int j_end,
     const double3 shift_i_d, const double3 shift_j_d,
     int b_id_local, int tid){
 
@@ -59,12 +59,12 @@ __device__ __forceinline__ void neighbour_interactions_density(
   extern __shared__ unsigned char smem[];
   //TODO: Check if this is safe and/or required. We're casting from float4 to float4
   //Also, we need positions to be double down tne road so this may need re-working!
-  float4* s_pos4 = reinterpret_cast<float4*>(smem);                   // [0 to 2 * GPU_THREAD_BLOCK_SIZE] (xj,yj,zj,hj)
-  float4* s_vel4 = reinterpret_cast<float4*>(s_pos4 + 2 * GPU_THREAD_BLOCK_SIZE);        // [2 * GPU_THREAD_BLOCK_SIZE to 4 * GPU_THREAD_BLOCK_SIZE] (vx,vy,vz,m)
+  float4* s_x_h = reinterpret_cast<float4*>(smem);                   // [0 to 2 * GPU_THREAD_BLOCK_SIZE] (xj,yj,zj,hj)
+  float4* s_vx_m = reinterpret_cast<float4*>(s_x_h + 2 * GPU_THREAD_BLOCK_SIZE);        // [2 * GPU_THREAD_BLOCK_SIZE to 4 * GPU_THREAD_BLOCK_SIZE] (vx,vy,vz,m)
 
   // Map this thread to its i-particle
-  const int i_idx = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
-  const bool i_in_range = (i_idx < i_end_excl);
+  const int i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+  const bool i_in_range = (i_id < i_end);
 
   // Declare i-data, initialize safely; only load if active
   float xi = 0.f, yi = 0.f, zi = 0.f, hi = 1.f;
@@ -72,7 +72,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
   float hig2 = 0.f, hi_inv = 1.f;
 
   if (i_in_range) {
-      const struct gpu_part_data_d pi = d_parts_send[i_idx].p_data;
+      const struct gpu_part_data_d pi = d_parts_send[i_id].p_data;
       xi = (float)(pi.x_h.x - shift_i_d.x);
       yi = (float)(pi.x_h.y - shift_i_d.y);
       zi = (float)(pi.x_h.z - shift_i_d.z);
@@ -94,17 +94,17 @@ __device__ __forceinline__ void neighbour_interactions_density(
   constexpr float eps = 1e-24f;
 
   // Number of tiles
-  const int numTiles = (j_end_excl - j_start + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+  const int numTiles = (j_end - j_start + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
   // === Prefetch tile 0 into buffer 0 ===
   if (numTiles > 0) {
       const int base0      = j_start;
-      const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, j_end_excl - base0);
+      const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, j_end - base0);
 
       for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
           const int gj = base0 + t;
-          __pipeline_memcpy_async(&s_pos4[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
-          __pipeline_memcpy_async(&s_vel4[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+          __pipeline_memcpy_async(&s_x_h[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+          __pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
       }
       __pipeline_commit();
   }
@@ -114,7 +114,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
   {
       const int buf       = tile & 1;  // 0 or 1 (ping-pong)
       const int base      = j_start + tile * GPU_THREAD_BLOCK_SIZE;
-      const int tileCount = min(GPU_THREAD_BLOCK_SIZE, j_end_excl - base);
+      const int tileCount = min(GPU_THREAD_BLOCK_SIZE, j_end - base);
 
       // Make sure the current tile (already committed) is resident in shared memory
       __pipeline_wait_prior(0);
@@ -127,12 +127,12 @@ __device__ __forceinline__ void neighbour_interactions_density(
         /*If nextTile & 1 == 0. nextTile is even. If nextTile & 1 == 1, nextTile is odd*/
         const int nextBuf  = nextTile & 1;
         const int nextBase = j_start + nextTile * GPU_THREAD_BLOCK_SIZE;
-        const int nextCnt  = min(GPU_THREAD_BLOCK_SIZE, j_end_excl - nextBase);
+        const int nextCnt  = min(GPU_THREAD_BLOCK_SIZE, j_end - nextBase);
 
         for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
           const int gj = nextBase + t;
-          __pipeline_memcpy_async(&s_pos4[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
-          __pipeline_memcpy_async(&s_vel4[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+          __pipeline_memcpy_async(&s_x_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+          __pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
         }
         __pipeline_commit();
       }
@@ -146,17 +146,17 @@ __device__ __forceinline__ void neighbour_interactions_density(
           {
               const int j_idx = base + t;
               /* j != pid: Exclude self contribution. This happens at a later step. */
-              if (j_idx == i_idx) continue;
+              if (j_idx == i_id) continue;
 
               /* First, grab handles. */
-              const float4 pj_pos = s_pos4[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
-              const float4 pj_vel = s_vel4[buf * GPU_THREAD_BLOCK_SIZE + t];
+              const float4 pj_x_h = s_x_h[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
+              const float4 pj_vel = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
 
               /* Now get stuff done. */
               // Apply j shift on-the-fly
-              const float xij = xi - (pj_pos.x - (float)shift_j_d.x);
-              const float yij = yi - (pj_pos.y - (float)shift_j_d.y);
-              const float zij = zi - (pj_pos.z - (float)shift_j_d.z);
+              const float xij = xi - (pj_x_h.x - (float)shift_j_d.x);
+              const float yij = yi - (pj_x_h.y - (float)shift_j_d.y);
+              const float zij = zi - (pj_x_h.z - (float)shift_j_d.z);
 
               // fmaf -> fused multiply-add
               const float r2 = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
@@ -205,15 +205,15 @@ __device__ __forceinline__ void neighbour_interactions_density(
 
   /* Write results. */
   if (i_in_range) {
-      atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.x, res_rho.x);
-      atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.y, res_rho.y);
-      atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.z, res_rho.z);
-      atomicAdd(&d_parts_recv[i_idx].rho_rhodh_wcount_wcount_dh.w, res_rho.w);
+      atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.x, res_rho.x);
+      atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.y, res_rho.y);
+      atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.z, res_rho.z);
+      atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.w, res_rho.w);
 
-      atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.x, res_rot.x);
-      atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.y, res_rot.y);
-      atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.z, res_rot.z);
-      atomicAdd(&d_parts_recv[i_idx].rot_vx_div_v.w, res_rot.w);
+      atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.x, res_rot.x);
+      atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.y, res_rot.y);
+      atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.z, res_rot.z);
+      atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.w, res_rot.w);
   }
 
 }
@@ -288,128 +288,217 @@ __global__ void cuda_kernel_density(
  * @param pid index of particle to compute density for in the data arrays
  * @param d_pars_send array of particle data received from CPU
  * @param d_parts_recv array of particle data to write results into
+ * @param i_start first particle in cell i
+ * @param i_end last particle in cell i
+ * @param j_start first particle in cell j
+ * @param j_end last particle in cell j
+ * @param shift_i shifts for particles in cell i
+ * @param shift_j shifts for particles in cell j
+ * @param b_id_local within the GPU thread blocks acting on this cell what is my id.
+ *        Needed to figure out which range of particles each CUDA block will work on
+ * @param t_id the current threads id in the list of threads in the block
  * @param d_a current cosmological expansion factor
  * @param d_H current Hubble constant
  */
-__device__ __attribute__((always_inline)) INLINE void neighbour_interactions_gradient(
-    int pid, const struct gpu_part_send_g *__restrict__ d_parts_send,
-    struct gpu_part_recv_g *__restrict__ d_parts_recv, float d_a, float d_H) {
+__device__ __forceinline__ void neighbour_interactions_gradient(
+    const struct gpu_part_send_g* __restrict__ d_parts_send,
+    struct gpu_part_recv_g*      __restrict__ d_parts_recv,
+    int i_start, int i_end, int j_start, int j_end,
+    const double3 shift_i_d, const double3 shift_j_d, int b_id_local,
+    int tid, float d_a, float d_H){
 
-  /* First, grab handles. */
-  const struct gpu_part_send_g pi = d_parts_send[pid].p_data;
+  /*Declare a variable to use up allocated shared memory*/
+  extern __shared__ unsigned char smem[];
+  /* TODO: we need positions to be double so this needs re-working in the near future!*/
+  /*Assign range of memory to use for x, y, z and h*/
+  float4* s_x_h = reinterpret_cast<float4*>(smem);
+  /*Assign range of memory to use for velocity (u, v, w) and mass*/
+  float4* s_vx_m = reinterpret_cast<float4*>(s_x_h + 2 * GPU_THREAD_BLOCK_SIZE);
+  /*Assign range of memory to use for energy u, density rho, speed of sound c, alpha visc*/
+  float4* s_u_rho_c_aviscmax = reinterpret_cast<float4*>(s_vx_m + 2 * GPU_THREAD_BLOCK_SIZE);
 
-  const float xi = pi.x_h.x;
-  const float yi = pi.x_h.y;
-  const float zi = pi.x_h.z;
-  const float hi = pi.x_h.w;
+  /*Map this thread to its i-particle*/
+  const int  i_id    = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+  /*Is the id in the cell we need to work on?*/
+  const bool i_in_range = (i_id < i_end);
 
-  const float vxi = pi.vx_m.x;
-  const float vyi = pi.vx_m.y;
-  const float vzi = pi.vx_m.z;
-  /* const float mi = pi.vx_m.w; */
+  /* Initialise particle i's data */
+  float xi=0.f, yi=0.f, zi=0.f, hi=1.f;
+  float vxi=0.f, vyi=0.f, vzi=0.f;
+  float energyi=0.f, ci=0.f;
+  float vsigi=0.f, lapui=0.f, avisc_maxi=0.f;
+  float hi_inv=1.f, hig2=0.f;
 
-  const float energyi = pi.u_rho_c_aviscmax.x;
-  /* const float rhoi = pi.u_rho_c_aviscmax.y; */
-  const float ci = pi.u_rho_c_aviscmax.z;
-  const float avisc_maxi = pi.u_rho_c_aviscmax.w;
+  /*Do not do any calculation if i_id is not in cell i range of particles*/
+  if (i_in_range) {
 
-  /* const float avisci = pi.avisc_vsig_lapu.x; */
-  const float vsigi = pi.avisc_vsig_lapu.y;
-  const float lapui = pi.avisc_vsig_lapu.z;
+    /*Load particle i*/
+    const struct gpu_part_data_g pi = d_parts_send[i_id].p_data;
 
-  const int pj_start = pi.pjs_pje.x;
-  const int pj_end = pi.pjs_pje.y;
+    /*Calculate i's position local to the cell*/
+    xi = (float)(pi.x_h.x - shift_i_d.x);
+    yi = (float)(pi.x_h.y - shift_i_d.y);
+    zi = (float)(pi.x_h.z - shift_i_d.z);
+    /*i smoothing length*/
+    hi = (float)(pi.x_h.w);
+    /*Find my velocities, mass not needed for particle i*/
+    vxi = pi.vx_m.x;
+    vyi = pi.vx_m.y;
+    vzi = pi.vx_m.z;
 
-  /* Do some auxiliary computations */
-  const float hig2 = hi * hi * kernel_gamma2;
-  const float hi_inv = 1.f / hi;
+    /*Now get energy i and speed of sound from u_rho_c_aviscmax (u, rho, c, avisc)*/
+    energyi = pi.u_rho_c_aviscmax.x;
+    ci      = pi.rho_avisc_u_c.w;
 
-  /* Prep output */
-  /* v_sig, laplace_u, a_viscosity_max */
+    /* Prep output */
+    /* Get previous value of avisc_vsig_lapu. vsig and lapu will be incremented while
+     * for avisc we want to find the maximum*/
+    avisc_maxi  = pi.avisc_vsig_lapu.x;
+    /*TODO: Double check whether I've introduced a bug here and if we actually need this.
+     * lapui should be set to zero I think since we atomically add them at the end*/
+    vsigi       = pi.avisc_vsig_lapu.y;
+    lapui       = 0.f//pi.avisc_vsig_lapu.z;
+
+    hi_inv = 1.0f / hi;
+    hig2   = (hi * hi) * kernel_gamma2;
+  }
+
+  // Accumulators
+  // Start from the i-side stored values (as in your original), then update over neighbours
   float3 res_aviscmax_vsig_lapui = {avisc_maxi, vsigi, lapui};
 
-  /* Start the neighbour interactions */
-  for (int j = pj_start; j < pj_end; j++) {
+  // Cosmology terms
+  const float fac_mu    = d_pow_three_gamma_minus_five_over_two(d_a);
+  const float a2_Hubble = d_a * d_a * d_H;
 
-    /* First, grab handles. */
-    const struct gpu_part_send_g pj = d_parts_send[pid];
+  constexpr float eps = 1e-24f;
 
-    const float xj = pj.x_h.x;
-    const float yj = pj.x_h.y;
-    const float zj = pj.x_h.z;
-    /* const float hj = pj.x_h.w; */
+  // Number of tiles
+  const int numTiles = (j_end - j_start + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
-    const float vxj = pj.vx_m.x;
-    const float vyj = pj.vx_m.y;
-    const float vzj = pj.vx_m.z;
-    const float mj = pj.vx_m.w;
+  // === Prefetch tile 0 into buffer 0 ===
+  if (numTiles > 0){
+    const int base0      = j_start;
+    const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, j_end - base0);
 
-    const float energyj = pj.u_rho_c_aviscmax.x;
-    const float rhoj = pj.u_rho_c_aviscmax.y;
-    const float cj = pj.u_rho_c_aviscmax.z;
-    /* const float avisc_maxj = pj.u_rho_c_aviscmax.w; */
+    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
+      const int gj = base0 + t;
+      __pipeline_memcpy_async(&s_x_h[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+      __pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+      __pipeline_memcpy_async(&s_u_rho_c_aviscmax[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_c_aviscmax, sizeof(float4));
+    }
+    __pipeline_commit();
+  }
+  // === Tile over J with prefetch of "next" tile while computing "current" ===
+  for (int tile = 0; tile < numTiles; ++tile){
 
-    const float aviscj = pj.avisc_vsig_lapu.x;
-    /* const float vsigj = pj.avisc_vsig_lapu.y; */
-    /* const float lapuj = pj.avisc_vsig_lapu.z; */
+    const int buf       = tile & 1;  // 0 or 1 (ping-pong)
+    const int base      = j_start + tile * GPU_THREAD_BLOCK_SIZE;
+    const int tileCount = min(GPU_THREAD_BLOCK_SIZE, j_end - base);
 
-    /* Now get stuff done. */
+    // Make sure the current tile (already committed) is resident in shared memory
+    __pipeline_wait_prior(0);
+    __syncthreads();
 
-    const float xij = xi - xj;
-    const float yij = yi - yj;
-    const float zij = zi - zj;
+    // --- Kick off prefetch for the next tile (overlaps with compute below) ---
+    const int nextTile = tile + 1;
+    if (nextTile < numTiles){
+      /*If nextTile & 1 == 0. nextTile is even. If nextTile & 1 == 1, nextTile is odd*/
+      const int nextBuf  = nextTile & 1;
+      const int nextBase = j_start + nextTile * GPU_THREAD_BLOCK_SIZE;
+      const int nextCnt  = min(GPU_THREAD_BLOCK_SIZE, j_end - nextBase);
 
-    const float r2 = xij * xij + yij * yij + zij * zij;
+      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
+        const int gj = nextBase + t;
+        __pipeline_memcpy_async(&s_x_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+        __pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+        __pipeline_memcpy_async(&s_u_rho_c_aviscmax[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_c_aviscmax, sizeof(float4));
+      }
+      __pipeline_commit();
+    }
+    // --- Compute on the current tile (buf) ---
+    if (i_in_range){
+      /* Start the neighbour interactions */
+#pragma unroll 4
+      for (int t = 0; t < tileCount; ++t){
+        const int j_idx = base + t;
+        /* j != pid: Exclude self contribution. This happens at a later step. */
+        if (j_idx == i_id) continue;
 
-    /* (j != pid): Exclude self contribution. This happens at a later step. */
-    const float mask = (r2 < hig2) && (j != pid) ? 1.f : 0.f;
+        /* First, grab handles. */
+        const float4 pj_x_h = s_x_h[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
+        const float4 pj_vx_m = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
+        /*Get rho, visc, energy and speed of sound*/
+        const float4 pj_u_rho_c_aviscmax = s_u_rho_c_aviscmax[buf * GPU_THREAD_BLOCK_SIZE + t];
+        const float xj = (float)(pj_x_h.x - (float)shift_j_d.x);
+        const float yj = (float)(pj_x_h.y - (float)shift_j_d.y);
+        const float zj = (float)(pj_x_h.z - (float)shift_j_d.z);
+        // const float hj = pj_x_h.w; // (hj not used in this gradient kernel)
 
-    /* Set the maximal alpha from the previous step over the neighbours
-     * (this is used to limit the diffusion in hydro_prepare_force) */
-    res_aviscmax_vsig_lapui.x = fmaxf(res_aviscmax_vsig_lapui.x, aviscj * mask);
+//        const float aviscj  = pj_u_rho_c_aviscmax.w;
 
-    const float r = sqrtf(r2);
-    /* r == 0 can happen for self-interaction, which we're masking out,
-     * but it'll produce NaNs through division by zero, so handle that. */
-    const float r_inv = r > 0.f ? (1.f / r) : 1.f;
+        /*Find particle distances*/
+        const float xij = xi - xj;
+        const float yij = yi - yj;
+        const float zij = zi - zj;
 
-    /* Cosmology terms for the signal velocity */
-    const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
-    const float a2_Hubble = d_a * d_a * d_H;
+        const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+        if (!(r2 < hig2)) continue;
 
-    /* Compute dv dot r */
-    float dvx = vxi - vxj;
-    float dvy = vyi - vyj;
-    float dvz = vzi - vzj;
-    const float dvdr = dvx * xij + dvy * yij + dvz * zij;
+        const float vxj = pj_vx_m.x, vyj = pj_vx_m.y, vzj = pj_vx_m.z, mj = pj_vx_m.w;
 
-    /* Add Hubble flow */
-    const float dvdr_Hubble = dvdr + a2_Hubble * r2;
+        const float energyj = pj_u_rho_c_aviscmax.x;
+        const float rhoj    = pj_u_rho_c_aviscmax.y;
+        const float cj      = pj_u_rho_c_aviscmax.z;
+        /*TODO: avisc_vsig_lapu should be changed to float 2 since we only need avisc and vsig for comparison. Lapu is accumulator*/
+        const float aviscj  = pj.avisc_vsig_lapu.x;
+        res_aviscmax_vsig_lapui.x = fmaxf(res_aviscmax_vsig_lapui.x, aviscj);
+        const float inv_r = rsqrtf(r2 + eps);
+        const float r     = r2 * inv_r;
 
-    /* Are the particles moving towards each others ? */
-    const float omega_ij = fminf(dvdr_Hubble, 0.f);
-    const float mu_ij = fac_mu * r_inv * omega_ij; /* This is 0 or negative */
+        // Cosmology-adjusted dv·r
+        const float dvx  = vxi - vxj;
+        const float dvy  = vyi - vyj;
+        const float dvz  = vzi - vzj;
+        const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij));
+        const float dvdr_Hubble = dvdr + a2_Hubble * r2;
 
-    /* Signal velocity */
-    const float new_v_sig = ci + cj - const_viscosity_beta * mu_ij;
+        // Approaching?
+        const float omega_ij = fminf(dvdr_Hubble, 0.f);
+        const float mu_ij    = fac_mu * inv_r * omega_ij; // <= 0
 
-    /* Update if we need to */
-    res_aviscmax_vsig_lapui.y = fmaxf(vsigi, new_v_sig * mask);
 
-    /* Calculate Del^2 u for the thermal diffusion coefficient. */
-    /* Need to get some kernel values F_ij = wi_dx */
-    float wi;
-    float wi_dx;
-    const float ui = r * hi_inv;
-    d_kernel_deval(ui, &wi, &wi_dx);
+        // Signal velocity (update running max across neighbors; initialised as vsigi)
+        const float new_v_sig = ci + cj - const_viscosity_beta * mu_ij;
+        res_aviscmax_vsig_lapui.y = fmaxf(res_aviscmax_vsig_lapui.y, new_v_sig);
 
-    const float delta_u_factor = (energyi - energyj) * r_inv;
-    res_aviscmax_vsig_lapui.z += mj * delta_u_factor * wi_dx / rhoj * mask;
+        // Kernel (derivative wrt r/hi); only wi_dx needed here
+        float wi, wi_dx;
+        const float ui = r * hi_inv;
+        d_kernel_deval(ui, &wi, &wi_dx);
 
-  } /*Loop through parts in cell j one GPU_THREAD_BLOCK_SIZE at a time*/
+        // Laplacian(u) accumulation
+        // delta_u_factor = (u_i - u_j) / r
+        /*Energy calculations*/
+        const float delta_u_factor = (energyi - energyj) * inv_r;
+        res_aviscmax_vsig_lapui.z += mj * delta_u_factor * wi_dx * (1.0f / rhoj);
 
-  /* Write results. */
-  d_parts_recv[pid].aviscmax_vsig_lapu = res_aviscmax_vsig_lapui;
+      }
+    }
+
+    __syncthreads();
+  }
+
+  /*Conditional to prevent writing out of bounds of this computation*/
+  if (i_in_range) {
+    //aviscmax
+    atomicMaxFloat(&d_parts_recv[i_id].avisc_vsig_lapu.y, vsigi);
+    //vsig
+    atomicMaxFloat(&d_parts_recv[i_id].avisc_vsig_lapu.x, res_aviscmax_vsig_lapui.x);
+    //lapu
+    atomicAdd(&d_parts_recv[i_id].avisc_vsig_lapu.z, res_aviscmax_vsig_lapui.z);
+  }
+
 }
 
 __global__ void cuda_kernel_gradient(
@@ -558,7 +647,7 @@ __device__ __attribute__((always_inline)) INLINE void neighbour_interactions_for
     struct gpu_part_recv_f *__restrict__ d_parts_recv, float d_a, float d_H) {
 
   /* First, grab handles */
-  const struct gpu_part_send_f pi = d_parts_send[pid];
+  const struct gpu_part_data_f pi = d_parts_send[pid];
 
   const float xi = pi.x_h.x;
   const float yi = pi.x_h.y;
@@ -602,7 +691,7 @@ __device__ __attribute__((always_inline)) INLINE void neighbour_interactions_for
   for (int j = pj_start; j < pj_end; j++) {
 
     /* First, grab handles. */
-    const struct gpu_part_send_f pj = d_parts_send[j];
+    const struct gpu_part_data_f pj = d_parts_send[j];
 
     const float xj = pj.x_h.x;
     const float yj = pj.x_h.y;

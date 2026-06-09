@@ -95,10 +95,11 @@ struct gpu_part_data_g {
   /*! Particle velocity and mass */
   float4 __align__(16) vx_m;
 
-  /*! Particle density alpha visc internal energy u and speed of sound c */
+  /*TODO: aviscmax is no longer needed as we do not use it on GPU. Remove!*/
+  /*! Particle internal energy u, density speed of sound and alpha visc*/
   float4 __align__(16) u_rho_c_aviscmax;
 
-  /*! viscosity information results */
+  /*! viscosity information required for particle i when comparing to neighbours*/
   float4 __align__(16) avisc_vsig_lapu;
 
 #endif
