@@ -586,151 +586,206 @@ __global__ void cuda_kernel_gradient(
 }
 
 /**
- * @brief Naive kernel computing the force interactions of a single particle
+ * @brief Naive kernel computing the gradient interactions of a single particle
  *
  * @param pid index of particle to compute density for in the data arrays
  * @param d_pars_send array of particle data received from CPU
  * @param d_parts_recv array of particle data to write results into
+ * @param i_start first particle in cell i
+ * @param i_end last particle in cell i
+ * @param j_start first particle in cell j
+ * @param j_end last particle in cell j
+ * @param shift_i shifts for particles in cell i
+ * @param shift_j shifts for particles in cell j
+ * @param b_id_local within the GPU thread blocks acting on this cell what is my id.
+ *        Needed to figure out which range of particles each CUDA block will work on
+ * @param t_id the current threads id in the list of threads in the block
  * @param d_a current cosmological expansion factor
  * @param d_H current Hubble constant
  */
 __device__ __forceinline__ void neighbour_interactions_force(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
     struct gpu_part_recv_f*      __restrict__ d_parts_recv,
-    int i_start, int i_end_excl, int j_start, int j_end_excl,
+    int i_start, int i_end, int j_start, int j_end,
     const double3 shift_i_d, const double3 shift_j_d, int b_id_local,
 	int tid, float d_a, float d_H) {
 
-    // Shared memory tile for J: pos/h, vel/m, f/bals/rho/p, c/u/avisc/adiff
+	/*Declare a variable to use up allocated shared memory*/
 	extern __shared__ __align__(16) unsigned char smem[];
-	float4* s_pos4  = reinterpret_cast<float4*>(smem);                      // [GPU_THREAD_BLOCK_SIZE]
-	float4* s_vel4  = reinterpret_cast<float4*>(s_pos4  + 2 * GPU_THREAD_BLOCK_SIZE);          // [GPU_THREAD_BLOCK_SIZE]
-	float4* s_fbrp4 = reinterpret_cast<float4*>(s_vel4  + 2 * GPU_THREAD_BLOCK_SIZE);          // [GPU_THREAD_BLOCK_SIZE]
-	float4* s_cuid4 = reinterpret_cast<float4*>(s_fbrp4 + 2 * GPU_THREAD_BLOCK_SIZE);          // [GPU_THREAD_BLOCK_SIZE]
+	/* TODO: we need positions to be double so this needs re-working in the near future!*/
+	/*Assign range of memory to use for x, y, z and h*/
+	float4* s_x_h  = reinterpret_cast<float4*>(smem);
+	/*Assign range of memory to use for velocity (u, v, w) and mass*/
+	float4* s_vx_m  = reinterpret_cast<float4*>(s_x_h  + 2 * GPU_THREAD_BLOCK_SIZE);
+	/*Assign range of memory to use for energy u, density rho, smoothing length constant f, pressure p*/
+	float4* s_u_r_f_p = reinterpret_cast<float4*>(s_vx_m  + 2 * GPU_THREAD_BLOCK_SIZE);
+	/*Assign range of memory to use for balsara b, speed of sound c, alpha visc av and diffusion ad*/
+	float4* s_b_c_av_ad = reinterpret_cast<float4*>(s_u_r_f_p + 2 * GPU_THREAD_BLOCK_SIZE);
 
-	// Map this thread to its i-particle (keep all threads in lockstep → no early return)
-	const int  i_idx     = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
-	const bool i_in_range  = (i_idx < i_end_excl);
+	/*Map this thread to its i-particle*/
+	const int  i_id     = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+	/*Is the id in the cell we need to work on?*/
+	const bool i_in_range  = (i_id < i_end);
 
-	// Per-i data (only loaded if active)
+	/* Initialise particle i's data. Needed since we require definition
+	 * before checking if i_in_range below */
 	float xi=0.f, yi=0.f, zi=0.f, hi=1.f;
 	float vxi=0.f, vyi=0.f, vzi=0.f, mi=1.f;
 	float fi=0.f, balsi=0.f, rhoi=1.f, pressurei=0.f;
 	float ci=0.f, energyi=0.f, avisci=0.f, adiffi=0.f;
-	int   tbj=0, min_ngb_tbi=0;     // follows your original variable usage
+	int   tbj=0, min_ngb_tbi=0;
 
-	float hi_inv=1.f, hid_inv=1.f, mi_inv=1.f, rhoi_inv=1.f, rhoi_inv2=1.f, hig2=0.f;
-
+	float hi_inv=0.f, hid_inv=0.f, mi_inv=0.f, rhoi_inv=0.f, rhoi_inv2=0.f, hig2=0.f;
+	/*Do not do any calculation if i_id is not in cell i range of particles*/
 	if (i_in_range) {
-		const struct gpu_part_data_f pi = d_parts_send[i_idx].p_data;
+		/* First, grab handles. */
+		const struct gpu_part_data_f pi = d_parts_send[i_id].p_data;
 
+	    /*Calculate i's position local to the cell*/
 		xi = (float)(pi.x_h.x - shift_i_d.x);
 		yi = (float)(pi.x_h.y - shift_i_d.y);
 		zi = (float)(pi.x_h.z - shift_i_d.z);
+	    /*Get particle i smoothing length*/
 		hi = (float)(pi.x_h.w);
 
-		vxi = pi.vx_m.x;  vyi = pi.vx_m.y;  vzi = pi.vx_m.z;  mi  = pi.vx_m.w;
+	    /*Find my velocities, mass not needed for particle i*/
+		vxi = pi.vx_m.x;
+		vyi = pi.vx_m.y;
+		vzi = pi.vx_m.z;
+		mi  = pi.vx_m.w;
 
-		fi = pi.u_rho_f_p.x;  balsi = pi.u_rho_f_p.y;
-		rhoi = pi.u_rho_f_p.z; pressurei = pi.u_rho_f_p.w;
+	    /*Now get energy i and the rest of the variables we need*/
+		energyi = pi.u_rho_f_p.x;
+		rhoi = pi.u_rho_f_p.y;
+		fi = pi.u_rho_f_p.z;
+		pressurei = pi.u_rho_f_p.w;
 
-		ci = pi.bals_c_avisc_adiff.x;     energyi = pi.bals_c_avisc_adiff.y;
-		avisci = pi.bals_c_avisc_adiff.z; adiffi  = pi.bals_c_avisc_adiff.w;
+		balsi = pi.bals_c_avisc_adiff.x;
+		ci = pi.bals_c_avisc_adiff.y;
+		avisci = pi.bals_c_avisc_adiff.z;
+		adiffi  = pi.bals_c_avisc_adiff.w;
 
+		/*Use my time bin as the first minimum neighbour time bin.
+		 * Will loop over neighbours to compare*/
 		tbj         = pi.timebin_minngbtimebin.x;
+		/*min neighbour time_bin*/
 		min_ngb_tbi = pi.timebin_minngbtimebin.y;
 
+		/* Get the kernel for hi. */
 		hi_inv   = 1.0f / hi;
-		hid_inv  = d_pow_dimension_plus_one(hi_inv);
+		hid_inv  = d_pow_dimension_plus_one(hi_inv); /* 1/h^(d+1) */
 		mi_inv   = 1.0f / mi;
 		rhoi_inv = 1.0f / rhoi;
 		rhoi_inv2= rhoi_inv * rhoi_inv;
 		hig2     = (hi * hi) * kernel_gamma2;
 	}
 
-	// Accumulators
+	/*Accumulators (results) for acceleration and everything else*/
 	float3 res_ahydro  = {0.f, 0.f, 0.f};
 	float2 res_udt_hdt = {0.f, 0.f};
+	/*minimum neighbouring time bin. Initialise to zero if i not in range of the cell contents in buffer array*/
 	int    res_min_ngb_timebin = i_in_range ? min_ngb_tbi : 0;
 
-	// Cosmology (same for all threads; computing per-thread is fine)
+	/* Cosmology terms for the signal velocity */
 	const float fac_mu    = d_pow_three_gamma_minus_five_over_two(d_a);
 	const float a2_Hubble = d_a * d_a * d_H;
-
+	/*const to avoid div by zero*/
 	constexpr float eps = 1e-24f;
 
-	// Number of tiles
-	const int numTiles = (j_end_excl - j_start + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+	/* Number of tiles. How many times to de we need to load GPU_
+	 * THREAD_BLOCK_SIZE particles to get through this cell? */
+	const int numTiles = (j_end - j_start + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
-	// === Prefetch tile 0 into buffer 0 ===
+	/* Prefetch tile 0 into buffer 0 */
 	if (numTiles > 0){
 		const int base0      = j_start;
-		const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, j_end_excl - base0);
+		const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, j_end - base0);
 
 		for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
 			const int gj = base0 + t;
-			__pipeline_memcpy_async(&s_pos4[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
-			__pipeline_memcpy_async(&s_vel4[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
-			__pipeline_memcpy_async(&s_fbrp4[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
-			__pipeline_memcpy_async(&s_cuid4[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
+			__pipeline_memcpy_async(&s_x_h[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+			__pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+			__pipeline_memcpy_async(&s_u_r_f_p[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
+			__pipeline_memcpy_async(&s_b_c_av_ad[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
 		}
 		__pipeline_commit();
 	}
-	// === Tile over J with prefetch of "next" tile while computing "current" ===
+	/* Loop over tiles prefetching of "next" tile while computing "current" */
 	for (int tile = 0; tile < numTiles; ++tile){
 
+		/*Is this tile 0 or 1 (ping-pong tile execution and prefetching)*/
 		const int buf       = tile & 1;  // 0 or 1 (ping-pong)
 		const int base      = j_start + tile * GPU_THREAD_BLOCK_SIZE;
-		const int tileCount = min(GPU_THREAD_BLOCK_SIZE, j_end_excl - base);
+		const int tileCount = min(GPU_THREAD_BLOCK_SIZE, j_end - base);
 
-		// Make sure the current tile (already committed) is resident in shared memory
+	    /* Make sure the current tile (already committed) is resident in shared memory */
 		__pipeline_wait_prior(0);
 		__syncthreads();
 
-		// --- Kick off prefetch for the next tile (overlaps with compute below) ---
+
+	    /* Initiate prefetch for the next tile (overlaps with compute further in the loop) */
 		const int nextTile = tile + 1;
 		if (nextTile < numTiles){
 			/*If nextTile & 1 == 0. nextTile is even. If nextTile & 1 == 1, nextTile is odd*/
 			const int nextBuf  = nextTile & 1;
+			/*Where does the next tile begin in the buffer array?*/
 			const int nextBase = j_start + nextTile * GPU_THREAD_BLOCK_SIZE;
-			const int nextCnt  = min(GPU_THREAD_BLOCK_SIZE, j_end_excl - nextBase);
+			/*What is the number of required threads in the next tile? If we are at the end of
+			 * cell j's range in the buffer only read to the end of the range*/
+			const int nextCnt  = min(GPU_THREAD_BLOCK_SIZE, j_end - nextBase);
 
+		    /*Now issue pre-fetch for next data set*/
 			for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
 				const int gj = nextBase + t;
-				__pipeline_memcpy_async(&s_pos4[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
-				__pipeline_memcpy_async(&s_vel4[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
-				__pipeline_memcpy_async(&s_fbrp4[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
-				__pipeline_memcpy_async(&s_cuid4[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
+				__pipeline_memcpy_async(&s_x_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+				__pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+				__pipeline_memcpy_async(&s_u_r_f_p[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
+				__pipeline_memcpy_async(&s_b_c_av_ad[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
 			}
+		    /*Commit but don't sync, syncing is done at the end of computations*/
 			__pipeline_commit();
 		}
-		if (i_in_range)
-		{
+
+	    /* Run computations on the current tile (buf)*/
+		if (i_in_range){
+		  /* Start the neighbour interactions */
 #pragma unroll 4
 			for (int t = 0; t < tileCount; ++t){
+
+		    	/* We need to construct the maximal signal velocity between our particle
+		    	 * and all of it's neighbours */
+		    	/*grab the particle's index in the buffer array*/
 				const int j_idx = base + t;
-				if (j_idx == i_idx) continue; // self for self-pairs
+				/* Exclude self contribution. This happens at a later step. */
+				if (j_idx == i_id) continue; // self for self-pairs
 
-				// Unpack J tile
-				const float4 pj_pos  = s_pos4[buf * GPU_THREAD_BLOCK_SIZE + t];
-				const float4 pj_vel  = s_vel4[buf * GPU_THREAD_BLOCK_SIZE + t];
-				const float4 pj_fbrp = s_fbrp4[buf * GPU_THREAD_BLOCK_SIZE + t];
-				const float4 pj_cuid = s_cuid4[buf * GPU_THREAD_BLOCK_SIZE + t];
+				/* First, grab handles. */
+				const float4 pj_x_h  = s_x_h[buf * GPU_THREAD_BLOCK_SIZE + t];
+				const float4 pj_vx_m  = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
+				const float4 pj_u_r_f_p = s_u_r_f_p[buf * GPU_THREAD_BLOCK_SIZE + t];
+				const float4 pj_b_c_av_ad = s_b_c_av_ad[buf * GPU_THREAD_BLOCK_SIZE + t];
 
-				const float xj = (float)(pj_pos.x - (float)shift_j_d.x);
-				const float yj = (float)(pj_pos.y - (float)shift_j_d.y);
-				const float zj = (float)(pj_pos.z - (float)shift_j_d.z);
-				const float hj = pj_pos.w;
+				/*Calculate particle position relative to cell position and get smoothing length*/
+				const float xj = (float)(pj_x_h.x - (float)shift_j_d.x);
+				const float yj = (float)(pj_x_h.y - (float)shift_j_d.y);
+				const float zj = (float)(pj_x_h.z - (float)shift_j_d.z);
+				const float hj = pj_x_h.w;
 
-				const float vxj = pj_vel.x, vyj = pj_vel.y, vzj = pj_vel.z, mj = pj_vel.w;
+				const float vxj = pj_vx_m.x;
+				const float vyj = pj_vx_m.y;
+				const float vzj = pj_vx_m.z, mj = pj_vx_m.w;
 
-				const float fj = pj_fbrp.x, balsj = pj_fbrp.y;
-				const float rhoj = pj_fbrp.z, pressurej = pj_fbrp.w;
+				const float energyj = pj_u_r_f_p.x;
+				const float rhoj = pj_u_r_f_p.y;
+				const float fj = pj_u_r_f_p.z;
+                const float pressurej = pj_u_r_f_p.w;
 
-				const float cj  = pj_cuid.x, energyj = pj_cuid.y;
-				const float aviscj = pj_cuid.z, adiffj = pj_cuid.w;
+                const float balsj = pj_b_c_av_ad.x;
+				const float cj  = pj_b_c_av_ad.y;
+				const float aviscj = pj_b_c_av_ad.z;
+				const float adiffj = pj_b_c_av_ad.w;
 
-				// Geometry
+				/*Find particle distances*/
 				const float xij = xi - xj;
 				const float yij = yi - yj;
 				const float zij = zi - zj;
@@ -743,7 +798,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				const float inv_r = rsqrtf(r2 + eps);
 				const float r     = r2 * inv_r;
 
-				// Kernels for i and j
+				/* Get the kernel for hj */
 				float wi, wi_dx, wj, wj_dx;
 
 				const float ui = r * hi_inv;   // r / hi
@@ -751,41 +806,41 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				const float wi_dr = hid_inv * wi_dx;
 
 				const float hj_inv  = 1.0f / hj;
-				const float hjd_inv = d_pow_dimension_plus_one(hj_inv);
+				const float hjd_inv = d_pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
 				const float uj      = r * hj_inv; // r / hj
 				d_kernel_deval(uj, &wj, &wj_dx);
 				const float wj_dr = hjd_inv * wj_dx;
 
-				// Velocity diffs
+				/* Compute dv dot r. */
 				const float dvx = vxi - vxj;
 				const float dvy = vyi - vyj;
 				const float dvz = vzi - vzj;
-
 				const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij)); // dv · r
 
-				// Hubble augmentation for dv·r
+				/* Includes the hubble flow term; not used for du/dt */
 				const float dvdr_Hubble = dvdr + a2_Hubble * r2;
 
-				// Are they approaching?
+				/* Are the particles moving towards each others ? */
 				const float omega_ij = fminf(dvdr_Hubble, 0.f);
-				const float mu_ij    = fac_mu * inv_r * omega_ij; // <= 0
+				const float mu_ij    = fac_mu * inv_r * omega_ij; /* This is 0 or negative */
 
-				// Signal velocity and grad-h terms
+				/* Compute sound speeds and signal velocity */
 				const float v_sig = ci + cj - const_viscosity_beta * mu_ij;
 
-				// NOTE: f_ij = 1 - fi/mj ; f_ji = 1 - fj/mi
+				/* Variable smoothing length term */
 				const float f_ij = 1.f - fi * (1.f / mj);
 				const float f_ji = 1.f - fj * mi_inv;
 
-				// Viscosity
+				/* Construct the full viscosity term */
 				const float rhoij      = rhoi + rhoj;
 				const float rhoij_inv  = 1.f / rhoij;
 				const float alpha      = avisci + aviscj;
 				const float visc       = -0.25f * alpha * v_sig * mu_ij * (balsi + balsj) * rhoij_inv;
 
+				/* Convolve with the kernel */
 				const float visc_acc_term = 0.5f * visc * (wi_dr * f_ij + wj_dr * f_ji) * inv_r;
 
-				// Pressure
+				/* Compute gradient terms */
 				const float rhoj2         = rhoj * rhoj;
 				const float rhoj_inv      = 1.f / rhoj;
 				const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
@@ -793,56 +848,64 @@ __device__ __forceinline__ void neighbour_interactions_force(
 
 				const float sph_acc_term  = (P_over_rho2_i * wi_dr + P_over_rho2_j * wj_dr) * inv_r;
 
+				/* Adaptive softening acceleration term */
 				const float acc = sph_acc_term + visc_acc_term;
 
-				// Acceleration accumulation
+				/* Assemble the acceleration */
 				res_ahydro.x -= mj * acc * xij;
 				res_ahydro.y -= mj * acc * yij;
 				res_ahydro.z -= mj * acc * zij;
 
-				// du/dt terms
+				/* Get the time derivative for u. */
 				const float sph_du_term_i = P_over_rho2_i * dvdr * inv_r * wi_dr;
+
+				/* Viscosity term */
 				const float visc_du_term  = 0.5f * visc_acc_term * dvdr_Hubble;
 
-				// Diffusion
+				/* Diffusion term */
+				/* Combine the alpha_diff into a pressure-based switch -- this allows the
+				 * alpha from the highest pressure particle to dominate, so that the
+				 * diffusion limited particles always take precedence - another trick to
+				 * allow the scheme to work with thermal feedback. */
 				float alpha_diff = (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
-				// if (fabsf(pressurei + pressurej) < 1e-10f) alpha_diff = 0.f; // optional
-
+				// if (fabsf(pressurei + pressurej) < 1e-10f) alpha_diff = 0.f; // optional safe guard
 				const float v_diff = alpha_diff * 0.5f *
 						(sqrtf(2.f * fabsf(pressurei - pressurej) * rhoij_inv) +
 								fabsf(fac_mu * inv_r * dvdr_Hubble));
-
+				/* wi_dx + wj_dx / 2 is F_ij */
 				const float diff_du_term = v_diff * (energyi - energyj) *
 						(f_ij * wi_dr * rhoi_inv + f_ji * wj_dr * rhoj_inv);
 
+				/* Assemble the energy equation term */
 				const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
 
-				// Accumulate energy & h-derivative
+				/* Internal energy time derivative */
 				res_udt_hdt.x += du_dt_i * mj;
+
+				/* Get the time derivative for h. */
 				res_udt_hdt.y -= mj * dvdr * inv_r * rhoj_inv * wi_dr;
 			}
 		}
 
-		__syncthreads(); // all threads must reach the same number of barriers
+		__syncthreads();
 	}
 
-	// Min neighbor timebin (your original logic used tbj from i)
+	/*Conditional to prevent writing out of bounds of this computation*/
 	if (i_in_range && tbj > 0) {
 		res_min_ngb_timebin = min(res_min_ngb_timebin, tbj);
 	}
-
-	// Atomics only for active i
+	/*Conditional to prevent writing out of bounds of this computation*/
 	if (i_in_range) {
-		atomicAdd(&d_parts_recv[i_idx].a_hydro.x, res_ahydro.x);
-		atomicAdd(&d_parts_recv[i_idx].a_hydro.y, res_ahydro.y);
-		atomicAdd(&d_parts_recv[i_idx].a_hydro.z, res_ahydro.z);
+		atomicAdd(&d_parts_recv[i_id].a_hydro.x, res_ahydro.x);
+		atomicAdd(&d_parts_recv[i_id].a_hydro.y, res_ahydro.y);
+		atomicAdd(&d_parts_recv[i_id].a_hydro.z, res_ahydro.z);
 
-		atomicAdd(&d_parts_recv[i_idx].udt_hdt.x, res_udt_hdt.x);
-		atomicAdd(&d_parts_recv[i_idx].udt_hdt.y, res_udt_hdt.y);
+		atomicAdd(&d_parts_recv[i_id].udt_hdt.x, res_udt_hdt.x);
+		atomicAdd(&d_parts_recv[i_id].udt_hdt.y, res_udt_hdt.y);
 
-		// If timebin is zero, set it; then take min
-		atomicCAS(&d_parts_recv[i_idx].minngbtb, 0, res_min_ngb_timebin);
-		atomicMin(&d_parts_recv[i_idx].minngbtb, res_min_ngb_timebin);
+		/* If timebin is zero, set it; then take min */
+		atomicCAS(&d_parts_recv[i_id].minngbtb, 0, res_min_ngb_timebin);
+		atomicMin(&d_parts_recv[i_id].minngbtb, res_min_ngb_timebin);
 	}
 }
 
