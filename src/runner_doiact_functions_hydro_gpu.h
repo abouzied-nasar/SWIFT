@@ -329,74 +329,98 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
                                       const char timer, const struct task * t, const struct cell *restrict cii,
                                       const struct cell *restrict cjj, const enum task_subtypes task_subtype) {
 
-	 /*TODO: Inline this function*/
-	  /* Grab some handles. */
-	  /* packing data and metadata */
-	  struct gpu_pack_metadata *md = &buf->md;
-	  const struct gpu_md *gpu_md = &buf->gpu_md;
-	  const int cii_count = cii->hydro.count;
-	  const int cjj_count = cjj->hydro.count;
-	  /*Figure out where cells start for controlling GPU computations*/
-	  /*How many blocks have we packed so far?
-	   * Each cell is split into count/BS chunks so that
-	   * multiple cuda blocks work on particles in each cell if cell is big enough*/
-	  const int n_blocks_packed = md->n_blocks_packed;
-	  /*How many blocks will the current cell be split into*/
-	  int n_blocks_current;
-	  if(cii == cjj){
-		  n_blocks_current = (cii_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-	  }else{/*This is a pair task need to take the max count of ci and cj*/
-		  n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-	  }
+#ifdef SWIFT_DEBUG_CHECKS
+  if (cii == NULL) error("Got NULL cell ci?");
+  if (cjj == NULL) error("Got NULL cell cj?");
+#endif
+  /* Grab some handles. */
+  /* packing data and metadata */
+  struct gpu_pack_metadata *md = &buf->md;
+  const struct gpu_md *gpu_md = &buf->gpu_md;
+  const int cii_count = cii->hydro.count;
+  const int cjj_count = cjj->hydro.count;
 
-	  /*Let the cuda blocks know which parts of the data we send they need to work on*/
-	  for(int b = 0; b < n_blocks_current; b++){
-		  /*Which leaf computation will this block (n_blocks_packed + b) work on?*/
-		  gpu_md->block_leaf_id[n_blocks_packed + b].x = md->n_leaves_packed;
-		  /*Save the id of the first block acting on this leaf comp.
-		   * Needed for indexing in kernel*/
-		  gpu_md->block_leaf_id[n_blocks_packed + b].y = n_blocks_packed;
-	  }
+#ifdef SWIFT_DEBUG_CHECKS
+  /* Anything to do here? */
+  if (cii_count == 0 || cjj_count == 0)
+    error("Empty cells should've been excluded during the recursion.");
+#endif
 
-	  /*Check to see we've not somehow gone over the number of blocks we allocated*/
-	  /*TODO: Put in debug checks ifdef. Leave for now while dev'ing*/
-	  ///////////////////////////////////////////////////////////////////////
-	  int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-	  md->n_blocks_packed += n_blocks_current;
-	  if(md->n_blocks_packed > n_blocks_max)
-		  error("exceeded n_block_max due to insufficient gpu_part_buffer_size. Increase gpu_part_buffer_size in your *.yml file");
-	  ///////////////////////////////////////////////////////////////////////
+  /* Get how many particles we've packed until now */
+  int pack_ind = md->count_parts_unique;
 
-	  /*Get a pointer to the full hash table and it's size
-	   * TODO: Make this a dynamically sized hash table
-	   * to use load factor to resize so that it is only ever 50% full*/
-	  struct hash_entry * ht = md->hash_table.entry;
-	  const int hash_size = md->hash_size;
+  int last_ind = pack_ind + cii_count;
+  if (cii != cjj) last_ind += cjj_count; /* packing pair interaction */
+  if (last_ind >= md->params.part_buffer_size) {
+    error(
+        "Exceeded particle buffer size. Increase "
+        "Scheduler:gpu_part_buffer_size."
+        "ind=%d, counts=%d %d, buffer_size=%d, task_subtype=%s, is self "
+        "task?=%d",
+        pack_ind, cii_count, cjj_count, md->params.part_buffer_size,
+        subtaskID_names[task_subtype], cii == cjj);
+  }
+  /*Figure out where cells start for controlling GPU computations*/
+  /*How many blocks have we packed so far?
+   * Each cell is split into count/BS chunks so that
+   * multiple cuda blocks work on particles in each cell if cell is big enough*/
+  const int n_blocks_packed = md->n_blocks_packed;
+  /*How many blocks will the current cell be split into*/
+  int n_blocks_current;
+  if(cii == cjj){
+	  n_blocks_current = (cii_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+  }else{/*This is a pair task need to take the max count of ci and cj*/
+	  n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+  }
 
-	  /*Check if ci has already been found.
-	   * If so, return where it's unique copy
-	   * is found in the hash table
-	   * Otherwise, add cell to hash table*/
-	  /*Flag that we're testing ci*/
-	  int ij = 0;
-	  hash_lookup_and_pack(cii, hash_size, ht, buf, ij, task_subtype);
-	  /*Same for cj. For self tasks this will point to ci's location*/
-		/*Flag that we're testing cj*/
-	  ij = 1;
-	  hash_lookup_and_pack(cjj, hash_size, ht, buf, ij, task_subtype);
+  /*Let the cuda blocks know which parts of the data we send they need to work on*/
+  for(int b = 0; b < n_blocks_current; b++){
+	  /*Which leaf computation will this block (n_blocks_packed + b) work on?*/
+	  gpu_md->block_leaf_id[n_blocks_packed + b].x = md->n_leaves_packed;
+	  /*Save the id of the first block acting on this leaf comp.
+	   * Needed for indexing in kernel*/
+	  gpu_md->block_leaf_id[n_blocks_packed + b].y = n_blocks_packed;
+  }
 
-	  /* Now finish up bookkeeping*/
-	  /* Update incremented pack length accordingly */
-	  if (cii == cjj) {
-	    /* We packed a self interaction */
-	    md->count_parts += cii_count;
-	  } else {
-	    /* We packed a pair interaction */
-	    md->count_parts += cii_count + cjj_count;
-	  }
-	  /* Record that we have now packed a new leaf cell (pair) & increment number
-	   * of leaf cells to offload */
-	  md->n_leaves_packed++;
+  /*Check to see we've not somehow gone over the number of blocks we allocated*/
+  /*TODO: Put in debug checks ifdef. Leave for now while dev'ing*/
+  ///////////////////////////////////////////////////////////////////////
+  int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+  md->n_blocks_packed += n_blocks_current;
+  if(md->n_blocks_packed > n_blocks_max)
+	  error("exceeded n_block_max due to insufficient gpu_part_buffer_size. Increase gpu_part_buffer_size in your *.yml file");
+  ///////////////////////////////////////////////////////////////////////
+
+  /*Get a pointer to the full hash table and it's size
+   * TODO: Make this a dynamically sized hash table
+   * to use load factor to resize so that it is only ever 50% full*/
+  struct hash_entry * ht = md->hash_table.entry;
+  const int hash_size = md->hash_size;
+
+  /*Check if ci has already been found.
+   * If so, return where it's unique copy
+   * is found in the hash table
+   * Otherwise, add cell to hash table*/
+  /*Flag that we're testing ci*/
+  int ij = 0;
+  hash_lookup_and_pack(cii, hash_size, ht, buf, ij, task_subtype);
+  /*Same for cj. For self tasks this will point to ci's location*/
+  /*Flag that we're testing cj*/
+  ij = 1;
+  hash_lookup_and_pack(cjj, hash_size, ht, buf, ij, task_subtype);
+
+  /* Now finish up bookkeeping*/
+  /* Update incremented pack length accordingly */
+  if (cii == cjj) {
+	  /* We packed a self interaction */
+	  md->count_parts += cii_count;
+  } else {
+	  /* We packed a pair interaction */
+	  md->count_parts += cii_count + cjj_count;
+  }
+  /* Record that we have now packed a new leaf cell (pair) & increment number
+   * of leaf cells to offload */
+  md->n_leaves_packed++;
 
 }
 
@@ -605,15 +629,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
           cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
     }
   }
-  /*"All things are ready, if our mind be so..."
-   * Make sure CPU has synchronised with GPU before moving on*/
-  cu_error =
-      cudaStreamSynchronize(stream[0]);
 #ifdef SWIFT_DEBUG_CHECKS
   else {
     error("Unknown GPU task subtype %s", subtaskID_names[task_subtype]);
   }
 #endif
+  /*"All things are ready, if our mind be so..."
+   * Make sure CPU has synchronised with GPU before moving on*/
+  cu_error =
+      cudaStreamSynchronize(stream[0]);
 
   if (cu_error != cudaSuccess) {
     /* If we're here, assume something's messed up with our code, not with
