@@ -668,6 +668,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     struct gpu_offload_data *restrict buf, struct task *t, cudaStream_t *stream,
     const float d_a, const float d_H) {
 
+  /* TODO: Needs updating to follow unique sorting algo */
   /* Grab handles */
   struct gpu_pack_metadata *md = &buf->md;
   int *task_first_packed_leaf = md->task_first_packed_leaf;
