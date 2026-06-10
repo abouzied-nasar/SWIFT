@@ -639,6 +639,24 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
 }
 
+__attribute__((always_inline)) INLINE static void finalise_gpu_metadata(
+    struct gpu_offload_data *restrict buf) {
+
+  const struct gpu_pack_metadata *md = &buf->md;
+  struct gpu_md *gpu_md = &buf->gpu_md;
+  /*Use tic for packing and tic2 for launch timing*/
+  TIMER_TIC;
+  for(int i = 0; i < md->n_leaves_packed; i++){
+	  int index_i = md->my_index[i].x;
+	  int index_j = md->my_index[i].y;
+	  gpu_md->cell_i_j_start_end[i].x = md->unique_start_end[index_i].x;
+	  gpu_md->cell_i_j_start_end[i].y = md->unique_start_end[index_i].y;
+	  gpu_md->cell_i_j_start_end[i].z = md->unique_start_end[index_j].x;
+	  gpu_md->cell_i_j_start_end[i].w = md->unique_start_end[index_j].y;
+  }
+  TIMER_TOC(timer_gpu_pack_f);
+}
+
 /**
  * @brief Wrapper to launch density tasks on the GPU.
  *
@@ -651,6 +669,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 __attribute__((always_inline)) INLINE static void runner_gpu_launch_density(
     const struct runner *r, struct gpu_offload_data *restrict buf,
     cudaStream_t *stream, const float d_a, const float d_H) {
+
+  /*Expand the start/end list from only the unique_start_end array into
+   * the full metadata required by GPU threads.
+   * This counts as packing but can only be done once we're ready to launch*/
+  finalise_gpu_metadata(buf);
 
   TIMER_TIC;
 
@@ -672,6 +695,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_gradient(
     const struct runner *r, struct gpu_offload_data *restrict buf,
     cudaStream_t *stream, const float d_a, const float d_H) {
 
+  /*Expand the start/end list from only the unique_start_end array into
+    * the full metadata required by GPU threads.
+	* This counts as packing but can only be done once we're ready to launch*/
+  finalise_gpu_metadata(buf);
+
   TIMER_TIC;
 
   runner_gpu_launch(r, buf, stream, d_a, d_H, task_subtype_gpu_gradient);
@@ -691,6 +719,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_gradient(
 __attribute__((always_inline)) INLINE static void runner_gpu_launch_force(
     const struct runner *r, struct gpu_offload_data *restrict buf,
     cudaStream_t *stream, const float d_a, const float d_H) {
+
+  /*Expand the start/end list from only the unique_start_end array into
+    * the full metadata required by GPU threads.
+	* This counts as packing but can only be done once we're ready to launch*/
+  finalise_gpu_metadata(buf);
 
   TIMER_TIC;
 
@@ -829,9 +862,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
    * unpacking is complete. By the end, all data will have been packed and some
    * of it (possibly all of it) will have been solved on the GPU already. */
 
-  /*Grab handle for metadata, this will be formed on CPU and off-loaded to GPU
-   * and guide the computations there*/
-  const struct gpu_md *gpu_md = &buf->gpu_md;
   while ((npacked < md->task_n_leaves) || launch_empty_task_leftovers) {
 
     /* We only need this for the first entry into the main loop. */
@@ -873,22 +903,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
     /*Record packing time*/
     if(t->subtype == task_subtype_gpu_density){
-      if (buf->md.is_pair_task)
-        TIMER_TOC(timer_dopair_gpu_pack_d);
-      else
-        TIMER_TOC(timer_doself_gpu_pack_d);
+      TIMER_TOC(timer_gpu_pack_d);
     }
     else if(t->subtype == task_subtype_gpu_gradient){
-      if (buf->md.is_pair_task)
-        TIMER_TOC(timer_dopair_gpu_pack_g);
-      else
-        TIMER_TOC(timer_doself_gpu_pack_g);
+      TIMER_TOC(timer_gpu_pack_g);
     }
     else if(t->subtype == task_subtype_gpu_force){
-      if (buf->md.is_pair_task)
-        TIMER_TOC(timer_dopair_gpu_pack_f);
-      else
-        TIMER_TOC(timer_doself_gpu_pack_f);
+      TIMER_TOC(timer_gpu_pack_f);
     }
 
     if (md->task_n_leaves > 0) {
