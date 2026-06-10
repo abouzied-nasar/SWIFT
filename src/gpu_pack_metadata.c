@@ -146,7 +146,11 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
 
   for(int i = 0; i < md->hash_size; i++){
       md->hash_table.entry[i].occupied = 0;
-      md->hash_table.entry[i].c = NULL;
+      /* This really messed up the code. Need to stop making
+       * silly mistakes such as this.
+       * TODO: figure out how to zero it without making the
+       * actual cell pointer NULL. *
+      md->hash_table.entry[i].c = NULL; */
       md->hash_table.entry[i].index = 0;
   }
   for(int i = 0; i < md->params.pack_size; i++){
