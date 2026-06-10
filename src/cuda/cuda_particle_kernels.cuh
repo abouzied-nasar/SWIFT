@@ -55,48 +55,60 @@ __device__ __forceinline__ void neighbour_interactions_density(
     const double3 shift_i_d, const double3 shift_j_d,
     int b_id_local, int tid){
 
-  // Shared memory for one tile of J: positions and velocities
+	/*Declare a variable to use up allocated shared memory*/
   extern __shared__ unsigned char smem[];
-  //TODO: Check if this is safe and/or required. We're casting from float4 to float4
-  //Also, we need positions to be double down tne road so this may need re-working!
-  float4* s_x_h = reinterpret_cast<float4*>(smem);                   // [0 to 2 * GPU_THREAD_BLOCK_SIZE] (xj,yj,zj,hj)
-  float4* s_vx_m = reinterpret_cast<float4*>(s_x_h + 2 * GPU_THREAD_BLOCK_SIZE);        // [2 * GPU_THREAD_BLOCK_SIZE to 4 * GPU_THREAD_BLOCK_SIZE] (vx,vy,vz,m)
+  /* TODO: we need positions to be double so this needs re-working in the near future!*/
+  /*Assign range of memory to use for x, y, z and h*/
+  float4* s_x_h = reinterpret_cast<float4*>(smem);
+  /*Assign range of memory to use for velocity (u, v, w) and mass*/
+  float4* s_vx_m = reinterpret_cast<float4*>(s_x_h + 2 * GPU_THREAD_BLOCK_SIZE);
 
-  // Map this thread to its i-particle
+  /*Map this thread to its i-particle*/
   const int i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+  /*Is the particle i_id in the cell we need to work on?*/
   const bool i_in_range = (i_id < i_end);
 
-  // Declare i-data, initialize safely; only load if active
+  /* Initialise particle i's data. Needed since we require definition
+     * before checking if i_in_range below */
   float xi = 0.f, yi = 0.f, zi = 0.f, hi = 1.f;
   float vxi = 0.f, vyi = 0.f, vzi = 0.f;
   float hig2 = 0.f, hi_inv = 1.f;
 
+  /*Do not do any calculation if i_id is not in cell i range of particles*/
   if (i_in_range) {
+
+	  /* First, grab handles. */
       const struct gpu_part_data_d pi = d_parts_send[i_id].p_data;
+      /*Calculate i's position local to the cell*/
       xi = (float)(pi.x_h.x - shift_i_d.x);
       yi = (float)(pi.x_h.y - shift_i_d.y);
       zi = (float)(pi.x_h.z - shift_i_d.z);
+      /*Get particle i smoothing length*/
       hi = (float)(pi.x_h.w);
-
+      /*Find my velocities, mass not needed for particle i*/
       vxi = pi.vx_m.x;
       vyi = pi.vx_m.y;
       vzi = pi.vx_m.z;
 
-      /* Do some auxiliary computations */
+      /*Calculate smoothing length related parameters*/
       hig2   = (hi * hi) * kernel_gamma2;
       hi_inv = 1.0f / hi;
   }
+
   /* Prep output */
   /* rho, rho_dh, wcount, wcount_dh */
   float4 res_rho = make_float4(0.f, 0.f, 0.f, 0.f);
   /* curl of velocity (3 coordinates), velocity divergence */
   float4 res_rot = make_float4(0.f, 0.f, 0.f, 0.f);
+
+  /*const to avoid div by zero*/
   constexpr float eps = 1e-24f;
 
-  // Number of tiles
+  /* Number of tiles. How many times to de we need to load GPU_
+     * THREAD_BLOCK_SIZE particles to get through this cell? */
   const int numTiles = (j_end - j_start + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
-  // === Prefetch tile 0 into buffer 0 ===
+  /* Prefetch tile 0 into buffer 0 */
   if (numTiles > 0) {
       const int base0      = j_start;
       const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, j_end - base0);
@@ -108,63 +120,64 @@ __device__ __forceinline__ void neighbour_interactions_density(
       }
       __pipeline_commit();
   }
+  /* Loop over tiles prefetching of "next" tile while computing "current" */
+  for (int tile = 0; tile < numTiles; ++tile){
 
-  // === Tile over J with prefetch of "next" tile while computing "current" ===
-  for (int tile = 0; tile < numTiles; ++tile)
-  {
+	  /*Is this tile 0 or 1 (ping-pong tile execution and prefetching)*/
       const int buf       = tile & 1;  // 0 or 1 (ping-pong)
       const int base      = j_start + tile * GPU_THREAD_BLOCK_SIZE;
       const int tileCount = min(GPU_THREAD_BLOCK_SIZE, j_end - base);
 
-      // Make sure the current tile (already committed) is resident in shared memory
+      /* Make sure the current tile (already committed) is resident in shared memory */
       __pipeline_wait_prior(0);
       __syncthreads();
 
-      // --- Kick off prefetch for the next tile (overlaps with compute below) ---
+      /* Initiate prefetch for the next tile (overlaps with compute further in the loop) */
       const int nextTile = tile + 1;
-      if (nextTile < numTiles)
-      {
-        /*If nextTile & 1 == 0. nextTile is even. If nextTile & 1 == 1, nextTile is odd*/
+      if (nextTile < numTiles){
+
+    	/*If nextTile & 1 == 0. nextTile is even. If nextTile & 1 == 1, nextTile is odd*/
         const int nextBuf  = nextTile & 1;
+        /*Where does the next tile begin in the buffer array?*/
         const int nextBase = j_start + nextTile * GPU_THREAD_BLOCK_SIZE;
+        /*What is the number of required threads in the next tile? If we are at the end of
+               * cell j's range in the buffer only read to the end of the range*/
         const int nextCnt  = min(GPU_THREAD_BLOCK_SIZE, j_end - nextBase);
 
+        /*Now issue pre-fetch for next data set*/
         for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
           const int gj = nextBase + t;
           __pipeline_memcpy_async(&s_x_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
           __pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
         }
+        /*Commit but don't sync, syncing is done at the end of computations*/
         __pipeline_commit();
       }
-
-      // --- Compute on the current tile (buf) ---
+      /* Run computations on the current tile (buf)*/
       if (i_in_range)
       {
       /* Start the neighbour interactions */
 #pragma unroll 4
-          for (int t = 0; t < tileCount; ++t)
-          {
+          for (int t = 0; t < tileCount; ++t){
+
+        	  /*grab the particle's index in the buffer array*/
               const int j_idx = base + t;
-              /* j != pid: Exclude self contribution. This happens at a later step. */
+              /* Exclude self contribution. This happens at a later step. */
               if (j_idx == i_id) continue;
 
               /* First, grab handles. */
               const float4 pj_x_h = s_x_h[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
               const float4 pj_vel = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
 
-              /* Now get stuff done. */
-              // Apply j shift on-the-fly
+              /* Now get stuff done.  Apply j shift on-the-fly */
               const float xij = xi - (pj_x_h.x - (float)shift_j_d.x);
               const float yij = yi - (pj_x_h.y - (float)shift_j_d.y);
               const float zij = zi - (pj_x_h.z - (float)shift_j_d.z);
 
-              // fmaf -> fused multiply-add
               const float r2 = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
               if (r2 >= hig2) continue;
 
-              // Clever Co-Pilot
               const float inv_r = rsqrtf(r2 + eps);
-              // Very clever Co-Pilot, multiply instead of divide
               /* Recover some data */
               const float r     = r2 * inv_r;
               /* Get the kernel for hi. */
@@ -199,12 +212,14 @@ __device__ __forceinline__ void neighbour_interactions_density(
               res_rot.w = fmaf(-faci, dvdr,    res_rot.w);
           }
       }/*Loop through parts in cell j and in current tile*/
-      // Ensure no thread is still reading from the current buffer before it may be overwritten next
+      /* Ensure no thread is still reading from the current buffer before it may be
+       * overwritten next */
       __syncthreads();
   }
 
-  /* Write results. */
+  /*Conditional to prevent writing out of bounds of this computation*/
   if (i_in_range) {
+	  /* Write results. */
       atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.x, res_rho.x);
       atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.y, res_rho.y);
       atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.z, res_rho.z);
@@ -474,7 +489,6 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
         const float inv_r = rsqrtf(r2 + eps);
         const float r     = r2 * inv_r;
 
-        /**/
         const float dvx  = vxi - vxj;
         const float dvy  = vyi - vyj;
         const float dvz  = vzi - vzj;
