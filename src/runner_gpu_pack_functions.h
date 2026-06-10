@@ -210,6 +210,100 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack(
  * previous task.
  * @param task_subtype this task's subtype
  */
+__attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
+    const struct runner *r, struct scheduler *s,
+    struct gpu_offload_data *restrict buf, const int npacked,
+    const enum task_subtypes task_subtype) {
+
+  /* Grab handles */
+  struct gpu_pack_metadata *md = &buf->md;
+  const struct engine *e = r->e;
+
+  /*Let's unpack the unique particle data first.
+   * We get on to enqueueing dependencies after this*/
+  int unpack_index = 0;
+  if(task_subtype == task_subtype_gpu_density){
+    for(int i = 0; i < md->n_unique; i++){
+      struct cell * c = md->unique_cells[i];
+      const int count = c->hydro.count;
+      while(cell_locktree(c)){
+        ;
+      }
+      gpu_unpack_part_density(c, buf->parts_recv_d, unpack_index,
+          count, e);
+      unpack_index += count + 1;
+      cell_unlocktree(c);
+    }
+  }
+  else if(task_subtype == task_subtype_gpu_force){
+    for(int i = 0; i < md->n_unique; i++){
+      struct cell * c = md->unique_cells[i];
+      const int count = c->hydro.count;
+      while(cell_locktree(c)){
+        ;
+      }
+      gpu_unpack_part_force(c, buf->parts_recv_f, unpack_index,
+          count, e);
+      unpack_index += count + 1;
+      cell_unlocktree(c);
+    }
+  }
+  else if(task_subtype == task_subtype_gpu_gradient){
+    for(int i = 0; i < md->n_unique; i++){
+      struct cell * c = md->unique_cells[i];
+      const int count = c->hydro.count;
+      while(cell_locktree(c)){
+        ;
+      }
+      gpu_unpack_part_gradient(c, buf->parts_recv_g, unpack_index,
+          count, e);
+      unpack_index += count + 1;
+      cell_unlocktree(c);
+    }
+  }
+
+
+  /* Loop over all tasks that we have offloaded */
+  for (int tid = 0; tid < md->tasks_in_list; tid++) {
+
+    /* If we haven't finished packing the currently handled task's leaf cells,
+     * we mustn't unlock its dependencies yet. ("Currently handled task" is
+     * the one for which the offloading cycle is currently underway in
+     * runner_gpu_pack_and_launch) */
+    if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves))
+    	continue;
+
+    /* If we're here, we're completely done with this task. Mark it as
+     * completed. */
+
+    /* schedule my dependencies */
+    scheduler_enqueue_dependencies(s, md->task_list[tid]);
+
+    /* Tell the scheduler's bookkeeping that this task is done */
+    pthread_mutex_lock(&s->sleep_mutex);
+    atomic_dec(&s->waiting);
+    pthread_cond_broadcast(&s->sleep_cond);
+    pthread_mutex_unlock(&s->sleep_mutex);
+
+    /* Mark the task as done. */
+    md->task_list[tid]->skip = 1;
+
+  } /* Loop over tasks in list */
+}
+
+/**
+ * @brief Generic function to unpack data received from the GPU depending on
+ * the task subtype.
+ *
+ * @param r the #runner
+ * @param s the #scheduler
+ * @param buf the particle data buffers
+ * @param npacked how many (pairs of) leaf cells have been packed during the
+ * current pair task offloading call. May differ from the total number of
+ * packed leaf cell pairs if there have been leftover leaf cell pairs from a
+ * previous task.
+ * @param task_subtype this task's subtype
+ */
 __attribute__((always_inline)) INLINE static void runner_gpu_unpack(
     const struct runner *r, struct scheduler *s,
     struct gpu_offload_data *restrict buf, const int npacked,
@@ -415,7 +509,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_density(
 
   TIMER_TIC;
 
-  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_density);
+  runner_gpu_unpack_pre_sorted(r, s, buf, npacked, task_subtype_gpu_density);
 
   TIMER_TOC(timer_gpu_unpack_d);
 }
@@ -436,7 +530,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_gradient(
 
   TIMER_TIC;
 
-  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_gradient);
+  runner_gpu_unpack_pre_sorted(r, s, buf, npacked, task_subtype_gpu_gradient);
 
   TIMER_TOC(timer_gpu_unpack_g);
 }
@@ -458,7 +552,7 @@ runner_dopair_gpu_unpack_force(const struct runner *r, struct scheduler *s,
 
   TIMER_TIC;
 
-  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_force);
+  runner_gpu_unpack_pre_sorted(r, s, buf, npacked, task_subtype_gpu_force);
 
   TIMER_TOC(timer_gpu_unpack_f);
 }
