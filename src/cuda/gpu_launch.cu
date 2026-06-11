@@ -72,7 +72,7 @@ void gpu_launch_density(
 
   /* Shared memory allocation. Need two tiles as another tile (1) is
    used for prefetching while tile 0 is used for computations and vice-versa*/
-  const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * (sizeof(struct gpu_part_recv_d));//(sizeof(float4) + sizeof(float4)); // 2048 bytes when TILE_J=64
+  const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * (sizeof(struct gpu_part_data_d));//(sizeof(float4) + sizeof(float4)); // 2048 bytes when TILE_J=64
 
   cuda_kernel_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H,

@@ -59,9 +59,10 @@ __device__ __forceinline__ void neighbour_interactions_density(
   extern __shared__ unsigned char smem[];
   /* TODO: we need positions to be double so this needs re-working in the near future!*/
   /*Assign range of memory to use for x, y, z and h*/
-  float4* s_x_h = reinterpret_cast<float4*>(smem);
+  double2* s_x_y = reinterpret_cast<double2*>(smem);
+  double2* s_z_h = reinterpret_cast<double2*>(s_x_y + 2 * GPU_THREAD_BLOCK_SIZE);
   /*Assign range of memory to use for velocity (u, v, w) and mass*/
-  float4* s_vx_m = reinterpret_cast<float4*>(s_x_h + 2 * GPU_THREAD_BLOCK_SIZE);
+  float4* s_vx_m = reinterpret_cast<float4*>(s_z_h + 2 * GPU_THREAD_BLOCK_SIZE);
 
   /*Map this thread to its i-particle*/
   const int i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
@@ -79,12 +80,12 @@ __device__ __forceinline__ void neighbour_interactions_density(
 
 	  /* First, grab handles. */
       const struct gpu_part_data_d pi = d_parts_send[i_id].p_data;
-      /*Calculate i's position local to the cell*/
-      xi = (float)(pi.x_h.x - shift_i_d.x);
-      yi = (float)(pi.x_h.y - shift_i_d.y);
-      zi = (float)(pi.x_h.z - shift_i_d.z);
-      /*Get particle i smoothing length*/
-      hi = (float)(pi.x_h.w);
+	  /*Calculate i's position local to the cell*/
+	  xi = (double)(pi.x_y.x - shift_i_d.x);
+	  yi = (double)(pi.x_y.y - shift_i_d.y);
+	  zi = (double)(pi.z_h.x - shift_i_d.z);
+	  /*Get particle i smoothing length*/
+	  hi = (float)(pi.z_h.y);
       /*Find my velocities, mass not needed for particle i*/
       vxi = pi.vx_m.x;
       vyi = pi.vx_m.y;
@@ -115,7 +116,8 @@ __device__ __forceinline__ void neighbour_interactions_density(
 
       for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
           const int gj = base0 + t;
-          __pipeline_memcpy_async(&s_x_h[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+          __pipeline_memcpy_async(&s_x_y[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_y, sizeof(double2));
+          __pipeline_memcpy_async(&s_z_h[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.z_h, sizeof(double2));
           __pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
       }
       __pipeline_commit();
@@ -147,7 +149,8 @@ __device__ __forceinline__ void neighbour_interactions_density(
         /*Now issue pre-fetch for next data set*/
         for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
           const int gj = nextBase + t;
-          __pipeline_memcpy_async(&s_x_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+		  __pipeline_memcpy_async(&s_x_y[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_y, sizeof(double2));
+		  __pipeline_memcpy_async(&s_z_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.z_h, sizeof(double2));
           __pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
         }
         /*Commit but don't sync, syncing is done at the end of computations*/
@@ -166,13 +169,18 @@ __device__ __forceinline__ void neighbour_interactions_density(
               if (j_idx == i_id) continue;
 
               /* First, grab handles. */
-              const float4 pj_x_h = s_x_h[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
+              const double2 pj_x_y = s_x_y[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
+              const double2 pj_z_h = s_z_h[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
               const float4 pj_vel = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
 
-              /* Now get stuff done.  Apply j shift on-the-fly */
-              const float xij = xi - (pj_x_h.x - (float)shift_j_d.x);
-              const float yij = yi - (pj_x_h.y - (float)shift_j_d.y);
-              const float zij = zi - (pj_x_h.z - (float)shift_j_d.z);
+			  const double xj = (pj_x_y.x - shift_j_d.x);
+			  const double yj = (pj_x_y.y - shift_j_d.y);
+			  const double zj = (pj_z_h.x - shift_j_d.z);
+
+              /* Now get stuff done*/
+              const float xij = xi - xj;
+              const float yij = yi - yj;
+              const float zij = zi - zj;
 
               const float r2 = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
               if (r2 >= hig2) continue;
@@ -327,9 +335,10 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
   /* TODO: we need positions to be double so this needs re-working in the near future!*/
   /* TODO: Should add float2 in shared for avisc and vsig*/
   /*Assign range of memory to use for x, y, z and h*/
-  float4* s_x_h = reinterpret_cast<float4*>(smem);
+  double2* s_x_y = reinterpret_cast<double2*>(smem);
+  double2* s_z_h = reinterpret_cast<double2*>(s_x_y + 2 * GPU_THREAD_BLOCK_SIZE);
   /*Assign range of memory to use for velocity (u, v, w) and mass*/
-  float4* s_vx_m = reinterpret_cast<float4*>(s_x_h + 2 * GPU_THREAD_BLOCK_SIZE);
+  float4* s_vx_m = reinterpret_cast<float4*>(s_z_h + 2 * GPU_THREAD_BLOCK_SIZE);
   /*Assign range of memory to use for energy u, density rho, speed of sound c, alpha visc*/
   float4* s_u_rho_c_aviscmax = reinterpret_cast<float4*>(s_vx_m + 2 * GPU_THREAD_BLOCK_SIZE);
   /*Assign range of memory to use for energy u, density rho, speed of sound c, alpha visc*/
@@ -355,11 +364,11 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
     const struct gpu_part_data_g pi = d_parts_send[i_id].p_data;
 
     /*Calculate i's position local to the cell*/
-    xi = (float)(pi.x_h.x - shift_i_d.x);
-    yi = (float)(pi.x_h.y - shift_i_d.y);
-    zi = (float)(pi.x_h.z - shift_i_d.z);
+	xi = (pi.x_y.x - shift_i_d.x);
+	yi = (pi.x_y.y - shift_i_d.y);
+	zi = (pi.z_h.x - shift_i_d.z);
     /*Get particle i smoothing length*/
-    hi = (float)(pi.x_h.w);
+	hi = (float)(pi.z_h.y);
     /*Find my velocities, mass not needed for particle i*/
     vxi = pi.vx_m.x;
     vyi = pi.vx_m.y;
@@ -401,7 +410,8 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
 
     for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
       const int gj = base0 + t;
-      __pipeline_memcpy_async(&s_x_h[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+      __pipeline_memcpy_async(&s_x_y[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_y, sizeof(double2));
+      __pipeline_memcpy_async(&s_z_h[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.z_h, sizeof(double2));
       __pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
       __pipeline_memcpy_async(&s_u_rho_c_aviscmax[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_c_aviscmax, sizeof(float4));
       __pipeline_memcpy_async(&s_avisc_vsig[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.avisc_vsig, sizeof(float4));
@@ -434,7 +444,8 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
       /*Now issue pre-fetch for next data set*/
       for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
         const int gj = nextBase + t;
-        __pipeline_memcpy_async(&s_x_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+		__pipeline_memcpy_async(&s_x_y[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_y, sizeof(double2));
+		__pipeline_memcpy_async(&s_z_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.z_h, sizeof(double2));
         __pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
         __pipeline_memcpy_async(&s_u_rho_c_aviscmax[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_c_aviscmax, sizeof(float4));
         __pipeline_memcpy_async(&s_avisc_vsig[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.avisc_vsig, sizeof(float4));
@@ -456,7 +467,8 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
         if (j_idx == i_id) continue;
 
         /* First, grab handles. */
-        const float4 pj_x_h = s_x_h[buf * GPU_THREAD_BLOCK_SIZE + t];
+        const double2 pj_x_y = s_x_y[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
+        const double2 pj_z_h = s_z_h[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
         const float4 pj_vx_m = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
         /*Get rho, visc, energy and speed of sound*/
         const float4 pj_u_rho_c_aviscmax = s_u_rho_c_aviscmax[buf * GPU_THREAD_BLOCK_SIZE + t];
@@ -465,9 +477,9 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
          *  We need vsig from CPU for particle i but not it's neighbours
          *  and we need aviscmax and vsig for particle i and not it's neighbours*/
         const float4 pj_avisc_vsig = s_avisc_vsig[buf * GPU_THREAD_BLOCK_SIZE + t];
-        const float xj = (float)(pj_x_h.x - (float)shift_j_d.x);
-        const float yj = (float)(pj_x_h.y - (float)shift_j_d.y);
-        const float zj = (float)(pj_x_h.z - (float)shift_j_d.z);
+		const double xj = (pj_x_y.x - shift_j_d.x);
+		const double yj = (pj_x_y.y - shift_j_d.y);
+		const double zj = (pj_z_h.x - shift_j_d.z);
 
         /*Find particle distances*/
         const float xij = xi - xj;
@@ -628,9 +640,10 @@ __device__ __forceinline__ void neighbour_interactions_force(
 	extern __shared__ __align__(16) unsigned char smem[];
 	/* TODO: we need positions to be double so this needs re-working in the near future!*/
 	/*Assign range of memory to use for x, y, z and h*/
-	float4* s_x_h  = reinterpret_cast<float4*>(smem);
+	double2* s_x_y = reinterpret_cast<double2*>(smem);
+	double2* s_z_h = reinterpret_cast<double2*>(s_x_y + 2 * GPU_THREAD_BLOCK_SIZE);
 	/*Assign range of memory to use for velocity (u, v, w) and mass*/
-	float4* s_vx_m  = reinterpret_cast<float4*>(s_x_h  + 2 * GPU_THREAD_BLOCK_SIZE);
+	float4* s_vx_m = reinterpret_cast<float4*>(s_z_h + 2 * GPU_THREAD_BLOCK_SIZE);
 	/*Assign range of memory to use for energy u, density rho, smoothing length constant f, pressure p*/
 	float4* s_u_r_f_p = reinterpret_cast<float4*>(s_vx_m  + 2 * GPU_THREAD_BLOCK_SIZE);
 	/*Assign range of memory to use for balsara b, speed of sound c, alpha visc av and diffusion ad*/
@@ -656,11 +669,11 @@ __device__ __forceinline__ void neighbour_interactions_force(
 		const struct gpu_part_data_f pi = d_parts_send[i_id].p_data;
 
 	    /*Calculate i's position local to the cell*/
-		xi = (float)(pi.x_h.x - shift_i_d.x);
-		yi = (float)(pi.x_h.y - shift_i_d.y);
-		zi = (float)(pi.x_h.z - shift_i_d.z);
+		xi = (pi.x_y.x - shift_i_d.x);
+		yi = (pi.x_y.y - shift_i_d.y);
+		zi = (pi.z_h.x - shift_i_d.z);
 	    /*Get particle i smoothing length*/
-		hi = (float)(pi.x_h.w);
+		hi = (float)(pi.z_h.y);
 
 	    /*Find my velocities, mass not needed for particle i*/
 		vxi = pi.vx_m.x;
@@ -717,7 +730,8 @@ __device__ __forceinline__ void neighbour_interactions_force(
 
 		for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
 			const int gj = base0 + t;
-			__pipeline_memcpy_async(&s_x_h[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+	        __pipeline_memcpy_async(&s_x_y[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_y, sizeof(double2));
+	        __pipeline_memcpy_async(&s_z_h[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.z_h, sizeof(double2));
 			__pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
 			__pipeline_memcpy_async(&s_u_r_f_p[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
 			__pipeline_memcpy_async(&s_b_c_av_ad[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
@@ -751,7 +765,8 @@ __device__ __forceinline__ void neighbour_interactions_force(
 		    /*Now issue pre-fetch for next data set*/
 			for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
 				const int gj = nextBase + t;
-				__pipeline_memcpy_async(&s_x_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_h, sizeof(float4));
+				__pipeline_memcpy_async(&s_x_y[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_y, sizeof(double2));
+				__pipeline_memcpy_async(&s_z_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.z_h, sizeof(double2));
 				__pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
 				__pipeline_memcpy_async(&s_u_r_f_p[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
 				__pipeline_memcpy_async(&s_b_c_av_ad[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
@@ -774,16 +789,17 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				if (j_idx == i_id) continue; // self for self-pairs
 
 				/* First, grab handles. */
-				const float4 pj_x_h  = s_x_h[buf * GPU_THREAD_BLOCK_SIZE + t];
+	            const double2 pj_x_y = s_x_y[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
+	            const double2 pj_z_h = s_z_h[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
 				const float4 pj_vx_m  = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
 				const float4 pj_u_r_f_p = s_u_r_f_p[buf * GPU_THREAD_BLOCK_SIZE + t];
 				const float4 pj_b_c_av_ad = s_b_c_av_ad[buf * GPU_THREAD_BLOCK_SIZE + t];
 
 				/*Calculate particle position relative to cell position and get smoothing length*/
-				const float xj = (float)(pj_x_h.x - (float)shift_j_d.x);
-				const float yj = (float)(pj_x_h.y - (float)shift_j_d.y);
-				const float zj = (float)(pj_x_h.z - (float)shift_j_d.z);
-				const float hj = pj_x_h.w;
+				const double xj = (pj_x_y.x - shift_j_d.x);
+				const double yj = (pj_x_y.y - shift_j_d.y);
+				const double zj = (pj_z_h.x - shift_j_d.z);
+				const float hj = pj_z_h.y;
 
 				const float vxj = pj_vx_m.x;
 				const float vyj = pj_vx_m.y;
