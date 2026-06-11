@@ -229,6 +229,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
       while(cell_locktree(c)){
         ;
       }
+      if (cell_is_active_hydro(c, e))
       gpu_unpack_part_density(c, buf->parts_recv_d, unpack_index,
           count, e);
       unpack_index += count + 1;
@@ -242,6 +243,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
       while(cell_locktree(c)){
         ;
       }
+      if (cell_is_active_hydro(c, e))
       gpu_unpack_part_force(c, buf->parts_recv_f, unpack_index,
           count, e);
       unpack_index += count + 1;
@@ -255,6 +257,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
       while(cell_locktree(c)){
         ;
       }
+      if (cell_is_active_hydro(c, e))
       gpu_unpack_part_gradient(c, buf->parts_recv_g, unpack_index,
           count, e);
       unpack_index += count + 1;

@@ -177,10 +177,10 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0];
-    ps[i].x_h.y = x[1];
-    ps[i].x_h.z = x[2];
-    ps[i].x_h.w = part_get_h(p);
+    ps[i].x_y.x = x[0];
+    ps[i].x_y.y = x[1];
+    ps[i].z_h.x = x[2];
+    ps[i].z_h.y = part_get_h(p);
 
     const float *v = part_get_const_v(p);
     ps[i].vx_m.x = v[0];
@@ -223,10 +223,10 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0];
-    ps[i].x_h.y = x[1];
-    ps[i].x_h.z = x[2];
-    ps[i].x_h.w = part_get_h(p);
+    ps[i].x_y.x = x[0];
+    ps[i].x_y.y = x[1];
+    ps[i].z_h.x = x[2];
+    ps[i].z_h.y = part_get_h(p);
 
     const float *v = part_get_const_v(p);
     ps[i].vx_m.x = v[0];
@@ -275,10 +275,10 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0];
-    ps[i].x_h.y = x[1];
-    ps[i].x_h.z = x[2];
-    ps[i].x_h.w = part_get_h(p);
+    ps[i].x_y.x = x[0];
+    ps[i].x_y.y = x[1];
+    ps[i].z_h.x = x[2];
+    ps[i].z_h.y = part_get_h(p);
 
     const float *v = part_get_const_v(p);
     ps[i].vx_m.x = v[0];

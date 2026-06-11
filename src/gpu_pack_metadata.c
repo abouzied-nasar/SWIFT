@@ -151,6 +151,7 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
        * TODO: figure out how to zero it without making the
        * actual cell pointer NULL. *
       md->hash_table.entry[i].c = NULL; */
+      md->hash_table.entry[i].c = NULL;
       md->hash_table.entry[i].index = 0;
   }
   for(int i = 0; i < md->params.pack_size; i++){

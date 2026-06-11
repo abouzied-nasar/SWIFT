@@ -38,7 +38,8 @@ struct gpu_part_data_d {
 #ifdef WITH_CUDA
 //TODO: This needs changing to doubles too. Darn it...
 /*! Particle position and h -> x, y, z, h */
-  float4 __align__(16) x_h;
+  double2 __align__(16) x_y;
+  double2 __align__(16) z_h;
 
   /*! Particle predicted velocity and mass -> ux, uy, uz, m */
   float4 __align__(16) vx_m;
@@ -90,7 +91,8 @@ struct gpu_part_data_g {
 #ifdef WITH_CUDA
 
   /*! Particle position & smoothing length */
-  float4 __align__(16) x_h;
+  double2 __align__(16) x_y;
+  double2 __align__(16) z_h;
 
   /*! Particle velocity and mass */
   float4 __align__(16) vx_m;
@@ -136,7 +138,8 @@ struct gpu_part_data_f {
   /* Data required for the calculation: Values read to local GPU memory */
 
   /*! Particle positions, smoothing length */
-  float4 __align__(16) x_h;
+  double2 __align__(16) x_y;
+  double2 __align__(16) z_h;
 
   /*! Particle predicted velocity and mass */
   float4 __align__(16) vx_m;
