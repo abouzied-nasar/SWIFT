@@ -144,9 +144,10 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
     float h_dt = pr.udt_hdt.y + part_get_h_dt(p);
     part_set_h_dt(p, h_dt);
 
-//    timebin_t mintbin = (timebin_t)(pr.minngbtb.z + 0.5f);
-    timebin_t mintbin = (timebin_t)min(part_get_timestep_limiter_min_ngb_time_bin(p), pr.minngbtb);
-    part_set_timestep_limiter_min_ngb_time_bin(p, mintbin);
+    timebin_t mintbin = min(part_get_timestep_limiter_min_ngb_time_bin(p), pr.minngbtb);
+    if(mintbin > 0)
+    	part_set_timestep_limiter_min_ngb_time_bin(p, mintbin);
+//      part_set_timestep_limiter_min_ngb_time_bin(p, pr.minngbtb);
   }
 }
 
@@ -296,8 +297,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     ps[i].bals_c_avisc_adiff.z = part_get_alpha_av(p);
     ps[i].bals_c_avisc_adiff.w = part_get_alpha_diff(p);
 
-    ps[i].timebin_minngbtimebin.x = (int)part_get_time_bin(p);
-//    int mintbin = (int)part_get_timestep_limiter_min_ngb_time_bin(p);
+    ps[i].timebin_minngbtimebin.x = part_get_time_bin(p);
     ps[i].timebin_minngbtimebin.y = part_get_timestep_limiter_min_ngb_time_bin(p);
 
   }

@@ -34,6 +34,7 @@ extern "C" {
 #include "device_functions.cuh"
 #include "gpu_part_structs.h"
 #include "inline.h"
+#include <stdio.h>
 
 #include <config.h>
 
@@ -611,6 +612,29 @@ __global__ void cuda_kernel_gradient(
     }
 }
 
+__device__ __forceinline__ void atomicMinNonZero(int* addr, int val) {
+    if (val <= 0) return;
+    int old = *addr;
+    while (true) {
+
+        int assumed = old;
+
+        int desired;
+        if (assumed == 0)
+            desired = val;
+        else
+            desired = min(assumed, val);
+
+        if (desired == assumed)
+            return;
+
+        old = atomicCAS(addr, assumed, desired);
+
+        if (old == assumed)
+            return;
+    }
+}
+
 /**
  * @brief Naive kernel computing the gradient interactions of a single particle
  *
@@ -649,12 +673,13 @@ __device__ __forceinline__ void neighbour_interactions_force(
 	/*Assign range of memory to use for balsara b, speed of sound c, alpha visc av and diffusion ad*/
 	float4* s_b_c_av_ad = reinterpret_cast<float4*>(s_u_r_f_p + 2 * GPU_THREAD_BLOCK_SIZE);
 	/*Assign range of memory to use for balsara b, speed of sound c, alpha visc av and diffusion ad*/
-	int4* s_tb_min_ngb_tb = reinterpret_cast<int4*>(s_b_c_av_ad + 2 * GPU_THREAD_BLOCK_SIZE);
+	int2* s_tb_min_ngb_tb = reinterpret_cast<int2*>(s_b_c_av_ad + 2 * GPU_THREAD_BLOCK_SIZE);
 
 	/*Map this thread to its i-particle*/
 	const int  i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
 	/*Is the id in the cell we need to work on?*/
-	const bool i_in_range  = (i_id < i_end);
+	/*TODO: Only < i_end check is necessary, added the >= i_start for debugging. REMOVE after!*/
+	const bool i_in_range  = (i_id >= i_start && i_id < i_end);
 
 	/* Initialise particle i's data. Needed since we require definition
 	 * before checking if i_in_range below */
@@ -662,7 +687,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 	float vxi=0.f, vyi=0.f, vzi=0.f, mi=0.f;
 	float fi=0.f, balsi=0.f, rhoi=0.f, pressurei=0.f;
 	float ci=0.f, energyi=0.f, avisci=0.f, adiffi=0.f;
-	int   tbj=0, min_ngb_tbi=0;
+	int   tbi=0, min_ngb_tbi=INT_MAX;
 
 	float hi_inv=0.f, hid_inv=0.f, mi_inv=0.f, rhoi_inv=0.f, rhoi_inv2=0.f, hig2=0.f;
 	/*Do not do any calculation if i_id is not in cell i range of particles*/
@@ -693,12 +718,11 @@ __device__ __forceinline__ void neighbour_interactions_force(
 		ci = pi.bals_c_avisc_adiff.y;
 		avisci = pi.bals_c_avisc_adiff.z;
 		adiffi  = pi.bals_c_avisc_adiff.w;
-
-		/*Use my time bin as the first minimum neighbour time bin.
-		 * Will loop over neighbours to compare*/
-		tbj         = pi.timebin_minngbtimebin.x;
-		/*min neighbour time_bin*/
+		tbi = pi.timebin_minngbtimebin.x;
 		min_ngb_tbi = pi.timebin_minngbtimebin.y;
+
+		if(min_ngb_tbi == 0)
+			printf("Entered with zero min ngb tb\n");
 
 		/* Get the kernel for hi. */
 		hi_inv   = 1.0f / hi;
@@ -712,8 +736,6 @@ __device__ __forceinline__ void neighbour_interactions_force(
 	/*Accumulators (results) for acceleration and everything else*/
 	float3 res_ahydro  = {0.f, 0.f, 0.f};
 	float2 res_udt_hdt = {0.f, 0.f};
-	/*minimum neighbouring time bin. Initialise to zero if i not in range of the cell contents in buffer array*/
-	int    res_min_ngb_timebin = i_in_range ? min_ngb_tbi : 0;
 
 	/* Cosmology terms for the signal velocity */
 	const float fac_mu    = d_pow_three_gamma_minus_five_over_two(d_a);
@@ -737,7 +759,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 			__pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
 			__pipeline_memcpy_async(&s_u_r_f_p[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
 			__pipeline_memcpy_async(&s_b_c_av_ad[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
-			__pipeline_memcpy_async(&s_tb_min_ngb_tb[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.timebin_minngbtimebin, sizeof(int4));
+			__pipeline_memcpy_async(&s_tb_min_ngb_tb[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.timebin_minngbtimebin, sizeof(int2));
 
 		}
 		__pipeline_commit();
@@ -774,7 +796,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				__pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
 				__pipeline_memcpy_async(&s_u_r_f_p[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
 				__pipeline_memcpy_async(&s_b_c_av_ad[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
-				__pipeline_memcpy_async(&s_tb_min_ngb_tb[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.timebin_minngbtimebin, sizeof(int4));
+				__pipeline_memcpy_async(&s_tb_min_ngb_tb[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.timebin_minngbtimebin, sizeof(int2));
 			}
 		    /*Commit but don't sync, syncing is done at the end of computations*/
 			__pipeline_commit();
@@ -799,13 +821,30 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				const float4 pj_vx_m  = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
 				const float4 pj_u_r_f_p = s_u_r_f_p[buf * GPU_THREAD_BLOCK_SIZE + t];
 				const float4 pj_b_c_av_ad = s_b_c_av_ad[buf * GPU_THREAD_BLOCK_SIZE + t];
-				const int4 pj_tb_min_ngb_tb = s_tb_min_ngb_tb[buf * GPU_THREAD_BLOCK_SIZE + t];
+				const int2 pj_tb_min_ngb_tb = s_tb_min_ngb_tb[buf * GPU_THREAD_BLOCK_SIZE + t];
+
+//				if (pj_tb_min_ngb_tb.x == 0 || pj_tb_min_ngb_tb.y == 0) {
+//				    printf("zero in shared: i_id=%d j_idx=%d tile=%d t=%d buf=%d tb=%d minngbtb=%d j_start=%d j_end=%d\n",
+//				           i_id, j_idx, tile, t, buf,
+//				           pj_tb_min_ngb_tb.x, pj_tb_min_ngb_tb.y,
+//				           j_start, j_end);
+//				}
 
 				/*Calculate particle position relative to cell position and get smoothing length*/
 				const float xj = (pj_x_y.x - shift_j_d.x);
 				const float yj = (pj_x_y.y - shift_j_d.y);
 				const float zj = (pj_z_h.x - shift_j_d.z);
 				const float hj = pj_z_h.y;
+
+				/*Find particle distances*/
+				const float xij = xi - xj;
+				const float yij = yi - yj;
+				const float zij = zi - zj;
+
+				const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+				const float hjg2= (hj * hj) * kernel_gamma2;
+
+				if (!((r2 < hig2) || (r2 < hjg2))) continue;
 
 				const float vxj = pj_vx_m.x;
 				const float vyj = pj_vx_m.y;
@@ -821,17 +860,22 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				const float aviscj = pj_b_c_av_ad.z;
 				const float adiffj = pj_b_c_av_ad.w;
 
-				/*Find particle distances*/
-				const float xij = xi - xj;
-				const float yij = yi - yj;
-				const float zij = zi - zj;
+				/*second condition is a fix for if min_ngb_tbi is zero.
+				 * Unsure why that would be but hey ho*/
 
-				const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
-				const float hjg2= (hj * hj) * kernel_gamma2;
+//				if (pj_tb_min_ngb_tb.x > 0) {
+//				    if (min_ngb_tbi == 0)
+//				        min_ngb_tbi = pj_tb_min_ngb_tb.x;
+//				    else
+//				        min_ngb_tbi = min(pj_tb_min_ngb_tb.x, min_ngb_tbi);
+//				}
+				if (pj_tb_min_ngb_tb.x > 0) {
+//				    if (min_ngb_tbi == 0)
+//				        min_ngb_tbi = pj_tb_min_ngb_tb.x;
+//				    else
+				        min_ngb_tbi = min(pj_tb_min_ngb_tb.x, min_ngb_tbi);
+				}
 
-				if (!((r2 < hig2) || (r2 < hjg2))) continue;
-
-				min_ngb_tbi = min(pj_tb_min_ngb_tb.x, min_ngb_tbi);
 				const float inv_r = rsqrtf(r2 + eps);
 				const float r     = r2 * inv_r;
 
@@ -928,10 +972,6 @@ __device__ __forceinline__ void neighbour_interactions_force(
 	}
 
 	/*Conditional to prevent writing out of bounds of this computation*/
-	if (i_in_range && tbj > 0) {
-		res_min_ngb_timebin = min(res_min_ngb_timebin, tbj);
-	}
-	/*Conditional to prevent writing out of bounds of this computation*/
 	if (i_in_range) {
 		atomicAdd(&d_parts_recv[i_id].a_hydro.x, res_ahydro.x);
 		atomicAdd(&d_parts_recv[i_id].a_hydro.y, res_ahydro.y);
@@ -940,10 +980,17 @@ __device__ __forceinline__ void neighbour_interactions_force(
 		atomicAdd(&d_parts_recv[i_id].udt_hdt.x, res_udt_hdt.x);
 		atomicAdd(&d_parts_recv[i_id].udt_hdt.y, res_udt_hdt.y);
 
-		/* If minimum timebin is zero, set it; then take min */
+		/* If minimum timebin is zero, set it to the current value;
+		 * then take the min to avoid cases where the value in global memory is zero */
 		/*TODO: Check whether this CAS is even necessary*/
-//		atomicCAS(&d_parts_recv[i_id].minngbtb, 0, min_ngb_tbi);
-		atomicMin(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
+//		if(min_ngb_tbi > 0){
+//		  atomicCAS(&d_parts_recv[i_id].minngbtb, 0, min_ngb_tbi);
+		  atomicMin(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
+//		}
+//		if (min_ngb_tbi > 0) {
+//			atomicMinNonZero(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
+//		}
+//		printf("my bin %i min time bin %i\n", min(tbi, min_ngb_tbi));
 	}
 }
 

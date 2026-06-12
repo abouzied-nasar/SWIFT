@@ -155,7 +155,7 @@ struct gpu_part_data_f {
    * and end index of particles to be interacted with in particle buffer
    * arrays */
   /*TODO: Change this to remove pjs and pje as will no longer be required*/
-  int4 __align__(16) timebin_minngbtimebin;
+  int2 __align__(16) timebin_minngbtimebin;
 
 #endif
 };
