@@ -71,9 +71,9 @@ __device__ __forceinline__ void neighbour_interactions_density(
 
   /* Initialise particle i's data. Needed since we require definition
      * before checking if i_in_range below */
-  float xi = 0.f, yi = 0.f, zi = 0.f, hi = 1.f;
+  float xi = 0.f, yi = 0.f, zi = 0.f, hi = 0.f;
   float vxi = 0.f, vyi = 0.f, vzi = 0.f;
-  float hig2 = 0.f, hi_inv = 1.f;
+  float hig2 = 0.f, hi_inv = 0.f;
 
   /*Do not do any calculation if i_id is not in cell i range of particles*/
   if (i_in_range) {
@@ -81,11 +81,11 @@ __device__ __forceinline__ void neighbour_interactions_density(
 	  /* First, grab handles. */
       const struct gpu_part_data_d pi = d_parts_send[i_id].p_data;
 	  /*Calculate i's position local to the cell*/
-	  xi = (double)(pi.x_y.x - shift_i_d.x);
-	  yi = (double)(pi.x_y.y - shift_i_d.y);
-	  zi = (double)(pi.z_h.x - shift_i_d.z);
+	  xi = (pi.x_y.x - shift_i_d.x);
+	  yi = (pi.x_y.y - shift_i_d.y);
+	  zi = (pi.z_h.x - shift_i_d.z);
 	  /*Get particle i smoothing length*/
-	  hi = (float)(pi.z_h.y);
+	  hi = (pi.z_h.y);
       /*Find my velocities, mass not needed for particle i*/
       vxi = pi.vx_m.x;
       vyi = pi.vx_m.y;
@@ -173,9 +173,9 @@ __device__ __forceinline__ void neighbour_interactions_density(
               const double2 pj_z_h = s_z_h[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
               const float4 pj_vel = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
 
-			  const double xj = (pj_x_y.x - shift_j_d.x);
-			  const double yj = (pj_x_y.y - shift_j_d.y);
-			  const double zj = (pj_z_h.x - shift_j_d.z);
+			  const float xj = (pj_x_y.x - shift_j_d.x);
+			  const float yj = (pj_x_y.y - shift_j_d.y);
+			  const float zj = (pj_z_h.x - shift_j_d.z);
 
               /* Now get stuff done*/
               const float xij = xi - xj;
@@ -345,7 +345,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
   float4* s_avisc_vsig = reinterpret_cast<float4*>(s_u_rho_c_aviscmax + 2 * GPU_THREAD_BLOCK_SIZE);
 
   /*Map this thread to its i-particle*/
-  const int  i_id    = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+  const int  i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
   /*Is the id in the cell we need to work on?*/
   const bool i_in_range = (i_id < i_end);
 
@@ -368,7 +368,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
 	yi = (pi.x_y.y - shift_i_d.y);
 	zi = (pi.z_h.x - shift_i_d.z);
     /*Get particle i smoothing length*/
-	hi = (float)(pi.z_h.y);
+	hi = (pi.z_h.y);
     /*Find my velocities, mass not needed for particle i*/
     vxi = pi.vx_m.x;
     vyi = pi.vx_m.y;
@@ -477,9 +477,9 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
          *  We need vsig from CPU for particle i but not it's neighbours
          *  and we need aviscmax and vsig for particle i and not it's neighbours*/
         const float4 pj_avisc_vsig = s_avisc_vsig[buf * GPU_THREAD_BLOCK_SIZE + t];
-		const double xj = (pj_x_y.x - shift_j_d.x);
-		const double yj = (pj_x_y.y - shift_j_d.y);
-		const double zj = (pj_z_h.x - shift_j_d.z);
+		const float xj = (pj_x_y.x - shift_j_d.x);
+		const float yj = (pj_x_y.y - shift_j_d.y);
+		const float zj = (pj_z_h.x - shift_j_d.z);
 
         /*Find particle distances*/
         const float xij = xi - xj;
@@ -648,17 +648,19 @@ __device__ __forceinline__ void neighbour_interactions_force(
 	float4* s_u_r_f_p = reinterpret_cast<float4*>(s_vx_m  + 2 * GPU_THREAD_BLOCK_SIZE);
 	/*Assign range of memory to use for balsara b, speed of sound c, alpha visc av and diffusion ad*/
 	float4* s_b_c_av_ad = reinterpret_cast<float4*>(s_u_r_f_p + 2 * GPU_THREAD_BLOCK_SIZE);
+	/*Assign range of memory to use for balsara b, speed of sound c, alpha visc av and diffusion ad*/
+	int4* s_tb_min_ngb_tb = reinterpret_cast<int4*>(s_b_c_av_ad + 2 * GPU_THREAD_BLOCK_SIZE);
 
 	/*Map this thread to its i-particle*/
-	const int  i_id     = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
+	const int  i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
 	/*Is the id in the cell we need to work on?*/
 	const bool i_in_range  = (i_id < i_end);
 
 	/* Initialise particle i's data. Needed since we require definition
 	 * before checking if i_in_range below */
-	float xi=0.f, yi=0.f, zi=0.f, hi=1.f;
-	float vxi=0.f, vyi=0.f, vzi=0.f, mi=1.f;
-	float fi=0.f, balsi=0.f, rhoi=1.f, pressurei=0.f;
+	float xi=0.f, yi=0.f, zi=0.f, hi=0.f;
+	float vxi=0.f, vyi=0.f, vzi=0.f, mi=0.f;
+	float fi=0.f, balsi=0.f, rhoi=0.f, pressurei=0.f;
 	float ci=0.f, energyi=0.f, avisci=0.f, adiffi=0.f;
 	int   tbj=0, min_ngb_tbi=0;
 
@@ -673,7 +675,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 		yi = (pi.x_y.y - shift_i_d.y);
 		zi = (pi.z_h.x - shift_i_d.z);
 	    /*Get particle i smoothing length*/
-		hi = (float)(pi.z_h.y);
+		hi = (pi.z_h.y);
 
 	    /*Find my velocities, mass not needed for particle i*/
 		vxi = pi.vx_m.x;
@@ -735,6 +737,8 @@ __device__ __forceinline__ void neighbour_interactions_force(
 			__pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
 			__pipeline_memcpy_async(&s_u_r_f_p[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
 			__pipeline_memcpy_async(&s_b_c_av_ad[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
+			__pipeline_memcpy_async(&s_tb_min_ngb_tb[0 * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.timebin_minngbtimebin, sizeof(int4));
+
 		}
 		__pipeline_commit();
 	}
@@ -770,6 +774,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				__pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.vx_m, sizeof(float4));
 				__pipeline_memcpy_async(&s_u_r_f_p[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
 				__pipeline_memcpy_async(&s_b_c_av_ad[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
+				__pipeline_memcpy_async(&s_tb_min_ngb_tb[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.timebin_minngbtimebin, sizeof(int4));
 			}
 		    /*Commit but don't sync, syncing is done at the end of computations*/
 			__pipeline_commit();
@@ -794,11 +799,12 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				const float4 pj_vx_m  = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
 				const float4 pj_u_r_f_p = s_u_r_f_p[buf * GPU_THREAD_BLOCK_SIZE + t];
 				const float4 pj_b_c_av_ad = s_b_c_av_ad[buf * GPU_THREAD_BLOCK_SIZE + t];
+				const int4 pj_tb_min_ngb_tb = s_tb_min_ngb_tb[buf * GPU_THREAD_BLOCK_SIZE + t];
 
 				/*Calculate particle position relative to cell position and get smoothing length*/
-				const double xj = (pj_x_y.x - shift_j_d.x);
-				const double yj = (pj_x_y.y - shift_j_d.y);
-				const double zj = (pj_z_h.x - shift_j_d.z);
+				const float xj = (pj_x_y.x - shift_j_d.x);
+				const float yj = (pj_x_y.y - shift_j_d.y);
+				const float zj = (pj_z_h.x - shift_j_d.z);
 				const float hj = pj_z_h.y;
 
 				const float vxj = pj_vx_m.x;
@@ -825,6 +831,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 
 				if (!((r2 < hig2) || (r2 < hjg2))) continue;
 
+				min_ngb_tbi = min(pj_tb_min_ngb_tb.x, min_ngb_tbi);
 				const float inv_r = rsqrtf(r2 + eps);
 				const float r     = r2 * inv_r;
 
@@ -933,9 +940,10 @@ __device__ __forceinline__ void neighbour_interactions_force(
 		atomicAdd(&d_parts_recv[i_id].udt_hdt.x, res_udt_hdt.x);
 		atomicAdd(&d_parts_recv[i_id].udt_hdt.y, res_udt_hdt.y);
 
-		/* If timebin is zero, set it; then take min */
-		atomicCAS(&d_parts_recv[i_id].minngbtb, 0, res_min_ngb_timebin);
-		atomicMin(&d_parts_recv[i_id].minngbtb, res_min_ngb_timebin);
+		/* If minimum timebin is zero, set it; then take min */
+		/*TODO: Check whether this CAS is even necessary*/
+//		atomicCAS(&d_parts_recv[i_id].minngbtb, 0, min_ngb_tbi);
+		atomicMin(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
 	}
 }
 

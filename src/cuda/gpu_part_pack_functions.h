@@ -145,7 +145,7 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
     part_set_h_dt(p, h_dt);
 
 //    timebin_t mintbin = (timebin_t)(pr.minngbtb.z + 0.5f);
-    timebin_t mintbin = min(part_get_timestep_limiter_min_ngb_time_bin(p), pr.minngbtb);
+    timebin_t mintbin = (timebin_t)min(part_get_timestep_limiter_min_ngb_time_bin(p), pr.minngbtb);
     part_set_timestep_limiter_min_ngb_time_bin(p, mintbin);
   }
 }
@@ -297,8 +297,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     ps[i].bals_c_avisc_adiff.w = part_get_alpha_diff(p);
 
     ps[i].timebin_minngbtimebin.x = (int)part_get_time_bin(p);
-    int mintbin = (int)part_get_timestep_limiter_min_ngb_time_bin(p);
-    ps[i].timebin_minngbtimebin.y = mintbin;
+//    int mintbin = (int)part_get_timestep_limiter_min_ngb_time_bin(p);
+    ps[i].timebin_minngbtimebin.y = part_get_timestep_limiter_min_ngb_time_bin(p);
 
   }
   /*We've packed all the particles. Now insert the cell position into the count index*/
