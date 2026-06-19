@@ -69,12 +69,12 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
     const int doi = pi_active && (depth_i >= min_depth) &&
                     (depth_i <= max_depth);
 
+    if (!doi) continue;
+
     const float h = part_get_h(p);
 #ifdef SWIFT_DEBUG_CHECKS
     if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
 #endif
-
-    if (!doi) continue;
 
     struct gpu_part_recv_d pr = parts_recv[i];
 
@@ -139,12 +139,12 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_gradient(
     const int doi = pi_active && (depth_i >= min_depth) &&
                     (depth_i <= max_depth);
 
+    if (!doi) continue;
+
     const float h = part_get_h(p);
 #ifdef SWIFT_DEBUG_CHECKS
-        if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
+     if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
 #endif
-
-    if (!doi) continue;
 
     struct gpu_part_recv_g pr = parts_recv[i];
 
@@ -199,12 +199,12 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
     const int doi = pi_active && (depth_i >= min_depth) &&
                     (depth_i <= max_depth);
 
+    if (!doi) continue;
+
     const float h = part_get_h(p);
 #ifdef SWIFT_DEBUG_CHECKS
-        if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
+     if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
 #endif
-
-    if (!doi) continue;
 
     struct gpu_part_recv_f pr = parts_recv[i];
 
