@@ -914,8 +914,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     struct cell *cii = md->ci_leaves[md->n_leaves_packed];
     struct cell *cjj = md->cj_leaves[md->n_leaves_packed];
 
-    TIMER_TIC;
-
+    if (md->task_n_leaves > 0) {
+      TIMER_TIC;
     ///////////////////////////////////////////////////////////////////////
     /* Test to see if cells i and j have already been packed
      * cells i and j are the same cell for self tasks but use the same
@@ -923,20 +923,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
      * If cells are already packed, keep track of where
      * they're packed (index). If not, pack and store their index as unique*/
     /* Note that this increments md->count_parts, md->count_parts_unique and md->n_leaves_packed */
-    pack_cell_particles_in_unique_list(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
+      pack_cell_particles_in_unique_list(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
 
-    /*Record packing time*/
-    if(t->subtype == task_subtype_gpu_density){
-      TIMER_TOC(timer_gpu_pack_d);
-    }
-    else if(t->subtype == task_subtype_gpu_gradient){
-      TIMER_TOC(timer_gpu_pack_g);
-    }
-    else if(t->subtype == task_subtype_gpu_force){
-      TIMER_TOC(timer_gpu_pack_f);
-    }
-
-    if (md->task_n_leaves > 0) {
+      /*Record packing time*/
+      if(t->subtype == task_subtype_gpu_density){
+    	TIMER_TOC(timer_gpu_pack_d);
+      }
+      else if(t->subtype == task_subtype_gpu_gradient){
+    	TIMER_TOC(timer_gpu_pack_g);
+      }
+      else if(t->subtype == task_subtype_gpu_force){
+    	TIMER_TOC(timer_gpu_pack_f);
+      }
 
 #ifdef SWIFT_DEBUG_CHECKS
       if (cii->hydro.count == 0)
