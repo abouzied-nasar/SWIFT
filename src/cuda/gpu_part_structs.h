@@ -154,7 +154,6 @@ struct gpu_part_data_f {
   /*! Particle timebin, initial value of min neighbour timebin, start
    * and end index of particles to be interacted with in particle buffer
    * arrays */
-  /*TODO: Change this to remove pjs and pje as will no longer be required*/
   int2 __align__(16) timebin_minngbtimebin;
 
 #endif
