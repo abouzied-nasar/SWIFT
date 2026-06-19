@@ -630,6 +630,27 @@ __global__ void cuda_kernel_gradient(
     }
 }
 
+
+
+__device__ __forceinline__ void atomicMinIgnoreZero(int* addr, int val) {
+
+    if (val <= 0) return;
+
+    int old = atomicCAS(addr, 0, val);
+
+    while (old != 0 && val < old) {
+        const int assumed = old;
+        const int desired = val;
+
+        old = atomicCAS(addr, assumed, desired);
+
+        if (old == assumed) break;
+    }
+}
+
+
+
+
 /**
  * @brief Naive kernel computing the gradient interactions of a single particle
  *
@@ -955,13 +976,12 @@ __device__ __forceinline__ void neighbour_interactions_force(
 
 		atomicAdd(&d_parts_recv[i_id].udt_hdt.x, res_udt_hdt.x);
 		atomicAdd(&d_parts_recv[i_id].udt_hdt.y, res_udt_hdt.y);
-	    if(min_ngb_tbi == 0 || d_parts_recv[i_id].minngbtb == 0)
-	    	printf("Zero min timebin on GPU");
 		/* If minimum timebin is zero, set it to the current value;
 		 * then take the min to avoid cases where the value in global memory is zero */
-		if(min_ngb_tbi > 0){
-		  atomicMin(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
-		}
+//		if(min_ngb_tbi > 0){
+//		  atomicMin(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
+//		}
+		atomicMinIgnoreZero(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
 	}
 }
 
