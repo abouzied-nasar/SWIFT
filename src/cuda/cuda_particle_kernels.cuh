@@ -678,8 +678,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 	/*Map this thread to its i-particle*/
 	const int  i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
 	/*Is the id in the cell we need to work on?*/
-	/*TODO: Only < i_end check is necessary, added the >= i_start for debugging. REMOVE after!*/
-	const bool i_in_range  = (i_id >= i_start && i_id < i_end);
+	const bool i_in_range  = (i_id < i_end);
 
 	/* Initialise particle i's data. Needed since we require definition
 	 * before checking if i_in_range below */
@@ -720,9 +719,6 @@ __device__ __forceinline__ void neighbour_interactions_force(
 		adiffi  = pi.bals_c_avisc_adiff.w;
 		tbi = pi.timebin_minngbtimebin.x;
 		min_ngb_tbi = pi.timebin_minngbtimebin.y;
-
-		if(min_ngb_tbi == 0)
-			printf("Entered with zero min ngb tb\n");
 
 		/* Get the kernel for hi. */
 		hi_inv   = 1.0f / hi;
@@ -823,13 +819,6 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				const float4 pj_b_c_av_ad = s_b_c_av_ad[buf * GPU_THREAD_BLOCK_SIZE + t];
 				const int2 pj_tb_min_ngb_tb = s_tb_min_ngb_tb[buf * GPU_THREAD_BLOCK_SIZE + t];
 
-//				if (pj_tb_min_ngb_tb.x == 0 || pj_tb_min_ngb_tb.y == 0) {
-//				    printf("zero in shared: i_id=%d j_idx=%d tile=%d t=%d buf=%d tb=%d minngbtb=%d j_start=%d j_end=%d\n",
-//				           i_id, j_idx, tile, t, buf,
-//				           pj_tb_min_ngb_tb.x, pj_tb_min_ngb_tb.y,
-//				           j_start, j_end);
-//				}
-
 				/*Calculate particle position relative to cell position and get smoothing length*/
 				const float xj = (pj_x_y.x - shift_j_d.x);
 				const float yj = (pj_x_y.y - shift_j_d.y);
@@ -863,16 +852,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				/*second condition is a fix for if min_ngb_tbi is zero.
 				 * Unsure why that would be but hey ho*/
 
-//				if (pj_tb_min_ngb_tb.x > 0) {
-//				    if (min_ngb_tbi == 0)
-//				        min_ngb_tbi = pj_tb_min_ngb_tb.x;
-//				    else
-//				        min_ngb_tbi = min(pj_tb_min_ngb_tb.x, min_ngb_tbi);
-//				}
 				if (pj_tb_min_ngb_tb.x > 0) {
-//				    if (min_ngb_tbi == 0)
-//				        min_ngb_tbi = pj_tb_min_ngb_tb.x;
-//				    else
 				        min_ngb_tbi = min(pj_tb_min_ngb_tb.x, min_ngb_tbi);
 				}
 
@@ -982,15 +962,9 @@ __device__ __forceinline__ void neighbour_interactions_force(
 
 		/* If minimum timebin is zero, set it to the current value;
 		 * then take the min to avoid cases where the value in global memory is zero */
-		/*TODO: Check whether this CAS is even necessary*/
-//		if(min_ngb_tbi > 0){
-//		  atomicCAS(&d_parts_recv[i_id].minngbtb, 0, min_ngb_tbi);
+		if(min_ngb_tbi > 0){
 		  atomicMin(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
-//		}
-//		if (min_ngb_tbi > 0) {
-//			atomicMinNonZero(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
-//		}
-//		printf("my bin %i min time bin %i\n", min(tbi, min_ngb_tbi));
+		}
 	}
 }
 
