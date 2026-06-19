@@ -373,7 +373,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
 	  n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
   }
 
-  /*Let the cuda blocks know which parts of the data we send they need to work on*/
+  /*Let the CUDA blocks know which parts of the data we send they need to work on*/
   for(int b = 0; b < n_blocks_current; b++){
 	  /*Which leaf computation will this block (n_blocks_packed + b) work on?*/
 	  gpu_md->block_leaf_id[n_blocks_packed + b].x = md->n_leaves_packed;

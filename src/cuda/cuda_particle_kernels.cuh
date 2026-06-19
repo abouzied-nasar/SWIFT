@@ -250,9 +250,15 @@ __global__ void cuda_kernel_density(
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim){
 
+	/*Figure out which range of particles threads in this block will work on*/
     const int bid     = blockIdx.x;
+    /*What is the leaf computation this block will work on*/
     const int leafid  = d_block_leaf_id[bid].x;
+    /*In case we need more than one block to run this leaf computation we need to know
+     * where in the group of blocks acting on a cell we are.
+     * bid_0 is the id of the first block acting on this cell*/
     const int bid_0   = d_block_leaf_id[bid].y;
+    /*Get the start and end positions of cells i and j*/
     int4 cell_se      = d_cell_i_j_start_end[leafid];
 
     const int ci_start = cell_se.x;
@@ -260,13 +266,16 @@ __global__ void cuda_kernel_density(
     const int cj_start = cell_se.z;
     const int cj_end   = cell_se.w; // cell pos at index [cj_end-1]
 
+    /*We can now find our block index in a local reference to this cell*/
     const int b_id_local = bid - bid_0;
     const int tid = threadIdx.x;
 
-    // Let's get the cell positions
+    /* Get the cell positions. We store them as the last entry in the
+     * particle array for each leaf computation */
     const auto ci_loc = d_parts_send[ci_end - 1].c_loc;
     const auto cj_loc = d_parts_send[cj_end - 1].c_loc;
 
+    /*Calculate the shifted cell positions if we have periodics*/
     double3 shift = {0.0, 0.0, 0.0};
     const double distx = cj_loc.x.x - ci_loc.x.x;
     const double disty = cj_loc.x.y - ci_loc.x.y;
@@ -552,11 +561,17 @@ __global__ void cuda_kernel_gradient(
     const float d_a, const float d_H,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
-    const double3 space_dim)
-{
+    const double3 space_dim){
+
+	/*Figure out which range of particles threads in this block will work on*/
     const int bid     = blockIdx.x;
+    /*What is the leaf computation this block will work on*/
     const int leafid  = d_block_leaf_id[bid].x;
+    /*In case we need more than one block to run this leaf computation we need to know
+     * where in the group of blocks acting on a cell we are.
+     * bid_0 is the id of the first block acting on this cell*/
     const int bid_0   = d_block_leaf_id[bid].y;
+    /*Get the start and end positions of cells i and j*/
     int4 cell_se      = d_cell_i_j_start_end[leafid];
 
     const int ci_start = cell_se.x;
@@ -564,13 +579,16 @@ __global__ void cuda_kernel_gradient(
     const int cj_start = cell_se.z;
     const int cj_end   = cell_se.w;
 
+    /*We can now find our block index in a local reference to this cell*/
     const int b_id_local = bid - bid_0;
     const int tid        = threadIdx.x;
 
-    // Periodic shift (same as your other kernels)
+    /* Get the cell positions. We store them as the last entry in the
+     * particle array for each leaf computation */
     const auto ci_loc = d_parts_send[ci_end - 1].c_loc;
     const auto cj_loc = d_parts_send[cj_end - 1].c_loc;
 
+    /*Calculate the shifted cell positions if we have periodics*/
     double3 shift = {0.0, 0.0, 0.0};
     const double distx = cj_loc.x.x - ci_loc.x.x;
     const double disty = cj_loc.x.y - ci_loc.x.y;
@@ -952,11 +970,17 @@ __global__ void cuda_kernel_force(
     const float d_a, const float d_H,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
-    const double3 space_dim)
-{
+    const double3 space_dim){
+
+	/*Figure out which range of particles threads in this block will work on*/
     const int bid     = blockIdx.x;
+    /*What is the leaf computation this block will work on*/
     const int leafid  = d_block_leaf_id[bid].x;
+    /*In case we need more than one block to run this leaf computation we need to know
+     * where in the group of blocks acting on a cell we are.
+     * bid_0 is the id of the first block acting on this cell*/
     const int bid_0   = d_block_leaf_id[bid].y;
+    /*Get the start and end positions of cells i and j*/
     int4 cell_se      = d_cell_i_j_start_end[leafid];
 
     const int ci_start = cell_se.x;
@@ -964,13 +988,16 @@ __global__ void cuda_kernel_force(
     const int cj_start = cell_se.z;
     const int cj_end   = cell_se.w;
 
+    /*We can now find our block index in a local reference to this cell*/
     const int b_id_local = bid - bid_0;
     const int tid = threadIdx.x;
 
-    // Periodic shift (same as your density wrapper)
+    /* Get the cell positions. We store them as the last entry in the
+     * particle array for each leaf computation */
     const auto ci_loc = d_parts_send[ci_end - 1].c_loc;
     const auto cj_loc = d_parts_send[cj_end - 1].c_loc;
 
+    /*Calculate the shifted cell positions if we have periodics*/
     double3 shift = {0.0, 0.0, 0.0};
     const double distx = cj_loc.x.x - ci_loc.x.x;
     const double disty = cj_loc.x.y - ci_loc.x.y;
@@ -993,8 +1020,7 @@ __global__ void cuda_kernel_force(
         cj_start, cj_end - 1,
         shift_i_res, shift_j_res,
         b_id_local, tid,
-        d_a, d_H
-    );
+        d_a, d_H);
 
     // Pass 2: cj <- ci (only if not self)
     if (ci_start != cj_start) {
@@ -1007,8 +1033,7 @@ __global__ void cuda_kernel_force(
             ci_start, ci_end - 1,
             shift_ii_res, shift_jj_res,
             b_id_local, tid,
-            d_a, d_H
-        );
+            d_a, d_H);
     }
 }
 
