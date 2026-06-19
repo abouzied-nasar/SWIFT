@@ -612,29 +612,6 @@ __global__ void cuda_kernel_gradient(
     }
 }
 
-__device__ __forceinline__ void atomicMinNonZero(int* addr, int val) {
-    if (val <= 0) return;
-    int old = *addr;
-    while (true) {
-
-        int assumed = old;
-
-        int desired;
-        if (assumed == 0)
-            desired = val;
-        else
-            desired = min(assumed, val);
-
-        if (desired == assumed)
-            return;
-
-        old = atomicCAS(addr, assumed, desired);
-
-        if (old == assumed)
-            return;
-    }
-}
-
 /**
  * @brief Naive kernel computing the gradient interactions of a single particle
  *
