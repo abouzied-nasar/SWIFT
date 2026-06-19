@@ -71,7 +71,7 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
   size_t hash_size = params->pack_size * 10;
   md->hash_table.entry = calloc(hash_size, sizeof(struct hash_entry));
   for (size_t i = 0; i < hash_size; i++){
-    md->hash_table.entry[i].c = 0;
+    md->hash_table.entry[i].c = NULL;
     md->hash_table.entry[i].index = 0;
     md->hash_table.entry[i].occupied = 0;
   }
@@ -146,11 +146,6 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
 
   for(int i = 0; i < md->hash_size; i++){
       md->hash_table.entry[i].occupied = 0;
-      /* This really messed up the code. Need to stop making
-       * silly mistakes such as this.
-       * TODO: figure out how to zero it without making the
-       * actual cell pointer NULL. *
-      md->hash_table.entry[i].c = NULL; */
       md->hash_table.entry[i].c = NULL;
       md->hash_table.entry[i].index = 0;
   }
