@@ -46,10 +46,35 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
 
   const struct gpu_part_recv_d *parts_recv = &parts_buffer[unpack_ind];
 
+  const int limit_min_h = 0;
+  const int limit_max_h = 1;
+
+  /* Get the depth limits (if any) */
+  const char min_depth = limit_max_h ? c->depth : 0;
+  const char max_depth = limit_min_h ? c->depth : CHAR_MAX;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /* Get the limits in h (if any) */
+  const float h_min = limit_min_h ? c->h_min_allowed : 0.;
+  const float h_max = limit_max_h ? c->h_max_allowed : FLT_MAX;
+#endif
+
   for (int i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
-    if (!part_is_active(p, e)) continue;
+
+    /*Check to see if we should unpack particle i*/
+    const char depth_i = part_get_depth_h(p);
+    const int pi_active = part_is_active(p, e);
+    const int doi = pi_active && (depth_i >= min_depth) &&
+                    (depth_i <= max_depth);
+
+    const float h = part_get_h(p);
+#ifdef SWIFT_DEBUG_CHECKS
+    if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
+#endif
+
+    if (!doi) continue;
 
     struct gpu_part_recv_d pr = parts_recv[i];
 
@@ -91,10 +116,35 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_gradient(
 
   const struct gpu_part_recv_g *parts_recv = &parts_buffer[unpack_ind];
 
+  const int limit_min_h = 0;
+  const int limit_max_h = 1;
+
+  /* Get the depth limits (if any) */
+  const char min_depth = limit_max_h ? c->depth : 0;
+  const char max_depth = limit_min_h ? c->depth : CHAR_MAX;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /* Get the limits in h (if any) */
+  const float h_min = limit_min_h ? c->h_min_allowed : 0.;
+  const float h_max = limit_max_h ? c->h_max_allowed : FLT_MAX;
+#endif
+
   for (int i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
-    if (!part_is_active(p, e)) continue;
+
+    /*Check to see if we should unpack particle i*/
+    const char depth_i = part_get_depth_h(p);
+    const int pi_active = part_is_active(p, e);
+    const int doi = pi_active && (depth_i >= min_depth) &&
+                    (depth_i <= max_depth);
+
+    const float h = part_get_h(p);
+#ifdef SWIFT_DEBUG_CHECKS
+        if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
+#endif
+
+    if (!doi) continue;
 
     struct gpu_part_recv_g pr = parts_recv[i];
 
@@ -126,10 +176,35 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
 
   const struct gpu_part_recv_f *parts_recv = &parts_buffer[unpack_ind];
 
+  const int limit_min_h = 0;
+  const int limit_max_h = 1;
+
+  /* Get the depth limits (if any) */
+  const char min_depth = limit_max_h ? c->depth : 0;
+  const char max_depth = limit_min_h ? c->depth : CHAR_MAX;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /* Get the limits in h (if any) */
+  const float h_min = limit_min_h ? c->h_min_allowed : 0.;
+  const float h_max = limit_max_h ? c->h_max_allowed : FLT_MAX;
+#endif
+
   for (int i = 0; i < count; i++) {
 
     struct part *restrict p = &c->hydro.parts[i];
-    if (!part_is_active(p, e)) continue;
+
+    /*Check to see if we should unpack particle i*/
+    const char depth_i = part_get_depth_h(p);
+    const int pi_active = part_is_active(p, e);
+    const int doi = pi_active && (depth_i >= min_depth) &&
+                    (depth_i <= max_depth);
+
+    const float h = part_get_h(p);
+#ifdef SWIFT_DEBUG_CHECKS
+        if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
+#endif
+
+    if (!doi) continue;
 
     struct gpu_part_recv_f pr = parts_recv[i];
 
