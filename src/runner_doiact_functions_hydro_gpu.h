@@ -915,7 +915,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     struct cell *cjj = md->cj_leaves[md->n_leaves_packed];
 
     if (md->task_n_leaves > 0) {
+#ifdef SWIFT_DEBUG_CHECKS
+      if (cii->hydro.count == 0)
+        error(
+            "Found cell cii with particle count=0 during packing. "
+            "It should have been excluded during the recursion.");
+      if (cjj->hydro.count == 0)
+        error(
+            "Found cell cjj with particle count=0 during packing. "
+            "It should have been excluded during the recursion.");
+#endif
       TIMER_TIC;
+
     ///////////////////////////////////////////////////////////////////////
     /* Test to see if cells i and j have already been packed
      * cells i and j are the same cell for self tasks but use the same
@@ -935,16 +946,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       else if(t->subtype == task_subtype_gpu_force){
     	TIMER_TOC(timer_gpu_pack_f);
       }
-
 #ifdef SWIFT_DEBUG_CHECKS
-      if (cii->hydro.count == 0)
-        error(
-            "Found cell cii with particle count=0 during packing. "
-            "It should have been excluded during the recursion.");
-      if (cjj->hydro.count == 0)
-        error(
-            "Found cell cjj with particle count=0 during packing. "
-            "It should have been excluded during the recursion.");
+      else {
+        error("Unknown task subtype %s", subtaskID_names[t->subtype]);
+      }
 #endif
 
       /* record how many leaves we've packed in total during this while loop */

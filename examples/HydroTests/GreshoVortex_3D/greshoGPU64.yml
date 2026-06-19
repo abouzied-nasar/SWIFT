@@ -8,7 +8,7 @@ InternalUnitSystem:
 
 Scheduler:
   gpu_pack_size:             64
-  gpu_bundle_size:           32
+  gpu_bundle_size:           64
   gpu_recursion_max_depth:   4
   max_top_level_cells:       8
   tasks_per_cell:            200
