@@ -825,7 +825,8 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				const float yij = yi - yj;
 				const float zij = zi - zj;
 
-				const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+//				const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+				const float r2  = xij * xij + yij * yij + zij * zij;
 				const float hjg2= (hj * hj) * kernel_gamma2;
 
 				if (!((r2 < hig2) || (r2 < hjg2))) continue;
@@ -847,7 +848,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				/*second condition is a fix for if min_ngb_tbi is zero.
 				 * Unsure why that would be but hey ho*/
 
-				if (pj_tb_min_ngb_tb.x > 0) {
+				if (pj_tb_min_ngb_tb.x > 0 && min_ngb_tbi > 0) {
 				        min_ngb_tbi = min(pj_tb_min_ngb_tb.x, min_ngb_tbi);
 				}
 
@@ -954,7 +955,8 @@ __device__ __forceinline__ void neighbour_interactions_force(
 
 		atomicAdd(&d_parts_recv[i_id].udt_hdt.x, res_udt_hdt.x);
 		atomicAdd(&d_parts_recv[i_id].udt_hdt.y, res_udt_hdt.y);
-
+	    if(min_ngb_tbi == 0 || d_parts_recv[i_id].minngbtb == 0)
+	    	printf("Zero min timebin on GPU");
 		/* If minimum timebin is zero, set it to the current value;
 		 * then take the min to avoid cases where the value in global memory is zero */
 		if(min_ngb_tbi > 0){

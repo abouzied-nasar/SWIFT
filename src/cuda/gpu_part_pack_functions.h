@@ -63,6 +63,11 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
 
     struct part *p = &c->hydro.parts[i];
 
+#ifdef SWIFT_DEBUG_CHECKS
+    if (part_is_inhibited(p, e))
+    	error("Don't have a mechanism to deal with inhibited parts yet");
+#endif
+
     /*Check to see if we should unpack particle i*/
     const char depth_i = part_get_depth_h(p);
     const int pi_active = part_is_active(p, e);
@@ -71,8 +76,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
 
     if (!doi) continue;
 
-    const float h = part_get_h(p);
 #ifdef SWIFT_DEBUG_CHECKS
+    const float h = part_get_h(p);
     if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
 #endif
 
@@ -133,6 +138,11 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_gradient(
 
     struct part *p = &c->hydro.parts[i];
 
+#ifdef SWIFT_DEBUG_CHECKS
+    if (part_is_inhibited(p, e))
+    	error("Don't have a mechanism to deal with inhibited parts yet");
+#endif
+
     /*Check to see if we should unpack particle i*/
     const char depth_i = part_get_depth_h(p);
     const int pi_active = part_is_active(p, e);
@@ -141,9 +151,9 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_gradient(
 
     if (!doi) continue;
 
-    const float h = part_get_h(p);
 #ifdef SWIFT_DEBUG_CHECKS
-     if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
+    const float h = part_get_h(p);
+    if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
 #endif
 
     struct gpu_part_recv_g pr = parts_recv[i];
@@ -193,6 +203,11 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
 
     struct part *restrict p = &c->hydro.parts[i];
 
+#ifdef SWIFT_DEBUG_CHECKS
+    if (part_is_inhibited(p, e))
+    	error("Don't have a mechanism to deal with inhibited parts yet");
+#endif
+
     /*Check to see if we should unpack particle i*/
     const char depth_i = part_get_depth_h(p);
     const int pi_active = part_is_active(p, e);
@@ -201,9 +216,9 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
 
     if (!doi) continue;
 
-    const float h = part_get_h(p);
 #ifdef SWIFT_DEBUG_CHECKS
-     if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
+    const float h = part_get_h(p);
+    if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
 #endif
 
     struct gpu_part_recv_f pr = parts_recv[i];
@@ -222,7 +237,6 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
     timebin_t mintbin = min(part_get_timestep_limiter_min_ngb_time_bin(p), pr.minngbtb);
     if(mintbin > 0)
     	part_set_timestep_limiter_min_ngb_time_bin(p, mintbin);
-//      part_set_timestep_limiter_min_ngb_time_bin(p, pr.minngbtb);
   }
 }
 
@@ -374,6 +388,8 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
 
     ps[i].timebin_minngbtimebin.x = part_get_time_bin(p);
     ps[i].timebin_minngbtimebin.y = part_get_timestep_limiter_min_ngb_time_bin(p);
+    if(part_get_timestep_limiter_min_ngb_time_bin(p) == 0)
+    	error("Zero min timebin");
 
   }
   /*We've packed all the particles. Now insert the cell position into the count index*/
