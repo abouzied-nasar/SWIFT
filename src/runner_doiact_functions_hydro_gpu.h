@@ -953,9 +953,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     /* Check to see if will go over packing limits in the next step
      * Necessary if cell heirarchy gets very deep and we have very large cells*/
     /* TODO: Check if some sort of condition similar to below is needed */
-    if(npacked < md->n_leaves - 1){
-      struct cell *ci_next = md->ci_leaves[npacked + 1];
-      struct cell *cj_next = md->cj_leaves[npacked + 1];
+    if(npacked < md->n_leaves){
+      struct cell *ci_next = md->ci_leaves[npacked];
+      struct cell *cj_next = md->cj_leaves[npacked];
       count_next = ci_next->hydro.count + cj_next->hydro.count;
     }
     int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
