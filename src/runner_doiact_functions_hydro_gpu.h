@@ -223,7 +223,6 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
         struct hash_entry *restrict ht, struct gpu_offload_data *restrict buf, const int ij,
         const enum task_subtypes task_subtype) {
 
-  TIMER_TIC;
   /*Get the hash using the cell's pointer address*/
   struct gpu_pack_metadata *md = &buf->md;
   int h_id = hash_func(c, hash_size);
@@ -271,14 +270,6 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
   /*Store where ci ends*/
   md->unique_start_end[unique_count].y = md->count_parts_unique + c_count + 1;
 
-  if(task_subtype == task_subtype_gpu_density)
-      TIMER_TOC(timer_gpu_hash_d);
-  else if(task_subtype == task_subtype_gpu_gradient)
-      TIMER_TOC(timer_gpu_hash_g);
-  else if(task_subtype == task_subtype_gpu_force)
-      TIMER_TOC(timer_gpu_hash_f);
-
-
   if(ij == 0){ /*This is ci and it is unique*/
     /*This cell has not been found yet.
      * Add to unique_cells and store it's index ascending
@@ -310,16 +301,9 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
     md->count_parts_unique += c_count + 1;
   }
 
-  TIMER_TIC2;
   /*Store pointers for this unique cell, update it's unique index in array of unique cells*/
   hash_insert(c, unique_count, h_id, ht);
   md->n_unique++;
-  if(task_subtype == task_subtype_gpu_density)
-      TIMER_TOC2(timer_gpu_hash_d);
-  else if(task_subtype == task_subtype_gpu_gradient)
-      TIMER_TOC2(timer_gpu_hash_g);
-  else if(task_subtype == task_subtype_gpu_force)
-      TIMER_TOC2(timer_gpu_hash_f);
 
 }
 
