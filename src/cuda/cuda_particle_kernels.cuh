@@ -104,7 +104,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
   float4 res_rot = make_float4(0.f, 0.f, 0.f, 0.f);
 
   /*const to avoid div by zero*/
-  constexpr float eps = 1e-24f;
+//  constexpr float eps = 1e-24f;
 
   /* Number of tiles. How many times to de we need to load GPU_
      * THREAD_BLOCK_SIZE particles to get through this cell? */
@@ -186,7 +186,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
               const float r2 = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
               if (r2 >= hig2) continue;
 
-              const float inv_r = rsqrtf(r2 + eps);
+              const float inv_r = rsqrtf(r2);
               /* Recover some data */
               const float r     = r2 * inv_r;
               /* Get the kernel for hi. */
@@ -407,7 +407,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
   const float a2_Hubble = d_a * d_a * d_H;
 
   /*const to avoid div by zero*/
-  constexpr float eps = 1e-24f;
+//  constexpr float eps = 1e-24f;
 
   /* Number of tiles. How many times to de we need to load GPU_
    * THREAD_BLOCK_SIZE particles to get through this cell? */
@@ -508,7 +508,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
         const float aviscj  = pj_avisc_vsig.x;
 
         avisc_maxi = fmaxf(avisc_maxi, aviscj);
-        const float inv_r = rsqrtf(r2 + eps);
+        const float inv_r = rsqrtf(r2);
         const float r     = r2 * inv_r;
 
         const float dvx  = vxi - vxj;
@@ -630,27 +630,6 @@ __global__ void cuda_kernel_gradient(
     }
 }
 
-
-
-__device__ __forceinline__ void atomicMinIgnoreZero(int* addr, int val) {
-
-    if (val <= 0) return;
-
-    int old = atomicCAS(addr, 0, val);
-
-    while (old != 0 && val < old) {
-        const int assumed = old;
-        const int desired = val;
-
-        old = atomicCAS(addr, assumed, desired);
-
-        if (old == assumed) break;
-    }
-}
-
-
-
-
 /**
  * @brief Naive kernel computing the gradient interactions of a single particle
  *
@@ -736,6 +715,11 @@ __device__ __forceinline__ void neighbour_interactions_force(
 		tbi = pi.timebin_minngbtimebin.x;
 		min_ngb_tbi = pi.timebin_minngbtimebin.y;
 
+		/*If no CUDA thread has written to it yet, the result will be zero.
+		 * So, initialise to the value we got from the CPU. Otherwise, leave as-is.
+		 * TODO: Do we need to check if min_ngb_tbi > 0?*/
+		atomicCAS(&d_parts_recv[i_id].minngbtb, 0, min_ngb_tbi);
+
 		/* Get the kernel for hi. */
 		hi_inv   = 1.0f / hi;
 		hid_inv  = d_pow_dimension_plus_one(hi_inv); /* 1/h^(d+1) */
@@ -753,7 +737,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 	const float fac_mu    = d_pow_three_gamma_minus_five_over_two(d_a);
 	const float a2_Hubble = d_a * d_a * d_H;
 	/*const to avoid div by zero*/
-	constexpr float eps = 1e-24f;
+//	constexpr float eps = 1e-24f;
 
 	/* Number of tiles. How many times to de we need to load GPU_
 	 * THREAD_BLOCK_SIZE particles to get through this cell? */
@@ -830,10 +814,6 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				/* First, grab handles. */
 	            const double2 pj_x_y = s_x_y[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
 	            const double2 pj_z_h = s_z_h[buf * GPU_THREAD_BLOCK_SIZE + t]; // unshifted
-				const float4 pj_vx_m  = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
-				const float4 pj_u_r_f_p = s_u_r_f_p[buf * GPU_THREAD_BLOCK_SIZE + t];
-				const float4 pj_b_c_av_ad = s_b_c_av_ad[buf * GPU_THREAD_BLOCK_SIZE + t];
-				const int2 pj_tb_min_ngb_tb = s_tb_min_ngb_tb[buf * GPU_THREAD_BLOCK_SIZE + t];
 
 				/*Calculate particle position relative to cell position and get smoothing length*/
 				const float xj = (pj_x_y.x - shift_j_d.x);
@@ -846,11 +826,16 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				const float yij = yi - yj;
 				const float zij = zi - zj;
 
-//				const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
-				const float r2  = xij * xij + yij * yij + zij * zij;
+				const float r2  = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
 				const float hjg2= (hj * hj) * kernel_gamma2;
 
 				if (!((r2 < hig2) || (r2 < hjg2))) continue;
+
+				/* Grab remaining required handles. */
+				const float4 pj_vx_m  = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
+				const float4 pj_u_r_f_p = s_u_r_f_p[buf * GPU_THREAD_BLOCK_SIZE + t];
+				const float4 pj_b_c_av_ad = s_b_c_av_ad[buf * GPU_THREAD_BLOCK_SIZE + t];
+				const int2 pj_tb_min_ngb_tb = s_tb_min_ngb_tb[buf * GPU_THREAD_BLOCK_SIZE + t];
 
 				const float vxj = pj_vx_m.x;
 				const float vyj = pj_vx_m.y;
@@ -869,11 +854,10 @@ __device__ __forceinline__ void neighbour_interactions_force(
 				/*second condition is a fix for if min_ngb_tbi is zero.
 				 * Unsure why that would be but hey ho*/
 
-				if (pj_tb_min_ngb_tb.x > 0 && min_ngb_tbi > 0) {
-				        min_ngb_tbi = min(pj_tb_min_ngb_tb.x, min_ngb_tbi);
-				}
+				if (pj_tb_min_ngb_tb.x > 0)
+				  min_ngb_tbi = min(pj_tb_min_ngb_tb.x, min_ngb_tbi);
 
-				const float inv_r = rsqrtf(r2 + eps);
+				const float inv_r = rsqrtf(r2);
 				const float r     = r2 * inv_r;
 
 				/* Get the kernel for hj */
@@ -968,20 +952,19 @@ __device__ __forceinline__ void neighbour_interactions_force(
 		__syncthreads();
 	}
 
-	/*Conditional to prevent writing out of bounds of this computation*/
+	/*Conditional to prevent writing out of bounds */
 	if (i_in_range) {
+
 		atomicAdd(&d_parts_recv[i_id].a_hydro.x, res_ahydro.x);
 		atomicAdd(&d_parts_recv[i_id].a_hydro.y, res_ahydro.y);
 		atomicAdd(&d_parts_recv[i_id].a_hydro.z, res_ahydro.z);
-
 		atomicAdd(&d_parts_recv[i_id].udt_hdt.x, res_udt_hdt.x);
 		atomicAdd(&d_parts_recv[i_id].udt_hdt.y, res_udt_hdt.y);
-		/* If minimum timebin is zero, set it to the current value;
-		 * then take the min to avoid cases where the value in global memory is zero */
-//		if(min_ngb_tbi > 0){
-//		  atomicMin(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
-//		}
-		atomicMinIgnoreZero(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
+		/* If minimum timebin calculated in this loop is not zero,
+		 * compare with the global result and set to the minimum */
+		if(min_ngb_tbi > 0)
+			atomicMin(&d_parts_recv[i_id].minngbtb, min_ngb_tbi);
+
 	}
 }
 
