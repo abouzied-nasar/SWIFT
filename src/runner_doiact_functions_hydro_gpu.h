@@ -366,13 +366,18 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
 	  gpu_md->block_leaf_id[n_blocks_packed + b].y = n_blocks_packed;
   }
 
-  /*Check to see we've not somehow gone over the number of blocks we allocated*/
-  /*TODO: Put in debug checks ifdef. Leave for now while dev'ing*/
+  /* Check to see we've not somehow gone over the number of blocks we allocated */
+  /* TODO: Put in debug checks ifdef. Leave for now while dev'ing */
+  /* TODO: Implement a way to check for this before we offload. The condition should be:
+   * If: The next pack will exceed n_blocks_max, which also means that we exceed gpu_part_buffer_size
+   * Then: Offload what we have packed and re-start packing.*/
   ///////////////////////////////////////////////////////////////////////
   int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
   md->n_blocks_packed += n_blocks_current;
   if(md->n_blocks_packed > n_blocks_max)
-	  error("exceeded n_block_max due to insufficient gpu_part_buffer_size. Increase gpu_part_buffer_size in your *.yml file");
+	  error("exceeded n_block_max (gpu_part_buffer_size/GPU_THREAD_BLOCK_SIZE)."
+			  "Encountered cell(s) much larger than anticipated due to deep heirarchy. "
+			  "Increasing gpu_part_buffer_size in *.yml file could help");
   ///////////////////////////////////////////////////////////////////////
 
   /*Get a pointer to the full hash table and it's size
@@ -944,13 +949,28 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     /* md->leaf_pairs_packed was incremented in runner_dopair_gpu_pack_<*>. */
     task_last_packed_leaf[tind] = md->n_leaves_packed;
 
+    uint count_next = 0;
+    /* Check to see if will go over packing limits in the next step
+     * Necessary if cell heirarchy gets very deep and we have very large cells*/
+    /* TODO: Check if some sort of condition similar to below is needed */
+    if(npacked < md->task_n_leaves - 1){
+      struct cell *ci_next = md->ci_leaves[md->n_leaves_packed + 1];
+      struct cell *cj_next = md->cj_leaves[md->n_leaves_packed + 1];
+      count_next = ci_next->hydro.count + cj_next->hydro.count;
+    }
+    int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+    /* Note we have already packed so n_blocks_current is md->n_blocks_packed*/
+    int n_blocks_next = md->n_blocks_packed + (count_next + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+    /* If we need to, raise the flag*/
+    char launch_before_over_filling = (n_blocks_next > n_blocks_max) ? 1 : 0;
+
     /* Can we launch? */
     if (md->n_leaves_packed == target_n_leaves) md->launch = 1;
 
     /* Are we launching, or are we launching leftovers AND have packed all
      * remaining leaves? */
     if (md->launch ||
-        (md->launch_leftovers && (npacked == md->task_n_leaves))) {
+        (md->launch_leftovers && (npacked == md->task_n_leaves)) || launch_before_over_filling) {
 
       /* Let others touch data while we're doing GPU computations.
        * We need this task's data released for the unpacking procedure: If
