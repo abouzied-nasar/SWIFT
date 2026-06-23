@@ -375,9 +375,11 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
   md->n_blocks_packed += n_blocks_current;
   if(md->n_blocks_packed > n_blocks_max)
-	  error("exceeded n_block_max (gpu_part_buffer_size/GPU_THREAD_BLOCK_SIZE)."
-			  "Encountered cell(s) much larger than anticipated due to deep heirarchy. "
-			  "Increasing gpu_part_buffer_size in *.yml file could help");
+	  error("Exceeded n_block_max (gpu_part_buffer_size/GPU_THREAD_BLOCK_SIZE = %i). "
+			  "n_blocks_current %i. n_blocks_packed %i. "
+			  "Possibly due to cell(s) much larger than anticipated in a  deep heirarchy. "
+			  "Increasing gpu_part_buffer_size in *.yml file could help", n_blocks_max,
+			  n_blocks_current, md->n_blocks_packed);
   ///////////////////////////////////////////////////////////////////////
 
   /*Get a pointer to the full hash table and it's size
@@ -962,7 +964,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     /* Note we have already packed so n_blocks_current is md->n_blocks_packed*/
     int n_blocks_next = md->n_blocks_packed + (count_next + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
     /* If we need to, raise the flag*/
-    char launch_before_over_filling = (n_blocks_next > n_blocks_max) ? 1 : 0;
+    char launch_before_over_filling = (n_blocks_next >= n_blocks_max) ? 1 : 0;
 
     /* Can we launch? */
     if (md->n_leaves_packed == target_n_leaves) md->launch = 1;
