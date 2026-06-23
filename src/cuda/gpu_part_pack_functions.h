@@ -46,10 +46,40 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
 
   const struct gpu_part_recv_d *parts_recv = &parts_buffer[unpack_ind];
 
+  const int limit_min_h = 0;
+  const int limit_max_h = 1;
+
+  /* Get the depth limits (if any) */
+  const char min_depth = limit_max_h ? c->depth : 0;
+  const char max_depth = limit_min_h ? c->depth : CHAR_MAX;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /* Get the limits in h (if any) */
+  const float h_min = limit_min_h ? c->h_min_allowed : 0.;
+  const float h_max = limit_max_h ? c->h_max_allowed : FLT_MAX;
+#endif
+
   for (int i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
-    if (!part_is_active(p, e)) continue;
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (part_is_inhibited(p, e))
+    	error("Don't have a mechanism to deal with inhibited parts yet");
+#endif
+
+    /*Check to see if we should unpack particle i*/
+    const char depth_i = part_get_depth_h(p);
+    const int pi_active = part_is_active(p, e);
+    const int doi = pi_active && (depth_i >= min_depth) &&
+                    (depth_i <= max_depth);
+
+    if (!doi) continue;
+
+#ifdef SWIFT_DEBUG_CHECKS
+    const float h = part_get_h(p);
+    if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
+#endif
 
     struct gpu_part_recv_d pr = parts_recv[i];
 
@@ -91,10 +121,40 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_gradient(
 
   const struct gpu_part_recv_g *parts_recv = &parts_buffer[unpack_ind];
 
+  const int limit_min_h = 0;
+  const int limit_max_h = 1;
+
+  /* Get the depth limits (if any) */
+  const char min_depth = limit_max_h ? c->depth : 0;
+  const char max_depth = limit_min_h ? c->depth : CHAR_MAX;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /* Get the limits in h (if any) */
+  const float h_min = limit_min_h ? c->h_min_allowed : 0.;
+  const float h_max = limit_max_h ? c->h_max_allowed : FLT_MAX;
+#endif
+
   for (int i = 0; i < count; i++) {
 
     struct part *p = &c->hydro.parts[i];
-    if (!part_is_active(p, e)) continue;
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (part_is_inhibited(p, e))
+    	error("Don't have a mechanism to deal with inhibited parts yet");
+#endif
+
+    /*Check to see if we should unpack particle i*/
+    const char depth_i = part_get_depth_h(p);
+    const int pi_active = part_is_active(p, e);
+    const int doi = pi_active && (depth_i >= min_depth) &&
+                    (depth_i <= max_depth);
+
+    if (!doi) continue;
+
+#ifdef SWIFT_DEBUG_CHECKS
+    const float h = part_get_h(p);
+    if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
+#endif
 
     struct gpu_part_recv_g pr = parts_recv[i];
 
@@ -126,10 +186,40 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
 
   const struct gpu_part_recv_f *parts_recv = &parts_buffer[unpack_ind];
 
+  const int limit_min_h = 0;
+  const int limit_max_h = 1;
+
+  /* Get the depth limits (if any) */
+  const char min_depth = limit_max_h ? c->depth : 0;
+  const char max_depth = limit_min_h ? c->depth : CHAR_MAX;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /* Get the limits in h (if any) */
+  const float h_min = limit_min_h ? c->h_min_allowed : 0.;
+  const float h_max = limit_max_h ? c->h_max_allowed : FLT_MAX;
+#endif
+
   for (int i = 0; i < count; i++) {
 
     struct part *restrict p = &c->hydro.parts[i];
-    if (!part_is_active(p, e)) continue;
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (part_is_inhibited(p, e))
+    	error("Don't have a mechanism to deal with inhibited parts yet");
+#endif
+
+    /*Check to see if we should unpack particle i*/
+    const char depth_i = part_get_depth_h(p);
+    const int pi_active = part_is_active(p, e);
+    const int doi = pi_active && (depth_i >= min_depth) &&
+                    (depth_i <= max_depth);
+
+    if (!doi) continue;
+
+#ifdef SWIFT_DEBUG_CHECKS
+    const float h = part_get_h(p);
+    if (h < h_min || h >= h_max) error("Inappropriate h for this level!");
+#endif
 
     struct gpu_part_recv_f pr = parts_recv[i];
 
@@ -138,14 +228,15 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
     a[1] += pr.a_hydro.y;
     a[2] += pr.a_hydro.z;
 
-    float u_dt = pr.udt_hdt_minngbtb.x + part_get_u_dt(p);
+    float u_dt = pr.udt_hdt.x + part_get_u_dt(p);
     part_set_u_dt(p, u_dt);
 
-    float h_dt = pr.udt_hdt_minngbtb.y + part_get_h_dt(p);
+    float h_dt = pr.udt_hdt.y + part_get_h_dt(p);
     part_set_h_dt(p, h_dt);
 
-    timebin_t mintbin = (timebin_t)(pr.udt_hdt_minngbtb.z + 0.5f);
-    part_set_timestep_limiter_min_ngb_time_bin(p, mintbin);
+    timebin_t mintbin = min(part_get_timestep_limiter_min_ngb_time_bin(p), pr.minngbtb);
+    if(mintbin > 0)
+    	part_set_timestep_limiter_min_ngb_time_bin(p, mintbin);
   }
 }
 
@@ -164,23 +255,22 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     const struct cell *restrict c,
-    struct gpu_part_send_d *restrict parts_buffer, const int pack_ind,
-    const double shift[3], const int cjstart, const int cjend) {
+    struct gpu_part_send_d *restrict parts_buffer, const int pack_ind) {
 
   /* Grab handles */
   const int count = c->hydro.count;
   const struct part *parts = c->hydro.parts;
-  struct gpu_part_send_d *ps = &parts_buffer[pack_ind];
+  struct gpu_part_data_d *ps = &parts_buffer[pack_ind].p_data;
 
   for (int i = 0; i < count; i++) {
 
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0] - shift[0];
-    ps[i].x_h.y = x[1] - shift[1];
-    ps[i].x_h.z = x[2] - shift[2];
-    ps[i].x_h.w = part_get_h(p);
+    ps[i].x_y.x = x[0];
+    ps[i].x_y.y = x[1];
+    ps[i].z_h.x = x[2];
+    ps[i].z_h.y = part_get_h(p);
 
     const float *v = part_get_const_v(p);
     ps[i].vx_m.x = v[0];
@@ -188,9 +278,12 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     ps[i].vx_m.z = v[2];
     ps[i].vx_m.w = part_get_mass(p);
 
-    ps[i].pjs_pje.x = cjstart;
-    ps[i].pjs_pje.y = cjend;
   }
+  /*We've packed all the particles. Now insert the cell position
+   *  into the count index*/
+  parts_buffer[pack_ind + count].c_loc.x.x = c->loc[0];
+  parts_buffer[pack_ind + count].c_loc.x.y = c->loc[1];
+  parts_buffer[pack_ind + count].c_loc.x.z = c->loc[2];
 }
 
 /**
@@ -207,24 +300,23 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
  * interacted with) in buffer
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
-    const struct cell *restrict ci,
-    struct gpu_part_send_g *restrict parts_buffer, const int pack_ind,
-    const double shift[3], const int cjstart, const int cjend) {
+    const struct cell *restrict c,
+    struct gpu_part_send_g *restrict parts_buffer, const int pack_ind) {
 
   /* Grab handles */
-  const int count = ci->hydro.count;
-  const struct part *parts = ci->hydro.parts;
-  struct gpu_part_send_g *ps = &parts_buffer[pack_ind];
+  const int count = c->hydro.count;
+  const struct part *parts = c->hydro.parts;
+  struct gpu_part_data_g *ps = &parts_buffer[pack_ind].p_data;
 
   for (int i = 0; i < count; i++) {
 
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0] - shift[0];
-    ps[i].x_h.y = x[1] - shift[1];
-    ps[i].x_h.z = x[2] - shift[2];
-    ps[i].x_h.w = part_get_h(p);
+    ps[i].x_y.x = x[0];
+    ps[i].x_y.y = x[1];
+    ps[i].z_h.x = x[2];
+    ps[i].z_h.y = part_get_h(p);
 
     const float *v = part_get_const_v(p);
     ps[i].vx_m.x = v[0];
@@ -237,13 +329,14 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     ps[i].u_rho_c_aviscmax.z = part_get_soundspeed(p);
     ps[i].u_rho_c_aviscmax.w = part_get_alpha_visc_max_ngb(p);
 
-    ps[i].avisc_vsig_lapu.x = part_get_alpha_av(p);
-    ps[i].avisc_vsig_lapu.y = part_get_v_sig(p);
-    ps[i].avisc_vsig_lapu.z = part_get_laplace_u(p);
+    ps[i].avisc_vsig.x = part_get_alpha_av(p);
+    ps[i].avisc_vsig.y = part_get_v_sig(p);
 
-    ps[i].pjs_pje.x = cjstart;
-    ps[i].pjs_pje.y = cjend;
   }
+  /*We've packed all the particles. Now insert the cell position into the count index*/
+  parts_buffer[pack_ind + count].c_loc.x.x = c->loc[0];
+  parts_buffer[pack_ind + count].c_loc.x.y = c->loc[1];
+  parts_buffer[pack_ind + count].c_loc.x.z = c->loc[2];
 }
 
 /**
@@ -261,22 +354,21 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     const struct cell *restrict ci,
-    struct gpu_part_send_f *restrict parts_buffer, const int pack_ind,
-    const double shift[3], const int cjstart, const int cjend) {
+    struct gpu_part_send_f *restrict parts_buffer, const int pack_ind) {
 
   const int count = ci->hydro.count;
   const struct part *parts = ci->hydro.parts;
-  struct gpu_part_send_f *ps = &parts_buffer[pack_ind];
+  struct gpu_part_data_f *ps = &parts_buffer[pack_ind].p_data;
 
   for (int i = 0; i < count; i++) {
 
     const struct part *p = &parts[i];
 
     const double *x = part_get_const_x(p);
-    ps[i].x_h.x = x[0] - shift[0];
-    ps[i].x_h.y = x[1] - shift[1];
-    ps[i].x_h.z = x[2] - shift[2];
-    ps[i].x_h.w = part_get_h(p);
+    ps[i].x_y.x = x[0];
+    ps[i].x_y.y = x[1];
+    ps[i].z_h.x = x[2];
+    ps[i].z_h.y = part_get_h(p);
 
     const float *v = part_get_const_v(p);
     ps[i].vx_m.x = v[0];
@@ -294,12 +386,16 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     ps[i].bals_c_avisc_adiff.z = part_get_alpha_av(p);
     ps[i].bals_c_avisc_adiff.w = part_get_alpha_diff(p);
 
-    ps[i].timebin_minngbtimebin_pjs_pje.x = (int)part_get_time_bin(p);
-    int mintbin = (int)part_get_timestep_limiter_min_ngb_time_bin(p);
-    ps[i].timebin_minngbtimebin_pjs_pje.y = mintbin;
-    ps[i].timebin_minngbtimebin_pjs_pje.z = cjstart;
-    ps[i].timebin_minngbtimebin_pjs_pje.w = cjend;
+    ps[i].timebin_minngbtimebin.x = part_get_time_bin(p);
+    ps[i].timebin_minngbtimebin.y = part_get_timestep_limiter_min_ngb_time_bin(p);
+    if(part_get_timestep_limiter_min_ngb_time_bin(p) == 0)
+    	error("Zero min timebin");
+
   }
+  /*We've packed all the particles. Now insert the cell position into the count index*/
+  parts_buffer[pack_ind + count].c_loc.x.x = ci->loc[0];
+  parts_buffer[pack_ind + count].c_loc.x.y = ci->loc[1];
+  parts_buffer[pack_ind + count].c_loc.x.z = ci->loc[2];
 }
 
 #endif /* GPU_PART_PACK_FUNCTIONS_H */

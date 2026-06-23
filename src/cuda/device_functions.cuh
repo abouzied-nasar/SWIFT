@@ -165,6 +165,24 @@ __device__ void d_kernel_deval(float u, float *__restrict__ W,
   *dW_dx = dw_dx * kernel_constant * kernel_gamma_inv_dim_plus_one;
 }
 
+/*Function which compares two floats using int CUDA intrinsics*/
+__device__ float atomicMaxFloat(float* addr, float val) {
+    // 1. Convert the float bit-pattern to an integer
+    int val_as_int = __float_as_int(val);
+
+    // 2. Handle the 'Negative Problem when the lexocographical order fails.
+    // If the number is negative, we flip the bits (except the sign bit)
+    // to ensure that -5.0 is "smaller" than -2.0 in integer space.
+    int transformed = (val_as_int >= 0) ? val_as_int : (0x80000000 - val_as_int);
+
+    // 3. Perform the atomic operation on the transformed integer
+    int old_int = atomicMax((int*)addr, transformed);
+
+    // 4. Transform the result back to the original float scale
+    int original_old = (old_int >= 0) ? old_int : (0x80000000 - old_int);
+
+    return __int_as_float(original_old);
+}
 #ifdef __cplusplus
 }
 #endif

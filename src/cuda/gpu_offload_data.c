@@ -30,6 +30,8 @@ extern "C" {
 
 #include "gpu_offload_data.h"
 
+#include "cuda_config.h"
+
 #include "task.h"
 
 #include <cuda.h>
@@ -90,6 +92,38 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   md->send_struct_size = send_struct_size;
   md->recv_struct_size = recv_struct_size;
 #endif
+
+  /* Now allocate arrays GPU-only metadata arrays*/
+
+  /*Data required for unique sorting*/
+  int size_of_cell_start_end = sizeof(int4) * params->pack_size;
+
+  /*Allocate memory for cell start and end data on host*/
+  cu_error = cudaMallocHost((void **)&buf->gpu_md.cell_i_j_start_end,
+                            size_of_cell_start_end);
+  swift_assert(cu_error == cudaSuccess);
+
+  /*Allocate memory for cell start and end data on device*/
+  cu_error = cudaMalloc((void **)&buf->gpu_md.d_cell_i_j_start_end,
+                            size_of_cell_start_end);
+  swift_assert(cu_error == cudaSuccess);
+
+  /*Since we have unique sorting this should be quite a bit less than
+   * the space needed to store enough blocks to work on part_buffer_size
+   * particles. Possibly problematic as 10 pulled out of the air...*/
+  const size_t n_blocks = (part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+
+  /*Allocate memory for array containing
+   * leaf_computation_id for each cuda block*/
+  cu_error = cudaMallocHost((void **)&buf->gpu_md.block_leaf_id,
+                            n_blocks * sizeof(int2));
+  swift_assert(cu_error == cudaSuccess);
+
+  /*Repeat for device copy*/
+  cu_error = cudaMalloc((void **)&buf->gpu_md.d_block_leaf_id,
+                            n_blocks * sizeof(int2));
+  swift_assert(cu_error == cudaSuccess);
+
 }
 
 /**

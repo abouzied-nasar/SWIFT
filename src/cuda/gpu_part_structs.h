@@ -34,19 +34,42 @@ extern "C" {
 #include "../timeline.h"
 
 /*! Container for particle data required for density calcs */
-struct gpu_part_send_d {
+struct gpu_part_data_d {
+#ifdef WITH_CUDA
+//TODO: This needs changing to doubles too. Darn it...
+/*! Particle position and h -> x, y, z, h */
+  double2 __align__(16) x_y;
+  double2 __align__(16) z_h;
+
+  /*! Particle predicted velocity and mass -> ux, uy, uz, m */
+  float4 __align__(16) vx_m;
+
+#endif
+};
+
+/*! Container for cell positions */
+struct gpu_cell_pos {
 #ifdef WITH_CUDA
 
-  /*! Particle position and h -> x, y, z, h */
-  float4 x_h;
+  /*! Cell position. This is set as the last entry in the
+   * range of particles contained within a cell (i.e
+   * N+1 contains info for cell position)*/
+  double4 x;
 
-  /*! Particle predicted velocity and mass -> vx, vy, vz, m */
-  float4 vx_m;
+#endif
+};
 
-  /*! Start and end index of particles to be interacted with in particle
-   * buffer arrays */
-  int2 pjs_pje;
-
+/*! Over-arching union used to switch
+ * between particle data and cell position. Saves us copying
+ * cell positions to GPU individually*/
+struct gpu_part_send_d {
+#ifdef WITH_CUDA
+  union {
+    /*! Container for particle data required for density calcs */
+    struct gpu_part_data_d p_data;
+    /*! Container for cell positions for density calcs */
+    struct gpu_cell_pos c_loc;
+  };
 #endif
 };
 
@@ -64,34 +87,74 @@ struct gpu_part_recv_d {
 };
 
 /*! Container for particle data required for gradient calcs */
-struct gpu_part_send_g {
+struct gpu_part_data_g {
 #ifdef WITH_CUDA
 
   /*! Particle position & smoothing length */
-  float4 x_h;
+  double2 __align__(16) x_y;
+  double2 __align__(16) z_h;
 
   /*! Particle velocity and mass */
-  float4 vx_m;
+  float4 __align__(16) vx_m;
 
-  /*! Particle density, alpha visc, internal energy u, and speed of sound c */
-  float4 u_rho_c_aviscmax;
+  /*TODO: aviscmax is no longer needed as we do not use it on GPU. Remove!*/
+  /*! Particle internal energy u, density speed of sound and alpha visc
+   * Better to use float4 than float3 even if we only need space for 3 vars*/
+  float4 __align__(16) u_rho_c_aviscmax;
 
-  /*! viscosity information results */
-  float3 avisc_vsig_lapu;
-
-  /*! Start and end index of particles to be interacted with in particle
-   * buffer arrays */
-  int2 pjs_pje;
+  /*! viscosity information required for particle i when comparing to neighbours*/
+  /*Leave as float4 for now. Gives best perf for pipeline async prefetching in kernel
+   * due to __align__(16) filling bus*/
+  float4 __align__(16) avisc_vsig;
 
 #endif
 };
+
+/*Particle and cell position data required for GPU density computations*/
+struct gpu_part_send_g{
+  union {
+    /*! Container for particle data required for density calcs */
+    struct gpu_part_data_g p_data;
+    /*! Container for cell positions for density calcs */
+    struct gpu_cell_pos c_loc;
+  };
+} ;
 
 /*! Container for particle data sent back to CPU for gradient calcs */
 struct gpu_part_recv_g {
 #ifdef WITH_CUDA
 
-  /*! viscosity information results */
-  float3 aviscmax_vsig_lapu;
+  /*! viscosity information results. Better to use float4 than float3
+   * even if we have 3 vars */
+  float4 aviscmax_vsig_lapu;
+
+#endif
+};
+
+/*! Container for particle data required for force calcs */
+struct gpu_part_data_f {
+#ifdef WITH_CUDA
+
+  /* Data required for the calculation: Values read to local GPU memory */
+
+  /*! Particle positions, smoothing length */
+  double2 __align__(16) x_y;
+  double2 __align__(16) z_h;
+
+  /*! Particle predicted velocity and mass */
+  float4 __align__(16) vx_m;
+
+  /*! internal energy, density, variable smoothing length term f, pressure */
+  float4 __align__(16) u_rho_f_p;
+
+  /*! balsara, Particle speed of sound, alpha constants for
+   * viscosity and diffusion */
+  float4 __align__(16) bals_c_avisc_adiff;
+
+  /*! Particle timebin, initial value of min neighbour timebin, start
+   * and end index of particles to be interacted with in particle buffer
+   * arrays */
+  int2 __align__(16) timebin_minngbtimebin;
 
 #endif
 };
@@ -99,29 +162,14 @@ struct gpu_part_recv_g {
 /*! Container for particle data required for force calcs */
 struct gpu_part_send_f {
 #ifdef WITH_CUDA
-
-  /* Data required for the calculation: Values read to local GPU memory */
-
-  /*! Particle positions, smoothing length */
-  float4 x_h;
-
-  /*! Particle predicted velocity and mass */
-  float4 vx_m;
-
-  /*! Variable smoothing length term f, balsara, density, pressure */
-  float4 u_rho_f_p;
-
-  /*! Particle speed of sound, internal energy, alpha constants for
-   * viscosity and diffusion */
-  float4 bals_c_avisc_adiff;
-
-  /*! Particle timebin, initial value of min neighbour timebin, start
-   * and end index of particles to be interacted with in particle buffer
-   * arrays */
-  int4 timebin_minngbtimebin_pjs_pje;
-
+  union {
+    /*! Container for particle data required for density calcs */
+    struct gpu_part_data_f p_data;
+    /*! Container for cell positions for density calcs */
+    struct gpu_cell_pos c_loc;
+  };
 #endif
-};
+} ;
 
 /*! Container for particle data sent back to CPU for force calcs */
 struct gpu_part_recv_f {
@@ -130,8 +178,13 @@ struct gpu_part_recv_f {
   /*! Particle acceleration vector */
   float3 a_hydro;
 
+  /*Note: Needed to revert back to float2 and int
+   * due to CUDA atomicMin requiring int*/
   /*! change of u and h with dt, v_sig */
-  float3 udt_hdt_minngbtb;
+  float2 udt_hdt;
+
+  /*! change of u and h with dt, v_sig */
+  int minngbtb;
 
 #endif
 };
