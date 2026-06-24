@@ -111,7 +111,7 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   /*Since we have unique sorting this should be quite a bit less than
    * the space needed to store enough blocks to work on part_buffer_size
    * particles. Possibly problematic as 10 pulled out of the air...*/
-  const size_t n_blocks = (part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+  const size_t n_blocks = (10 * part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
 
   /*Allocate memory for array containing
    * leaf_computation_id for each cuda block*/

@@ -958,13 +958,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     if(npacked < md->task_n_leaves){
       struct cell *ci_next = md->ci_leaves[npacked];
       struct cell *cj_next = md->cj_leaves[npacked];
-      count_next = ci_next->hydro.count + cj_next->hydro.count;
+      count_next = max(ci_next->hydro.count, cj_next->hydro.count);
     }
     int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
     /* Note we have already packed so n_blocks_current is md->n_blocks_packed*/
     int n_blocks_next = md->n_blocks_packed + (count_next + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
     /* If we need to, raise the flag*/
     char launch_before_over_filling = (n_blocks_next >= n_blocks_max) ? 1 : 0;
+
+//    if(n_blocks_next >= n_blocks_max)
+//      error("launch_before_over_filling %i n_blocks_next %i n_blocks_max %i", launch_before_over_filling,
+//    		  n_blocks_next, n_blocks_max);
 
     /* Can we launch? */
     if (md->n_leaves_packed == target_n_leaves) md->launch = 1;
