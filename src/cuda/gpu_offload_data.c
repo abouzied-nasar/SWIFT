@@ -54,7 +54,12 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
 
   /* Grab some handles */
   const size_t n_bundles = params->n_bundles;
-  const size_t part_buffer_size = params->part_buffer_size;
+  const size_t part_buffer_size = params->part_send_size_d;
+//  const size_t cell_buffer_size = params->part_send_size_d;
+//  const size_t block_buffer_size = params->part_send_size_d;
+
+  message("part_buffer_size %i new and improved %i", params->part_buffer_size, params->part_send_size_d);
+  message("cell_start_end_buffer_size %i cuda_blockid_buffer_size %i", params->cell_start_end_buffer_size, params->cuda_blockid_buffer_size);
 
   /* Initialise and set up metadata */
   struct gpu_pack_metadata *md = &(buf->md);

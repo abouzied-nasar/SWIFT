@@ -28,6 +28,7 @@
 #include "cuda_config.h"
 #include "gpu_pack_params.h"
 #include "runner.h"
+#include "gpu_part_structs.h"
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -36,9 +37,9 @@
  * @brief Initialize the GPU context for each thread. This should be
  * called in a threaded region, e.g. runner_main_cuda.
  */
-void gpu_init_thread(const struct engine *e, const int cpuid) {
+void gpu_init_thread(struct engine *e, const int cpuid) {
 
-  const struct gpu_global_pack_params *gpu_pack_params = &e->gpu_pack_params;
+  struct gpu_global_pack_params *gpu_pack_params = &e->gpu_pack_params;
 
   /* Find and print GPU name(s) */
   int dev_id = 0; /* gpu device name */
@@ -86,28 +87,99 @@ void gpu_init_thread(const struct engine *e, const int cpuid) {
 
   int nPartsPerCell = space->nr_parts / space->tot_cells;
   if (cpuid == 0 && engine_rank == 0) {
-    message("Devices available:          %i", n_devices);
-    message("Device id:                  %i", dev_id);
-    message("Device name:                %s", prop.name);
-    message("n_SMs:                      %i", n_SMs);
-    message("max blocks per SM:          %i", max_blocks_SM);
-    message("max blocks per stream:      %i", n_SMs * max_blocks_SM);
+    message("   Devices available:          %i", n_devices);
+    message("   Device id:                  %i", dev_id);
+    message("   Device name:                %s", prop.name);
+    message("   n_SMs:                      %i", n_SMs);
+    message("   max blocks per SM:          %i", max_blocks_SM);
+    message("   max blocks per stream:      %i", n_SMs * max_blocks_SM);
     message(
-        "Target n_blocks per kernel: %d",
+        "   Target n_blocks per kernel: %d",
         gpu_pack_params->bundle_size * nPartsPerCell / GPU_THREAD_BLOCK_SIZE);
-    message("Target n_blocks per stream: %d",
+    message("   Target n_blocks per stream: %d",
             gpu_pack_params->pack_size * nPartsPerCell / GPU_THREAD_BLOCK_SIZE);
-    message("Leaf cell buffer size:      %i",
+    message("   Leaf cell buffer size:      %i",
             gpu_pack_params->leaf_buffer_size);
-    message("Particles buffer size:      %i",
+    message("   Particles buffer size:      %i",
             gpu_pack_params->part_buffer_size);
-    message("Pack size:                  %i", gpu_pack_params->pack_size);
-    message("Bundle size:                %i", gpu_pack_params->bundle_size);
-    message("free mem:                   %.3g GB",
+    message("   Pack size:                  %i", gpu_pack_params->pack_size);
+    message("   Bundle size:                %i", gpu_pack_params->bundle_size);
+    message("   free mem:                   %.3g GB",
             ((double)free_mem) / (1024. * 1024. * 1024.));
-    message("total mem:                  %.3g GB",
+    message("   total mem:                  %.3g GB",
             ((double)total_mem) / (1024. * 1024. * 1024.));
   }
+  /*Based on the GPU memory available, let's calculate how much to use per CPU thread*/
+  size_t safe_free_mem = free_mem;
+  /*Check if we have more than 32GB. If we do, leave 5GB free to be safe.
+   * Otherwise use up 90% of available memory. Pulled out of the air but
+   * most decent GPUs have > 32 GB*/
+  size_t GB2Byte = (1024 * 1024 * 1024);
+  if(free_mem * GB2Byte > 32)
+	  safe_free_mem =  free_mem - 5 * GB2Byte;
+  else
+	  safe_free_mem =  free_mem * 90 / 100;
+
+  size_t free_mem_per_thread =  (safe_free_mem + e->nr_threads - 1)/e->nr_threads;
+  if (cpuid == 0 && engine_rank == 0) {
+    message("   safe free mem:                  %.3g GB",
+              ((double)safe_free_mem) / (1024. * 1024. * 1024.));
+    message("   free mem per thread:            %.3g GB",
+                ((double)free_mem_per_thread) / (1024. * 1024. * 1024.));
+  }
+
+  size_t mem_send_d = sizeof(struct gpu_part_data_d);
+  size_t mem_send_g = sizeof(struct gpu_part_data_g);
+  size_t mem_send_f = sizeof(struct gpu_part_data_f);
+  size_t mem_recv_d = sizeof(struct gpu_part_recv_d);
+  size_t mem_recv_g = sizeof(struct gpu_part_recv_g);
+  size_t mem_recv_f = sizeof(struct gpu_part_recv_f);
+  /* Total mem required per thread per part */
+  size_t mem_req_part = mem_send_d + mem_send_g + mem_send_f
+		  + mem_recv_d + mem_recv_g + mem_recv_f;
+  /* Memory required per leaf computation launched */
+  size_t mem_req_leaf_computation = sizeof(int4);
+  /* Memory required per CUDA block launched, each CUDA block needs to know which cell it will work on */
+  size_t mem_req_CUDA_block = sizeof(int2);
+
+  /* Now we need to figure out how much of free memory to assign to what */
+  /* We need one instance of block_ID per GPU_THREAD_BLOCK_SIZE particles */
+  /* As a conservative estimate, let's say all leaf cells have a uniform
+   * number of particles proprtional to 2H. We therefore need one
+   * cell_start_end per np particles*/
+
+  /* Guess the particle array size. First try to estimate average number of
+   * particles per leaf-cell. */
+  /* Get smoothing length/particle spacing */
+  int np_per_cell = 1.2/*random safety buffer*/ * 2 * ceil(2.0 * e->s->eta_neighbours);
+  /* Apply appropriate dimensional multiplication */
+#if defined(HYDRO_DIMENSION_2D)
+  np_per_cell *= np_per_cell;
+#elif defined(HYDRO_DIMENSION_3D)
+  np_per_cell *= np_per_cell * np_per_cell;
+#elif defined(HYDRO_DIMENSION_1D)
+#endif
+
+  double total_memory_per_particle = (double)mem_req_part +
+		  (double)mem_req_leaf_computation/(double)np_per_cell +
+		  (double)mem_req_CUDA_block/(double)GPU_THREAD_BLOCK_SIZE;
+    double fraction_of_memory_for_parts = free_mem_per_thread * (double)mem_req_part/total_memory_per_particle;
+
+    gpu_pack_params->part_send_size_d = fraction_of_memory_for_parts/mem_req_part;
+//  gpu_pack_params->part_send_size_d = free_mem_per_thread * (double)mem_send_d/total_memory_per_particle;
+//  gpu_pack_params->part_send_size_g = free_mem_per_thread * (double)mem_send_g/total_memory_per_particle;
+//  gpu_pack_params->part_send_size_f = free_mem_per_thread * (double)mem_send_f/total_memory_per_particle;
+//  gpu_pack_params->part_recv_size_d = free_mem_per_thread * (double)mem_recv_d/total_memory_per_particle;
+//  gpu_pack_params->part_recv_size_g = free_mem_per_thread * (double)mem_recv_g/total_memory_per_particle;
+//  gpu_pack_params->part_recv_size_f = free_mem_per_thread * (double)mem_recv_f/total_memory_per_particle;
+
+  gpu_pack_params->cell_start_end_buffer_size = free_mem_per_thread * (double)mem_req_leaf_computation/total_memory_per_particle;
+  gpu_pack_params->cuda_blockid_buffer_size = free_mem_per_thread * (double)mem_req_CUDA_block/total_memory_per_particle;
+
+  message("size predicted in ");
+
+
+
 }
 
 /**

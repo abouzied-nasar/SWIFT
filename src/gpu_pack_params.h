@@ -43,6 +43,21 @@ struct gpu_global_pack_params {
   /*! Size of the particle data buffers for offloading */
   int part_buffer_size;
 
+  /*! Size of the particle data buffers for offloading */
+  int part_send_size_d;
+  int part_send_size_g;
+  int part_send_size_f;
+  int part_recv_size_d;
+  int part_recv_size_g;
+  int part_recv_size_f;
+
+  /*! Size of the data buffers for cell starts and ends */
+  int cell_start_end_buffer_size;
+
+  /*! Size of the data buffers for meta data to decide
+   *  which leaf cell each CUDA block of threads works on */
+  int cuda_blockid_buffer_size;
+
   /*! Size of the cell list buffers for offloading. */
   int leaf_buffer_size;
 };
