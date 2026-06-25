@@ -54,12 +54,7 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
 
   /* Grab some handles */
   const size_t n_bundles = params->n_bundles;
-  const size_t part_buffer_size = params->part_send_size_d;
-//  const size_t cell_buffer_size = params->part_send_size_d;
-//  const size_t block_buffer_size = params->part_send_size_d;
-
-  message("part_buffer_size %i new and improved %i", params->part_buffer_size, params->part_send_size_d);
-  message("cell_start_end_buffer_size %i cuda_blockid_buffer_size %i", params->cell_start_end_buffer_size, params->cuda_blockid_buffer_size);
+  const size_t part_buffer_size = params->part_buffer_size;
 
   /* Initialise and set up metadata */
   struct gpu_pack_metadata *md = &(buf->md);
@@ -101,7 +96,7 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   /* Now allocate arrays GPU-only metadata arrays*/
 
   /*Data required for unique sorting*/
-  int size_of_cell_start_end = sizeof(int4) * params->pack_size;
+  int size_of_cell_start_end = sizeof(int4) * params->cell_start_end_buffer_size;
 
   /*Allocate memory for cell start and end data on host*/
   cu_error = cudaMallocHost((void **)&buf->gpu_md.cell_i_j_start_end,
@@ -116,7 +111,7 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   /*Since we have unique sorting this should be quite a bit less than
    * the space needed to store enough blocks to work on part_buffer_size
    * particles. Possibly problematic as 10 pulled out of the air...*/
-  const size_t n_blocks = (10 * part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+  const size_t n_blocks = params->cuda_blockid_buffer_size;//(10 * part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
 
   /*Allocate memory for array containing
    * leaf_computation_id for each cuda block*/

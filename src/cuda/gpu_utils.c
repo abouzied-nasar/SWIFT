@@ -128,30 +128,35 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
                 ((double)free_mem_per_thread) / (1024. * 1024. * 1024.));
   }
 
+  /*Get sizes of all the structs containing particle data*/
   size_t mem_send_d = sizeof(struct gpu_part_data_d);
   size_t mem_send_g = sizeof(struct gpu_part_data_g);
   size_t mem_send_f = sizeof(struct gpu_part_data_f);
   size_t mem_recv_d = sizeof(struct gpu_part_recv_d);
   size_t mem_recv_g = sizeof(struct gpu_part_recv_g);
   size_t mem_recv_f = sizeof(struct gpu_part_recv_f);
-  /* Total mem required per thread per part */
+
+  /* Total mem required per thread per particle */
   size_t mem_req_part = mem_send_d + mem_send_g + mem_send_f
 		  + mem_recv_d + mem_recv_g + mem_recv_f;
+
   /* Memory required per leaf computation launched */
   size_t mem_req_leaf_computation = sizeof(int4);
+
   /* Memory required per CUDA block launched, each CUDA block needs to know which cell it will work on */
   size_t mem_req_CUDA_block = sizeof(int2);
 
-  /* Now we need to figure out how much of free memory to assign to what */
+  /* Now we need to figure out how much memory to assign to what */
   /* We need one instance of block_ID per GPU_THREAD_BLOCK_SIZE particles */
   /* As a conservative estimate, let's say all leaf cells have a uniform
-   * number of particles proprtional to 2H. We therefore need one
+   * number of particles proportional to 2H. We therefore need one
    * cell_start_end per np particles*/
 
-  /* Guess the particle array size. First try to estimate average number of
+  /* Here we try to estimate average number of
    * particles per leaf-cell. */
   /* Get smoothing length/particle spacing */
-  int np_per_cell = 1.2/*random safety buffer*/ * 2 * ceil(2.0 * e->s->eta_neighbours);
+                  /*1.2 is a random safety buffer*/
+  int np_per_cell = 1.2 * 2 * ceil(2.0 * e->s->eta_neighbours);
   /* Apply appropriate dimensional multiplication */
 #if defined(HYDRO_DIMENSION_2D)
   np_per_cell *= np_per_cell;
@@ -160,25 +165,22 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
 #elif defined(HYDRO_DIMENSION_1D)
 #endif
 
-  double total_memory_per_particle = (double)mem_req_part +
-		  (double)mem_req_leaf_computation/(double)np_per_cell +
+  /*Figure out how much memory we need per particle*/
+  double total_memory_per_particle = (double)mem_req_part + (double)mem_req_leaf_computation/(double)np_per_cell +
 		  (double)mem_req_CUDA_block/(double)GPU_THREAD_BLOCK_SIZE;
-    double fraction_of_memory_for_parts = free_mem_per_thread * (double)mem_req_part/total_memory_per_particle;
 
-    gpu_pack_params->part_send_size_d = fraction_of_memory_for_parts/mem_req_part;
-//  gpu_pack_params->part_send_size_d = free_mem_per_thread * (double)mem_send_d/total_memory_per_particle;
-//  gpu_pack_params->part_send_size_g = free_mem_per_thread * (double)mem_send_g/total_memory_per_particle;
-//  gpu_pack_params->part_send_size_f = free_mem_per_thread * (double)mem_send_f/total_memory_per_particle;
-//  gpu_pack_params->part_recv_size_d = free_mem_per_thread * (double)mem_recv_d/total_memory_per_particle;
-//  gpu_pack_params->part_recv_size_g = free_mem_per_thread * (double)mem_recv_g/total_memory_per_particle;
-//  gpu_pack_params->part_recv_size_f = free_mem_per_thread * (double)mem_recv_f/total_memory_per_particle;
+  /*Now figure out what fraction of freemem we assign to what*/
+  double fraction_of_memory_for_parts = free_mem_per_thread * (double)mem_req_part/total_memory_per_particle;
+  double fraction_of_memory_for_cell_md = free_mem_per_thread *
+		  (double)mem_req_leaf_computation/((double)np_per_cell * total_memory_per_particle);
+  double fraction_of_memory_for_blockid = free_mem_per_thread *
+		  (double)mem_req_CUDA_block/((double)GPU_THREAD_BLOCK_SIZE * total_memory_per_particle);
 
-  gpu_pack_params->cell_start_end_buffer_size = free_mem_per_thread * (double)mem_req_leaf_computation/total_memory_per_particle;
-  gpu_pack_params->cuda_blockid_buffer_size = free_mem_per_thread * (double)mem_req_CUDA_block/total_memory_per_particle;
-
-  message("size predicted in ");
-
-
+  /*Now simply calculate how much of each data type we can into the fraction of memory allocated and assign
+   * buffer sizes*/
+  gpu_pack_params->part_buffer_size = fraction_of_memory_for_parts/mem_req_part;
+  gpu_pack_params->cell_start_end_buffer_size = fraction_of_memory_for_cell_md/mem_req_leaf_computation;
+  gpu_pack_params->cuda_blockid_buffer_size = fraction_of_memory_for_blockid/mem_req_CUDA_block;
 
 }
 
