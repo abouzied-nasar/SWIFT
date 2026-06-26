@@ -113,7 +113,8 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
   size_t safe_free_mem = free_mem;
   /*Check if we have more than 32GB. If we do, leave 5GB free to be safe.
    * Otherwise use up 90% of available memory. Pulled out of the air but
-   * most decent GPUs have > 32 GB*/
+   * most decent GPUs have > 32 GB. Also a good fail-safe for when other users
+   * use same GPU*/
   size_t GB2Byte = (1024 * 1024 * 1024);
   if(free_mem * GB2Byte > 32)
 	  safe_free_mem =  free_mem - 5 * GB2Byte;
