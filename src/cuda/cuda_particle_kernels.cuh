@@ -713,12 +713,17 @@ __device__ __forceinline__ void neighbour_interactions_force(
 		avisci = pi.bals_c_avisc_adiff.z;
 		adiffi  = pi.bals_c_avisc_adiff.w;
 		tbi = pi.timebin_minngbtimebin.x;
-		min_ngb_tbi = pi.timebin_minngbtimebin.y;
+
+//		min_ngb_tbi = pi.timebin_minngbtimebin.y;
+
+		const int old_min_ngb_tbi = pi.timebin_minngbtimebin.y;
+		min_ngb_tbi = old_min_ngb_tbi > 0 ? old_min_ngb_tbi : INT_MAX;
+
 
 		/*If no CUDA thread has written to it yet, the result will be zero.
 		 * So, initialise to the value we got from the CPU. Otherwise, leave as-is.
 		 * TODO: Do we need to check if min_ngb_tbi > 0?*/
-		atomicCAS(&d_parts_recv[i_id].minngbtb, 0, min_ngb_tbi);
+	    atomicCAS(&d_parts_recv[i_id].minngbtb, 0, min_ngb_tbi);
 
 		/* Get the kernel for hi. */
 		hi_inv   = 1.0f / hi;
