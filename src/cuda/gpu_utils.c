@@ -122,9 +122,9 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
 
   size_t free_mem_per_thread =  (safe_free_mem + e->nr_threads - 1)/e->nr_threads;
   if (cpuid == 0 && engine_rank == 0) {
-    message("   safe free mem:                  %.3g GB",
+    message("   safe to use free mem:       %.3g GB",
               ((double)safe_free_mem) / (1024. * 1024. * 1024.));
-    message("   free mem per thread:            %.3g GB",
+    message("   per thread:                 %.3g GB",
                 ((double)free_mem_per_thread) / (1024. * 1024. * 1024.));
   }
 
@@ -137,14 +137,14 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
   size_t mem_recv_f = sizeof(struct gpu_part_recv_f);
 
   /* Total mem required per thread per particle */
-  size_t mem_req_part = mem_send_d + mem_send_g + mem_send_f
+  double mem_req_part = mem_send_d + mem_send_g + mem_send_f
 		  + mem_recv_d + mem_recv_g + mem_recv_f;
 
   /* Memory required per leaf computation launched */
-  size_t mem_req_leaf_computation = sizeof(int4);
+  double mem_req_leaf_computation = sizeof(int4);
 
   /* Memory required per CUDA block launched, each CUDA block needs to know which cell it will work on */
-  size_t mem_req_CUDA_block = sizeof(int2);
+  double mem_req_CUDA_block = sizeof(int2);
 
   /* Now we need to figure out how much memory to assign to what */
   /* We need one instance of block_ID per GPU_THREAD_BLOCK_SIZE particles */
@@ -156,7 +156,7 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
    * particles per leaf-cell. */
   /* Get smoothing length/particle spacing */
                   /*1.2 is a random safety buffer*/
-  int np_per_cell = 1.2 * 2 * ceil(2.0 * e->s->eta_neighbours);
+  double np_per_cell = 1.2 * 2 * ceil(2.0 * e->s->eta_neighbours);
   /* Apply appropriate dimensional multiplication */
 #if defined(HYDRO_DIMENSION_2D)
   np_per_cell *= np_per_cell;
@@ -166,21 +166,23 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
 #endif
 
   /*Figure out how much memory we need per particle*/
-  double total_memory_per_particle = (double)mem_req_part + (double)mem_req_leaf_computation/(double)np_per_cell +
-		  (double)mem_req_CUDA_block/(double)GPU_THREAD_BLOCK_SIZE;
+  double total_memory_per_particle = mem_req_part + mem_req_leaf_computation/np_per_cell +
+		  mem_req_CUDA_block/GPU_THREAD_BLOCK_SIZE;
 
   /*Now figure out what fraction of freemem we assign to what*/
-  double fraction_of_memory_for_parts = free_mem_per_thread * (double)mem_req_part/total_memory_per_particle;
+  double fraction_of_memory_for_parts = free_mem_per_thread * mem_req_part/total_memory_per_particle;
   double fraction_of_memory_for_cell_md = free_mem_per_thread *
-		  (double)mem_req_leaf_computation/((double)np_per_cell * total_memory_per_particle);
+		  mem_req_leaf_computation/(np_per_cell * total_memory_per_particle);
   double fraction_of_memory_for_blockid = free_mem_per_thread *
-		  (double)mem_req_CUDA_block/((double)GPU_THREAD_BLOCK_SIZE * total_memory_per_particle);
+		  mem_req_CUDA_block/(GPU_THREAD_BLOCK_SIZE * total_memory_per_particle);
 
-  /*Now simply calculate how much of each data type we can into the fraction of memory allocated and assign
-   * buffer sizes*/
-  gpu_pack_params->part_buffer_size = fraction_of_memory_for_parts/mem_req_part;
-  gpu_pack_params->cell_start_end_buffer_size = fraction_of_memory_for_cell_md/mem_req_leaf_computation;
-  gpu_pack_params->cuda_blockid_buffer_size = fraction_of_memory_for_blockid/mem_req_CUDA_block;
+  /* Now simply calculate how much of each data type we can into the fraction of memory allocated and assign
+   * buffer sizes */
+  /* TODO: part_buffer_size is currently read in from yml. For now over-write it here
+   * but come back and make it so that we no longer read it in. */
+  gpu_pack_params->part_buffer_size = (int)fraction_of_memory_for_parts/(int)mem_req_part;
+  gpu_pack_params->cell_start_end_buffer_size = (int)fraction_of_memory_for_cell_md/(int)mem_req_leaf_computation;
+  gpu_pack_params->cuda_blockid_buffer_size = (int)fraction_of_memory_for_blockid/(int)mem_req_CUDA_block;
 
 }
 
@@ -216,12 +218,12 @@ void gpu_print_free_mem(const struct engine *e, const int cpuid) {
   if (cpuid == 0) {
 #ifdef SWIFT_DEBUG_CHECKS
     message(
-        "pciBusID %4d, After allocation: free mem: %8.3g GB, total mem: %8.3g "
+        "pciBusID %4d, After allocation: free mem: %2.3g GB, total mem: %8.3g "
         "GB",
         prop.pciBusID, ((double)free_mem) / (1024. * 1024. * 1024.),
         ((double)total_mem) / (1024. * 1024. * 1024.));
 #else
-    message("After allocation: free mem: %8.3g GB, total mem: %8.3g GB",
+    message("After allocation: free mem: %2.3g GB, total mem: %8.3g GB",
             ((double)free_mem) / (1024. * 1024. * 1024.),
             ((double)total_mem) / (1024. * 1024. * 1024.));
 #endif
