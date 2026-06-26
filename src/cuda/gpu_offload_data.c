@@ -153,11 +153,20 @@ void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
   memset(buf->parts_send_d, 0, pars.part_buffer_size * md.send_struct_size);
   memset(buf->parts_recv_d, 0, pars.part_buffer_size * md.recv_struct_size);
 
-  /* Can't do this from the host side, would need to launch cuda kernel */
-  /* bzero(buf->d_parts_recv_d, pars.part_buffer_size *
-   * sizeof(md.send_struct_size)); */
-  /* bzero(buf->d_parts_send_d, pars.part_buffer_size) *
-   * sizeof(md.recv_struct_size); */
+  /* Can't do this from the host side, would need to launch cuda kernel
+   * We can actually. cudaMemSet() */
+  /* initialise to just some meaningless value to silence the compiler */
+//  cudaError_t cu_error = cudaErrorMemoryAllocation;
+//
+//  cu_error =
+//      cudaMemset(&buf->d_parts_send_d,
+//      0, pars.part_buffer_size * md.send_struct_size);
+//  swift_assert(cu_error == cudaSuccess);
+//
+//  cu_error =
+//      cudaMemset(&buf->d_parts_recv_d,
+//      0, pars.part_buffer_size * md.recv_struct_size);
+//  swift_assert(cu_error == cudaSuccess);
 
 #endif
 }
