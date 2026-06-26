@@ -204,6 +204,8 @@ void *runner_main_cuda(void *data) {
   int step = 0;
 #endif
 
+  /*TODO: Should we put a barrier here to ensure we report the correct remaining memory?*/
+//  swift_barrier_wait(&e->wait_barrier);
   /* Tell me how much memory we're using. */
   gpu_print_free_mem(e, r->cpuid);
 
