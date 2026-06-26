@@ -905,6 +905,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     struct cell *cii = md->ci_leaves[md->n_leaves_packed];
     struct cell *cjj = md->cj_leaves[md->n_leaves_packed];
 
+    char launch_before_over_filling = 0;
     if (md->task_n_leaves > 0) {
 #ifdef SWIFT_DEBUG_CHECKS
       if (cii->hydro.count == 0)
@@ -918,13 +919,31 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 #endif
       TIMER_TIC;
 
-    ///////////////////////////////////////////////////////////////////////
-    /* Test to see if cells i and j have already been packed
-     * cells i and j are the same cell for self tasks but use the same
-     * function as for the pairs.
-     * If cells are already packed, keep track of where
-     * they're packed (index). If not, pack and store their index as unique*/
-    /* Note that this increments md->count_parts, md->count_parts_unique and md->n_leaves_packed */
+      /* Check to see if we will go over packing limits in the next step
+       * Necessary if cell heirarchy gets very deep and we have very large cells*/
+      uint count_next = 0;
+      /* Note we will have checked the task_n_leaves'th leaf computation to see
+       * if it will overfill buffers before we start to pack so no issues here*/
+      if(npacked < md->task_n_leaves - 1){
+        struct cell *ci_next = md->ci_leaves[npacked + 1];
+        struct cell *cj_next = md->cj_leaves[npacked + 1];
+        count_next = max(ci_next->hydro.count, cj_next->hydro.count);
+      }
+      /*TODO: Replcae this with a member of struct md rather than calculate repeatedly*/
+      int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+      /* Get how many blocks we have now */
+      int n_blocks_current = md->n_blocks_packed + (max(cii->hydro.count, cjj->hydro.count)+ GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+      /* Get how many blocks we will end up with in the next packing cycle*/
+      int n_blocks_next = n_blocks_current + (count_next + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+      /* If we need to, raise the flag*/
+      launch_before_over_filling = (n_blocks_next >= n_blocks_max) ? 1 : 0;
+
+      /* Test to see if cells i and j have already been packed
+       * cells i and j are the same cell for self tasks but use the same
+       * function as for the pairs.
+       * If cells are already packed, keep track of where
+       * they're packed (index). If not, pack and store their index as unique*/
+      /* Note that this increments md->count_parts, md->count_parts_unique and md->n_leaves_packed */
       pack_cell_particles_in_unique_list(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
 
       /*Record packing time*/
@@ -950,25 +969,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     /* Update the current last leaf cell pair index of this task. */
     /* md->leaf_pairs_packed was incremented in runner_dopair_gpu_pack_<*>. */
     task_last_packed_leaf[tind] = md->n_leaves_packed;
-
-    uint count_next = 0;
-    /* Check to see if will go over packing limits in the next step
-     * Necessary if cell heirarchy gets very deep and we have very large cells*/
-    /* TODO: Check if some sort of condition similar to below is needed */
-    if(npacked < md->task_n_leaves){
-      struct cell *ci_next = md->ci_leaves[npacked];
-      struct cell *cj_next = md->cj_leaves[npacked];
-      count_next = max(ci_next->hydro.count, cj_next->hydro.count);
-    }
-    int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-    /* Note we have already packed so n_blocks_current is md->n_blocks_packed*/
-    int n_blocks_next = md->n_blocks_packed + (count_next + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-    /* If we need to, raise the flag*/
-    char launch_before_over_filling = (n_blocks_next >= n_blocks_max) ? 1 : 0;
-
-//    if(n_blocks_next >= n_blocks_max)
-//      error("launch_before_over_filling %i n_blocks_next %i n_blocks_max %i", launch_before_over_filling,
-//    		  n_blocks_next, n_blocks_max);
 
     /* Can we launch? */
     if (md->n_leaves_packed == target_n_leaves) md->launch = 1;
