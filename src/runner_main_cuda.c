@@ -172,7 +172,9 @@ void *runner_main_cuda(void *data) {
   /* Initialise cuda context for this thread. */
   gpu_init_thread(e, r->cpuid);
 
-  /* Wait here until we have correctly assigned part_buffer_size */
+  /* Wait here until we have correctly assigned part_buffer_size
+   * This ensures that we do not try to allocate GPU memory while other threads
+   * are trying to figure out how much memory is available*/
   pthread_barrier_wait(&e->gpu_barrier);
 
   /* Get estimates for array sizes et al. */
