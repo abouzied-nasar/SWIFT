@@ -172,6 +172,9 @@ void *runner_main_cuda(void *data) {
   /* Initialise cuda context for this thread. */
   gpu_init_thread(e, r->cpuid);
 
+  /* Wait here until we have correctly assigned part_buffer_size */
+  pthread_barrier_wait(&e->gpu_barrier);
+
   /* Get estimates for array sizes et al. */
   const struct gpu_global_pack_params gpu_pack_params = e->gpu_pack_params;
 

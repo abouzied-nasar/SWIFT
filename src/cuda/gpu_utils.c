@@ -190,14 +190,15 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
 			  "our minimum threshold (or size requested) is set to %ld.", (double)free_mem_per_thread/(1024. * 1024. * 1024.),
 			  buf_size_avail, gpu_pack_params->part_buffer_size);
 
-  gpu_pack_params->part_buffer_size = buf_size_avail;
-  gpu_pack_params->cell_start_end_buffer_size = (int)fraction_of_memory_for_cell_md/(int)mem_req_leaf_computation;
-  gpu_pack_params->cuda_blockid_buffer_size = (int)fraction_of_memory_for_blockid/(int)mem_req_CUDA_block;
-
-  if(gpu_pack_params->part_buffer_size <=0 ||
-		  gpu_pack_params->cell_start_end_buffer_size <=0 ||
-		  gpu_pack_params->cuda_blockid_buffer_size <=0)
-	  error("Trying to define negative CPU/GPU buffer size. Likely a signed int overflow");
+  if(cpuid == 0){
+    gpu_pack_params->part_buffer_size = buf_size_avail;
+    gpu_pack_params->cell_start_end_buffer_size = (int)fraction_of_memory_for_cell_md/(int)mem_req_leaf_computation;
+    gpu_pack_params->cuda_blockid_buffer_size = (int)fraction_of_memory_for_blockid/(int)mem_req_CUDA_block;
+    if(gpu_pack_params->part_buffer_size <=0 ||
+            gpu_pack_params->cell_start_end_buffer_size <=0 ||
+            gpu_pack_params->cuda_blockid_buffer_size <=0)
+        error("Trying to define negative CPU/GPU buffer size. Likely a signed int overflow");
+  }
 
 }
 

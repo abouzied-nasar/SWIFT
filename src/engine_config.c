@@ -903,7 +903,8 @@ void engine_config(int restart, int fof, struct engine *e,
 
   /* First of all, init the barrier and lock it. */
   if (swift_barrier_init(&e->wait_barrier, NULL, e->nr_threads + 1) != 0 ||
-      swift_barrier_init(&e->run_barrier, NULL, e->nr_threads + 1) != 0)
+      swift_barrier_init(&e->run_barrier, NULL, e->nr_threads + 1) != 0 ||
+      swift_barrier_init(&e->gpu_barrier, NULL, e->nr_threads) != 0 )
     error("Failed to initialize barrier.");
 
   /* Expected average for tasks per cell. If set to zero we use a heuristic
