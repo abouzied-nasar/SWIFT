@@ -339,7 +339,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     error(
         "Exceeded particle buffer size. Increase "
         "Scheduler:gpu_part_buffer_size."
-        "ind=%d, counts=%d %d, buffer_size=%d, task_subtype=%s, is self "
+        "ind=%d, counts=%d %d, buffer_size=%ld, task_subtype=%s, is self "
         "task?=%d",
         pack_ind, cii_count, cjj_count, md->params.part_buffer_size,
         subtaskID_names[task_subtype], cii == cjj);

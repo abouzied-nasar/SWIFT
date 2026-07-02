@@ -100,7 +100,7 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
             gpu_pack_params->pack_size * nPartsPerCell / GPU_THREAD_BLOCK_SIZE);
     message("   Leaf cell buffer size:      %i",
             gpu_pack_params->leaf_buffer_size);
-    message("   Particles buffer size:      %i",
+    message("   Particles buffer size:      %ld",
             gpu_pack_params->part_buffer_size);
     message("   Pack size:                  %i", gpu_pack_params->pack_size);
     message("   Bundle size:                %i", gpu_pack_params->bundle_size);
@@ -181,14 +181,23 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
    * buffer sizes */
   /* TODO: part_buffer_size is currently read in from yml. For now over-write it here
    * but come back and make it so that we no longer read it in. */
-  int buf_size_avail = (int)fraction_of_memory_for_parts/(int)mem_req_part;
-  if(buf_size_avail < gpu_pack_params->part_buffer_size)
-	  error("Only %.4gGB memory available on GPU per thread -> This fits %i particles in buffer per thread but "
-			  "our minimum threshold (or size requested) is set to %i.", (double)free_mem_per_thread/(1024. * 1024. * 1024.),
+  long buf_size_avail = (long)fraction_of_memory_for_parts/(long)mem_req_part;
+  /*NOTE: part_buffer_size is currently a global parameter so only do this check once.
+   * This is probably not the best way to do this since all threads will be able to set
+   * part_buffer_size RACE CONDITION. Should really make this a thread-safe variable*/
+  if(buf_size_avail < gpu_pack_params->part_buffer_size && cpuid == 0)
+	  error("Only %.4gGB memory available on GPU per thread -> This fits %ld particles in buffer per thread but "
+			  "our minimum threshold (or size requested) is set to %ld.", (double)free_mem_per_thread/(1024. * 1024. * 1024.),
 			  buf_size_avail, gpu_pack_params->part_buffer_size);
+
   gpu_pack_params->part_buffer_size = buf_size_avail;
   gpu_pack_params->cell_start_end_buffer_size = (int)fraction_of_memory_for_cell_md/(int)mem_req_leaf_computation;
   gpu_pack_params->cuda_blockid_buffer_size = (int)fraction_of_memory_for_blockid/(int)mem_req_CUDA_block;
+
+  if(gpu_pack_params->part_buffer_size <=0 ||
+		  gpu_pack_params->cell_start_end_buffer_size <=0 ||
+		  gpu_pack_params->cuda_blockid_buffer_size <=0)
+	  error("Trying to define negative CPU/GPU buffer size. Likely a signed int overflow");
 
 }
 

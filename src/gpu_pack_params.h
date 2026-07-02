@@ -41,7 +41,7 @@ struct gpu_global_pack_params {
   int n_bundles;
 
   /*! Size of the particle data buffers for offloading */
-  int part_buffer_size;
+  long part_buffer_size;
 
   /*! Size of the particle data buffers for offloading */
   int part_send_size_d;
