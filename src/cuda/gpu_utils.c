@@ -151,7 +151,7 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
   /* We need one instance of block_ID per GPU_THREAD_BLOCK_SIZE particles */
   /* As a conservative estimate, let's say all leaf cells have a uniform
    * number of particles proportional to 2H. We therefore need one
-   * cell_start_end per np particles*/
+   * cell_start_end per np_per_cell particles*/
 
   /* Here we try to estimate average number of
    * particles per leaf-cell. */
@@ -178,7 +178,8 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
 		  mem_req_CUDA_block/(GPU_THREAD_BLOCK_SIZE * total_memory_per_particle);
 
   /* Now simply calculate how much of each data type we can fit into the fraction of memory allocated and assign
-   * buffer sizes */
+   * buffer sizes. Need to use long since the number of parts we can fit on GPU memory is possibly greater than
+   * what we can store as an int */
   /* TODO: part_buffer_size is currently read in from yml. For now over-write it here
    * but come back and make it so that we no longer read it in. */
   long buf_size_avail = (long)fraction_of_memory_for_parts/(long)mem_req_part;
