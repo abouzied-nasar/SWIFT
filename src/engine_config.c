@@ -901,11 +901,18 @@ void engine_config(int restart, int fof, struct engine *e,
   e->s->multipoles_sub = (struct gravity_tensors **)calloc(
       nr_pool_threads + 1, sizeof(struct gravity_tensors *));
 
+#if defined(WITH_CUDA) || defined(WITH_HIP)
   /* First of all, init the barrier and lock it. */
   if (swift_barrier_init(&e->wait_barrier, NULL, e->nr_threads + 1) != 0 ||
       swift_barrier_init(&e->run_barrier, NULL, e->nr_threads + 1) != 0 ||
       swift_barrier_init(&e->gpu_barrier, NULL, e->nr_threads) != 0 )
     error("Failed to initialize barrier.");
+#else
+  /* First of all, init the barrier and lock it. */
+  if (swift_barrier_init(&e->wait_barrier, NULL, e->nr_threads + 1) != 0 ||
+      swift_barrier_init(&e->run_barrier, NULL, e->nr_threads + 1) != 0)
+    error("Failed to initialize barrier.");
+#endif
 
   /* Expected average for tasks per cell. If set to zero we use a heuristic
    * guess based on the numbers of cells and how many tasks per cell we expect.
