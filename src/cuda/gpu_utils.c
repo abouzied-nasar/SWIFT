@@ -177,23 +177,23 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
   double fraction_of_memory_for_blockid = free_mem_per_thread *
 		  mem_req_CUDA_block/(GPU_THREAD_BLOCK_SIZE * total_memory_per_particle);
 
-  /* Now simply calculate how much of each data type we can into the fraction of memory allocated and assign
+  /* Now simply calculate how much of each data type we can fit into the fraction of memory allocated and assign
    * buffer sizes */
   /* TODO: part_buffer_size is currently read in from yml. For now over-write it here
    * but come back and make it so that we no longer read it in. */
   long buf_size_avail = (long)fraction_of_memory_for_parts/(long)mem_req_part;
-  /*NOTE: part_buffer_size is currently a global parameter so only do this check once.
-   * This is probably not the best way to do this since all threads will be able to set
-   * part_buffer_size RACE CONDITION. Should really make this a thread-safe variable*/
+  /*NOTE: part_buffer_size is a global parameter (one value for all threads) so only do this check once */
   if(buf_size_avail < gpu_pack_params->part_buffer_size && cpuid == 0)
 	  error("Only %.4gGB memory available on GPU per thread -> This fits %ld particles in buffer per thread but "
 			  "our minimum threshold (or size requested) is set to %ld.", (double)free_mem_per_thread/(1024. * 1024. * 1024.),
 			  buf_size_avail, gpu_pack_params->part_buffer_size);
 
+  /* Now assign the sizes we calculate */
   if(cpuid == 0){
     gpu_pack_params->part_buffer_size = buf_size_avail;
     gpu_pack_params->cell_start_end_buffer_size = (int)fraction_of_memory_for_cell_md/(int)mem_req_leaf_computation;
     gpu_pack_params->cuda_blockid_buffer_size = (int)fraction_of_memory_for_blockid/(int)mem_req_CUDA_block;
+    /* This is a check for over-spill (in case the sizes are bigger than what we can store as an int) */
     if(gpu_pack_params->part_buffer_size <=0 ||
             gpu_pack_params->cell_start_end_buffer_size <=0 ||
             gpu_pack_params->cuda_blockid_buffer_size <=0)
