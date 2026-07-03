@@ -223,10 +223,6 @@ void *runner_main_cuda(void *data) {
     /* Can we go home yet? */
     if (e->step_props & engine_step_prop_done) break;
 
-    /* Check if we have enough active tasks to offload to the GPU */
-    int n_gpu = 0;
-    int n_cpu = 0;
-
     /* Check how many leaf level cells we need to work on.
      * If we have enough, flag that we should offload to GPU
      * Currently we use gpu_buf_dens to hold md->n_active_leaves.
@@ -315,13 +311,11 @@ void *runner_main_cuda(void *data) {
             if(offload){
               runner_doself_gpu_density(r, sched, &gpu_buf_dens, t, stream, d_a,
                                         d_H);
-              n_gpu++;
             }else{
               runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
               int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
                 1;
               if (count < 1) gpu_buf_dens.md.launch_leftovers = 1;
-              n_cpu++;
             }
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
@@ -821,7 +815,6 @@ void *runner_main_cuda(void *data) {
         t = scheduler_done(sched, t);
       }
     } /* Loop while there are tasks */
-    message("n_cpu %i n_gpu %i", n_cpu, n_gpu);
   } /* main loop. */
 
   /* Release the bytes back into the wilderness */
