@@ -232,8 +232,10 @@ void *runner_main_cuda(void *data) {
       if(cell_is_active_hydro(&e->s->cells_top[i], e))
         runner_self_recurse_and_test_active(r, sched, &gpu_buf_dens, &e->s->cells_top[i], /*depth=*/0, /*timer=*/1);
     }
-    message("n_active_leaves %i", gpu_buf_dens.md.n_active_leaves);
-    int offload = gpu_buf_dens.md.n_active_leaves > e->gpu_pack_params.pack_size;
+    /* We want to have at least one full pack of leaf computations per thread
+     * If we do not have enough run on the CPU.
+     * TODO: Need to check that this is a good estimate*/
+    int offload = gpu_buf_dens.md.n_active_leaves > e->gpu_pack_params.pack_size * e->nr_threads;
     gpu_buf_dens.md.n_active_leaves = 0;
 
     gpu_data_buffers_init_step(&gpu_buf_dens);
