@@ -227,12 +227,14 @@ void *runner_main_cuda(void *data) {
     int n_gpu = 0;
     int n_cpu = 0;
 
-    int n_active = 0;
+    gpu_buf_dens.md.n_active_leaves = 0;
     for(int i = 0; i < e->s->nr_local_cells; i++){
       if(cell_is_active_hydro(&e->s->cells_top[i], e))
-        n_active++;
+        runner_self_recurse_and_test_active(r, sched, &gpu_buf_dens, &e->s->cells_top[i], /*depth=*/0, /*timer=*/1);
     }
-    int offload = n_active > e->gpu_pack_params.pack_size;
+    message("n_active_leaves %i", gpu_buf_dens.md.n_active_leaves);
+    int offload = gpu_buf_dens.md.n_active_leaves > e->gpu_pack_params.pack_size;
+    gpu_buf_dens.md.n_active_leaves = 0;
 
     gpu_data_buffers_init_step(&gpu_buf_dens);
     gpu_data_buffers_init_step(&gpu_buf_grad);

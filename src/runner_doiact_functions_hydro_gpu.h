@@ -203,6 +203,123 @@ static void runner_doself_gpu_recurse(const struct runner *r,
   if (timer) TIMER_TOC(timer_gpu_self_recurse);
 }
 
+/**
+ * @brief recurse into a pair of cells and recusrively identify all cell-cell
+ * interactions.
+ *
+ * @param r The #runner
+ * @param s The #scheduler
+ * @param buf the data buffers
+ * @param ci the first #cell to be interacted recursively
+ * @param cj the second #cell to be interacted recursively
+ * @param depth current recursion depth
+ * @param timer are we timing this?
+ */
+static void runner_pair_recurse_and_test_active(const struct runner *r,
+                                      const struct scheduler *s,
+                                      struct gpu_offload_data *restrict buf,
+                                      struct cell *ci, struct cell *cj,
+                                      const int depth, const char timer) {
+
+  /* Note: Can't inline a recursive function... */
+
+  TIMER_TIC;
+
+  /* Should we even bother? */
+  const struct engine *e = r->e;
+  if (!cell_is_active_hydro(ci, e) && !cell_is_active_hydro(cj, e)) return;
+  if (ci->hydro.count == 0 || cj->hydro.count == 0) return;
+
+  /* Grab some handles. */
+  /* packing data and metadata */
+  struct gpu_pack_metadata *md = &buf->md;
+
+  /* Get the type of pair and flip ci/cj if needed. */
+  double shift[3];
+  const int sid = space_getsid_and_swap_cells(e->s, &ci, &cj, shift);
+
+  /* Recurse? */
+  if (cell_can_recurse_in_pair_hydro_task(ci) &&
+      cell_can_recurse_in_pair_hydro_task(cj)) {
+
+    struct cell_split_pair *csp = &cell_split_pairs[sid];
+
+    for (int k = 0; k < csp->count; k++) {
+      const int pid = csp->pairs[k].pid;
+      const int pjd = csp->pairs[k].pjd;
+      if (ci->progeny[pid] != NULL && cj->progeny[pjd] != NULL) {
+        runner_pair_recurse_and_test_active(r, s, buf, ci->progeny[pid], cj->progeny[pjd],
+                                  depth + 1, /*timer=*/0);
+      }
+    }
+  } else {
+
+    /* At this point, we found leaves with work to do. Add them to list. */
+    /* Note: We leave md->n_leaves unmodified during the recursion. So the
+     * correct cell index will be md->n_leaves + how many new leaf cells we've
+     * found for this task's recursion, which is stored in md->task_n_leaves. */
+    /* Increment the counter. */
+    md->n_active_leaves++;
+  }
+
+  if (timer) TIMER_TOC(timer_gpu_pair_recurse);
+}
+
+/**
+ * @brief recurse into a cell and recursively identify all leaf cell
+ * interactions needed in this step.
+ *
+ * @param r The #runner
+ * @param s The #scheduler
+ * @param buf the data buffers
+ * @param ci the #cell to be interacted recursively
+ * @param depth current recursion depth
+ * @param timer are we timing this?
+ */
+static void runner_self_recurse_and_test_active(const struct runner *r,
+                                      const struct scheduler *s,
+                                      struct gpu_offload_data *restrict buf,
+                                      struct cell *ci, const int depth,
+                                      const char timer) {
+
+  /* Note: Can't inline a recursive function... */
+
+  TIMER_TIC;
+
+  /* Should we even bother? */
+  const struct engine *e = r->e;
+  if (!cell_is_active_hydro(ci, e)) return;
+  if (ci->hydro.count == 0) return;
+
+  /* Grab some handles. */
+  /* packing data and metadata */
+  struct gpu_pack_metadata *md = &buf->md;
+
+  /* Recurse? */
+  if (cell_can_recurse_in_self_hydro_task(ci)) {
+
+    for (int k = 0; k < 8; k++) {
+      if (ci->progeny[k] != NULL) {
+        runner_self_recurse_and_test_active(r, s, buf, ci->progeny[k], depth + 1,
+                                  /*timer=*/0);
+        for (int j = k + 1; j < 8; j++) {
+          if (ci->progeny[j] != NULL) {
+            runner_pair_recurse_and_test_active(r, s, buf, ci->progeny[k], ci->progeny[j],
+                                      depth + 1, /*timer=*/0);
+          }
+        }
+      }
+    }
+
+  } else {
+
+    /* Increment the counter. */
+    md->n_active_leaves++;
+  }
+
+  if (timer) TIMER_TOC(timer_gpu_self_recurse);
+}
+
 /*TODO: Move all hash_table code into hash_cell_pointers.c or something*/
 /* Simple hash function for pointers */
 __attribute__((always_inline)) INLINE static int hash_func(const struct cell *ptr, const int hash_size) {

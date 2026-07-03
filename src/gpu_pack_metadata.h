@@ -50,6 +50,7 @@ struct hash_entry {
  * does not depend on cuda/hip et al. */
 struct gpu_pack_metadata {
 
+  int n_active_leaves;
   /*! Lists of leaf cell pairs (ci, cj) each constituting a leaf computation (see Nasar et al. 2026).
    * May contain entries of multiple tasks' leaf cells. */
   struct cell **ci_leaves;
