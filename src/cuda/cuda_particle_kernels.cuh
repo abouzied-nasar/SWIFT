@@ -681,7 +681,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 	float vxi=0.f, vyi=0.f, vzi=0.f, mi=0.f;
 	float fi=0.f, balsi=0.f, rhoi=0.f, pressurei=0.f;
 	float ci=0.f, energyi=0.f, avisci=0.f, adiffi=0.f;
-	int   tbi=0, min_ngb_tbi=INT_MAX;
+	int   min_ngb_tbi=INT_MAX;
 
 	float hi_inv=0.f, hid_inv=0.f, mi_inv=0.f, rhoi_inv=0.f, rhoi_inv2=0.f, hig2=0.f;
 	/*Do not do any calculation if i_id is not in cell i range of particles*/
@@ -712,7 +712,6 @@ __device__ __forceinline__ void neighbour_interactions_force(
 		ci = pi.bals_c_avisc_adiff.y;
 		avisci = pi.bals_c_avisc_adiff.z;
 		adiffi  = pi.bals_c_avisc_adiff.w;
-		tbi = pi.timebin_minngbtimebin.x;
 
 //		min_ngb_tbi = pi.timebin_minngbtimebin.y;
 
