@@ -129,7 +129,7 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
                 ((double)free_mem_per_thread) / (1024. * 1024. * 1024.));
   }
 
-  /*Get sizes of all the structs containing particle data*/
+  /* Get sizes of all the structs containing particle data */
   size_t mem_send_d = sizeof(struct gpu_part_data_d);
   size_t mem_send_g = sizeof(struct gpu_part_data_g);
   size_t mem_send_f = sizeof(struct gpu_part_data_f);
@@ -180,16 +180,16 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
   /* Now simply calculate how much of each data type we can fit into the fraction of memory allocated and assign
    * buffer sizes. Need to use long since the number of parts we can fit on GPU memory is possibly greater than
    * what we can store as an int */
-  /* TODO: part_buffer_size is currently read in from yml. For now over-write it here
-   * but come back and make it so that we no longer read it in. */
+  /* TODO: part_buffer_size can still be read in from yml but will be over-written here.
+   * Probably redundant now so we should change it so it is not read in. */
   long buf_size_avail = (long)fraction_of_memory_for_parts/(long)mem_req_part;
-  /*NOTE: part_buffer_size is a global parameter (one value for all threads) so only do this check once */
+  /* NOTE: part_buffer_size is a global parameter (one value for all threads) so only do this check once for thread 0 */
   if(buf_size_avail < gpu_pack_params->part_buffer_size && cpuid == 0)
 	  error("Only %.4gGB memory available on GPU per thread -> This fits %ld particles in buffer per thread but "
 			  "our minimum threshold (or size requested) is set to %ld.", (double)free_mem_per_thread/(1024. * 1024. * 1024.),
 			  buf_size_avail, gpu_pack_params->part_buffer_size);
 
-  /* Now assign the sizes we calculate */
+  /* Now assign the sizes we calculated */
   if(cpuid == 0){
     gpu_pack_params->part_buffer_size = buf_size_avail;
     gpu_pack_params->cell_start_end_buffer_size = (int)fraction_of_memory_for_cell_md/(int)mem_req_leaf_computation;
