@@ -204,8 +204,8 @@ static void runner_doself_gpu_recurse(const struct runner *r,
 }
 
 /**
- * @brief recurse into a pair of cells and recusrively identify all cell-cell
- * interactions.
+ * @brief recurse into a pair of cells found from self recursion and count
+ * the number of cell-cell interactions needed for self tasks in this step.
  *
  * @param r The #runner
  * @param s The #scheduler
@@ -266,7 +266,7 @@ static void runner_pair_recurse_and_test_active(const struct runner *r,
 }
 
 /**
- * @brief recurse into a cell and recursively identify all leaf cell
+ * @brief recurse into a cell and recursively identify how many leaf cell
  * interactions needed in this step.
  *
  * @param r The #runner
@@ -320,6 +320,39 @@ static void runner_self_recurse_and_test_active(const struct runner *r,
   if (timer) TIMER_TOC(timer_gpu_self_recurse);
 }
 
+/**
+ * @brief Decide if we will offload this time step.
+ * Recurse through all local top level cells and see if we
+ * have enough leaf level computations to offload.
+ *
+ * @param r The #runner
+ * @param s The #scheduler
+ * @param e The #engine
+ * @param buf the data buffers
+ * @param timer are we timing this?
+ */
+__attribute__((always_inline)) INLINE static int runner_GPU_offload_switch(const struct runner *r,
+                                      const struct scheduler *s,
+									  struct engine *e,
+                                      struct gpu_offload_data *restrict buf,
+                                      const char timer) {
+
+//  TIMER_TIC;
+
+  buf->md.n_active_leaves = 0;
+  /*TODO: Need to time this separately to ensure we are not wasting too much time here*/
+  for(int i = 0; i < e->s->nr_local_cells; i++){
+    if(cell_is_active_hydro(&e->s->cells_top[i], e))
+      runner_self_recurse_and_test_active(r, s, buf, &e->s->cells_top[i], /*depth=*/0, /*timer=*/1);
+  }
+  /* We want to have at least one full pack of leaf computations per thread
+   * If we do not have enough run on the CPU.
+   * TODO: Need to check that this is a good estimate*/
+  return buf->md.n_active_leaves > e->gpu_pack_params.pack_size * e->nr_threads;
+
+//  if (timer) TIMER_TOC(timer_gpu_self_recurse);
+
+}
 /*TODO: Move all hash_table code into hash_cell_pointers.c or something*/
 /* Simple hash function for pointers */
 __attribute__((always_inline)) INLINE static int hash_func(const struct cell *ptr, const int hash_size) {

@@ -227,16 +227,11 @@ void *runner_main_cuda(void *data) {
     int n_gpu = 0;
     int n_cpu = 0;
 
-    gpu_buf_dens.md.n_active_leaves = 0;
-    for(int i = 0; i < e->s->nr_local_cells; i++){
-      if(cell_is_active_hydro(&e->s->cells_top[i], e))
-        runner_self_recurse_and_test_active(r, sched, &gpu_buf_dens, &e->s->cells_top[i], /*depth=*/0, /*timer=*/1);
-    }
-    /* We want to have at least one full pack of leaf computations per thread
-     * If we do not have enough run on the CPU.
-     * TODO: Need to check that this is a good estimate*/
-    int offload = gpu_buf_dens.md.n_active_leaves > e->gpu_pack_params.pack_size * e->nr_threads;
-    gpu_buf_dens.md.n_active_leaves = 0;
+    /* Check how many leaf level cells we need to work on.
+     * If we have enough, flag that we should offload to GPU
+     * Currently we use gpu_buf_dens to hold md->n_active_leaves.
+     * Could use any of the other buffers*/
+    const int offload = runner_GPU_offload_switch(r, sched, e, &gpu_buf_dens, /*timer off 0, on 1*/1);
 
     gpu_data_buffers_init_step(&gpu_buf_dens);
     gpu_data_buffers_init_step(&gpu_buf_grad);
