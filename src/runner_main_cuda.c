@@ -223,6 +223,17 @@ void *runner_main_cuda(void *data) {
     /* Can we go home yet? */
     if (e->step_props & engine_step_prop_done) break;
 
+    /* Check if we have enough active tasks to offload to the GPU */
+    int n_gpu = 0;
+    int n_cpu = 0;
+
+    int n_active = 0;
+    for(int i = 0; i < e->s->nr_local_cells; i++){
+      if(cell_is_active_hydro(&e->s->cells_top[i], e))
+        n_active++;
+    }
+    int offload = n_active > e->gpu_pack_params.pack_size;
+
     gpu_data_buffers_init_step(&gpu_buf_dens);
     gpu_data_buffers_init_step(&gpu_buf_grad);
     gpu_data_buffers_init_step(&gpu_buf_forc);
@@ -301,18 +312,46 @@ void *runner_main_cuda(void *data) {
 #endif
           } else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
-            runner_doself_gpu_density(r, sched, &gpu_buf_dens, t, stream, d_a,
-                                      d_H);
+            /* Do we have enough active tasks worth running on the GPU? */
+            if(offload){
+              runner_doself_gpu_density(r, sched, &gpu_buf_dens, t, stream, d_a,
+                                        d_H);
+              n_gpu++;
+            }else{
+              runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
+              int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
+                1;
+              if (count < 1) gpu_buf_dens.md.launch_leftovers = 1;
+              n_cpu++;
+            }
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-            runner_doself_gpu_gradient(r, sched, &gpu_buf_grad, t, stream, d_a,
-                                       d_H);
+            if(offload){
+              runner_doself_gpu_gradient(r, sched, &gpu_buf_grad, t, stream, d_a,
+                  d_H);
+            }else{
+#ifdef EXTRA_HYDRO_LOOP_TYPE2
+              runner_dosub_self2_gradient(r, ci, /*below_h_max=*/0, 1);
+#else
+              runner_dosub_self1_gradient(r, ci, /*below_h_max=*/0, 1);
+#endif
+              int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
+                  1;
+              if (count < 1) gpu_buf_grad.md.launch_leftovers = 1;
+            }
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-            runner_doself_gpu_force(r, sched, &gpu_buf_forc, t, stream, d_a,
-                                    d_H);
+            if(offload){
+              runner_doself_gpu_force(r, sched, &gpu_buf_forc, t, stream, d_a,
+                  d_H);
+            }else{
+              runner_dosub_self2_force(r, ci, /*below_h_max=*/0, 1);
+              int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) -
+                  1;
+              if (count < 1) gpu_buf_forc.md.launch_leftovers = 1;
+            }
 #endif
           }
 #ifdef EXTRA_HYDRO_LOOP
@@ -380,18 +419,43 @@ void *runner_main_cuda(void *data) {
           /* GPU WORK */
           else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
+          if(offload){
             runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_dens, t,
                                       stream, d_a, d_H);
+          }else{
+            runner_dosub_pair1_density(r, ci, cj, /*below_h_max=*/0, 1);
+            int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
+                1;
+              if (count < 1) gpu_buf_dens.md.launch_leftovers = 1;
+          }
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
+          if(offload){
             runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_grad, t,
                                        stream, d_a, d_H);
+          }else{
+#ifdef EXTRA_HYDRO_LOOP_TYPE2
+            runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 1);
+#else
+            runner_dosub_pair1_gradient(r, ci, cj, /*below_h_max=*/0, 1);
+#endif  // EXTRA_HYDRO_LOOP_TYPE2
+            int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
+                1;
+              if (count < 1) gpu_buf_grad.md.launch_leftovers = 1;
+          }
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-            runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_forc, t, stream,
-                                    d_a, d_H);
+            if(offload){
+              runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_forc, t, stream,
+                  d_a, d_H);
+            }else{
+              runner_dosub_pair2_force(r, ci, cj, /*below_h_max=*/0, 1);
+              int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) -
+                  1;
+              if (count < 1) gpu_buf_forc.md.launch_leftovers = 1;
+            }
 #endif
           }
 
@@ -714,31 +778,43 @@ void *runner_main_cuda(void *data) {
       prev = t;
       if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
-        /* Don't enqueue dependencies yet. Just signal the runners */
-        t->skip = 1;
-        t->toc = getticks();
-        t->total_ticks += t->toc - t->tic;
-        t = NULL;
+        if(offload){
+          /* Don't enqueue dependencies yet. Just signal the runners */
+          t->skip = 1;
+          t->toc = getticks();
+          t->total_ticks += t->toc - t->tic;
+          t = NULL;
+        }
+        else
+          t = scheduler_done(sched, t);
 #else
         t = scheduler_done(sched, t);
 #endif
       } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-        /* Don't enqueue dependencies yet. Just signal the runners */
-        t->skip = 1;
-        t->toc = getticks();
-        t->total_ticks += t->toc - t->tic;
-        t = NULL;
+        if(offload){
+          /* Don't enqueue dependencies yet. Just signal the runners */
+          t->skip = 1;
+          t->toc = getticks();
+          t->total_ticks += t->toc - t->tic;
+          t = NULL;
+        }
+        else
+          t = scheduler_done(sched, t);
 #else
         t = scheduler_done(sched, t);
 #endif
       } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-        /* Don't enqueue dependencies yet. Just signal the runners */
-        t->skip = 1;
-        t->toc = getticks();
-        t->total_ticks += t->toc - t->tic;
-        t = NULL;
+        if(offload){
+          /* Don't enqueue dependencies yet. Just signal the runners */
+          t->skip = 1;
+          t->toc = getticks();
+          t->total_ticks += t->toc - t->tic;
+          t = NULL;
+        }
+        else
+          t = scheduler_done(sched, t);
 #else
         t = scheduler_done(sched, t);
 #endif
@@ -746,6 +822,7 @@ void *runner_main_cuda(void *data) {
         t = scheduler_done(sched, t);
       }
     } /* Loop while there are tasks */
+    message("n_cpu %i n_gpu %i", n_cpu, n_gpu);
   } /* main loop. */
 
   /* Release the bytes back into the wilderness */
