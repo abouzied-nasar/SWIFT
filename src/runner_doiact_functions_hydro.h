@@ -3055,8 +3055,11 @@ void DOSUB_PAIR1(struct runner *r, struct cell *ci, struct cell *cj,
       }
     }
   }
-
+#ifdef WITH_CUDA
+  if (gettimer) TIMER_TOC(timer_gpu_pack_d);
+#else
   if (gettimer) TIMER_TOC(TIMER_DOSUB_PAIR);
+#endif
 }
 
 /**
@@ -3118,8 +3121,11 @@ void DOSUB_SELF1(struct runner *r, struct cell *c, int recurse_below_h_max,
       }
     }
   }
-
+#ifdef WITH_CUDA
+  if (gettimer) TIMER_TOC(timer_gpu_pack_d);
+#else
   if (gettimer) TIMER_TOC(TIMER_DOSUB_SELF);
+#endif
 }
 
 /**
@@ -3223,8 +3229,11 @@ void DOSUB_PAIR2(struct runner *r, struct cell *ci, struct cell *cj,
       }
     }
   }
-
+#ifdef WITH_CUDA
+  if (gettimer) TIMER_TOC(timer_gpu_pack_d);
+#else
   if (gettimer) TIMER_TOC(TIMER_DOSUB_PAIR);
+#endif
 }
 
 /**
@@ -3284,8 +3293,11 @@ void DOSUB_SELF2(struct runner *r, struct cell *c, int recurse_below_h_max,
       }
     }
   }
-
+#ifdef WITH_CUDA
+  if (gettimer) TIMER_TOC(timer_gpu_pack_d);
+#else
   if (gettimer) TIMER_TOC(TIMER_DOSUB_SELF);
+#endif
 }
 
 /**
