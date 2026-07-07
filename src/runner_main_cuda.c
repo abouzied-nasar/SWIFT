@@ -314,7 +314,7 @@ void *runner_main_cuda(void *data) {
               runner_doself_gpu_density(r, sched, &gpu_buf_dens, t, stream, d_a,
                                         d_H);
             }else{
-              runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 1);
+              runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 0);
               int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
                 1;
               if (count < 1) gpu_buf_dens.md.launch_leftovers = 1;
@@ -327,9 +327,9 @@ void *runner_main_cuda(void *data) {
                   d_H);
             }else{
 #ifdef EXTRA_HYDRO_LOOP_TYPE2
-              runner_dosub_self2_gradient(r, ci, /*below_h_max=*/0, 1);
+              runner_dosub_self2_gradient(r, ci, /*below_h_max=*/0, 0);
 #else
-              runner_dosub_self1_gradient(r, ci, /*below_h_max=*/0, 1);
+              runner_dosub_self1_gradient(r, ci, /*below_h_max=*/0, 0);
 #endif
               int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
                   1;
@@ -342,7 +342,7 @@ void *runner_main_cuda(void *data) {
               runner_doself_gpu_force(r, sched, &gpu_buf_forc, t, stream, d_a,
                   d_H);
             }else{
-              runner_dosub_self2_force(r, ci, /*below_h_max=*/0, 1);
+              runner_dosub_self2_force(r, ci, /*below_h_max=*/0, 0);
               int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) -
                   1;
               if (count < 1) gpu_buf_forc.md.launch_leftovers = 1;
@@ -418,7 +418,7 @@ void *runner_main_cuda(void *data) {
             runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_dens, t,
                                       stream, d_a, d_H);
           }else{
-            runner_dosub_pair1_density(r, ci, cj, /*below_h_max=*/0, 1);
+            runner_dosub_pair1_density(r, ci, cj, /*below_h_max=*/0, 0);
             int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
                 1;
               if (count < 1) gpu_buf_dens.md.launch_leftovers = 1;
@@ -431,9 +431,9 @@ void *runner_main_cuda(void *data) {
                                        stream, d_a, d_H);
           }else{
 #ifdef EXTRA_HYDRO_LOOP_TYPE2
-            runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 1);
+            runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 0);
 #else
-            runner_dosub_pair1_gradient(r, ci, cj, /*below_h_max=*/0, 1);
+            runner_dosub_pair1_gradient(r, ci, cj, /*below_h_max=*/0, 0);
 #endif  // EXTRA_HYDRO_LOOP_TYPE2
             int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
                 1;
@@ -446,7 +446,7 @@ void *runner_main_cuda(void *data) {
               runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_forc, t, stream,
                   d_a, d_H);
             }else{
-              runner_dosub_pair2_force(r, ci, cj, /*below_h_max=*/0, 1);
+              runner_dosub_pair2_force(r, ci, cj, /*below_h_max=*/0, 0);
               int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) -
                   1;
               if (count < 1) gpu_buf_forc.md.launch_leftovers = 1;
