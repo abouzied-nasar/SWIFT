@@ -2194,11 +2194,23 @@ void scheduler_reweight(struct scheduler *s, int verbose) {
         } else if (t->subtype == task_subtype_do_bh_swallow) {
           cost = 1.f * wscale * (bcount_i + bcount_j);
         } else if (t->subtype == task_subtype_gpu_density) {
-          cost = 2.f * (wscale * count_i) * count_i;
+          if (t->ci->nodeID != nodeID || t->cj->nodeID != nodeID) {
+            cost = 3.f * (wscale * count_i) * count_j * sid_scale[t->flags];
+          } else {
+            cost = 2.f * (wscale * count_i) * count_j * sid_scale[t->flags];
+          }
         } else if (t->subtype == task_subtype_gpu_force) {
-          cost = 2.f * (wscale * count_i) * count_i;
+          if (t->ci->nodeID != nodeID || t->cj->nodeID != nodeID) {
+            cost = 3.f * (wscale * count_i) * count_j * sid_scale[t->flags];
+          } else {
+            cost = 2.f * (wscale * count_i) * count_j * sid_scale[t->flags];
+          }
         } else if (t->subtype == task_subtype_gpu_gradient) {
-          cost = 2.f * (wscale * count_i) * count_i;
+          if (t->ci->nodeID != nodeID || t->cj->nodeID != nodeID) {
+            cost = 3.f * (wscale * count_i) * count_j * sid_scale[t->flags];
+          } else {
+            cost = 2.f * (wscale * count_i) * count_j * sid_scale[t->flags];
+          }
         } else if (t->subtype == task_subtype_density ||
                    t->subtype == task_subtype_gradient ||
                    t->subtype == task_subtype_force ||
