@@ -228,9 +228,7 @@ void *runner_main_cuda(void *data) {
      * Currently we use gpu_buf_dens to hold md->n_active_leaves.
      * Could use any of the other buffers*/
     int offload = 0;
-    if(e->step > 0)
-    	offload = runner_GPU_offload_switch(r, sched, e, &gpu_buf_dens, /*timer off 0, on 1*/1);
-    else
+    offload = runner_GPU_offload_switch(r, sched, e, &gpu_buf_dens, /*timer off 0, on 1*/1);
 
     gpu_data_buffers_init_step(&gpu_buf_dens);
     gpu_data_buffers_init_step(&gpu_buf_grad);
