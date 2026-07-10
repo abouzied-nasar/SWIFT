@@ -449,9 +449,9 @@ struct engine {
   /* Data for the threads' barrier. */
   swift_barrier_t wait_barrier;
   swift_barrier_t run_barrier;
-#if defined(WITH_CUDA) || defined(WITH_HIP)
+//#if defined(WITH_CUDA) || defined(WITH_HIP)
   swift_barrier_t gpu_barrier;
-#endif
+//#endif
 
   /* ID of the node this engine lives on. */
   int nr_nodes, nodeID;
