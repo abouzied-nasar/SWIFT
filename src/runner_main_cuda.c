@@ -175,7 +175,7 @@ void *runner_main_cuda(void *data) {
   /* Wait here until we have correctly assigned part_buffer_size
    * This ensures that we do not try to allocate GPU memory while other threads
    * are trying to figure out how much memory is available*/
-  pthread_barrier_wait(&e->gpu_barrier);
+  swift_barrier_wait(&(e->gpu_barrier));
 
   /* Get estimates for array sizes et al. */
   const struct gpu_global_pack_params gpu_pack_params = e->gpu_pack_params;
@@ -227,9 +227,10 @@ void *runner_main_cuda(void *data) {
      * If we have enough, flag that we should offload to GPU
      * Currently we use gpu_buf_dens to hold md->n_active_leaves.
      * Could use any of the other buffers*/
-    const int offload = runner_GPU_offload_switch(r, sched, e, &gpu_buf_dens, /*timer off 0, on 1*/1);
-    if(offload && r->cpuid == 0)
-      message("OFFLOADING");
+    int offload = 0;
+    if(e->step > 0)
+    	offload = runner_GPU_offload_switch(r, sched, e, &gpu_buf_dens, /*timer off 0, on 1*/1);
+    else
 
     gpu_data_buffers_init_step(&gpu_buf_dens);
     gpu_data_buffers_init_step(&gpu_buf_grad);
