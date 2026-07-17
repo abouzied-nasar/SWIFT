@@ -2941,7 +2941,9 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
   if (qid >= nr_queues || qid < 0) error("Bad queue ID.");
 
   /* Get a pointer to our queue for re-use */
+#if defined(WITH_CUDA) || defined(WITH_HIP)
   struct queue *q = &s->queues[qid];
+#endif
   /* Loop as long as there are tasks... */
   while (s->waiting > 0 && res == NULL) {
     /* Try more than once before sleeping. */
@@ -2963,8 +2965,8 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
 
         /* Make list of queues that have 1 or more tasks in them */
         for (int k = 0; k < nr_queues; k++) {
-          /* Don't include this queue */
-          if (k == qid) continue;
+//          /* Don't include this queue */
+//          if (k == qid) continue;
           if (s->queues[k].count > 0 || s->queues[k].count_incoming > 0) {
             qids[count++] = k;
           }
@@ -2974,50 +2976,13 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
 
           /* Pick a queue at random among the non-empty ones */
           const int ind = rand_r(&seed) % count;
-          /* Index of queue we are stealing from */
-          int qstl_id = qids[ind];
-
-          /* If we got the queue we already have, skip. */
-          /* TODO: I think we can remove this, we already exclude the queue in
-           * the loop above. */
-          if (qid == qstl_id) {
-            /* Reduce the size of the list of non-empty queues */
-            qids[ind] = qids[--count];
-            continue;
-          }
-
-          /* Get a pointer to the queue we're stealing from */
-          struct queue *q_stl = &s->queues[qstl_id];
-
-          /* Can we lock our own queue? */
-          if (lock_trylock(&q->lock) != 0) {
-
-            /* No --> continue and try a different queue */
-            continue;
-
-          } else {
-
-            /* Yes --> Try locking the queue we steal from */
-            if (lock_trylock(&q_stl->lock) != 0) {
-
-              /* Failed? --> Unlock the 1st queue and
-                 try again */
-              if (lock_unlock(&q->lock) != 0)
-                error("Unlocking our queue failed");
-              continue;
-            }
-          }
-
-          /* We now have locked q and q_stl */
-
-          /* Try to get a task from that random queue */
           TIMER_TIC;
+//          while(lock_trylock(&q->lock) == 0);
+          struct queue * q_stl = &s->queues[qids[ind]];
+//          while(lock_trylock(&q_stl->lock) == 0);
           res = queue_gettask(q_stl, prev, 0);
           TIMER_TOC(timer_qsteal);
-
-          /* Lucky? i.e. did we actually get a task? */
           if (res != NULL) {
-
 #if defined(WITH_CUDA) || defined(WITH_HIP)
             /* For GPU tasks: Move counter from the robbed to the robber */
 
@@ -3026,25 +2991,26 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
             if (subtype == task_subtype_gpu_density) {
               atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_density]);
               atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_density]);
+              message("stole dens task");
             } else if (subtype == task_subtype_gpu_gradient) {
               atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_gradient]);
               atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_gradient]);
+              message("stole grad task");
             } else if (subtype == task_subtype_gpu_force) {
               atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_force]);
               atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_force]);
+              message("stole forc task");
             }
 #endif
             /* Run with the task */
             break;
           } else {
-
             /* Reduce the size of the list of non-empty queues */
             qids[ind] = qids[--count];
           }
-
-          if (lock_unlock(&q->lock) != 0) error("Unlocking our queue failed");
-          if (lock_unlock(&q_stl->lock) != 0)
-            error("Unlocking the stealing queue failed");
+//          if (lock_unlock(&q->lock) != 0) error("Unlocking our queue failed");
+//          if (lock_unlock(&q_stl->lock) != 0)
+//            error("Unlocking the stealing queue failed");
         }
         if (res != NULL) break;
       }
