@@ -189,6 +189,22 @@ __attribute__((always_inline)) INLINE static int cell_is_active_hydro(
 }
 
 /**
+ * @brief Does a cell contain any particle finishing their time-step now ?
+ *This version does not do the debug checks. It is done once in a time step
+ *to recurse through all cells in a space (beginning from top cells which are not included in active/inactive computations)
+ *to and identify how many total leaf level computations are active
+ *The debug checks will be carried out as usual when unpacking so the test will still be made as in original functions
+ *
+ * @param c The #cell.
+ * @param e The #engine containing information about the current time.
+ * @return 1 if the #cell contains at least an active particle, 0 otherwise.
+ */
+__attribute__((always_inline)) INLINE static int cell_is_active_hydro_inc_tops(
+    const struct cell *c, const struct engine *e) {
+  return (c->hydro.ti_end_min == e->ti_current);
+}
+
+/**
  * @brief Does a cell contain any particle finishing their RT time-step now ?
  *
  * @param c The #cell.
