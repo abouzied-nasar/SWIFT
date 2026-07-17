@@ -288,7 +288,7 @@ static void runner_self_recurse_and_test_active(const struct runner *r,
 
   /* Should we even bother? */
   const struct engine *e = r->e;
-  if (!cell_is_active_hydro(ci, e)) return;
+  if (!cell_is_active_hydro_inc_tops(ci, e)) return;
   if (ci->hydro.count == 0) return;
 
   /* Grab some handles. */
@@ -342,8 +342,7 @@ __attribute__((always_inline)) INLINE static int runner_GPU_offload_switch(const
   buf->md.n_active_leaves = 0;
   /*TODO: Need to time this separately to ensure we are not wasting too much time here*/
   for(int i = 0; i < e->s->nr_local_cells; i++){
-    if(cell_is_active_hydro(&e->s->cells_top[i], e))
-      runner_self_recurse_and_test_active(r, s, buf, &e->s->cells_top[i], /*depth=*/0, /*timer=*/1);
+	runner_self_recurse_and_test_active(r, s, buf, &e->s->cells_top[i], /*depth=*/0, /*timer=*/1);
   }
   /* We want to have at least one full pack of leaf computations per thread
    * If we do not have enough run on the CPU.
@@ -1267,9 +1266,11 @@ static void runner_doself_gpu_density(const struct runner *r,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
+  while(lock_trylock(&s->queues[qid].lock) == 0);
   int count =
       atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
       1;
+  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
@@ -1303,9 +1304,11 @@ static void runner_doself_gpu_gradient(const struct runner *r,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
+  while(lock_trylock(&s->queues[qid].lock) == 0);
   int count =
       atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
       1;
+  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
@@ -1338,11 +1341,14 @@ static void runner_doself_gpu_force(const struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 and pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
+  while(lock_trylock(&s->queues[qid].lock) == 0);
   int count =
       atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
+  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
   if (count < 1) buf->md.launch_leftovers = 1;
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
+
 }
 
 /**
@@ -1375,9 +1381,11 @@ static void runner_dopair_gpu_density(const struct runner *r,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
+  while(lock_trylock(&s->queues[qid].lock) == 0);
   int count =
       atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
       1;
+  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
@@ -1414,9 +1422,11 @@ static void runner_dopair_gpu_gradient(const struct runner *r,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
+  while(lock_trylock(&s->queues[qid].lock) == 0);
   int count =
       atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
       1;
+  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
@@ -1452,8 +1462,10 @@ static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
    * launch_leftovers to 1 to pack and launch on GPU */
   unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
+  while(lock_trylock(&s->queues[qid].lock) == 0);
   int count =
       atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
+  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
   if (count < 1) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
