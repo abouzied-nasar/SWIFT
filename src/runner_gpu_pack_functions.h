@@ -133,8 +133,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
     pthread_cond_broadcast(&s->sleep_cond);
     pthread_mutex_unlock(&s->sleep_mutex);
 
-    /* Mark the task as done. */
-    md->task_list[tid]->skip = 1;
+//    /* Mark the task as done. */
+//    md->task_list[tid]->skip = 1;
 
   } /* Loop over tasks in list */
 }

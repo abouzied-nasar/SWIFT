@@ -956,8 +956,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     pthread_cond_broadcast(&s->sleep_cond);
     pthread_mutex_unlock(&s->sleep_mutex);
 
-    /* Mark the task as done. */
-    t->skip = 1;
+//    /* Mark the task as done. */
+//    t->skip = 1;
 
     /* We're done here. */
     return;
