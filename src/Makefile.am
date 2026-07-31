@@ -642,7 +642,7 @@ libswift_cuda_device_a_SOURCES = $(AM_CUDA_DEVICE_SOURCES)
 libswift_cuda_device_a_LIBADD = $(AM_CUDA_DEVICE_OBJECTS) $(AM_CUDA_DEVICE_DLINK_OBJECTS)
 
 AM_NVCCFLAGS = -I$(top_srcdir) -I$(top_srcdir)/src
-AM_NVCCFLAGS += -D_FORCE_INLINES -O4 -lineinfo -src-in-ptx --maxrregcount=64
+AM_NVCCFLAGS += -D_FORCE_INLINES -lineinfo --maxrregcount=64
 # use fast approximation mode for divisions, sqrt et al. as default, even with
 # debug/no-optimization enabled. We don't want the float output to differ too much.
 AM_NVCCFLAGS += --ftz=false --prec-div=false --prec-sqrt=false --fmad=true
