@@ -65,7 +65,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
   const struct engine *e = r->e;
 
   /*Let's unpack the unique particle data first.
-   * We get on to enqueueing dependencies after this*/
+   * We get on to enqueueing dependencies after this
+   * TODO: Need to refactor so we only have one loop with conditional for
+   * task types just before we unpack*/
   int unpack_index = 0;
   if(task_subtype == task_subtype_gpu_density){
     for(int i = 0; i < md->n_unique; i++){
