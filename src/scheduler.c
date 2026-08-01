@@ -2941,14 +2941,14 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
                                const struct task *prev) {
   struct task *res = NULL;
   const int nr_queues = s->nr_queues;
-  unsigned int seed = qid;
+//  unsigned int seed = qid;
 
   /* Check qid. */
   if (qid >= nr_queues || qid < 0) error("Bad queue ID.");
 
   /* Get a pointer to our queue for re-use */
 #if defined(WITH_CUDA) || defined(WITH_HIP)
-  struct queue *q = &s->queues[qid];
+//  struct queue *q = &s->queues[qid];
 #endif
   /* Loop as long as there are tasks... */
   while (s->waiting > 0 && res == NULL) {
@@ -2964,75 +2964,75 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
       }
 
       /* If unsuccessful, try stealing from the other queues. */
-      if (s->flags & scheduler_flag_steal) {
-
-        int count = 0;
-        int qids[nr_queues];
-
-        /* Make list of queues that have 1 or more tasks in them */
-        for (int k = 0; k < nr_queues; k++) {
-//          /* Don't include this queue */
-//          if (k == qid) continue;
-          if (s->queues[k].count > 0 || s->queues[k].count_incoming > 0) {
-            qids[count++] = k;
-          }
-        }
-
-        for (int k = 0; k < scheduler_maxsteal && count > 0; k++) {
-
-          /* Pick a queue at random among the non-empty ones */
-          const int ind = rand_r(&seed) % count;
-          TIMER_TIC;
-//          while(lock_trylock(&q->lock) == 0);
-          struct queue *q_stl = &s->queues[qids[ind]];
-//          while(lock_trylock(&q_stl->lock) == 0);
-//#if defined(WITH_CUDA) || defined(WITH_HIP)
-//          for(int tp = 0; tp < 3; tp++){
-//            if(q_stl->gpu_tasks_left[tp] > 3){
-//#endif
-              res = queue_gettask(q_stl, prev, 0);
-//#if defined(WITH_CUDA) || defined(WITH_HIP)
-//              break;
-//            }
-//            else{
-//              res = NULL;
-//            }
+//      if (s->flags & scheduler_flag_steal) {
+//
+//        int count = 0;
+//        int qids[nr_queues];
+//
+//        /* Make list of queues that have 1 or more tasks in them */
+//        for (int k = 0; k < nr_queues; k++) {
+////          /* Don't include this queue */
+////          if (k == qid) continue;
+//          if (s->queues[k].count > 0 || s->queues[k].count_incoming > 0) {
+//            qids[count++] = k;
 //          }
+//        }
+//
+//        for (int k = 0; k < scheduler_maxsteal && count > 0; k++) {
+//
+//          /* Pick a queue at random among the non-empty ones */
+//          const int ind = rand_r(&seed) % count;
+//          TIMER_TIC;
+////          while(lock_trylock(&q->lock) == 0);
+//          struct queue *q_stl = &s->queues[qids[ind]];
+////          while(lock_trylock(&q_stl->lock) == 0);
+////#if defined(WITH_CUDA) || defined(WITH_HIP)
+////          for(int tp = 0; tp < 3; tp++){
+////            if(q_stl->gpu_tasks_left[tp] > 3){
+////#endif
+//              res = queue_gettask(q_stl, prev, 0);
+////#if defined(WITH_CUDA) || defined(WITH_HIP)
+////              break;
+////            }
+////            else{
+////              res = NULL;
+////            }
+////          }
+////#endif
+//
+//          TIMER_TOC(timer_qsteal);
+//          if (res != NULL) {
+//#if defined(WITH_CUDA) || defined(WITH_HIP)
+//            /* For GPU tasks: Move counter from the robbed to the robber */
+//
+//            enum task_subtypes subtype = res->subtype;
+//
+//            if (subtype == task_subtype_gpu_density) {
+//              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_density]);
+//              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_density]);
+//              message("stole dens task");
+//            } else if (subtype == task_subtype_gpu_gradient) {
+//              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_gradient]);
+//              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_gradient]);
+//              message("stole grad task");
+//            } else if (subtype == task_subtype_gpu_force) {
+//              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_force]);
+//              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_force]);
+//              message("stole forc task");
+//            }
 //#endif
-
-          TIMER_TOC(timer_qsteal);
-          if (res != NULL) {
-#if defined(WITH_CUDA) || defined(WITH_HIP)
-            /* For GPU tasks: Move counter from the robbed to the robber */
-
-            enum task_subtypes subtype = res->subtype;
-
-            if (subtype == task_subtype_gpu_density) {
-              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_density]);
-              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_density]);
-              message("stole dens task");
-            } else if (subtype == task_subtype_gpu_gradient) {
-              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_gradient]);
-              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_gradient]);
-              message("stole grad task");
-            } else if (subtype == task_subtype_gpu_force) {
-              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_force]);
-              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_force]);
-              message("stole forc task");
-            }
-#endif
-            /* Run with the task */
-            break;
-          } else {
-            /* Reduce the size of the list of non-empty queues */
-            qids[ind] = qids[--count];
-          }
-//          if (lock_unlock(&q->lock) != 0) error("Unlocking our queue failed");
-//          if (lock_unlock(&q_stl->lock) != 0)
-//            error("Unlocking the stealing queue failed");
-        }
-        if (res != NULL) break;
-      }
+//            /* Run with the task */
+//            break;
+//          } else {
+//            /* Reduce the size of the list of non-empty queues */
+//            qids[ind] = qids[--count];
+//          }
+////          if (lock_unlock(&q->lock) != 0) error("Unlocking our queue failed");
+////          if (lock_unlock(&q_stl->lock) != 0)
+////            error("Unlocking the stealing queue failed");
+//        }
+//        if (res != NULL) break;
+//      }
     }
 
 /* If we failed, take a short nap. */

@@ -1131,13 +1131,19 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     /* Are we launching, or are we launching leftovers AND have packed all
      * remaining leaves or are we launching before exceeding buffer array size? */
     if(t->subtype == task_subtype_gpu_density){
-      md->launch_leftovers = atomic_cas(&s->n_dens, 0, 1);//0 == s->n_dens ? 1 : 0;
+      md->launch_leftovers = 1 == atomic_cas(&s->n_dens, 0, 1) ? 1 : 0;
+      if (md->launch_leftovers > 1)error("%i", md->launch_leftovers);
+//      md->launch_leftovers = 0 == s->n_dens ? 1 : 0;
     }
     else if(t->subtype == task_subtype_gpu_gradient){
-      md->launch_leftovers = atomic_cas(&s->n_grad, 0, 1);//0 == s->n_grad ? 1 : 0;
+      md->launch_leftovers = 1 == atomic_cas(&s->n_grad, 0, 1) ? 1 : 0;
+      if (md->launch_leftovers > 1)error("%i", md->launch_leftovers);
+//      md->launch_leftovers = 0 == s->n_grad ? 1 : 0;
     }
     else if(t->subtype == task_subtype_gpu_force){
-      md->launch_leftovers = atomic_cas(&s->n_forc, 0, 1);//0 == s->n_forc ? 1 : 0;
+      md->launch_leftovers = 1 == atomic_cas(&s->n_forc, 0, 1) ? 1 : 0;
+      if (md->launch_leftovers > 1)error("%i", md->launch_leftovers);
+//      md->launch_leftovers = 0 == s->n_forc ? 1 : 0;
     }
     if (md->launch ||
         (md->launch_leftovers && (npacked == md->task_n_leaves)) || launch_before_over_filling) {
