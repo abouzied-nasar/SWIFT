@@ -917,7 +917,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   struct gpu_pack_metadata *md = &buf->md;
   int *task_first_packed_leaf = md->task_first_packed_leaf;
   int *task_last_packed_leaf = md->task_last_packed_leaf;
-
+  md->s_waiting_start = s->waiting;
+  md->s_waiting_end = md->s_waiting_start;
+  message("task");
   /* Should we early exit? */
   if ((md->task_n_leaves == 0) &&
       (!md->launch_leftovers ||
@@ -953,8 +955,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     /* Tell the scheduler's bookkeeping that this task is done */
     pthread_mutex_lock(&s->sleep_mutex);
     atomic_dec(&s->waiting);
+    md->s_waiting_end--;
     pthread_cond_broadcast(&s->sleep_cond);
     pthread_mutex_unlock(&s->sleep_mutex);
+    message("empty task");
 
 //    /* Mark the task as done. */
 //    t->skip = 1;
@@ -1025,9 +1029,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
    * pairs to pack after the launch, we pack those too after the launch and
    * unpacking is complete. By the end, all data will have been packed and some
    * of it (possibly all of it) will have been solved on the GPU already. */
-
+//  int launched = 0;
   while ((npacked < md->task_n_leaves) || launch_empty_task_leftovers) {
 
+//    launched = 0;
     /* We only need this for the first entry into the main loop. */
     launch_empty_task_leftovers = 0;
 
@@ -1125,6 +1130,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
     /* Are we launching, or are we launching leftovers AND have packed all
      * remaining leaves or are we launching before exceeding buffer array size? */
+    if(t->subtype == task_subtype_gpu_density){
+      md->launch_leftovers = atomic_cas(&s->n_dens, 0, 1);//0 == s->n_dens ? 1 : 0;
+    }
+    else if(t->subtype == task_subtype_gpu_gradient){
+      md->launch_leftovers = atomic_cas(&s->n_grad, 0, 1);//0 == s->n_grad ? 1 : 0;
+    }
+    else if(t->subtype == task_subtype_gpu_force){
+      md->launch_leftovers = atomic_cas(&s->n_forc, 0, 1);//0 == s->n_forc ? 1 : 0;
+    }
     if (md->launch ||
         (md->launch_leftovers && (npacked == md->task_n_leaves)) || launch_before_over_filling) {
 
@@ -1136,6 +1150,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       /* Take note that we unlocked this task. */
       unlocked = 1;
 
+      message("Launching %i leftovers %i overfill %i", md->launch, md->launch_leftovers, launch_before_over_filling);
       if (t->subtype == task_subtype_gpu_density) {
 
         /* Launch the GPU offload */
@@ -1166,6 +1181,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         error("Unknown task subtype %s", subtaskID_names[t->subtype]);
       }
 #endif
+//      if(md->s_waiting_end == md->s_waiting_start)
+//        error("Missed one");
 
       if (npacked == md->task_n_leaves) {
 
@@ -1226,10 +1243,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         task_last_packed_leaf[0] = 0;  /* Nothing's packed yet. */
         /* Same for first particle index of task */
         md->task_first_packed_part[0] = 0;
+//        launched = 1;
 
       } /* Launched, but not finished packing */
     } /* if launch or launch_leftovers */
   } /* while npacked < md->task_n_leaves */
+//  if(md->s_waiting_end == md->s_waiting_start && launched)//(md->launch || md->launch_leftovers))
+//    error("Missed one");
 
   /* We're done with this task's data: Everything we'll need has been copied
    * into buffers. So we can release the cell locks now. */
@@ -1274,14 +1294,19 @@ static void runner_doself_gpu_density(const struct runner *r,
 
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 and pack and launch on GPU */
-  unsigned int qid = r->qid;
+//  unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
 //  while(lock_trylock(&s->queues[qid].lock) == 0);
-  int count =
-      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
-      1;
+//  int count =
+//      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
+//      1;
+//  int count2 =
+  pthread_mutex_lock(&s->sleep_mutex);
+  atomic_dec(&s->n_dens);
+  pthread_cond_broadcast(&s->sleep_cond);
+  pthread_mutex_unlock(&s->sleep_mutex);
 //  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
-  if (count < 1) buf->md.launch_leftovers = 1;
+  if (s->n_dens == 0) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
@@ -1312,14 +1337,19 @@ static void runner_doself_gpu_gradient(const struct runner *r,
 
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 and pack and launch on GPU */
-  unsigned int qid = r->qid;
+//  unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
 //  while(lock_trylock(&s->queues[qid].lock) == 0);
-  int count =
-      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
-      1;
+//  int count =
+//      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
+//      1;
+//  int count2 =
+  pthread_mutex_lock(&s->sleep_mutex);
+  atomic_dec(&s->n_grad);
+  pthread_cond_broadcast(&s->sleep_cond);
+  pthread_mutex_unlock(&s->sleep_mutex);
 //  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
-  if (count < 1) buf->md.launch_leftovers = 1;
+  if (s->n_grad == 0) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
@@ -1349,13 +1379,18 @@ static void runner_doself_gpu_force(const struct runner *r, struct scheduler *s,
 
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 and pack and launch on GPU */
-  unsigned int qid = r->qid;
+//  unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
 //  while(lock_trylock(&s->queues[qid].lock) == 0);
-  int count =
-      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
+//  int count =
+//      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
+//  int count2 =
+  pthread_mutex_lock(&s->sleep_mutex);
+  atomic_dec(&s->n_forc);
+  pthread_cond_broadcast(&s->sleep_cond);
+  pthread_mutex_unlock(&s->sleep_mutex);
 //  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
-  if (count < 1) buf->md.launch_leftovers = 1;
+  if (s->n_forc == 0) buf->md.launch_leftovers = 1;
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
 
@@ -1389,14 +1424,19 @@ static void runner_dopair_gpu_density(const struct runner *r,
 
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 to pack and launch on GPU */
-  unsigned int qid = r->qid;
+//  unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
 //  while(lock_trylock(&s->queues[qid].lock) == 0);
-  int count =
-      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
-      1;
+//  int count =
+//      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
+//      1;
 //  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
-  if (count < 1) buf->md.launch_leftovers = 1;
+//  int count2 =
+  pthread_mutex_lock(&s->sleep_mutex);
+  atomic_dec(&s->n_dens);
+  pthread_cond_broadcast(&s->sleep_cond);
+  pthread_mutex_unlock(&s->sleep_mutex);
+  if (s->n_dens == 0) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
@@ -1430,14 +1470,19 @@ static void runner_dopair_gpu_gradient(const struct runner *r,
 
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 to pack and launch on GPU */
-  unsigned int qid = r->qid;
+//  unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
 //  while(lock_trylock(&s->queues[qid].lock) == 0);
-  int count =
-      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
-      1;
+//  int count =
+//      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
+//      1;
+//  int count2 =
+  pthread_mutex_lock(&s->sleep_mutex);
+  atomic_dec(&s->n_grad);
+  pthread_cond_broadcast(&s->sleep_cond);
+  pthread_mutex_unlock(&s->sleep_mutex);
 //  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
-  if (count < 1) buf->md.launch_leftovers = 1;
+  if (s->n_grad == 0) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);
@@ -1470,13 +1515,18 @@ static void runner_dopair_gpu_force(const struct runner *r, struct scheduler *s,
 
   /* Check to see if this is the last task in the queue. If so, set
    * launch_leftovers to 1 to pack and launch on GPU */
-  unsigned int qid = r->qid;
+//  unsigned int qid = r->qid;
   /* atomic_dec returns previously held value; So subtract 1 from it again */
 //  while(lock_trylock(&s->queues[qid].lock) == 0);
-  int count =
-      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
+//  int count =
+//      atomic_dec(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
 //  if (lock_unlock(&s->queues[qid].lock) != 0) error("Unlocking our queue failed");
-  if (count < 1) buf->md.launch_leftovers = 1;
+//  int count2 =
+  pthread_mutex_lock(&s->sleep_mutex);
+  atomic_dec(&s->n_forc);
+  pthread_cond_broadcast(&s->sleep_cond);
+  pthread_mutex_unlock(&s->sleep_mutex);
+  if (s->n_forc == 0) buf->md.launch_leftovers = 1;
 
   /* pack the data and run, if enough data has been gathered */
   runner_gpu_pack_and_launch(r, s, buf, t, stream, d_a, d_H);

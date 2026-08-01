@@ -134,6 +134,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
     atomic_dec(&s->waiting);
     pthread_cond_broadcast(&s->sleep_cond);
     pthread_mutex_unlock(&s->sleep_mutex);
+    md->s_waiting_end--;
 
 //    /* Mark the task as done. */
 //    md->task_list[tid]->skip = 1;

@@ -69,6 +69,10 @@ struct scheduler {
   /* Total number of tasks. */
   int nr_tasks, size, tasks_next;
 
+  int n_dens, n_grad, n_forc;
+
+  int launch_leftovers;
+
   /* Total number of waiting tasks. */
   int waiting;
 

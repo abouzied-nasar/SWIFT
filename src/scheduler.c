@@ -2426,6 +2426,9 @@ void scheduler_enqueue_mapper(void *map_data, int num_elements,
 void scheduler_start(struct scheduler *s) {
 
 #if defined(WITH_CUDA) || defined(WITH_HIP)
+  s->n_dens = 0;
+  s->n_grad = 0;
+  s->n_forc = 0;
   for (int i = 0; i < s->nr_queues; i++) {
     for (int j = 0; j < gpu_task_type_count; j++) {
       s->queues[i].gpu_tasks_left[j] = 0;
@@ -2781,10 +2784,13 @@ void scheduler_enqueue(struct scheduler *s, struct task *t) {
     /* A. Nasar: Increment counters required for the pack tasks */
     if (t->subtype == task_subtype_gpu_density) {
       atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]);
+      atomic_inc(&s->n_dens);
     } else if (t->subtype == task_subtype_gpu_force) {
       atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]);
+      atomic_inc(&s->n_forc);
     } else if (t->subtype == task_subtype_gpu_gradient) {
       atomic_inc(&s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]);
+      atomic_inc(&s->n_grad);
     }
 #endif
   }
@@ -2978,9 +2984,22 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
           const int ind = rand_r(&seed) % count;
           TIMER_TIC;
 //          while(lock_trylock(&q->lock) == 0);
-          struct queue * q_stl = &s->queues[qids[ind]];
+          struct queue *q_stl = &s->queues[qids[ind]];
 //          while(lock_trylock(&q_stl->lock) == 0);
-          res = queue_gettask(q_stl, prev, 0);
+//#if defined(WITH_CUDA) || defined(WITH_HIP)
+//          for(int tp = 0; tp < 3; tp++){
+//            if(q_stl->gpu_tasks_left[tp] > 3){
+//#endif
+              res = queue_gettask(q_stl, prev, 0);
+//#if defined(WITH_CUDA) || defined(WITH_HIP)
+//              break;
+//            }
+//            else{
+//              res = NULL;
+//            }
+//          }
+//#endif
+
           TIMER_TOC(timer_qsteal);
           if (res != NULL) {
 #if defined(WITH_CUDA) || defined(WITH_HIP)
