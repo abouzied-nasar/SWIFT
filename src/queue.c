@@ -307,6 +307,105 @@ struct task *queue_gettask(struct queue *q, const struct task *prev,
   return res;
 }
 
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+/**
+ * @brief Get a task free of dependencies and conflicts.
+ *
+ * @param q The task #queue.
+ * @param prev The previous #task extracted from this #queue.
+ * @param blocking Block until access to the queue is granted.
+ */
+struct task *queue_stealtask(struct queue *q, const struct task *prev,
+                           int blocking) {
+
+  swift_lock_type *qlock = &q->lock;
+  struct task *res = NULL;
+
+  /* Grab the task lock. */
+  if (blocking) {
+    if (lock_lock(qlock) != 0) error("Locking the qlock failed.\n");
+  } else {
+    if (lock_trylock(qlock) != 0) return NULL;
+  }
+
+  /* Fill any tasks from the incoming DEQ. */
+  queue_get_incoming(q);
+
+  /* If there is only 1 task in queue to steal from, leave immediately. */
+  if (q->count == 0) {
+    lock_unlock_blind(qlock);
+    return NULL;
+  }
+
+  /* Set some pointers we will use often. */
+  struct queue_entry *entries = q->entries;
+  struct task *qtasks = q->tasks;
+  const int old_qcount = q->count;
+
+  /* Loop over the queue entries. */
+  int ind;
+  for (ind = 0; ind < old_qcount; ind++) {
+
+    /* Try to lock the next task. */
+    struct task * t_temp = &qtasks[entries[ind].tid];
+    /*If task is a GPU task and we only have 1 left in victim's queue have pity and do not steal it:
+     * Stealing it will interfere with signalling the task is done in the victim's off-load code*/
+    if((t_temp->subtype == task_subtype_gpu_density && q->gpu_tasks_left[gpu_task_type_hydro_density] == 1) ||
+        (t_temp->subtype == task_subtype_gpu_gradient && q->gpu_tasks_left[gpu_task_type_hydro_gradient] == 1) ||
+        (t_temp->subtype == task_subtype_gpu_force && q->gpu_tasks_left[gpu_task_type_hydro_force] == 1))
+      continue;
+    if (task_lock(&qtasks[entries[ind].tid])) break;
+
+    /* Should we de-prioritize this task? */
+
+    // MATTHIEU: We now have more than 64 tasks so the bit-wise
+    // operation here is problematic.
+    // However, the mask was such that this condition is always true anyway.
+    if (1 /* (1ULL << qtasks[entries[ind].tid].type) & */
+        /* queue_lock_fail_reweight_mask */) {
+
+      /* Scale the task's weight. */
+      entries[ind].weight *= queue_lock_fail_reweight_factor;
+
+      /* Send it down the binary heap. */
+      if (queue_sift_down(q, ind) != ind) ind -= 1;
+    }
+  }
+
+  /* Did we get a task? */
+  if (ind < old_qcount) {
+
+    /* Another one bites the dust. */
+    const int qcount = q->count -= 1;
+
+    /* Get a pointer on the task that we want to return. */
+    res = &qtasks[entries[ind].tid];
+
+    /* Swap this task with the last task and re-heap. */
+    if (ind < qcount) {
+      entries[ind] = entries[qcount];
+      ind = queue_bubble_up(q, ind);
+      ind = queue_sift_down(q, ind);
+    }
+
+  } else
+    res = NULL;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  /* Check the queue's consistency. */
+  for (int k = 1; k < q->count; k++)
+    if (entries[(k - 1) / 2].weight < entries[k].weight)
+      error("Queue heap is disordered.");
+#endif
+
+  /* Release the task lock. */
+  if (lock_unlock(qlock) != 0) error("Unlocking the qlock failed.\n");
+
+  /* Take the money and run. */
+  return res;
+}
+#endif
+
 void queue_clean(struct queue *q) {
 
   free(q->entries);

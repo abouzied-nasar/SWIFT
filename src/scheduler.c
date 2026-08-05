@@ -2965,8 +2965,7 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
 
         /* Make list of queues that have 1 or more tasks in them */
         for (int k = 0; k < nr_queues; k++) {
-//          /* Don't include this queue */
-//          if (k == qid) continue;
+          /* Don't include this queue */
           if (s->queues[k].count > 0 || s->queues[k].count_incoming > 0) {
             qids[count++] = k;
           }
@@ -2977,10 +2976,12 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
           /* Pick a queue at random among the non-empty ones */
           const int ind = rand_r(&seed) % count;
           TIMER_TIC;
-//          while(lock_trylock(&q->lock) == 0);
           struct queue * q_stl = &s->queues[qids[ind]];
-//          while(lock_trylock(&q_stl->lock) == 0);
+#if defined(WITH_CUDA) || defined(WITH_HIP)
+          res = queue_stealtask(q_stl, prev, 1);
+#else
           res = queue_gettask(q_stl, prev, 0);
+#endif
           TIMER_TOC(timer_qsteal);
           if (res != NULL) {
 #if defined(WITH_CUDA) || defined(WITH_HIP)
@@ -2991,15 +2992,15 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
             if (subtype == task_subtype_gpu_density) {
               atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_density]);
               atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_density]);
-              message("stole dens task");
+              message("stole dens");
             } else if (subtype == task_subtype_gpu_gradient) {
               atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_gradient]);
               atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_gradient]);
-              message("stole grad task");
+              message("stole grad");
             } else if (subtype == task_subtype_gpu_force) {
               atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_force]);
               atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_force]);
-              message("stole forc task");
+              message("stole forc");
             }
 #endif
             /* Run with the task */
@@ -3008,9 +3009,6 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
             /* Reduce the size of the list of non-empty queues */
             qids[ind] = qids[--count];
           }
-//          if (lock_unlock(&q->lock) != 0) error("Unlocking our queue failed");
-//          if (lock_unlock(&q_stl->lock) != 0)
-//            error("Unlocking the stealing queue failed");
         }
         if (res != NULL) break;
       }

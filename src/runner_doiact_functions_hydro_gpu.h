@@ -917,7 +917,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   struct gpu_pack_metadata *md = &buf->md;
   int *task_first_packed_leaf = md->task_first_packed_leaf;
   int *task_last_packed_leaf = md->task_last_packed_leaf;
-
+  t->signalled = 0;
   /* Should we early exit? */
   if ((md->task_n_leaves == 0) &&
       (!md->launch_leftovers ||
@@ -955,6 +955,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     atomic_dec(&s->waiting);
     pthread_cond_broadcast(&s->sleep_cond);
     pthread_mutex_unlock(&s->sleep_mutex);
+
+//    t->signalled = 1;
 
 //    /* Mark the task as done. */
 //    t->skip = 1;
@@ -1026,7 +1028,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
    * unpacking is complete. By the end, all data will have been packed and some
    * of it (possibly all of it) will have been solved on the GPU already. */
 
-  while ((npacked < md->task_n_leaves) || launch_empty_task_leftovers) {
+//  md->ive_been_robbed = 0;
+  while ((npacked < md->task_n_leaves) || launch_empty_task_leftovers){// || md->ive_been_robbed) {
 
     /* We only need this for the first entry into the main loop. */
     launch_empty_task_leftovers = 0;
@@ -1122,6 +1125,23 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
     /* Can we launch? */
     if (md->n_leaves_packed == target_n_leaves) md->launch = 1;
+
+//    const int qid = r->qid;
+//    if(t->subtype == task_subtype_gpu_density){
+//      if(s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density] == 0){
+//        md->launch_leftovers = 1;
+//      }
+//    }
+//    if(t->subtype == task_subtype_gpu_gradient){
+//      if(s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient] == 0){
+//        md->launch_leftovers = 1;
+//      }
+//    }
+//    if(t->subtype == task_subtype_gpu_force){
+//      if(s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force] == 0){
+//        md->launch_leftovers = 1;
+//      }
+//    }
 
     /* Are we launching, or are we launching leftovers AND have packed all
      * remaining leaves or are we launching before exceeding buffer array size? */
@@ -1229,6 +1249,30 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
       } /* Launched, but not finished packing */
     } /* if launch or launch_leftovers */
+//    if(t->subtype == task_subtype_gpu_density && s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density] == 0
+//        && npacked < md->task_n_leaves){
+//      md->launch_leftovers = 1;
+////      md->ive_been_robbed = 1;
+//    }
+////    else{
+////      md->ive_been_robbed = 0;
+////    }
+//    if(t->subtype == task_subtype_gpu_gradient && s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient] == 0
+//        && npacked < md->task_n_leaves){
+//      md->launch_leftovers = 1;
+////      md->ive_been_robbed = 1;
+//    }
+////    else{
+////      md->ive_been_robbed = 0;
+////    }
+//    if(t->subtype == task_subtype_gpu_force && s->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force] == 0
+//        && npacked < md->task_n_leaves){
+//      md->launch_leftovers = 1;
+////      md->ive_been_robbed = 1;
+//    }
+//    else{
+//      md->ive_been_robbed = 0;
+//    }
   } /* while npacked < md->task_n_leaves */
 
   /* We're done with this task's data: Everything we'll need has been copied
@@ -1245,6 +1289,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 //    error("s->waiting less than zero");
 
   /* Reset flags too. */
+  md->ive_been_robbed = 0;
   md->launch_leftovers = 0;
   md->launch = 0;
 }

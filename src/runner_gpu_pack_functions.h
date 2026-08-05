@@ -120,12 +120,20 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
      * we mustn't unlock its dependencies yet. ("Currently handled task" is
      * the one for which the offloading cycle is currently underway in
      * runner_gpu_pack_and_launch) */
-    if ((tid == md->tasks_in_list - 1) && (npacked != md->task_n_leaves))
+//    if((md->task_list[tid]->subtype == task_subtype_gpu_density && s->queues[r->qid].gpu_tasks_left[gpu_task_type_hydro_density] > 0) ||
+//        (md->task_list[tid]->subtype == task_subtype_gpu_gradient && s->queues[r->qid].gpu_tasks_left[gpu_task_type_hydro_gradient] > 0) ||
+//        (md->task_list[tid]->subtype == task_subtype_gpu_force && s->queues[r->qid].gpu_tasks_left[gpu_task_type_hydro_force] > 0))
+      if ((tid == md->tasks_in_list - 1) &&
+          (npacked != md->task_n_leaves))// &&
+//          md->ive_been_robbed == 0 &&
+//          md->task_list[tid]->signalled == 1)
     	continue;
 
     /* If we're here, we're completely done with this task. Mark it as
      * completed. */
 
+    if(md->ive_been_robbed == 1)
+      md->task_list[tid]->signalled = 1;
     /* schedule my dependencies */
     scheduler_enqueue_dependencies(s, md->task_list[tid]);
 

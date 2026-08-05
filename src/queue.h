@@ -85,6 +85,8 @@ struct queue {
 /* Function prototypes. */
 struct task *queue_gettask(struct queue *q, const struct task *prev,
                            int blocking);
+struct task *queue_stealtask(struct queue *q, const struct task *prev,
+                           int blocking);
 void queue_init(struct queue *q, struct task *tasks);
 void queue_insert(struct queue *q, struct task *t);
 void queue_clean(struct queue *q);
