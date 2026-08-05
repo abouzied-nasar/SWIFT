@@ -499,12 +499,12 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
    * multiple cuda blocks work on particles in each cell if cell is big enough*/
   const int n_blocks_packed = md->n_blocks_packed;
   /*How many blocks will the current cell be split into*/
-  int n_blocks_current;
-  if(cii == cjj){
-	  n_blocks_current = (cii_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-  }else{/*This is a pair task need to take the max count of ci and cj*/
-	  n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-  }
+//  int n_blocks_current;
+//  if(cii == cjj){
+//	  n_blocks_current = (cii_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+//  }else{/*This is a pair task need to take the max count of ci and cj*/
+	int n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+//  }
 
   /*Let the CUDA blocks know which parts of the data we send they need to work on*/
   for(int b = 0; b < n_blocks_current; b++){
@@ -1076,7 +1076,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         struct cell *cj_next = md->cj_leaves[npacked + 1];
         count_next = max(ci_next->hydro.count, cj_next->hydro.count);
       }
-      /*TODO: Replcae this with a member of struct md rather than calculate repeatedly*/
+      /*TODO: Replicate this with a member of struct md rather than calculate repeatedly*/
       int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
       /* Get how many blocks we have now */
       int n_blocks_current = md->n_blocks_packed + (max(cii->hydro.count, cjj->hydro.count)+ GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
@@ -1225,6 +1225,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
       } /* Launched, but not finished packing */
     } /* if launch or launch_leftovers */
+    if(launch_before_over_filling)
+      message("Launched before overfilling");
   } /* while npacked < md->task_n_leaves */
 
   /* We're done with this task's data: Everything we'll need has been copied
