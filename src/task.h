@@ -305,8 +305,6 @@ struct task {
   /* Total time spent running this task */
   ticks total_ticks;
 
-  int signalled;
-
 #ifdef SWIFT_DEBUG_CHECKS
   /* When was this task last run? */
   integertime_t ti_run;

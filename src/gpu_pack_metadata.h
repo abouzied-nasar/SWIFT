@@ -64,8 +64,6 @@ struct gpu_pack_metadata {
    * in the particle data buffer array offloaded to GPU*/
   int2 *unique_start_end;
 
-  int ive_been_robbed;
-
   /*Hash table used to find unique cells*/
   struct hash_table{
     struct hash_entry * entry;
