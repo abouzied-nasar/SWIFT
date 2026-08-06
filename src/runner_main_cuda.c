@@ -243,7 +243,7 @@ void *runner_main_cuda(void *data) {
     struct task *prev = NULL;
 
 #ifdef CUDA_PROFILER
-    if (step == 0) cudaProfilerStart();
+    if (step == 2) cudaProfilerStart();
     step++;
 #endif
 
@@ -816,6 +816,9 @@ void *runner_main_cuda(void *data) {
         t = scheduler_done(sched, t);
       }
     } /* Loop while there are tasks */
+#ifdef CUDA_PROFILER
+    if (step == 4) cudaProfilerStop();
+#endif
   } /* main loop. */
 
   /* Release the bytes back into the wilderness */
