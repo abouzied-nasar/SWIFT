@@ -37,12 +37,10 @@ extern "C" {
 
 /* Cuda headers */
 #ifdef WITH_CUDA
+
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-#ifdef CUDA_PROFILER
-#include <cuda_profiler_api.h>
-#endif
 #endif
 
 /* This object's header. */
@@ -50,6 +48,12 @@ extern "C" {
 
 /* Local headers. */
 #include "cuda/cuda_config.h"
+
+/*Needs to be here to see that CUDA_PROFILER has been defined in cuda_config.h*/
+#ifdef CUDA_PROFILER
+#include <cuda_profiler_api.h>
+#endif
+
 #include "cuda/gpu_offload_data.h"
 #include "cuda/gpu_utils.h"
 #include "engine.h"
