@@ -1049,7 +1049,7 @@ if test "x$with_cuda" != "xno"; then
     else
       # Add optimization flags. We have to do this here because nvcc doesn't
       # have something like --no-use_fast_math.
-      NVCC_FLAGS="$NVCC_FLAGS"" --use_fast_math --extra-device-vectorization"
+      NVCC_FLAGS="$NVCC_FLAGS"" --use_fast_math --extra-device-vectorization -O3"
       if test "x$with_gpu_debug" == "xno"; then
         # Add link time optimization if we're not using debug flags.
         # Can't have -G and -lto simultaneously, that's a nvcc fatal error.
