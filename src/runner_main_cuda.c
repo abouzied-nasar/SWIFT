@@ -247,7 +247,7 @@ void *runner_main_cuda(void *data) {
     struct task *prev = NULL;
 
 #ifdef CUDA_PROFILER
-    if (step == 2) cudaProfilerStart();
+    if (step == 1) cudaProfilerStart();
     step++;
 #endif
 
