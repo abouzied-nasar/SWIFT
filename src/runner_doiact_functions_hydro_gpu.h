@@ -499,12 +499,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
    * multiple cuda blocks work on particles in each cell if cell is big enough*/
   const int n_blocks_packed = md->n_blocks_packed;
   /*How many blocks will the current cell be split into*/
-//  int n_blocks_current;
-//  if(cii == cjj){
-//	  n_blocks_current = (cii_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-//  }else{/*This is a pair task need to take the max count of ci and cj*/
-	int n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-//  }
+  int n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
 
   /*Let the CUDA blocks know which parts of the data we send they need to work on*/
   for(int b = 0; b < n_blocks_current; b++){
