@@ -25,6 +25,10 @@
 /* Config parameters. */
 #include <config.h>
 
+#ifdef WITH_LIKWID
+#include "likwid_wrapper.h"
+#endif
+
 /* Some standard headers. */
 #include <errno.h>
 #include <fenv.h>
@@ -152,6 +156,11 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
+#ifdef WITH_LIKWID
+  swift_likwid_marker_init();
+  swift_likwid_marker_register("runner_main");
+#endif
+
   /* Welcome to SWIFT, you made the right choice */
   if (myrank == 0) greetings(/*fof=*/0);
 
@@ -198,6 +207,7 @@ int main(int argc, char *argv[]) {
   int with_sinks = 0;
   int with_qla = 0;
   int with_eagle = 0;
+  int with_flamingo = 0;
   int with_gear = 0;
   int with_agora = 0;
   int with_line_of_sight = 0;
@@ -286,6 +296,12 @@ int main(int argc, char *argv[]) {
       OPT_BOOLEAN(
           0, "eagle", &with_eagle,
           "Run with all the options needed for the EAGLE model. This is "
+          "equivalent to --hydro --limiter --sync --self-gravity --stars "
+          "--star-formation --cooling --feedback --black-holes --fof.",
+          NULL, 0, 0),
+      OPT_BOOLEAN(
+          0, "flamingo", &with_flamingo,
+          "Run with all the options needed for the FLAMINGO model. This is "
           "equivalent to --hydro --limiter --sync --self-gravity --stars "
           "--star-formation --cooling --feedback --black-holes --fof.",
           NULL, 0, 0),
@@ -385,6 +401,18 @@ int main(int argc, char *argv[]) {
     with_cooling = 1;
   }
   if (with_eagle) {
+    with_hydro = 1;
+    with_timestep_limiter = 1;
+    with_timestep_sync = 1;
+    with_self_gravity = 1;
+    with_stars = 1;
+    with_star_formation = 1;
+    with_cooling = 1;
+    with_feedback = 1;
+    with_black_holes = 1;
+    with_fof = 1;
+  }
+  if (with_flamingo) {
     with_hydro = 1;
     with_timestep_limiter = 1;
     with_timestep_sync = 1;
@@ -696,10 +724,11 @@ int main(int argc, char *argv[]) {
   }
 #endif
 
-#ifdef TRACERS_EAGLE
+#if defined(TRACERS_EAGLE) || defined(TRACERS_FLAMINGO)
   if (!with_cooling && !with_temperature)
     error(
-        "Error: Cannot use EAGLE tracers without --cooling or --temperature.");
+        "Error: Cannot use EAGLE or FLAMINGO tracers without --cooling or "
+        "--temperature.");
 #endif
 
 /* Let's pin the main thread, now we know if affinity will be used. */
@@ -1016,7 +1045,7 @@ int main(int argc, char *argv[]) {
       if (myrank == 0)
         message("The restart files don't all contain the same ti_current!");
 
-      for (int i = 0; i < myrank; ++i) {
+      for (int i = 0; i < nr_nodes; ++i) {
         if (myrank == i)
           message("MPI rank %d reading file '%s' found an integer time= %lld",
                   myrank, restart_file, e.ti_current);
@@ -1238,7 +1267,7 @@ int main(int argc, char *argv[]) {
     /* Initialize power spectra calculation */
     if (with_power) {
 #ifdef HAVE_FFTW
-      power_init(&pow_data, params, nr_threads);
+      power_spectrum_init(&pow_data, params, nr_threads);
 #else
       error("No FFTW library found. Cannot compute power spectra.");
 #endif
@@ -1867,7 +1896,7 @@ int main(int argc, char *argv[]) {
     e.step += 1;
     engine_current_step = e.step;
 
-    engine_drift_all(&e, /*drift_mpole=*/0);
+    engine_drift_all(&e, /*drift_mpole=*/0, /*init_particles=*/0);
 
     /* Write final statistics? */
     if (e.output_list_stats) {
@@ -1953,18 +1982,24 @@ int main(int argc, char *argv[]) {
   if (with_cosmology) cosmology_clean(e.cosmology);
   if (e.neutrino_properties->use_linear_response)
     neutrino_response_clean(e.neutrino_response);
-  if (with_self_gravity && s.periodic) pm_mesh_clean(e.mesh);
+  if (e.mesh->periodic) pm_mesh_clean(e.mesh);
   if (with_stars) stars_props_clean(e.stars_properties);
   if (with_cooling || with_temperature) cooling_clean(e.cooling_func);
   if (with_feedback) feedback_clean(e.feedback_props);
-  if (with_lightcone) lightcone_array_clean(e.lightcone_array_properties);
   if (with_rt) rt_clean(e.rt_props, restart);
   if (with_power) power_clean(e.power_data);
+  if (with_lightcone) lightcone_array_clean(e.lightcone_array_properties);
+  forcing_terms_clean(e.forcing_terms);
   extra_io_clean(e.io_extra_props);
   engine_clean(&e, /*fof=*/0, restart);
   free(params);
   if (restart) free(refparams);
+  if (restart) output_options_clean(output_options);
   free(output_options);
+
+#ifdef WITH_LIKWID
+  swift_likwid_marker_close();
+#endif
 
 #ifdef WITH_MPI
   partition_clean(&initial_partition, &reparttype);

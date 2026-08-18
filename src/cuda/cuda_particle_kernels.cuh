@@ -429,7 +429,7 @@ __device__ __attribute__((always_inline)) INLINE void cuda_kernel_force(
     const float rhoj2 = rhoj * rhoj;
     const float rhoj_inv = 1.f / rhoj;
     const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
-    const float P_over_rho2_j = pressurej / (rhoj2) * f_ji;
+    const float P_over_rho2_j = pressurej / (rhoj2)*f_ji;
 
     /* SPH acceleration term */
     const float sph_acc_term =

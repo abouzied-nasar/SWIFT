@@ -98,7 +98,7 @@ void DOSELF1_SINKS(struct runner *r, struct cell *c, int timer) {
         if (r2 < hig2) {
           IACT_SINKS_GAS(r2, dx, hi, hj, si, pj, with_cosmology, cosmo,
                          e->gravity_properties, e->sink_properties,
-                         e->ti_current, e->time);
+                         e->ti_current, e->time, e->time_base);
         }
       } /* loop over the parts in ci. */
     } /* loop over the sinks in ci. */
@@ -155,7 +155,7 @@ void DOSELF1_SINKS(struct runner *r, struct cell *c, int timer) {
       if (r2 < hig2 || r2 < hjg2) {
         IACT_SINKS_SINK(r2, dx, hi, hj, si, sj, with_cosmology, cosmo,
                         e->gravity_properties, e->sink_properties,
-                        e->ti_current, e->time);
+                        e->ti_current, e->time, e->time_base);
       }
     } /* loop over the sinks in ci. */
   } /* loop over the sinks in ci. */
@@ -250,7 +250,7 @@ void DO_NONSYM_PAIR1_SINKS_NAIVE(struct runner *r, struct cell *restrict ci,
         if (r2 < hig2) {
           IACT_SINKS_GAS(r2, dx, hi, hj, si, pj, with_cosmology, cosmo,
                          e->gravity_properties, e->sink_properties,
-                         e->ti_current, e->time);
+                         e->ti_current, e->time, e->time_base);
         }
       } /* loop over the parts in cj. */
     } /* loop over the sinks in ci. */
@@ -307,7 +307,7 @@ void DO_NONSYM_PAIR1_SINKS_NAIVE(struct runner *r, struct cell *restrict ci,
       if (r2 < hig2 || r2 < hjg2) {
         IACT_SINKS_SINK(r2, dx, hi, hj, si, sj, with_cosmology, cosmo,
                         e->gravity_properties, e->sink_properties,
-                        e->ti_current, e->time);
+                        e->ti_current, e->time, e->time_base);
       }
     } /* loop over the sinks in cj. */
   } /* loop over the sinks in ci. */
@@ -418,7 +418,7 @@ void DOPAIR1_SUBSET_SINKS_NAIVE(struct runner *r, struct cell *restrict ci,
       if (r2 < hig2) {
         IACT_SINKS_GAS(r2, dx, hi, hj, si, pj, with_cosmology, cosmo,
                        e->gravity_properties, e->sink_properties, e->ti_current,
-                       e->time);
+                       e->time, e->time_base);
       }
     } /* loop over the parts in cj. */
   } /* loop over the parts in ci. */
@@ -493,7 +493,7 @@ void DOSELF1_SUBSET_SINKS(struct runner *r, struct cell *restrict ci,
       if (r2 < hig2) {
         IACT_SINKS_GAS(r2, dx, hi, part_get_h(pj), si, pj, with_cosmology,
                        cosmo, e->gravity_properties, e->sink_properties,
-                       e->ti_current, e->time);
+                       e->ti_current, e->time, e->time_base);
       }
     } /* loop over the parts in cj. */
   } /* loop over the parts in ci. */

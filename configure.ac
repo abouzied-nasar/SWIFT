@@ -16,7 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # Init the project.
-AC_INIT([SWIFT],[2025.10],[https://gitlab.cosma.dur.ac.uk/swift/swiftsim])
+AC_INIT([SWIFT],[2026.04],[https://gitlab.cosma.dur.ac.uk/swift/swiftsim])
 swift_config_flags="$*"
 
 AC_COPYRIGHT
@@ -323,6 +323,18 @@ AC_ARG_ENABLE([timers],
 )
 if test "$enable_timers" = "yes"; then
    AC_DEFINE([SWIFT_USE_TIMERS],1,[Enable individual timers])
+fi
+
+AC_ARG_ENABLE([likwid],
+   [AS_HELP_STRING([--enable-likwid],
+      [Enable LIKWID performance monitoring])],
+   [enable_likwid="$enableval"],
+   [enable_likwid="no"]
+)
+
+if test "$enable_likwid" = "yes"; then
+   AC_DEFINE([WITH_LIKWID], 1, [Enable LIKWID performance monitoring])
+   LIBS="$LIBS -llikwid"
 fi
 
 # Check if expensive debugging is on.
@@ -2140,7 +2152,7 @@ AC_SUBST([SUNDIALS_INCS])
 AC_ARG_WITH([subgrid],
 	[AS_HELP_STRING([--with-subgrid=<subgrid>],
 		[Master switch for subgrid methods. Inexperienced user should
-		start here. Options are: @<:@none, GEAR, GEAR-G3, AGORA, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SPIN_JET_EAGLE default: none@:>@]
+		start here. Options are: @<:@none, GEAR, GEAR-G3, AGORA, QLA, QLA-EAGLE, EAGLE, EAGLE-XL, SPIN_JET_EAGLE, FLAMINGO, SPIN_JET_FLAMINGO default: none@:>@]
 	)],
 	[with_subgrid="$withval"],
 	[with_subgrid=none]
@@ -2167,6 +2179,7 @@ case "$with_subgrid" in
    GEAR)
 	with_subgrid_cooling=grackle_0
 	with_subgrid_chemistry=GEAR_10
+	with_subgrid_tracers=GEAR
 	with_subgrid_pressure_floor=GEAR
 	with_subgrid_stars=GEAR
 	with_subgrid_star_formation=GEAR
@@ -2179,6 +2192,7 @@ case "$with_subgrid" in
    GEAR-G3)
 	with_subgrid_cooling=grackle_3
 	with_subgrid_chemistry=GEAR_10
+	with_subgrid_tracers=GEAR
 	with_subgrid_pressure_floor=none
 	with_subgrid_stars=GEAR
 	with_subgrid_star_formation=GEAR
@@ -2191,6 +2205,7 @@ case "$with_subgrid" in
    AGORA)
 	with_subgrid_cooling=grackle_0
 	with_subgrid_chemistry=AGORA
+	with_subgrid_tracers=none
 	with_subgrid_pressure_floor=GEAR
 	with_subgrid_stars=GEAR
 	with_subgrid_star_formation=GEAR
@@ -2264,7 +2279,7 @@ case "$with_subgrid" in
 	with_subgrid_extra_io=none
 	enable_fof=yes
    ;;
-  SPIN_JET_EAGLE-XL)
+   SPIN_JET_EAGLE-XL)
 	with_subgrid_cooling=PS2020
 	with_subgrid_chemistry=EAGLE
 	with_subgrid_tracers=EAGLE
@@ -2276,6 +2291,32 @@ case "$with_subgrid" in
 	with_subgrid_sink=none
 	with_subgrid_extra_io=none
 	enable_fof=yes
+   ;;
+   FLAMINGO)
+        with_subgrid_cooling=PS2020
+     	with_subgrid_chemistry=EAGLE
+        with_subgrid_tracers=FLAMINGO
+        with_subgrid_entropy_floor=EAGLE
+        with_subgrid_stars=EAGLE
+	with_subgrid_star_formation=EAGLE
+        with_subgrid_feedback=EAGLE-kinetic
+        with_subgrid_black_holes=EAGLE
+        with_subgrid_sink=none
+        with_subgrid_extra_io=EAGLE
+        enable_fof=yes
+   ;;
+   SPIN_JET_FLAMINGO)
+        with_subgrid_cooling=PS2020
+        with_subgrid_chemistry=EAGLE
+        with_subgrid_tracers=FLAMINGO
+        with_subgrid_entropy_floor=EAGLE
+	with_subgrid_stars=EAGLE
+        with_subgrid_star_formation=EAGLE
+        with_subgrid_feedback=EAGLE-kinetic
+        with_subgrid_black_holes=SPIN_JET
+        with_subgrid_sink=none
+        with_subgrid_extra_io=EAGLE
+        enable_fof=yes
    ;;
    *)
       AC_MSG_ERROR([Unknown subgrid choice: $with_subgrid])
@@ -2832,7 +2873,7 @@ fi
 #  Particle tracers
 AC_ARG_WITH([tracers],
    [AS_HELP_STRING([--with-tracers=<function>],
-      [chemistry function @<:@none, EAGLE default: none@:>@]
+      [Tracer functions @<:@none, EAGLE, FLAMINGO, GEAR default: none@:>@]
    )],
    [with_tracers="$withval"],
    [with_tracers="none"]
@@ -2852,6 +2893,12 @@ case "$with_tracers" in
    ;;
    EAGLE)
       AC_DEFINE([TRACERS_EAGLE], [1], [Tracers taken from the EAGLE model])
+   ;;
+   FLAMINGO)
+      AC_DEFINE([TRACERS_FLAMINGO], [1], [Tracers taken from the FLAMINGO model])
+   ;;
+   GEAR)
+      AC_DEFINE([TRACERS_GEAR], [1], [Tracers taken from the GEAR model])
    ;;
    *)
       AC_MSG_ERROR([Unknown tracers choice: $with_tracers])
@@ -3058,7 +3105,7 @@ esac
 # Forcing terms
 AC_ARG_WITH([forcing],
    [AS_HELP_STRING([--with-forcing=<term>],
-      [Hydrodynamics forcing terms @<:@none, boundary-particles, roberts-flow, roberts-flow-acceleration, abc-flow, default: none@:>@]
+      [Hydrodynamics forcing terms @<:@none, boundary-particles, roberts-flow, roberts-flow-acceleration, abc-flow, idealized-agn-jet, balsarakim default: none@:>@]
    )],
    [with_forcing="$withval"],
    [with_forcing="none"]
@@ -3078,6 +3125,12 @@ case "$with_forcing" in
    ;;
    abc-flow)
       AC_DEFINE([FORCING_ABC_FLOW], [1], [ABC flow external forcing terms])
+   ;;
+   balsarakim)
+      AC_DEFINE([FORCING_BALSARAKIM], [1], [BalsaraKim internal energy injections])
+   ;;
+   idealized-agn-jet)
+      AC_DEFINE([FORCING_IDEALIZED_AGN_JET], [1], [Launch AGN jets and treats particles in jet reservoir as fixed boundary particles])
    ;;
    *)
       AC_MSG_ERROR([Unknown external forcing term: $with_forcing])
@@ -3357,6 +3410,47 @@ case "$with_rt" in
    ;;
 esac
 
+# Task-multiplexing
+
+#  Number of hydro cooling tasks per cell
+AC_ARG_WITH([hydro-cooling-ntask],
+   [AS_HELP_STRING([--with-hydro-cooling-ntask=<ntask>],
+      [number of hydro cooling tasks to use per cell @<:@ default: 1@:>@]
+   )],
+   [with_hydro_cooling_ntask="$withval"],
+   [with_hydro_cooling_ntask="1"]
+)
+AC_DEFINE_UNQUOTED([HYDRO_COOLING_NTASK], [$with_hydro_cooling_ntask], [Number of hydro cooling tasks per cell])
+
+#  Number of stars density ghost tasks per cell
+AC_ARG_WITH([hydro-ghost-ntask],
+   [AS_HELP_STRING([--with-hydro-ghost-ntask=<ntask>],
+      [number of hydro density ghost tasks to use per cell @<:@ default: 1@:>@]
+   )],
+   [with_hydro_ghost_ntask="$withval"],
+   [with_hydro_ghost_ntask="1"]
+)
+AC_DEFINE_UNQUOTED([HYDRO_GHOST_NTASK], [$with_hydro_ghost_ntask], [Number of hydro density ghost tasks per cell])
+
+#  Number of stars density ghost tasks per cell
+AC_ARG_WITH([stars-ghost-ntask],
+   [AS_HELP_STRING([--with-stars-ghost-ntask=<ntask>],
+      [number of stars density ghost tasks to use per cell @<:@ default: 1@:>@]
+   )],
+   [with_stars_ghost_ntask="$withval"],
+   [with_stars_ghost_ntask="1"]
+)
+AC_DEFINE_UNQUOTED([STARS_GHOST_NTASK], [$with_stars_ghost_ntask], [Number of stars density ghost tasks per cell])
+
+#  Number of stars density self tasks per cell
+AC_ARG_WITH([stars-self-ntask],
+   [AS_HELP_STRING([--with-stars-self-ntask=<ntask>],
+      [number of stars density self tasks to use per cell @<:@ default: 1@:>@]
+   )],
+   [with_stars_self_ntask="$withval"],
+   [with_stars_self_ntask="1"]
+)
+AC_DEFINE_UNQUOTED([STARS_SELF_NTASK], [$with_stars_self_ntask], [Number of stars density self tasks per cell])
 
 # Check for git, needed for revision stamps.
 AC_PATH_PROG([GIT_CMD], [git])
@@ -3546,6 +3640,11 @@ AC_MSG_RESULT([
    Black holes model    : $with_black_holes
    Radiative transfer   : $with_rt
    Extra i/o            : $with_extra_io
+   Hydro cooling ntask  : $with_hydro_cooling_ntask
+   Hydro ghost ntask    : $with_hydro_ghost_ntask
+   Stars ghost ntask    : $with_stars_ghost_ntask
+   Stars self ntask     : $with_stars_self_ntask
+
 
    Atomic operations in tasks  : $enable_atomics_within_tasks
    Individual timers           : $enable_timers
