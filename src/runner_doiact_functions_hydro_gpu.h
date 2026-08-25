@@ -498,8 +498,12 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
    * Each cell is split into count/BS chunks so that
    * multiple cuda blocks work on particles in each cell if cell is big enough*/
   const int n_blocks_packed = md->n_blocks_packed;
+  const int n_blocks_packed_i = md->n_blocks_packed_i;
+  const int n_blocks_packed_j = md->n_blocks_packed_j;
   /*How many blocks will the current cell be split into*/
   int n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+  int n_blocks_current_i = (cii_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+  int n_blocks_current_j = (cjj_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
 
   /*Let the CUDA blocks know which parts of the data we send they need to work on*/
   for(int b = 0; b < n_blocks_current; b++){
@@ -508,6 +512,24 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
 	  /*Save the id of the first block acting on this leaf comp.
 	   * Needed for indexing in kernel*/
 	  gpu_md->block_leaf_id[n_blocks_packed + b].y = n_blocks_packed;
+  }
+
+  /*Let the CUDA blocks know which parts of the data we send they need to work on*/
+  for(int b = 0; b < n_blocks_current_i; b++){
+      /*Which leaf computation will this block (n_blocks_packed + b) work on?*/
+      gpu_md->block_leaf_id_i[n_blocks_packed_i + b].x = md->n_leaves_packed;
+      /*Save the id of the first block acting on this leaf comp.
+       * Needed for indexing in kernel*/
+      gpu_md->block_leaf_id_i[n_blocks_packed_i + b].y = n_blocks_packed_i;
+  }
+
+  /*Let the CUDA blocks know which parts of the data we send they need to work on*/
+  for(int b = 0; b < n_blocks_current_j; b++){
+      /*Which leaf computation will this block (n_blocks_packed + b) work on?*/
+      gpu_md->block_leaf_id_j[n_blocks_packed_j + b].x = md->n_leaves_packed;
+      /*Save the id of the first block acting on this leaf comp.
+       * Needed for indexing in kernel*/
+      gpu_md->block_leaf_id_j[n_blocks_packed_j + b].y = n_blocks_packed_j;
   }
 
   /* Check to see we've not somehow gone over the number of blocks we allocated */
@@ -712,6 +734,19 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   }
   else if (task_subtype == task_subtype_gpu_force){
 
+    /*Copy the metadata to GPU telling each cuda block what sections of the unique particle data to work on.*/
+    cu_error =
+        cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id_i[0],
+            &buf->gpu_md.block_leaf_id_i[0],
+            md->n_blocks_packed_i * sizeof(int2),
+            cudaMemcpyHostToDevice, stream[0]);
+    /*Copy the metadata to GPU telling each cuda block what sections of the unique particle data to work on.*/
+    cu_error =
+        cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id_j[0],
+            &buf->gpu_md.block_leaf_id_j[0],
+            md->n_blocks_packed_j * sizeof(int2),
+            cudaMemcpyHostToDevice, stream[0]);
+
     /*What's gone and what's past help. Should be past grief
      *Re-set sums to zero on GPU before launching kernel*/
     cu_error =
@@ -744,10 +779,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
     /*"Once more unto the breach dear friends, once more!"
      *Issue instruction to launch GPU computations*/
-    gpu_launch_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
-        n_blocks,
+//    gpu_launch_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
+//        n_blocks,
+//        gpu_md->d_cell_i_j_start_end,
+//        gpu_md->d_block_leaf_id, space_dim, stream[0]);
+    gpu_launch_force_one_way_interactions(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
+        md->n_blocks_packed_i,
         gpu_md->d_cell_i_j_start_end,
-        gpu_md->d_block_leaf_id, space_dim, stream[0]);
+        gpu_md->d_block_leaf_id_i, space_dim, stream[0]);
+    gpu_launch_force_one_way_interactions(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
+        md->n_blocks_packed_j,
+        gpu_md->d_cell_i_j_start_end,
+        gpu_md->d_block_leaf_id_j, space_dim, stream[0]);
 
     /*"The wheel is come full circle; I am here."
      * Copy results back to CPU BUFFERS */
@@ -1075,7 +1118,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
       /* Get how many blocks we have now */
       int n_blocks_current = md->n_blocks_packed + (max(cii->hydro.count, cjj->hydro.count)+ GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+//      int n_blocks_current_i = md->n_blocks_packed_i + (cii->hydro.count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+//      int n_blocks_current_j = md->n_blocks_packed_j + (cjj->hydro.count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
       /* Get how many blocks we will end up with in the next packing cycle*/
+      /*TODO: Check if this is fine for case where we launch two kernels, one for is and one for js*/
       int n_blocks_next = n_blocks_current + (count_next + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
       /* If we need to, raise the flag*/
       launch_before_over_filling = (n_blocks_next >= n_blocks_max) ? 1 : 0;

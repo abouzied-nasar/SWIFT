@@ -121,6 +121,10 @@ struct gpu_pack_metadata {
   /*How many blocks of cuda threads do we need to process the packed
    *  computations*/
   int n_blocks_packed;
+  /*How many blocks have we packed for interaction i -> j*/
+  int n_blocks_packed_i;
+  /*How many blocks have we packed for interaction j -> i*/
+  int n_blocks_packed_j;
 
   /*! Are these buffers ready to trigger launch on GPU? */
   char launch;

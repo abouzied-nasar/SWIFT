@@ -101,8 +101,12 @@ struct gpu_offload_data {
      * of the first cuda block which will work on this leaf computation*/
     /*Host copy*/
     int2 *block_leaf_id;
+    int2 *block_leaf_id_i;
+    int2 *block_leaf_id_j;
     /*Device copy*/
     int2 *d_block_leaf_id;
+    int2 *d_block_leaf_id_i;
+    int2 *d_block_leaf_id_j;
   } gpu_md;
 
 #endif /* WITH_CUDA */

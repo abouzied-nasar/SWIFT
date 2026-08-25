@@ -118,9 +118,21 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   cu_error = cudaMallocHost((void **)&buf->gpu_md.block_leaf_id,
                             n_blocks * sizeof(int2));
   swift_assert(cu_error == cudaSuccess);
+  cu_error = cudaMallocHost((void **)&buf->gpu_md.block_leaf_id_i,
+                            n_blocks * sizeof(int2));
+  swift_assert(cu_error == cudaSuccess);
+  cu_error = cudaMallocHost((void **)&buf->gpu_md.block_leaf_id_j,
+                            n_blocks * sizeof(int2));
+  swift_assert(cu_error == cudaSuccess);
 
   /*Repeat for device copy*/
   cu_error = cudaMalloc((void **)&buf->gpu_md.d_block_leaf_id,
+                            n_blocks * sizeof(int2));
+  swift_assert(cu_error == cudaSuccess);
+  cu_error = cudaMalloc((void **)&buf->gpu_md.d_block_leaf_id_i,
+                            n_blocks * sizeof(int2));
+  swift_assert(cu_error == cudaSuccess);
+  cu_error = cudaMalloc((void **)&buf->gpu_md.d_block_leaf_id_j,
                             n_blocks * sizeof(int2));
   swift_assert(cu_error == cudaSuccess);
 
