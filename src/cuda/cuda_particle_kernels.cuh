@@ -973,15 +973,88 @@ __device__ __forceinline__ void neighbour_interactions_force(
 }
 
 
+//__global__ void cuda_kernel_force(
+//    const struct gpu_part_send_f* __restrict__ d_parts_send,
+//    struct gpu_part_recv_f*      __restrict__ d_parts_recv,
+//    const float d_a, const float d_H,
+//    const int4* __restrict__ d_cell_i_j_start_end,
+//    const int2* __restrict__ d_block_leaf_id,
+//    const double3 space_dim){
+//
+//	/*Figure out which range of particles threads in this block will work on*/
+//    const int bid     = blockIdx.x;
+//    /*What is the leaf computation this block will work on*/
+//    const int leafid  = d_block_leaf_id[bid].x;
+//    /*In case we need more than one block to run this leaf computation we need to know
+//     * where in the group of blocks acting on a cell we are.
+//     * bid_0 is the id of the first block acting on this cell*/
+//    const int bid_0   = d_block_leaf_id[bid].y;
+//    /*Get the start and end positions of cells i and j*/
+//    int4 cell_se      = d_cell_i_j_start_end[leafid];
+//
+//    const int ci_start = cell_se.x;
+//    const int ci_end   = cell_se.y; // cell position at [ci_end-1]
+//    const int cj_start = cell_se.z;
+//    const int cj_end   = cell_se.w;
+//
+//    /*We can now find our block index in a local reference to this cell*/
+//    const int b_id_local = bid - bid_0;
+//    const int tid = threadIdx.x;
+//
+//    /* Get the cell positions. We store them as the last entry in the
+//     * particle array for each leaf computation */
+//    const auto ci_loc = d_parts_send[ci_end - 1].c_loc;
+//    const auto cj_loc = d_parts_send[cj_end - 1].c_loc;
+//
+//    /*Calculate the shifted cell positions if we have periodics*/
+//    double3 shift = {0.0, 0.0, 0.0};
+//    const double distx = cj_loc.x.x - ci_loc.x.x;
+//    const double disty = cj_loc.x.y - ci_loc.x.y;
+//    const double distz = cj_loc.x.z - ci_loc.x.z;
+//
+//    if (distx < -space_dim.x * 0.5)      shift.x =  space_dim.x;
+//    else if (distx >  space_dim.x * 0.5)  shift.x = -space_dim.x;
+//    if (disty < -space_dim.y * 0.5)      shift.y =  space_dim.y;
+//    else if (disty >  space_dim.y * 0.5)  shift.y = -space_dim.y;
+//    if (distz < -space_dim.z * 0.5)      shift.z =  space_dim.z;
+//    else if (distz >  space_dim.z * 0.5)  shift.z = -space_dim.z;
+//
+//    const double3 shift_i_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
+//    const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
+//
+//    // Pass 1: ci <- cj (exclude cell-position slot at end-1)
+//    neighbour_interactions_force(
+//        d_parts_send, d_parts_recv,
+//        ci_start, ci_end - 1,
+//        cj_start, cj_end - 1,
+//        shift_i_res, shift_j_res,
+//        b_id_local, tid,
+//        d_a, d_H);
+//
+//    // Pass 2: cj <- ci (only if not self)
+//    if (ci_start != cj_start) {
+//        const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
+//        const double3 shift_jj_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
+//
+//        neighbour_interactions_force(
+//            d_parts_send, d_parts_recv,
+//            cj_start, cj_end - 1,
+//            ci_start, ci_end - 1,
+//            shift_ii_res, shift_jj_res,
+//            b_id_local, tid,
+//            d_a, d_H);
+//    }
+//}
+
 __global__ void cuda_kernel_force(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
     struct gpu_part_recv_f*      __restrict__ d_parts_recv,
     const float d_a, const float d_H,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
-    const double3 space_dim){
+    const double3 space_dim, const int ij){
 
-	/*Figure out which range of particles threads in this block will work on*/
+    /*Figure out which range of particles threads in this block will work on*/
     const int bid     = blockIdx.x;
     /*What is the leaf computation this block will work on*/
     const int leafid  = d_block_leaf_id[bid].x;
@@ -1022,17 +1095,18 @@ __global__ void cuda_kernel_force(
     const double3 shift_i_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
     const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
 
-    // Pass 1: ci <- cj (exclude cell-position slot at end-1)
-    neighbour_interactions_force(
+    // This is a ci <- cj interaction (exclude cell-position slot at end-1)
+    if(ij)
+      neighbour_interactions_force(
         d_parts_send, d_parts_recv,
         ci_start, ci_end - 1,
         cj_start, cj_end - 1,
         shift_i_res, shift_j_res,
         b_id_local, tid,
         d_a, d_H);
-
-    // Pass 2: cj <- ci (only if not self)
-    if (ci_start != cj_start) {
+    else{
+      // Do a cj <- ci interaction (only if not self as this will be done if ij ==1)
+      if (ci_start != cj_start) {
         const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
         const double3 shift_jj_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
 
@@ -1043,6 +1117,7 @@ __global__ void cuda_kernel_force(
             shift_ii_res, shift_jj_res,
             b_id_local, tid,
             d_a, d_H);
+      }
     }
 }
 

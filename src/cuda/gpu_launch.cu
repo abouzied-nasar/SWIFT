@@ -127,24 +127,24 @@ void gpu_launch_gradient(
  * d_parts_* arrays
  * @param bundle_n_parts nr of particles in this bundle
  */
-void gpu_launch_force(
-    const struct gpu_part_send_f* __restrict__ d_parts_send,
-    struct gpu_part_recv_f*      __restrict__ d_parts_recv,
-    const float d_a, const float d_H,
-    int num_blocks_x,
-    const int4* __restrict__ d_cell_i_j_start_end,
-    const int2* __restrict__ d_block_leaf_id,
-    const double3 space_dim,
-    cudaStream_t stream)
-{
-  /* Shared memory allocation. Need two tiles as another tile (1) is
-       used for prefetching while tile 0 is used for computations and vice-versa*/
-    const size_t shmem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_f);
-
-    cuda_kernel_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
-        d_parts_send, d_parts_recv, d_a, d_H,
-        d_cell_i_j_start_end, d_block_leaf_id, space_dim);
-}
+//void gpu_launch_force(
+//    const struct gpu_part_send_f* __restrict__ d_parts_send,
+//    struct gpu_part_recv_f*      __restrict__ d_parts_recv,
+//    const float d_a, const float d_H,
+//    int num_blocks_x,
+//    const int4* __restrict__ d_cell_i_j_start_end,
+//    const int2* __restrict__ d_block_leaf_id,
+//    const double3 space_dim,
+//    cudaStream_t stream)
+//{
+//  /* Shared memory allocation. Need two tiles as another tile (1) is
+//       used for prefetching while tile 0 is used for computations and vice-versa*/
+//    const size_t shmem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_f);
+//
+//    cuda_kernel_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
+//        d_parts_send, d_parts_recv, d_a, d_H,
+//        d_cell_i_j_start_end, d_block_leaf_id, space_dim);
+//}
 
 void gpu_launch_force_one_way_interactions(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
@@ -154,15 +154,18 @@ void gpu_launch_force_one_way_interactions(
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim,
-    cudaStream_t stream)
+    cudaStream_t stream, const int ij)
 {
   /* Shared memory allocation. Need two tiles as another tile (1) is
        used for prefetching while tile 0 is used for computations and vice-versa*/
+  /* Allocate twice as much shmem as necessary since we will be overlapping comm.s and comp.s
+   * using async Glocal2Shared mem copies in kernel*/
     const size_t shmem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_f);
 
+//    printf("shmem %i, ij %i num_blocks %i\n", shmem, ij, num_blocks_x);
     cuda_kernel_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
-        d_cell_i_j_start_end, d_block_leaf_id, space_dim);
+        d_cell_i_j_start_end, d_block_leaf_id, space_dim, ij);
 }
 
 #ifdef __cplusplus

@@ -54,6 +54,15 @@ void gpu_launch_force(
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim,
     cudaStream_t stream);
+void gpu_launch_force_one_way_interactions(
+    const struct gpu_part_send_f* __restrict__ d_parts_send,
+    struct gpu_part_recv_f*      __restrict__ d_parts_recv,
+    const float d_a, const float d_H,
+    int num_blocks_x,
+    const int4* __restrict__ d_cell_i_j_start_end,
+    const int2* __restrict__ d_block_leaf_id,
+    const double3 space_dim,
+    cudaStream_t stream, const int ij);
 
 #ifdef __cplusplus
 }

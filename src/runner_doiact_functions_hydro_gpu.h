@@ -540,6 +540,8 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   ///////////////////////////////////////////////////////////////////////
   int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
   md->n_blocks_packed += n_blocks_current;
+  md->n_blocks_packed_i += n_blocks_current_i;
+  md->n_blocks_packed_j += n_blocks_current_j;
   if(md->n_blocks_packed > n_blocks_max)
 	  error("Exceeded n_block_max (gpu_part_buffer_size/GPU_THREAD_BLOCK_SIZE = %i). "
 			  "n_blocks_current %i. n_blocks_packed %i. "
@@ -786,11 +788,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     gpu_launch_force_one_way_interactions(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
         md->n_blocks_packed_i,
         gpu_md->d_cell_i_j_start_end,
-        gpu_md->d_block_leaf_id_i, space_dim, stream[0]);
+        gpu_md->d_block_leaf_id_i, space_dim, stream[0], /*To do ij set to 1, to do ji set to 0*/ 1);
+
     gpu_launch_force_one_way_interactions(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
         md->n_blocks_packed_j,
         gpu_md->d_cell_i_j_start_end,
-        gpu_md->d_block_leaf_id_j, space_dim, stream[0]);
+        gpu_md->d_block_leaf_id_j, space_dim, stream[0], /*To do ij set to 1, to do ji set to 0*/ 0);
 
     /*"The wheel is come full circle; I am here."
      * Copy results back to CPU BUFFERS */
