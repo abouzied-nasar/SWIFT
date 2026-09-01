@@ -60,7 +60,27 @@ extern "C" {
  * d_parts_* arrays
  * @param bundle_n_parts nr of particles in this bundle
  */
-void gpu_launch_density(
+//void gpu_launch_density(
+//    const struct gpu_part_send_d* __restrict__ d_parts_send,
+//    struct gpu_part_recv_d* __restrict__ d_parts_recv,
+//    const float d_a, const float d_H,
+//    int num_blocks_x,
+//    const int4* __restrict__ d_cell_i_j_start_end,
+//    const int2* __restrict__ d_block_leaf_id,
+//    const double3 space_dim,
+//    cudaStream_t stream){
+//
+//  /* Shared memory allocation. Need two tiles as another tile (1) is
+//   used for prefetching while tile 0 is used for computations and vice-versa*/
+//  const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * (sizeof(struct gpu_part_data_d));//(sizeof(float4) + sizeof(float4)); // 2048 bytes when TILE_J=64
+//
+//  cuda_kernel_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
+//      d_parts_send, d_parts_recv, d_a, d_H,
+//      d_cell_i_j_start_end, d_block_leaf_id, space_dim);
+//
+//}
+
+void gpu_launch_density_one_way_interactions(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     struct gpu_part_recv_d* __restrict__ d_parts_recv,
     const float d_a, const float d_H,
@@ -68,7 +88,7 @@ void gpu_launch_density(
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim,
-    cudaStream_t stream){
+    cudaStream_t stream, const int ij){
 
   /* Shared memory allocation. Need two tiles as another tile (1) is
    used for prefetching while tile 0 is used for computations and vice-versa*/
@@ -76,7 +96,7 @@ void gpu_launch_density(
 
   cuda_kernel_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H,
-      d_cell_i_j_start_end, d_block_leaf_id, space_dim);
+      d_cell_i_j_start_end, d_block_leaf_id, space_dim, ij);
 
 }
 
@@ -94,7 +114,26 @@ void gpu_launch_density(
  * d_parts_* arrays
  * @param bundle_n_parts nr of particles in this bundle
  */
-void gpu_launch_gradient(
+//void gpu_launch_gradient(
+//    const struct gpu_part_send_g* __restrict__ d_parts_send,
+//    struct gpu_part_recv_g*      __restrict__ d_parts_recv,
+//    const float d_a, const float d_H,
+//    int num_blocks_x,
+//    const int4* __restrict__ d_cell_i_j_start_end,
+//    const int2* __restrict__ d_block_leaf_id,
+//    const double3 space_dim,
+//    cudaStream_t stream)
+//{
+//  /* Shared memory allocation. Need two tiles as another tile (1) is
+//     used for prefetching while tile 0 is used for computations and vice-versa*/
+//    const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_g);  // 3072 bytes when TILE_J=64
+//
+//    cuda_kernel_gradient<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
+//        d_parts_send, d_parts_recv, d_a, d_H,
+//        d_cell_i_j_start_end, d_block_leaf_id, space_dim);
+//}
+
+void gpu_launch_gradient_one_way_interactions(
     const struct gpu_part_send_g* __restrict__ d_parts_send,
     struct gpu_part_recv_g*      __restrict__ d_parts_recv,
     const float d_a, const float d_H,
@@ -102,7 +141,7 @@ void gpu_launch_gradient(
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim,
-    cudaStream_t stream)
+    cudaStream_t stream, const int ij)
 {
   /* Shared memory allocation. Need two tiles as another tile (1) is
      used for prefetching while tile 0 is used for computations and vice-versa*/
@@ -110,7 +149,7 @@ void gpu_launch_gradient(
 
     cuda_kernel_gradient<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
-        d_cell_i_j_start_end, d_block_leaf_id, space_dim);
+        d_cell_i_j_start_end, d_block_leaf_id, space_dim, ij);
 }
 
 /**

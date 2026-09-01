@@ -248,7 +248,7 @@ __global__ void cuda_kernel_density(
     const float d_a, const float d_H,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
-    const double3 space_dim){
+    const double3 space_dim, const int ij){
 
 	/*Figure out which range of particles threads in this block will work on*/
     const int bid     = blockIdx.x;
@@ -291,17 +291,18 @@ __global__ void cuda_kernel_density(
     const double3 shift_i_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
     const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
 
-    // Pass 1: ci <- cj
-    neighbour_interactions_density(
+    // This is a ci <- cj interaction (exclude cell-position slot at end-1)
+    if(ij)
+      neighbour_interactions_density(
         d_parts_send, d_parts_recv,
         ci_start, ci_end - 1,
         cj_start, cj_end - 1,
         shift_i_res, shift_j_res,
         b_id_local, tid
     );
-
-    // Pass 2: cj <- ci (only if not self)
-    if (ci_start != cj_start) {
+    else{
+      // Do a cj <- ci interaction (only if not self as this will be done if ij ==1)
+      if (ci_start != cj_start) {
         const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
         const double3 shift_jj_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
 
@@ -312,6 +313,7 @@ __global__ void cuda_kernel_density(
             shift_ii_res, shift_jj_res,
             b_id_local, tid
         );
+      }
     }
 }
 
@@ -561,7 +563,7 @@ __global__ void cuda_kernel_gradient(
     const float d_a, const float d_H,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
-    const double3 space_dim){
+    const double3 space_dim, const int ij){
 
 	/*Figure out which range of particles threads in this block will work on*/
     const int bid     = blockIdx.x;
@@ -604,8 +606,9 @@ __global__ void cuda_kernel_gradient(
     const double3 shift_i_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
     const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
 
-    // Pass 1: ci <- cj (exclude the cell-position slot at end-1)
-    neighbour_interactions_gradient(
+    // This is a ci <- cj interaction (exclude cell-position slot at end-1)
+    if(ij)
+      neighbour_interactions_gradient(
         d_parts_send, d_parts_recv,
         ci_start, ci_end - 1,
         cj_start, cj_end - 1,
@@ -613,9 +616,9 @@ __global__ void cuda_kernel_gradient(
         b_id_local, tid,
         d_a, d_H
     );
-
-    // Pass 2: cj <- ci (only if not self)
-    if (ci_start != cj_start) {
+    else{
+      // Do a cj <- ci interaction (only if not self as this will be done if ij ==1)
+      if (ci_start != cj_start) {
         const double3 shift_ii_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
         const double3 shift_jj_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
 
@@ -627,6 +630,7 @@ __global__ void cuda_kernel_gradient(
             b_id_local, tid,
             d_a, d_H
         );
+      }
     }
 }
 

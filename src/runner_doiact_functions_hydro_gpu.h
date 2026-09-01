@@ -638,6 +638,19 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
    * this is calculated while we pack*/
   const int n_blocks = md->n_blocks_packed;
 
+  /*Copy the metadata to GPU telling each cuda block what sections of the unique particle data to work on.*/
+  cu_error =
+      cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id_i[0],
+          &buf->gpu_md.block_leaf_id_i[0],
+          md->n_blocks_packed_i * sizeof(int2),
+          cudaMemcpyHostToDevice, stream[0]);
+  /*Copy the metadata to GPU telling each cuda block what sections of the unique particle data to work on.*/
+  cu_error =
+      cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id_j[0],
+          &buf->gpu_md.block_leaf_id_j[0],
+          md->n_blocks_packed_j * sizeof(int2),
+          cudaMemcpyHostToDevice, stream[0]);
+
   /*TODO: Refactor this if at all possible*/
   if (task_subtype == task_subtype_gpu_density){
 
@@ -674,10 +687,20 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
     /*"Once more unto the breach dear friends, once more!"
      *Issue instruction to launch GPU computations*/
-    gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
-        n_blocks,
+//    gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
+//        n_blocks,
+//        gpu_md->d_cell_i_j_start_end,
+//        gpu_md->d_block_leaf_id, space_dim, stream[0]);
+
+    gpu_launch_density_one_way_interactions(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
+        md->n_blocks_packed_i,
         gpu_md->d_cell_i_j_start_end,
-        gpu_md->d_block_leaf_id, space_dim, stream[0]);
+        gpu_md->d_block_leaf_id_i, space_dim, stream[0], /*To do ij set to 1, to do ji set to 0*/ 1);
+
+    gpu_launch_density_one_way_interactions(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
+        md->n_blocks_packed_j,
+        gpu_md->d_cell_i_j_start_end,
+        gpu_md->d_block_leaf_id_j, space_dim, stream[0], /*To do ij set to 1, to do ji set to 0*/ 0);
 
     /*"The wheel is come full circle; I am here"
      *  Results are ready to copy back to CPU BUFFERS */
@@ -720,10 +743,20 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
       /*"Once more unto the breach dear friends, once more!"
        *Issue instruction to launch GPU computations*/
-      gpu_launch_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H,
-              n_blocks,
-              gpu_md->d_cell_i_j_start_end,
-              gpu_md->d_block_leaf_id, space_dim, stream[0]);
+//      gpu_launch_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H,
+//              n_blocks,
+//              gpu_md->d_cell_i_j_start_end,
+//              gpu_md->d_block_leaf_id, space_dim, stream[0]);
+
+      gpu_launch_gradient_one_way_interactions(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H,
+          md->n_blocks_packed_i,
+          gpu_md->d_cell_i_j_start_end,
+          gpu_md->d_block_leaf_id_i, space_dim, stream[0], /*To do ij set to 1, to do ji set to 0*/ 1);
+
+      gpu_launch_gradient_one_way_interactions(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H,
+          md->n_blocks_packed_j,
+          gpu_md->d_cell_i_j_start_end,
+          gpu_md->d_block_leaf_id_j, space_dim, stream[0], /*To do ij set to 1, to do ji set to 0*/ 0);
 
       /*"The wheel is come full circle; I am here"
        *  Results are ready to copy back to CPU BUFFERS */
@@ -735,19 +768,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
   }
   else if (task_subtype == task_subtype_gpu_force){
-
-    /*Copy the metadata to GPU telling each cuda block what sections of the unique particle data to work on.*/
-    cu_error =
-        cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id_i[0],
-            &buf->gpu_md.block_leaf_id_i[0],
-            md->n_blocks_packed_i * sizeof(int2),
-            cudaMemcpyHostToDevice, stream[0]);
-    /*Copy the metadata to GPU telling each cuda block what sections of the unique particle data to work on.*/
-    cu_error =
-        cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id_j[0],
-            &buf->gpu_md.block_leaf_id_j[0],
-            md->n_blocks_packed_j * sizeof(int2),
-            cudaMemcpyHostToDevice, stream[0]);
 
     /*What's gone and what's past help. Should be past grief
      *Re-set sums to zero on GPU before launching kernel*/
