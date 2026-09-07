@@ -184,7 +184,7 @@ void gpu_launch_gradient_one_way_interactions(
 //        d_parts_send, d_parts_recv, d_a, d_H,
 //        d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 //}
-
+#include <nvToolsExt.h>
 void gpu_launch_force_one_way_interactions(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
     struct gpu_part_recv_f*      __restrict__ d_parts_recv,
@@ -201,10 +201,20 @@ void gpu_launch_force_one_way_interactions(
    * using async Glocal2Shared mem copies in kernel*/
     const size_t shmem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_f);
 
+    nvtxRangeId_t range;
+    if(num_blocks_x == 5)
+    	range = nvtxRangeStartA("force_grid_lt_10");
+    else if (num_blocks_x > 5000)
+    	range = nvtxRangeStartA("force_grid_gt_5000");
+
 //    printf("shmem %i, ij %i num_blocks %i\n", shmem, ij, num_blocks_x);
     cuda_kernel_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
         d_cell_i_j_start_end, d_block_leaf_id, space_dim, ij);
+
+    if(num_blocks_x == 5 || num_blocks_x > 5000)
+    	nvtxRangeEnd(range);
+//    	nvtxRangePop();
 }
 
 #ifdef __cplusplus
