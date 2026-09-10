@@ -164,7 +164,7 @@ void gpu_launch_force(
 
 //    const size_t shmem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_f);
 
-    cuda_kernel_force_original<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
+    cuda_kernel_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
         d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
