@@ -137,11 +137,34 @@ void gpu_launch_force(
     const double3 space_dim,
     cudaStream_t stream)
 {
-  /* Shared memory allocation. Need two tiles as another tile (1) is
-       used for prefetching while tile 0 is used for computations and vice-versa*/
-    const size_t shmem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_f);
 
-    cuda_kernel_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
+	static_assert(
+	    (GPU_THREAD_BLOCK_SIZE &
+	     (GPU_THREAD_BLOCK_SIZE - 1)) == 0,
+	    "GPU_THREAD_BLOCK_SIZE must be a power of two");
+	/* Shared memory allocation. Need two tiles as another tile (1) is
+	     used for prefetching while tile 0 is used for computations and vice-versa*/
+	const size_t original_shared_bytes =
+	    2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_f);
+//	    (
+//	        sizeof(double2) +
+//	        sizeof(double2) +
+//	        sizeof(float4)  +
+//	        sizeof(float4)  +
+//	        sizeof(float4)  +
+//	        sizeof(int2)
+//	    );
+
+	const size_t reduction_shared_bytes =
+	    GPU_THREAD_BLOCK_SIZE *
+	    sizeof(force_block_partial);
+
+	const size_t shmem =
+	    max(original_shared_bytes, reduction_shared_bytes);
+
+//    const size_t shmem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_f);
+
+    cuda_kernel_force_original<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
         d_cell_i_j_start_end, d_block_leaf_id, space_dim);
 }
