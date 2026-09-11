@@ -116,9 +116,26 @@ void gpu_launch_gradient(
     const double3 space_dim,
     cudaStream_t stream)
 {
-  /* Shared memory allocation. Need two tiles as another tile (1) is
+
+  static_assert(
+	    GPU_THREAD_BLOCK_SIZE > 0 &&
+	    (GPU_THREAD_BLOCK_SIZE &
+	     (GPU_THREAD_BLOCK_SIZE - 1)) == 0,
+	    "GPU_THREAD_BLOCK_SIZE must be a power of two");
+
+  const size_t gradient_tiling_shared_bytes = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(gpu_part_data_g);
+  const size_t gradient_reduction_shared_bytes =
+      GPU_THREAD_BLOCK_SIZE *
+      sizeof(gradient_block_partial);
+
+  const size_t sh_mem =
+      gradient_tiling_shared_bytes >
+      gradient_reduction_shared_bytes
+          ? gradient_tiling_shared_bytes
+          : gradient_reduction_shared_bytes;
+	/* Shared memory allocation. Need two tiles as another tile (1) is
      used for prefetching while tile 0 is used for computations and vice-versa*/
-    const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_g);  // 3072 bytes when TILE_J=64
+//    const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_g);  // 3072 bytes when TILE_J=64
 
     cuda_kernel_gradient<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,

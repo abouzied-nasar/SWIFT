@@ -1235,7 +1235,373 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
 
 }
 
-__global__ void cuda_kernel_gradient(
+struct gradient_block_partial {
+
+    /* Maximum neighbour viscosity parameter. */
+    float aviscmax;
+
+    /* Maximum signal velocity. */
+    float vsig;
+
+    /* Sum of the thermal diffusion Laplacian contribution. */
+    float lapu;
+};
+
+#include <cfloat>
+
+/**
+ * @brief Compute i <- j gradient interactions while assigning one particle
+ * from source cell j to each CUDA thread.
+ *
+ * The mathematical interaction direction remains i <- j. CUDA threads are
+ * distributed over particles in cell j rather than particles in target
+ * cell i.
+ *
+ * For every target particle i:
+ *
+ *   - each thread calculates the contribution from one source particle j;
+ *   - aviscmax is reduced using a block-wise maximum;
+ *   - vsig is reduced using a block-wise maximum;
+ *   - lapu is reduced using a block-wise sum;
+ *   - thread zero atomically accumulates the block result.
+ *
+ * Shared memory is used only for block-wise reduction. Particle data is read
+ * directly from global memory.
+ *
+ * The block mapping must be based on the number of particles in source cell j.
+ */
+__device__ __forceinline__
+void neighbour_interactions_gradient_j_parallel(
+    const struct gpu_part_send_g* __restrict__ d_parts_send,
+    struct gpu_part_recv_g* __restrict__ d_parts_recv,
+    int i_start,
+    int i_end,
+    int j_start,
+    int j_end,
+    const double3 shift_i_d,
+    const double3 shift_j_d,
+    int b_id_local,
+    int tid,
+    float d_a,
+    float d_H) {
+
+    /*
+     * Shared memory is used only for the block-wise reduction.
+     */
+    extern __shared__ __align__(16) unsigned char smem[];
+
+    gradient_block_partial* const s_partial =
+        reinterpret_cast<gradient_block_partial*>(smem);
+
+    /*
+     * Map this thread to one particle in source cell j.
+     */
+    const int j_id =
+        j_start +
+        b_id_local * GPU_THREAD_BLOCK_SIZE +
+        tid;
+
+    const bool j_in_range =
+        (j_id < j_end);
+
+    /*
+     * Load this thread's source particle once. It remains in registers while
+     * this thread loops over every target particle in the smaller cell.
+     *
+     * Threads outside the j-cell range retain dummy values but still
+     * participate in all block synchronisations and reductions.
+     */
+    float xj = 0.f;
+    float yj = 0.f;
+    float zj = 0.f;
+
+    float vxj = 0.f;
+    float vyj = 0.f;
+    float vzj = 0.f;
+    float mj  = 0.f;
+
+    float energyj = 0.f;
+    float rhoj    = 0.f;
+    float cj      = 0.f;
+    float aviscj  = 0.f;
+
+    if (j_in_range) {
+
+        const struct gpu_part_data_g pj =
+            d_parts_send[j_id].p_data;
+
+        xj = (float)(pj.x_y.x - shift_j_d.x);
+        yj = (float)(pj.x_y.y - shift_j_d.y);
+        zj = (float)(pj.z_h.x - shift_j_d.z);
+
+        vxj = pj.vx_m.x;
+        vyj = pj.vx_m.y;
+        vzj = pj.vx_m.z;
+        mj  = pj.vx_m.w;
+
+        energyj = pj.u_rho_c_aviscmax.x;
+        rhoj    = pj.u_rho_c_aviscmax.y;
+        cj      = pj.u_rho_c_aviscmax.z;
+
+        aviscj = pj.avisc_vsig.x;
+    }
+
+    /*
+     * Cosmology terms for the signal velocity.
+     */
+    const float fac_mu =
+        d_pow_three_gamma_minus_five_over_two(d_a);
+
+    const float a2_Hubble =
+        d_a * d_a * d_H;
+
+    /*
+     * Every block loops over all target particles in cell i.
+     *
+     * All threads execute the same number of iterations and therefore reach
+     * every block synchronisation point.
+     */
+    for (int i_id = i_start; i_id < i_end; ++i_id) {
+
+        /*
+         * All threads read the same target particle directly from global
+         * memory. No shared-memory particle staging is used in this path.
+         */
+        const struct gpu_part_data_g pi =
+            d_parts_send[i_id].p_data;
+
+        const float xi =
+            (float)(pi.x_y.x - shift_i_d.x);
+
+        const float yi =
+            (float)(pi.x_y.y - shift_i_d.y);
+
+        const float zi =
+            (float)(pi.z_h.x - shift_i_d.z);
+
+        const float hi =
+            (float)pi.z_h.y;
+
+        const float vxi =
+            pi.vx_m.x;
+
+        const float vyi =
+            pi.vx_m.y;
+
+        const float vzi =
+            pi.vx_m.z;
+
+        const float energyi =
+            pi.u_rho_c_aviscmax.x;
+
+        const float ci =
+            pi.u_rho_c_aviscmax.z;
+
+        /*
+         * These are the pre-existing target values with which the original
+         * target-owned function initialises its running maxima.
+         */
+        const float initial_aviscmax =
+            pi.u_rho_c_aviscmax.w;
+
+        const float initial_vsig =
+            pi.avisc_vsig.y;
+
+        const float hi_inv =
+            1.0f / hi;
+
+        const float hig2 =
+            hi * hi * kernel_gamma2;
+
+        gradient_block_partial local;
+
+        /*
+         * Include the target's initial maxima only once per block. Initialising
+         * every thread with the same values would still produce the correct
+         * maximum but would perform redundant reduction work.
+         */
+        if (tid == 0) {
+            local.aviscmax = initial_aviscmax;
+            local.vsig     = initial_vsig;
+        } else {
+            local.aviscmax = -FLT_MAX;
+            local.vsig     = -FLT_MAX;
+        }
+
+        local.lapu = 0.f;
+
+        /*
+         * Calculate this thread's source-j contribution to the current
+         * target particle i.
+         */
+        if (j_in_range && j_id != i_id) {
+
+            const float xij =
+                xi - xj;
+
+            const float yij =
+                yi - yj;
+
+            const float zij =
+                zi - zj;
+
+            const float r2 =
+                fmaf(
+                    xij,
+                    xij,
+                    fmaf(yij, yij, zij * zij));
+
+            /*
+             * Gradient interactions are directional and use the smoothing
+             * length of the target particle i.
+             */
+            if (r2 < hig2) {
+
+                local.aviscmax =
+                    fmaxf(local.aviscmax, aviscj);
+
+                const float inv_r =
+                    rsqrtf(r2);
+
+                const float r =
+                    r2 * inv_r;
+
+                const float dvx =
+                    vxi - vxj;
+
+                const float dvy =
+                    vyi - vyj;
+
+                const float dvz =
+                    vzi - vzj;
+
+                const float dvdr =
+                    fmaf(
+                        dvx,
+                        xij,
+                        fmaf(dvy, yij, dvz * zij));
+
+                const float dvdr_Hubble =
+                    dvdr + a2_Hubble * r2;
+
+                /*
+                 * Are the particles moving towards each other?
+                 */
+                const float omega_ij =
+                    fminf(dvdr_Hubble, 0.f);
+
+                const float mu_ij =
+                    fac_mu * inv_r * omega_ij;
+
+                /*
+                 * Signal velocity.
+                 */
+                const float new_v_sig =
+                    ci +
+                    cj -
+                    const_viscosity_beta * mu_ij;
+
+                local.vsig =
+                    fmaxf(local.vsig, new_v_sig);
+
+                /*
+                 * Calculate Del^2 u for the thermal diffusion coefficient.
+                 */
+                float wi;
+                float wi_dx;
+
+                const float ui =
+                    r * hi_inv;
+
+                d_kernel_deval(
+                    ui,
+                    &wi,
+                    &wi_dx);
+
+                const float delta_u_factor =
+                    (energyi - energyj) * inv_r;
+
+                local.lapu +=
+                    mj *
+                    delta_u_factor *
+                    wi_dx *
+                    (1.0f / rhoj);
+            }
+        }
+
+        /*
+         * Store one partial gradient result per CUDA thread.
+         */
+        s_partial[tid] = local;
+
+        __syncthreads();
+
+        /*
+         * Block-wide reduction.
+         *
+         * The two maximum quantities use fmaxf(), while lapu is summed.
+         *
+         * GPU_THREAD_BLOCK_SIZE must be a power of two and blockDim.x must
+         * equal GPU_THREAD_BLOCK_SIZE.
+         */
+        for (int offset = GPU_THREAD_BLOCK_SIZE >> 1;
+             offset > 0;
+             offset >>= 1) {
+
+            if (tid < offset) {
+
+                s_partial[tid].aviscmax =
+                    fmaxf(
+                        s_partial[tid].aviscmax,
+                        s_partial[tid + offset].aviscmax);
+
+                s_partial[tid].vsig =
+                    fmaxf(
+                        s_partial[tid].vsig,
+                        s_partial[tid + offset].vsig);
+
+                s_partial[tid].lapu +=
+                    s_partial[tid + offset].lapu;
+            }
+
+            __syncthreads();
+        }
+
+        /*
+         * Different blocks process different ranges of source cell j.
+         * Therefore, the block-reduced results must still be atomically
+         * accumulated into target particle i.
+         */
+        if (tid == 0) {
+
+            const gradient_block_partial result =
+                s_partial[0];
+
+            atomicMaxFloat(
+                &d_parts_recv[i_id]
+                     .aviscmax_vsig_lapu.x,
+                result.aviscmax);
+
+            atomicMaxFloat(
+                &d_parts_recv[i_id]
+                     .aviscmax_vsig_lapu.y,
+                result.vsig);
+
+            atomicAdd(
+                &d_parts_recv[i_id]
+                     .aviscmax_vsig_lapu.z,
+                result.lapu);
+        }
+
+        /*
+         * Ensure thread zero has finished reading the reduction result before
+         * any thread overwrites shared memory for the next target particle.
+         */
+        __syncthreads();
+    }
+}
+
+__global__ void cuda_kernel_gradient_original(
     const struct gpu_part_send_g* __restrict__ d_parts_send,
     struct gpu_part_recv_g*      __restrict__ d_parts_recv,
     const float d_a, const float d_H,
@@ -1308,6 +1674,347 @@ __global__ void cuda_kernel_gradient(
             d_a, d_H
         );
     }
+}
+
+#ifndef GRADIENT_CELL_COUNT_RATIO
+#define GRADIENT_CELL_COUNT_RATIO 8
+#endif
+
+__global__ void cuda_kernel_gradient(
+    const struct gpu_part_send_g* __restrict__ d_parts_send,
+    struct gpu_part_recv_g* __restrict__ d_parts_recv,
+    const float d_a,
+    const float d_H,
+    const int4* __restrict__ d_cell_i_j_start_end,
+    const int2* __restrict__ d_block_leaf_id,
+    const double3 space_dim) {
+
+    /*
+     * Figure out which range of particles threads in this block will work on.
+     */
+    const int bid =
+        blockIdx.x;
+
+    /*
+     * What is the leaf computation this block will work on?
+     */
+    const int leafid =
+        d_block_leaf_id[bid].x;
+
+    /*
+     * Global block ID of the first block assigned to this leaf computation.
+     */
+    const int bid_0 =
+        d_block_leaf_id[bid].y;
+
+    /*
+     * Block index local to this leaf computation.
+     */
+    const int b_id_local =
+        bid - bid_0;
+
+    const int tid =
+        threadIdx.x;
+
+    /*
+     * Get the start and end positions of cells i and j.
+     */
+    const int4 cell_se =
+        d_cell_i_j_start_end[leafid];
+
+    const int ci_start =
+        cell_se.x;
+
+    const int ci_end =
+        cell_se.y;
+
+    const int cj_start =
+        cell_se.z;
+
+    const int cj_end =
+        cell_se.w;
+
+    /*
+     * The final entry in each cell range stores the cell position and is not
+     * a particle.
+     */
+    const int ci_particle_end =
+        ci_end - 1;
+
+    const int cj_particle_end =
+        cj_end - 1;
+
+    const int ni =
+        ci_particle_end - ci_start;
+
+    const int nj =
+        cj_particle_end - cj_start;
+
+    /*
+     * Skip empty cell interactions.
+     *
+     * This decision is block-uniform, so the return is safe.
+     */
+    if (ni <= 0 || nj <= 0)
+        return;
+
+    /*
+     * d_block_leaf_id is generated from max(ni, nj), so b_id_local maps over
+     * the larger cell for either asymmetric execution path.
+     */
+    const bool ci_much_larger =
+        (long long)ni >=
+        (long long)GRADIENT_CELL_COUNT_RATIO *
+        (long long)nj;
+
+    const bool cj_much_larger =
+        (long long)nj >=
+        (long long)GRADIENT_CELL_COUNT_RATIO *
+        (long long)ni;
+
+    /*
+     * Get the cell positions. The final packed entry in each cell range stores
+     * its cell position.
+     */
+    const auto ci_loc =
+        d_parts_send[ci_end - 1].c_loc;
+
+    const auto cj_loc =
+        d_parts_send[cj_end - 1].c_loc;
+
+    /*
+     * Calculate the periodic shift between cells i and j.
+     */
+    double3 shift = {
+        0.0,
+        0.0,
+        0.0
+    };
+
+    const double distx =
+        cj_loc.x.x - ci_loc.x.x;
+
+    const double disty =
+        cj_loc.x.y - ci_loc.x.y;
+
+    const double distz =
+        cj_loc.x.z - ci_loc.x.z;
+
+    if (distx < -space_dim.x * 0.5)
+        shift.x = space_dim.x;
+    else if (distx > space_dim.x * 0.5)
+        shift.x = -space_dim.x;
+
+    if (disty < -space_dim.y * 0.5)
+        shift.y = space_dim.y;
+    else if (disty > space_dim.y * 0.5)
+        shift.y = -space_dim.y;
+
+    if (distz < -space_dim.z * 0.5)
+        shift.z = space_dim.z;
+    else if (distz > space_dim.z * 0.5)
+        shift.z = -space_dim.z;
+
+    /*
+     * Coordinate shifts for ci <- cj.
+     */
+    const double3 ci_target_shift = {
+        shift.x + cj_loc.x.x,
+        shift.y + cj_loc.x.y,
+        shift.z + cj_loc.x.z
+    };
+
+    const double3 cj_source_shift = {
+        cj_loc.x.x,
+        cj_loc.x.y,
+        cj_loc.x.z
+    };
+
+    /*
+     * Coordinate shifts for cj <- ci.
+     */
+    const double3 cj_target_shift = {
+        cj_loc.x.x,
+        cj_loc.x.y,
+        cj_loc.x.z
+    };
+
+    const double3 ci_source_shift = {
+        shift.x + cj_loc.x.x,
+        shift.y + cj_loc.x.y,
+        shift.z + cj_loc.x.z
+    };
+
+    /*
+     * Self interaction.
+     *
+     * Only one directional call is required because both particle ranges
+     * identify the same cell.
+     */
+    if (ci_start == cj_start) {
+
+        neighbour_interactions_gradient(
+            d_parts_send,
+            d_parts_recv,
+            ci_start,
+            ci_particle_end,
+            cj_start,
+            cj_particle_end,
+            ci_target_shift,
+            cj_source_shift,
+            b_id_local,
+            tid,
+            d_a,
+            d_H);
+
+        return;
+    }
+
+    /*
+     * Cell i is much larger than cell j.
+     *
+     * Blocks map over particles in cell i.
+     *
+     * ci <- cj:
+     *   Cell i is the larger target, so use the original target-parallel
+     *   implementation.
+     *
+     * cj <- ci:
+     *   Cell i is the larger source, so continue mapping threads over cell i
+     *   and reduce their contributions into target particles in cell j.
+     */
+    if (ci_much_larger) {
+
+        neighbour_interactions_gradient(
+            d_parts_send,
+            d_parts_recv,
+            ci_start,
+            ci_particle_end,
+            cj_start,
+            cj_particle_end,
+            ci_target_shift,
+            cj_source_shift,
+            b_id_local,
+            tid,
+            d_a,
+            d_H);
+
+        /*
+         * Both device functions reuse the same dynamic shared-memory
+         * allocation. Ensure that every thread has completed the first
+         * interaction direction before any thread begins the second.
+         */
+        __syncthreads();
+
+        neighbour_interactions_gradient_j_parallel(
+            d_parts_send,
+            d_parts_recv,
+            cj_start,
+            cj_particle_end,
+            ci_start,
+            ci_particle_end,
+            cj_target_shift,
+            ci_source_shift,
+            b_id_local,
+            tid,
+            d_a,
+            d_H);
+
+        return;
+    }
+
+    /*
+     * Cell j is much larger than cell i.
+     *
+     * Blocks map over particles in cell j.
+     *
+     * ci <- cj:
+     *   Cell j is the larger source, so map threads over cell j and reduce
+     *   their contributions into target particles in cell i.
+     *
+     * cj <- ci:
+     *   Cell j is the larger target, so use the original target-parallel
+     *   implementation.
+     */
+    if (cj_much_larger) {
+
+        neighbour_interactions_gradient_j_parallel(
+            d_parts_send,
+            d_parts_recv,
+            ci_start,
+            ci_particle_end,
+            cj_start,
+            cj_particle_end,
+            ci_target_shift,
+            cj_source_shift,
+            b_id_local,
+            tid,
+            d_a,
+            d_H);
+
+        /*
+         * Both interaction paths interpret and reuse the same dynamic
+         * shared-memory allocation.
+         */
+        __syncthreads();
+
+        neighbour_interactions_gradient(
+            d_parts_send,
+            d_parts_recv,
+            cj_start,
+            cj_particle_end,
+            ci_start,
+            ci_particle_end,
+            cj_target_shift,
+            ci_source_shift,
+            b_id_local,
+            tid,
+            d_a,
+            d_H);
+
+        return;
+    }
+
+    /*
+     * Similar cell sizes.
+     *
+     * Retain the original target-parallel implementation for both directions.
+     * Because blocks are allocated using max(ni, nj), surplus blocks for the
+     * slightly smaller target cell are handled by i_in_range in the original
+     * function.
+     */
+    neighbour_interactions_gradient(
+        d_parts_send,
+        d_parts_recv,
+        ci_start,
+        ci_particle_end,
+        cj_start,
+        cj_particle_end,
+        ci_target_shift,
+        cj_source_shift,
+        b_id_local,
+        tid,
+        d_a,
+        d_H);
+
+    /*
+     * Both calls reuse the same dynamic shared-memory particle buffers.
+     */
+    __syncthreads();
+
+    neighbour_interactions_gradient(
+        d_parts_send,
+        d_parts_recv,
+        cj_start,
+        cj_particle_end,
+        ci_start,
+        ci_particle_end,
+        cj_target_shift,
+        ci_source_shift,
+        b_id_local,
+        tid,
+        d_a,
+        d_H);
 }
 
 /**
