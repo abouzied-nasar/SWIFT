@@ -1625,6 +1625,8 @@ __global__ void cuda_kernel_force(
             d_a,
             d_H);
 
+        /*Necessary to avoid over-writing shared memory with new values*/
+        __syncthreads();
         /*
          * This function's i range is the mathematical target and its j range
          * is the source cell over which CUDA threads are distributed.
@@ -1674,6 +1676,8 @@ __global__ void cuda_kernel_force(
             d_a,
             d_H);
 
+        /*Necessary to avoid over-writing shared memory with new values*/
+        __syncthreads();
         neighbour_interactions_force(
             d_parts_send,
             d_parts_recv,
@@ -1713,6 +1717,8 @@ __global__ void cuda_kernel_force(
         d_a,
         d_H);
 
+    /*Necessary to avoid over-writing shared memory with new values*/
+    __syncthreads();
     neighbour_interactions_force(
         d_parts_send,
         d_parts_recv,
