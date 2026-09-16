@@ -2978,28 +2978,28 @@ struct task *scheduler_gettask(struct scheduler *s, int qid,
           TIMER_TIC;
           struct queue * q_stl = &s->queues[qids[ind]];
 #if defined(WITH_CUDA) || defined(WITH_HIP)
-          res = queue_stealtask(q_stl, prev, 0);
+          res = queue_stealtask(q_stl, q, prev, 0);
 #else
           res = queue_gettask(q_stl, prev, 0);
 #endif
           TIMER_TOC(timer_qsteal);
           if (res != NULL) {
-#if defined(WITH_CUDA) || defined(WITH_HIP)
-            /* For GPU tasks: Move counter from the robbed to the robber */
-
-            enum task_subtypes subtype = res->subtype;
-
-            if (subtype == task_subtype_gpu_density) {
-              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_density]);
-              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_density]);
-            } else if (subtype == task_subtype_gpu_gradient) {
-              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_gradient]);
-              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_gradient]);
-            } else if (subtype == task_subtype_gpu_force) {
-              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_force]);
-              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_force]);
-            }
-#endif
+//#if defined(WITH_CUDA) || defined(WITH_HIP)
+//            /* For GPU tasks: Move counter from the robbed to the robber */
+//
+//            enum task_subtypes subtype = res->subtype;
+//
+//            if (subtype == task_subtype_gpu_density) {
+//              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_density]);
+//              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_density]);
+//            } else if (subtype == task_subtype_gpu_gradient) {
+//              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_gradient]);
+//              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_gradient]);
+//            } else if (subtype == task_subtype_gpu_force) {
+//              atomic_inc(&q->gpu_tasks_left[gpu_task_type_hydro_force]);
+//              atomic_dec(&q_stl->gpu_tasks_left[gpu_task_type_hydro_force]);
+//            }
+//#endif
             /* Run with the task */
             break;
           } else {
