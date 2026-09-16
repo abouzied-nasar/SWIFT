@@ -341,19 +341,21 @@ static inline int task_get_gpu_task_type(const struct task *t) {
 static inline int queue_reserve_gpu_task(struct queue *q,
                                          const int gpu_task_type) {
 
-  int current =
+  /*Read number of tasks left atomically*/
+  int current_n_left =
       __atomic_load_n(&q->gpu_tasks_left[gpu_task_type], __ATOMIC_ACQUIRE);
 
-  while (current > 1) {
-
-    const int desired = current - 1;
-
-    /*
-     * On failure, current is updated with the value now held by the
+  /*Are we allowed to steal? Only if current_n_left > 1*/
+  while (current_n_left > 1) {
+	/*If we can steal then n_left will reduce by 1*/
+    const int new_n_left = current_n_left - 1;
+    /* On failure, current_n_left is updated with the value now held by the
      * counter. The loop then checks the threshold again.
-     */
+     * Use a "weak" CAS since we are in a while loop -> even if weak CAS
+     * fails for some unexpected reason we will try again unless current_n_left
+     * exchanged with 1*/
     if (__atomic_compare_exchange_n(
-            &q->gpu_tasks_left[gpu_task_type], &current, desired,
+            &q->gpu_tasks_left[gpu_task_type], &current_n_left, new_n_left,
             /*weak=*/1, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
       return 1;
   }
@@ -361,108 +363,6 @@ static inline int queue_reserve_gpu_task(struct queue *q,
   return 0;
 }
 #endif
-
-
-//#if defined(WITH_CUDA) || defined(WITH_HIP)
-///**
-// * @brief Get a task free of dependencies and conflicts.
-// *
-// * @param q The task #queue.
-// * @param prev The previous #task extracted from this #queue.
-// * @param blocking Block until access to the queue is granted.
-// */
-//struct task *queue_stealtask(struct queue *q, struct queue *destination,
-//                             const struct task *prev, int blocking){
-////struct task *queue_stealtask(struct queue *q, const struct task *prev,
-////                           int blocking) {
-//
-//  swift_lock_type *qlock = &q->lock;
-//  struct task *res = NULL;
-//
-//  /* Grab the task lock. */
-//  if (blocking) {
-//    if (lock_lock(qlock) != 0) error("Locking the qlock failed.\n");
-//  } else {
-//    if (lock_trylock(qlock) != 0) return NULL;
-//  }
-//
-//  /* Fill any tasks from the incoming DEQ. */
-//  queue_get_incoming(q);
-//
-//  /* If there is only 1 task in queue to steal from, leave immediately. */
-//  if (q->count == 0) {
-//    lock_unlock_blind(qlock);
-//    return NULL;
-//  }
-//
-//  /* Set some pointers we will use often. */
-//  struct queue_entry *entries = q->entries;
-//  struct task *qtasks = q->tasks;
-//  const int old_qcount = q->count;
-//
-//  /* Loop over the queue entries. */
-//  int ind;
-//  for (ind = 0; ind < old_qcount; ind++) {
-//
-//    /* Try to lock the next task. */
-//    struct task * t_temp = &qtasks[entries[ind].tid];
-//    /*If task is a GPU task and we only have 1 left in victim's queue have pity and do not steal it:
-//     * Stealing it will interfere with signalling the task is done in the victim's off-load code*/
-//    if((t_temp->subtype == task_subtype_gpu_density && q->gpu_tasks_left[gpu_task_type_hydro_density] <= 2) ||
-//        (t_temp->subtype == task_subtype_gpu_gradient && q->gpu_tasks_left[gpu_task_type_hydro_gradient] <= 2) ||
-//        (t_temp->subtype == task_subtype_gpu_force && q->gpu_tasks_left[gpu_task_type_hydro_force] <= 2))
-//      continue;
-//    if (task_lock(&qtasks[entries[ind].tid])) break;
-//
-//    /* Should we de-prioritize this task? */
-//
-//    // MATTHIEU: We now have more than 64 tasks so the bit-wise
-//    // operation here is problematic.
-//    // However, the mask was such that this condition is always true anyway.
-//    if (1 /* (1ULL << qtasks[entries[ind].tid].type) & */
-//        /* queue_lock_fail_reweight_mask */) {
-//
-//      /* Scale the task's weight. */
-//      entries[ind].weight *= queue_lock_fail_reweight_factor;
-//
-//      /* Send it down the binary heap. */
-//      if (queue_sift_down(q, ind) != ind) ind -= 1;
-//    }
-//  }
-//
-//  /* Did we get a task? */
-//  if (ind < old_qcount) {
-//
-//    /* Another one bites the dust. */
-//    const int qcount = q->count -= 1;
-//
-//    /* Get a pointer on the task that we want to return. */
-//    res = &qtasks[entries[ind].tid];
-//
-//    /* Swap this task with the last task and re-heap. */
-//    if (ind < qcount) {
-//      entries[ind] = entries[qcount];
-//      ind = queue_bubble_up(q, ind);
-//      ind = queue_sift_down(q, ind);
-//    }
-//
-//  } else
-//    res = NULL;
-//
-//#ifdef SWIFT_DEBUG_CHECKS
-//  /* Check the queue's consistency. */
-//  for (int k = 1; k < q->count; k++)
-//    if (entries[(k - 1) / 2].weight < entries[k].weight)
-//      error("Queue heap is disordered.");
-//#endif
-//
-//  /* Release the task lock. */
-//  if (lock_unlock(qlock) != 0) error("Unlocking the qlock failed.\n");
-//
-//  /* Take the money and run. */
-//  return res;
-//}
-//#endif
 
 #if defined(WITH_CUDA) || defined(WITH_HIP)
 /**
@@ -508,19 +408,14 @@ struct task *queue_stealtask(struct queue *q, struct queue *destination,
 
     struct task *t_temp = &qtasks[entries[ind].tid];
     const int gpu_type = task_get_gpu_task_type(t_temp);
-
     reserved_gpu_type = -1;
-
-    /*
-     * Atomically reserve ownership of the GPU task from the victim.
-     * This check races safely with runner functions decrementing the
-     * same counter.
-     */
+    /* Atomically reserve ownership of the GPU task from the victim.
+     * This check is safe to use with runner functions decrementing the
+     * same counter since we only reserve ownership (in order to steal a task)
+     * if there are more than 1 gpu tasks of a type left in the queue. */
     if (gpu_type >= 0) {
-
       if (!queue_reserve_gpu_task(q, gpu_type))
         continue;
-
       reserved_gpu_type = gpu_type;
     }
 
@@ -528,10 +423,8 @@ struct task *queue_stealtask(struct queue *q, struct queue *destination,
     if (task_lock(t_temp))
       break;
 
-    /*
-     * The task could not be locked, so return the reservation to the
-     * victim queue.
-     */
+    /* The task could not be locked, so return the reservation to the
+     * victim queue. */
     if (reserved_gpu_type >= 0) {
       atomic_inc(&q->gpu_tasks_left[reserved_gpu_type]);
       reserved_gpu_type = -1;
@@ -569,11 +462,9 @@ struct task *queue_stealtask(struct queue *q, struct queue *destination,
       ind = queue_sift_down(q, ind);
     }
 
-    /*
-     * The victim counter was decremented by queue_reserve_gpu_task().
-     * Complete the ownership transfer by incrementing the destination
-     * counter before making the stolen task available to the caller.
-     */
+    /* If the victim counter was decremented by queue_reserve_gpu_task(),
+     * complete the ownership transfer by incrementing the destination
+     * counter. */
     if (reserved_gpu_type >= 0)
       atomic_inc(&destination->gpu_tasks_left[reserved_gpu_type]);
 
