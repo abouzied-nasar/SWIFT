@@ -945,7 +945,6 @@ struct gradient_block_partial {
  * @param d_a current cosmological expansion factor
  * @param d_H current Hubble constant
  */
- */
 __device__ __forceinline__ void neighbour_interactions_gradient_j_parallel(
     const struct gpu_part_send_g *__restrict__ d_parts_send,
     struct gpu_part_recv_g *__restrict__ d_parts_recv, int i_start, int i_end,
