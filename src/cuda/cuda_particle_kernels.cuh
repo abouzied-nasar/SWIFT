@@ -536,164 +536,110 @@ __global__ void cuda_kernel_density_original(
 
 __global__ void cuda_kernel_density(
     const struct gpu_part_send_d *__restrict__ d_parts_send,
-    struct gpu_part_recv_d *__restrict__ d_parts_recv, const float d_a,
-    const float d_H, const int4 *__restrict__ d_cell_i_j_start_end,
+    struct gpu_part_recv_d *__restrict__ d_parts_recv,
+	const int4 *__restrict__ d_cell_i_j_start_end,
     const int2 *__restrict__ d_block_leaf_id, const double3 space_dim) {
-
-  /*
-   * d_a and d_H are currently unused by the density interaction.
-   */
-  (void)d_a;
-  (void)d_H;
 
   /* Figure out which range of particles this block will work on. */
   const int bid = blockIdx.x;
-
   /* What is the leaf computation this block will work on? */
   const int leafid = d_block_leaf_id[bid].x;
-
-  /*
-   * Global ID of the first block assigned to this leaf computation.
-   */
+  /*In case we need more than one block to run this leaf computation we need to
+   * know where in the group of blocks acting on a cell we are. bid_0 is the id
+   * of the first block acting on this cell*/
   const int bid_0 = d_block_leaf_id[bid].y;
-
-  /*
-   * Block index local to this leaf computation.
-   */
-  const int b_id_local = bid - bid_0;
-
-  const int tid = threadIdx.x;
-
   /* Get the start and end positions of cells i and j. */
   const int4 cell_se = d_cell_i_j_start_end[leafid];
 
+  /*Grab indices for where cells i and j start and end in d_parts_send array*/
   const int ci_start = cell_se.x;
-
   const int ci_end = cell_se.y;
-
   const int cj_start = cell_se.z;
-
   const int cj_end = cell_se.w;
 
-  /*
-   * The final entry in each cell range stores the cell position and is not
-   * a particle.
-   */
-  const int ci_particle_end = ci_end - 1;
+  /*We can now find our block index in a local reference to this cell*/
+  /* Block index local to this leaf computation. */
+  const int b_id_local = bid - bid_0;
+  /*This thread's ID within the block*/
+  const int tid = threadIdx.x;
 
+  /* The final entry in each cell range stores the cell position and is not a particle.
+   * ci_particle_end corresponds to the last particle in the array d_parts_send*/
+  const int ci_particle_end = ci_end - 1;
   const int cj_particle_end = cj_end - 1;
 
+  /*Find the number of particles in cells i and j. Needed for decision making later*/
   const int ni = ci_particle_end - ci_start;
-
   const int nj = cj_particle_end - cj_start;
 
-  /*
-   * Avoid processing empty cell interactions.
-   *
-   * This decision is block-uniform, so the early return is safe.
-   */
+  /* Avoid processing empty cell interactions. This decision is block-uniform, so the
+   * early return is safe. */
   if (ni <= 0 || nj <= 0) return;
 
-  /*
-   * d_block_leaf_id is constructed using max(ni, nj). Therefore,
-   * b_id_local naturally maps over the larger cell for either asymmetric
-   * path.
-   */
-  const bool ci_much_larger =
-      (long long)ni >= (long long)DENSITY_CELL_COUNT_RATIO * (long long)nj;
+  /* d_block_leaf_id is constructed using max(ni, nj). Therefore,
+   * b_id_local naturally maps over the larger cell for either path if assymetric (ni >> nj or vice-versa). */
+  const bool ci_much_larger = ni >= DENSITY_CELL_COUNT_RATIO * nj;
+  const bool cj_much_larger = nj >= DENSITY_CELL_COUNT_RATIO * ni;
 
-  const bool cj_much_larger =
-      (long long)nj >= (long long)DENSITY_CELL_COUNT_RATIO * (long long)ni;
-
-  /*
-   * Get cell positions. The cell position is stored as the final entry in
-   * each cell's packed particle range.
-   */
+  /* Get cell positions. The cell position is stored as the final entry in
+   * each cell's packed particle range. */
   const auto ci_loc = d_parts_send[ci_end - 1].c_loc;
-
   const auto cj_loc = d_parts_send[cj_end - 1].c_loc;
 
-  /* Calculate the periodic shift between cells i and j. */
+  /* Calculate the periodic shift between cells i and j if we have periodics */
   double3 shift = {0.0, 0.0, 0.0};
-
   const double distx = cj_loc.x.x - ci_loc.x.x;
-
   const double disty = cj_loc.x.y - ci_loc.x.y;
-
   const double distz = cj_loc.x.z - ci_loc.x.z;
 
   if (distx < -space_dim.x * 0.5)
     shift.x = space_dim.x;
   else if (distx > space_dim.x * 0.5)
     shift.x = -space_dim.x;
-
   if (disty < -space_dim.y * 0.5)
     shift.y = space_dim.y;
   else if (disty > space_dim.y * 0.5)
     shift.y = -space_dim.y;
-
   if (distz < -space_dim.z * 0.5)
     shift.z = space_dim.z;
   else if (distz > space_dim.z * 0.5)
     shift.z = -space_dim.z;
 
-  /*
-   * Coordinate shifts for ci <- cj.
-   */
+  /* Calculate shifts for case where we gather sums from cj (ci <- cj).
+   * In this case ci is target, cj is source*/
   const double3 ci_target_shift = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y,
                                    shift.z + cj_loc.x.z};
-
   const double3 cj_source_shift = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
 
-  /*
-   * Coordinate shifts for cj <- ci.
-   */
+  /* Calculate shifts for cj <- ci. */
   const double3 cj_target_shift = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
-
   const double3 ci_source_shift = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y,
                                    shift.z + cj_loc.x.z};
 
-  /*
-   * Self interaction.
-   *
-   * Only one directional call is required because both ranges identify the
-   * same cell. The original function excludes the particle's own entry.
-   */
+  /* Self interaction: Only 1 kernel call is required */
   if (ci_start == cj_start) {
-
     neighbour_interactions_density(
         d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
         cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid);
-
     return;
   }
 
-  /*
-   * Cell i is much larger than cell j.
-   *
-   * Blocks map over cell i.
-   *
-   * ci <- cj:
-   *   Cell i is the larger target, so use the original target-parallel
-   *   implementation.
-   *
-   * cj <- ci:
-   *   Cell i is now the larger source. Continue to map threads over cell i
-   *   and reduce their contributions into target particles in cell j.
-   */
+  /* Cell i is much larger than cell j: Blocks map over cell i. */
   if (ci_much_larger) {
 
+	/* Do ci <- cj: Cell i is the larger target, so use the target-parallel
+	 * implementation.*/
     neighbour_interactions_density(
         d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
         cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid);
 
-    /*
-     * Both device functions reuse the same dynamic shared-memory
+    /* Both device functions reuse the same dynamic shared-memory
      * allocation. Ensure every thread has completed the first direction
-     * before any thread begins the second direction.
-     */
+     * before any thread begins the second direction. */
     __syncthreads();
 
+    /* Do cj <- ci: Cell i is now the larger source. Continue to map threads over cell i
+     * and reduce their contributions into target particles in cell j. */
     neighbour_interactions_density_j_parallel(
         d_parts_send, d_parts_recv, cj_start, cj_particle_end, ci_start,
         ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid);
@@ -701,31 +647,21 @@ __global__ void cuda_kernel_density(
     return;
   }
 
-  /*
-   * Cell j is much larger than cell i.
-   *
-   * Blocks map over cell j.
-   *
-   * ci <- cj:
-   *   Cell j is the larger source. Threads map over cell j and reduce their
-   *   contributions into target particles in cell i.
-   *
-   * cj <- ci:
-   *   Cell j is then the larger target, so use the original target-parallel
-   *   implementation.
-   */
+  /* Cell j is much larger than cell i: Blocks map over cell j. */
   if (cj_much_larger) {
 
+	/* Do ci <- cj: Cell j is the larger source. Threads map over cell j and reduce their
+	 * contributions into target particles in cell i. */
     neighbour_interactions_density_j_parallel(
         d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
         cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid);
 
-    /*
-     * The two device functions interpret and reuse the same dynamic
-     * shared-memory allocation differently.
-     */
+    /* The two device functions interpret and reuse the same dynamic
+     * shared-memory allocation differently. make sure we sync before continuing*/
     __syncthreads();
 
+	/* Do cj <- ci: Cell j is then the larger target, so use the target-parallel
+	 * implementation. */
     neighbour_interactions_density(
         d_parts_send, d_parts_recv, cj_start, cj_particle_end, ci_start,
         ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid);
@@ -733,25 +669,20 @@ __global__ void cuda_kernel_density(
     return;
   }
 
-  /*
-   * Similar cell sizes.
-   *
-   * Retain the original target-parallel implementation for both directions.
-   * Since blocks are allocated using max(ni, nj), some blocks may contain no
-   * valid target threads for the slightly smaller cell. The original
-   * function handles that through i_in_range while retaining all required
-   * block synchronisations.
-   */
+  /* Similar cell sizes: Use the target-parallel implementation for both directions.
+   * Since blocks are allocated using max(ni, nj), some blocks will contain no
+   * valid per-thread target particles for the smaller cell. The functions
+   * handles this through i_in_range to ignore OOB particles. */
+  /*Do ci <- cj*/
   neighbour_interactions_density(
       d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
       cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid);
 
-  /*
-   * Required because both calls reuse the same dynamic shared-memory
-   * particle buffers.
-   */
+  /* Required because both calls reuse the same dynamic shared-memory
+   * particle buffers. */
   __syncthreads();
 
+  /*Now do cj <- ci*/
   neighbour_interactions_density(
       d_parts_send, d_parts_recv, cj_start, cj_particle_end, ci_start,
       ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid);
