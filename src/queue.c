@@ -412,7 +412,7 @@ struct task *queue_stealtask(struct queue *q, struct queue *destination,
     /* Atomically reserve ownership of the GPU task from the victim.
      * This check is safe to use with runner functions decrementing the
      * same counter since we only reserve ownership (in order to steal a task)
-     * if there are more than 1 gpu tasks of a type left in the queue. */
+     * if there are more than 1 gpu tasks of target type left in the queue. */
     if (gpu_type >= 0) {
       if (!queue_reserve_gpu_task(q, gpu_type))
         continue;
@@ -462,7 +462,7 @@ struct task *queue_stealtask(struct queue *q, struct queue *destination,
       ind = queue_sift_down(q, ind);
     }
 
-    /* If the victim counter was decremented by queue_reserve_gpu_task(),
+    /* If the victim's counter was decremented by queue_reserve_gpu_task(),
      * complete the ownership transfer by incrementing the destination
      * counter. */
     if (reserved_gpu_type >= 0)
