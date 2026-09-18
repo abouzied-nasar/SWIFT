@@ -233,6 +233,7 @@ void *runner_main_cuda(void *data) {
      * Could use any of the other buffers*/
     int offload = 0;
     offload = runner_GPU_offload_switch(r, sched, e, &gpu_buf_dens, /*timer off 0, on 1*/1);
+    e->gpu_used = offload;
 
     gpu_data_buffers_init_step(&gpu_buf_dens);
     gpu_data_buffers_init_step(&gpu_buf_grad);
