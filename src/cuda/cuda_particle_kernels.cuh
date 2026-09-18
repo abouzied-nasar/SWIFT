@@ -951,7 +951,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient_j_parallel(
     int j_start, int j_end, const double3 shift_i_d, const double3 shift_j_d,
     int b_id_local, int tid, float d_a, float d_H) {
 
-	 /* Declare shared memory used for block reduction. */
+  /* Declare shared memory used for block reduction. */
   extern __shared__ __align__(16) unsigned char smem[];
   gradient_block_partial *const s_partial =
       reinterpret_cast<gradient_block_partial *>(smem);
@@ -981,18 +981,23 @@ __device__ __forceinline__ void neighbour_interactions_gradient_j_parallel(
 
   /*Get properties (position, velocity, mass) needed for particle j*/
   if (j_in_range) {
+
     const struct gpu_part_data_g pj = d_parts_send[j_id].p_data;
+
     xj = (float)(pj.x_y.x - shift_j_d.x);
     yj = (float)(pj.x_y.y - shift_j_d.y);
     zj = (float)(pj.z_h.x - shift_j_d.z);
+
     vxj = pj.vx_m.x;
     vyj = pj.vx_m.y;
     vzj = pj.vx_m.z;
+
     mj = pj.vx_m.w;
     energyj = pj.u_rho_c_aviscmax.x;
     rhoj = pj.u_rho_c_aviscmax.y;
     cj = pj.u_rho_c_aviscmax.z;
     aviscj = pj.avisc_vsig.x;
+
   }
 
   /* Cosmology terms for the signal velocity. */
@@ -1366,7 +1371,6 @@ __global__ void cuda_kernel_gradient(
 /**
  * @brief Naive kernel computing the force interactions of a single particle
  *
- * @param pid index of particle to compute density for in the data arrays
  * @param d_pars_send array of particle data received from CPU
  * @param d_parts_recv array of particle data to write results into
  * @param i_start first particle in cell i
@@ -1746,32 +1750,59 @@ __device__ __forceinline__ void neighbour_interactions_force(
   }
 }
 
+/*For use in optimising the kernel in-case we have greatly disparate cell-sizes:
+ * Instead of using shared memory for pre-fetching we use shared memory for
+ * thread-block-wise reductions before writing to global memory*/
 struct force_block_partial {
+  /*Accelerations*/
   float ax;
   float ay;
   float az;
+  /*Rate of change of internal energy*/
   float udt;
+  /*Rate of change of h*/
   float hdt;
+  /*Minimum neighbour time bin*/
   int min_ngb_tb;
 };
 
 /**
- * @brief Compute i <- j interactions while assigning one j particle to each
- * CUDA thread.
- *
+ * @brief Compute i <- j gradient interactions while assigning one particle
+ * from cell j to each CUDA thread in case count j >> count i.
  * The mathematical interaction direction remains i <- j. The difference from
- * neighbour_interactions_force() is that the CUDA threads are distributed over
+ * neighbour_interactions_density() is that CUDA threads are distributed over
  * the source j cell rather than the target i cell.
- *
  * Each block handles up to GPU_THREAD_BLOCK_SIZE particles from cell j. For
- * each target particle in cell i, contributions from those j particles are
- * reduced within the block. Thread zero then atomically adds the block result
+ * each target particle in cell i, the contributions from those j particles
+ * are reduced within the block. Thread zero atomically adds the block result
  * to the target particle.
+ * Shared memory is used only for block-wise accumulation. Particle i data is
+ * read directly from global memory.
+ * The block mapping must be based on the number of particles in cell j.
  *
- * Shared memory is used only for the block reduction. No particle data is
- * staged in shared memory.
+ * This path should only be used when cell i is substantially smaller than
+ * cell j because one block reduction is required for every target i (highly
+ * inefficient if count_i >= count_j).
  *
- * The block mapping must be based on the number of source j particles.
+ * Shared memory is used only for block-wise reduction. Particle data is read
+ * directly from global memory.
+ *
+ * The block mapping must be based on the number of particles in larger source cell j.
+ *
+ * @param d_parts_send array of particle data received from CPU
+ * @param d_parts_recv array of particle data to write results into
+ * @param i_start first particle in cell i
+ * @param i_end last particle in cell i
+ * @param j_start first particle in cell j
+ * @param j_end last particle in cell j
+ * @param shift_i shifts for particles in cell i
+ * @param shift_j shifts for particles in cell j
+ * @param b_id_local within the GPU thread blocks acting on this cell what is my
+ * id. Needed to figure out which range of particles each CUDA block will work
+ * on
+ * @param t_id the current threads id in the list of threads in the block
+ * @param d_a current cosmological expansion factor
+ * @param d_H current Hubble constant
  */
 __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
     const struct gpu_part_send_f *__restrict__ d_parts_send,
@@ -1779,26 +1810,29 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
     int j_start, int j_end, const double3 shift_i_d, const double3 shift_j_d,
     int b_id_local, int tid, float d_a, float d_H) {
 
+  /* Declare shared memory used for block reduction. */
   extern __shared__ __align__(16) unsigned char smem[];
-
   force_block_partial *const s_partial =
       reinterpret_cast<force_block_partial *>(smem);
 
-  /* Map this thread to its source j particle. */
+  /* Map this thread to one particle in cell j. We scatter sum from particles in
+   * cell j to particles in cell i */
   const int j_id = j_start + b_id_local * GPU_THREAD_BLOCK_SIZE + tid;
-
+  /*Is the particle j_id in the cell we need to work on? Needed to prevent
+   * un-necessary/stray threads from reading/writing OOB.*/
   const bool j_in_range = (j_id < j_end);
 
-  /*
-   * Load the j particle once. It remains in registers while this thread
-   * loops over all target particles in the smaller i cell.
-   */
+  /* Load the source j particle once and retain it in registers while this
+   * thread loops over all target particles in cell i.
+   * Out-of-range threads retain zero values but must still participate in
+   * every block-wide synchronisation and reduction (otherwise code hangs). */
   float xj = 0.f, yj = 0.f, zj = 0.f, hj = 0.f;
   float vxj = 0.f, vyj = 0.f, vzj = 0.f, mj = 0.f;
   float energyj = 0.f, rhoj = 0.f, fj = 0.f, pressurej = 0.f;
   float balsj = 0.f, cj = 0.f, aviscj = 0.f, adiffj = 0.f;
   int timebin_j = 0;
 
+  /*Get properties (position, velocity, mass, etc.) needed for particle j*/
   if (j_in_range) {
 
     const struct gpu_part_data_f pj = d_parts_send[j_id].p_data;
@@ -1824,73 +1858,57 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
     adiffj = pj.bals_c_avisc_adiff.w;
 
     timebin_j = pj.timebin_minngbtimebin.x;
+
   }
 
   /* Cosmology terms for the signal velocity. */
   const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
-
   const float a2_Hubble = d_a * d_a * d_H;
 
-  /*
-   * Every block loops over all target particles in cell i. All threads
-   * execute the same number of target iterations and therefore reach every
-   * block synchronisation point.
-   */
+  /* Every block (of j particles) loops over all target particles in cell i. */
   for (int i_id = i_start; i_id < i_end; ++i_id) {
 
-    /*
-     * All threads read the same target particle directly from global
-     * memory. No shared-memory particle tiling is used in this path.
-     */
-    const struct gpu_part_data_f pi = d_parts_send[i_id].p_data;
+	/* All threads read the same target particle directly from global
+	 * memory. No shared-memory tiling is used in this path. */
 
+	/* First, grab handles. */
+    const struct gpu_part_data_f pi = d_parts_send[i_id].p_data;
     const float xi = (float)(pi.x_y.x - shift_i_d.x);
     const float yi = (float)(pi.x_y.y - shift_i_d.y);
     const float zi = (float)(pi.z_h.x - shift_i_d.z);
     const float hi = (float)pi.z_h.y;
-
     const float vxi = pi.vx_m.x;
     const float vyi = pi.vx_m.y;
     const float vzi = pi.vx_m.z;
     const float mi = pi.vx_m.w;
-
     const float energyi = pi.u_rho_f_p.x;
     const float rhoi = pi.u_rho_f_p.y;
     const float fi = pi.u_rho_f_p.z;
     const float pressurei = pi.u_rho_f_p.w;
-
     const float balsi = pi.bals_c_avisc_adiff.x;
     const float ci = pi.bals_c_avisc_adiff.y;
     const float avisci = pi.bals_c_avisc_adiff.z;
     const float adiffi = pi.bals_c_avisc_adiff.w;
-
     const int old_min_ngb_tbi = pi.timebin_minngbtimebin.y;
-
     const int initial_min_ngb_tbi =
         old_min_ngb_tbi > 0 ? old_min_ngb_tbi : INT_MAX;
 
-    /*
-     * Only one thread per block needs to attempt the initialisation.
-     * Multiple blocks may attempt it, but atomicCAS only replaces zero.
-     */
-    if (tid == 0) {
+    /* Only one thread per block needs to attempt the initialisation.
+     * Multiple blocks may attempt it, but atomicCAS only replaces zero. */
+    if (tid == 0)
       atomicCAS(&d_parts_recv[i_id].minngbtb, 0, initial_min_ngb_tbi);
-    }
 
+    /*Pre-calculations
+     * TODO: Should we move this to after the distance condition?*/
     const float hi_inv = 1.0f / hi;
-
     const float hid_inv = d_pow_dimension_plus_one(hi_inv);
-
     const float mi_inv = 1.0f / mi;
-
     const float rhoi_inv = 1.0f / rhoi;
-
     const float rhoi_inv2 = rhoi_inv * rhoi_inv;
-
     const float hig2 = hi * hi * kernel_gamma2;
 
+    /*Initialise sums and time bin calcs*/
     force_block_partial local;
-
     local.ax = 0.f;
     local.ay = 0.f;
     local.az = 0.f;
@@ -1898,12 +1916,9 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
     local.hdt = 0.f;
     local.min_ngb_tb = INT_MAX;
 
-    /*
-     * This thread calculates the contribution from its source j particle
-     * to the current target i particle.
-     */
     if (j_in_range && j_id != i_id) {
 
+      /* Now get stuff done*/
       const float xij = xi - xj;
       const float yij = yi - yj;
       const float zij = zi - zj;
@@ -1917,40 +1932,30 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
         if (timebin_j > 0) local.min_ngb_tb = timebin_j;
 
         const float inv_r = rsqrtf(r2);
-
+        /* Recover some data */
         const float r = r2 * inv_r;
-
+        /* Get the kernel for hi */
         float wi, wi_dx;
         float wj, wj_dx;
-
         const float ui = r * hi_inv;
-
         d_kernel_deval(ui, &wi, &wi_dx);
-
         const float wi_dr = hid_inv * wi_dx;
-
+        /*Now for hj*/
         const float hj_inv = 1.0f / hj;
-
         const float hjd_inv = d_pow_dimension_plus_one(hj_inv);
-
         const float uj = r * hj_inv;
-
         d_kernel_deval(uj, &wj, &wj_dx);
-
         const float wj_dr = hjd_inv * wj_dx;
 
         /* Compute dv dot r. */
         const float dvx = vxi - vxj;
         const float dvy = vyi - vyj;
         const float dvz = vzi - vzj;
-
         const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij));
-
         const float dvdr_Hubble = dvdr + a2_Hubble * r2;
 
         /* Are the particles moving towards each other? */
         const float omega_ij = fminf(dvdr_Hubble, 0.f);
-
         const float mu_ij = fac_mu * inv_r * omega_ij;
 
         /* Compute sound speeds and signal velocity. */
@@ -1958,16 +1963,12 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
 
         /* Variable smoothing-length terms. */
         const float f_ij = 1.f - fi * (1.f / mj);
-
         const float f_ji = 1.f - fj * mi_inv;
 
         /* Construct the full viscosity term. */
         const float rhoij = rhoi + rhoj;
-
         const float rhoij_inv = 1.f / rhoij;
-
         const float alpha = avisci + aviscj;
-
         const float visc =
             -0.25f * alpha * v_sig * mu_ij * (balsi + balsj) * rhoij_inv;
 
@@ -1977,19 +1978,15 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
 
         /* Compute gradient terms. */
         const float rhoj2 = rhoj * rhoj;
-
         const float rhoj_inv = 1.f / rhoj;
-
         const float P_over_rho2_i = pressurei * rhoi_inv2 * f_ij;
-
         const float P_over_rho2_j = pressurej * (1.f / rhoj2) * f_ji;
 
         const float sph_acc_term =
             (P_over_rho2_i * wi_dr + P_over_rho2_j * wj_dr) * inv_r;
 
+        /*Now add the accelerations terms and add to sum*/
         const float acc = sph_acc_term + visc_acc_term;
-
-        /* Assemble the acceleration. */
         local.ax -= mj * acc * xij;
         local.ay -= mj * acc * yij;
         local.az -= mj * acc * zij;
@@ -2000,9 +1997,11 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
         /* Viscosity term. */
         const float visc_du_term = 0.5f * visc_acc_term * dvdr_Hubble;
 
-        /*
-         * Combine alpha_diff into a pressure-based switch.
-         */
+        /* Diffusion term */
+        /* Combine the alpha_diff into a pressure-based switch -- this allows
+         * the alpha from the highest pressure particle to dominate, so that the
+         * diffusion limited particles always take precedence - another trick to
+         * allow the scheme to work with thermal feedback. */
         const float alpha_diff =
             (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
 
@@ -2015,6 +2014,7 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
             v_diff * (energyi - energyj) *
             (f_ij * wi_dr * rhoi_inv + f_ji * wj_dr * rhoj_inv);
 
+        /* Assemble the energy equation term */
         const float du_dt_i = sph_du_term_i + visc_du_term + diff_du_term;
 
         /* Internal energy time derivative. */
@@ -2025,67 +2025,47 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
       }
     }
 
-    /*
-     * Store one partial result per thread.
-     */
+    /* Store one partial result per thread. */
     s_partial[tid] = local;
-
+    /* Now sync threads to ensure all threads have written their contribution*/
     __syncthreads();
 
-    /*
-     * Reduce the contributions from all j particles handled by this block.
-     *
-     * GPU_THREAD_BLOCK_SIZE must be a power of two.
-     */
+    /* Block-wide reduction to s_partial[0]:
+     * GPU_THREAD_BLOCK_SIZE must be a power of two and blockDim.x must equal
+     * GPU_THREAD_BLOCK_SIZE. GPU_THREAD_BLOCK_SIZE >> 1 is bitwise shift
+     * (essentially division by two) offset >>= 1 is offset = offset >> 1 for
+     * each iteration we divide the offset by two and then add the sum to tid
+     * finally ending in s_partial[0] containing the sum of BLOCK_SIZE elements
+     * The two maximum quantities use fmaxf(), while lapu is summed. */
     for (int offset = GPU_THREAD_BLOCK_SIZE >> 1; offset > 0; offset >>= 1) {
-
       if (tid < offset) {
-
         s_partial[tid].ax += s_partial[tid + offset].ax;
-
         s_partial[tid].ay += s_partial[tid + offset].ay;
-
         s_partial[tid].az += s_partial[tid + offset].az;
-
         s_partial[tid].udt += s_partial[tid + offset].udt;
-
         s_partial[tid].hdt += s_partial[tid + offset].hdt;
-
         s_partial[tid].min_ngb_tb =
             min(s_partial[tid].min_ngb_tb, s_partial[tid + offset].min_ngb_tb);
       }
-
       __syncthreads();
     }
 
-    /*
-     * Different blocks handle different ranges of cell j. The reduced
-     * block results must therefore still be atomically accumulated.
-     */
+    /* Different blocks process different ranges of cell j. Consequently,
+     * the block-reduced results must still be atomically accumulated into
+     * the target particle. */
     if (tid == 0) {
-
       const force_block_partial result = s_partial[0];
-
       atomicAdd(&d_parts_recv[i_id].a_hydro.x, result.ax);
-
       atomicAdd(&d_parts_recv[i_id].a_hydro.y, result.ay);
-
       atomicAdd(&d_parts_recv[i_id].a_hydro.z, result.az);
-
       atomicAdd(&d_parts_recv[i_id].udt_hdt.x, result.udt);
-
       atomicAdd(&d_parts_recv[i_id].udt_hdt.y, result.hdt);
-
-      if (result.min_ngb_tb > 0 && result.min_ngb_tb != INT_MAX) {
-
+      if (result.min_ngb_tb > 0 && result.min_ngb_tb != INT_MAX)
         atomicMin(&d_parts_recv[i_id].minngbtb, result.min_ngb_tb);
-      }
     }
 
-    /*
-     * Ensure thread zero has finished reading the reduction result before
-     * other threads overwrite shared memory for the next target particle.
-     */
+    /* Ensure thread zero has finished reading s_partial[0] before the
+     * shared-memory array is reused for the next target particle. */
     __syncthreads();
   }
 }
