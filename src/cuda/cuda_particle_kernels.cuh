@@ -456,6 +456,9 @@ __device__ __forceinline__ void neighbour_interactions_density_j_parallel(
     __syncthreads();
   }
 }
+#ifndef TARGET_BLOCK_LIMIT
+#define TARGET_BLOCK_LIMIT 4
+#endif
 
 #ifndef DENSITY_CELL_COUNT_RATIO
 #define DENSITY_CELL_COUNT_RATIO 8
@@ -508,6 +511,12 @@ __global__ void cuda_kernel_density(
   const bool ci_much_larger = ni >= DENSITY_CELL_COUNT_RATIO * nj;
   const bool cj_much_larger = nj >= DENSITY_CELL_COUNT_RATIO * ni;
 
+  const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+  const int cj_blocks = (nj + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+
+  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
+  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
+
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
   const auto ci_loc = d_parts_send[ci_end - 1].c_loc;
@@ -554,7 +563,7 @@ __global__ void cuda_kernel_density(
   }
 
   /* Cell i is much larger than cell j: Blocks map over cell i. */
-  if (ci_much_larger) {
+  if (use_ci_source_parallel) {
 
 	/* Do ci <- cj: Cell i is the larger target, so use the target-parallel
 	 * implementation.*/
@@ -577,7 +586,7 @@ __global__ void cuda_kernel_density(
   }
 
   /* Cell j is much larger than cell i: Blocks map over cell j. */
-  if (cj_much_larger) {
+  if (use_cj_source_parallel) {
 
 	/* Do ci <- cj: Cell j is the larger source. Threads map over cell j and reduce their
 	 * contributions into target particles in cell i. */
@@ -1178,8 +1187,14 @@ __global__ void cuda_kernel_gradient(
 
   /* d_block_leaf_id is constructed using max(ni, nj). Therefore,
    * b_id_local naturally maps over the larger cell for either path if assymetric (ni >> nj or vice-versa). */
-  const bool ci_much_larger = ni >= GRADIENT_CELL_COUNT_RATIO * nj;
-  const bool cj_much_larger = nj >= GRADIENT_CELL_COUNT_RATIO * ni;
+  const bool ci_much_larger = ni >= DENSITY_CELL_COUNT_RATIO * nj;
+  const bool cj_much_larger = nj >= DENSITY_CELL_COUNT_RATIO * ni;
+
+  const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+  const int cj_blocks = (nj + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+
+  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
+  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
 
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
@@ -1228,7 +1243,7 @@ __global__ void cuda_kernel_gradient(
   }
 
   /* Cell i is much larger than cell j: Blocks map over cell i. */
-  if (ci_much_larger) {
+  if (use_ci_source_parallel) {
 
 	/* Do ci <- cj: Cell i is the larger target, so use the target-parallel
 	 * implementation.*/
@@ -1253,7 +1268,7 @@ __global__ void cuda_kernel_gradient(
   }
 
   /* Cell j is much larger than cell i: Blocks map over cell j. */
-  if (cj_much_larger) {
+  if (use_cj_source_parallel) {
 
 	/* Do ci <- cj: Cell j is the larger source. Threads map over cell j and reduce their
 	 * contributions into target particles in cell i. */
@@ -2052,8 +2067,14 @@ __global__ void cuda_kernel_force(
 
   /* d_block_leaf_id is constructed using max(ni, nj). Therefore,
    * b_id_local naturally maps over the larger cell for either path if assymetric (ni >> nj or vice-versa). */
-  const bool ci_much_larger = (ni >= FORCE_CELL_COUNT_RATIO * nj);
-  const bool cj_much_larger = (nj >= FORCE_CELL_COUNT_RATIO * ni);
+  const bool ci_much_larger = ni >= DENSITY_CELL_COUNT_RATIO * nj;
+  const bool cj_much_larger = nj >= DENSITY_CELL_COUNT_RATIO * ni;
+
+  const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+  const int cj_blocks = (nj + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+
+  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
+  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
 
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
@@ -2105,7 +2126,7 @@ __global__ void cuda_kernel_force(
   }
 
   /* Cell i is much larger than cell j: Blocks map over cell i. */
-  if (ci_much_larger) {
+  if (use_ci_source_parallel) {
 
 	/* Do ci <- cj: Cell i is the larger target, so use the target-parallel
 	 * implementation.*/
@@ -2130,7 +2151,7 @@ __global__ void cuda_kernel_force(
   }
 
   /* Cell j is much larger than cell i: Blocks map over cell j. */
-  if (cj_much_larger) {
+  if (use_cj_source_parallel) {
 
 	/* Do ci <- cj: Cell j is the larger source. Threads map over cell j and reduce their
 	 * contributions into target particles in cell i. */

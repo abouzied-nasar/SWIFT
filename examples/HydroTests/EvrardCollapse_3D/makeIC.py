@@ -32,7 +32,7 @@ parser.add_argument(
          Number of particles to be used in the Evrard collapse.
          """,
     required=False,
-    default=100000,
+    default=128*128*128,
 )
 
 args = vars(parser.parse_args())
