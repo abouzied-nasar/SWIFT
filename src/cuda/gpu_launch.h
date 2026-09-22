@@ -35,7 +35,7 @@ void gpu_launch_density(
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim,
-    cudaStream_t stream);
+    cudaStream_t stream, const int tester_param);
 void gpu_launch_gradient(
     const struct gpu_part_send_g* __restrict__ d_parts_send,
     struct gpu_part_recv_g*      __restrict__ d_parts_recv,
@@ -44,7 +44,7 @@ void gpu_launch_gradient(
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim,
-    cudaStream_t stream);
+    cudaStream_t stream, const int tester_param);
 void gpu_launch_force(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
     struct gpu_part_recv_f*      __restrict__ d_parts_recv,
@@ -53,7 +53,7 @@ void gpu_launch_force(
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim,
-    cudaStream_t stream);
+    cudaStream_t stream, const int tester_param);
 
 #ifdef __cplusplus
 }

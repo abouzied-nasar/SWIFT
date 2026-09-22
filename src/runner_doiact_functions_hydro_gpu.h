@@ -595,6 +595,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   /*Grab a pointer to GPU destined metadata*/
   const struct gpu_md *gpu_md = &buf->gpu_md;
 
+  const int tester_param = md->params.tester_param;
+
   /* initialise to just some meaningless value to silence the compiler */
   cudaError_t cu_error = cudaErrorMemoryAllocation;
 
@@ -658,7 +660,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
         n_blocks,
         gpu_md->d_cell_i_j_start_end,
-        gpu_md->d_block_leaf_id, space_dim, stream[0]);
+        gpu_md->d_block_leaf_id, space_dim, stream[0], tester_param);
 
     /*"The wheel is come full circle; I am here"
      *  Results are ready to copy back to CPU BUFFERS */
@@ -704,7 +706,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       gpu_launch_gradient(buf->d_parts_send_g, buf->d_parts_recv_g, d_a, d_H,
               n_blocks,
               gpu_md->d_cell_i_j_start_end,
-              gpu_md->d_block_leaf_id, space_dim, stream[0]);
+              gpu_md->d_block_leaf_id, space_dim, stream[0], tester_param);
 
       /*"The wheel is come full circle; I am here"
        *  Results are ready to copy back to CPU BUFFERS */
@@ -752,7 +754,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
     gpu_launch_force(buf->d_parts_send_f, buf->d_parts_recv_f, d_a, d_H,
         n_blocks,
         gpu_md->d_cell_i_j_start_end,
-        gpu_md->d_block_leaf_id, space_dim, stream[0]);
+        gpu_md->d_block_leaf_id, space_dim, stream[0], tester_param);
 
     /*"The wheel is come full circle; I am here."
      * Copy results back to CPU BUFFERS */

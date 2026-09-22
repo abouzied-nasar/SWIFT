@@ -37,6 +37,10 @@ struct gpu_global_pack_params {
    * of `bundle_size` tasks per bundle. */
   int bundle_size;
 
+  /*! BETA TESTER PARAM FOR USE IN MODIFYING ONE OPTIMISATION PARAMETER
+   * TODO: Formalise this when done testing to control kernel path choices*/
+  int tester_param;
+
   /*! How many bundles we expect to offload each cycle. */
   int n_bundles;
 
@@ -67,7 +71,7 @@ void gpu_pack_params_set(struct gpu_global_pack_params *pars,
                          const int gpu_recursion_max_depth,
                          const int part_buffer_size, const float eta_neighbours,
                          const int nparts_hydro, const int n_top_level_cells,
-                         const int nthreads);
+                         const int nthreads, const int tester_var);
 void gpu_pack_params_copy(const struct gpu_global_pack_params *src,
                           struct gpu_global_pack_params *dest);
 

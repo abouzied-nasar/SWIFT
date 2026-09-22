@@ -482,7 +482,7 @@ __global__ void cuda_kernel_density(
     const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv,
 	const int4 *__restrict__ d_cell_i_j_start_end,
-    const int2 *__restrict__ d_block_leaf_id, const double3 space_dim) {
+    const int2 *__restrict__ d_block_leaf_id, const double3 space_dim,const int tester_param) {
 
   /* Figure out which range of particles this block will work on. */
   const int bid = blockIdx.x;
@@ -522,8 +522,8 @@ __global__ void cuda_kernel_density(
 
   /* d_block_leaf_id is constructed using max(ni, nj). Therefore,
    * b_id_local naturally maps over the larger cell for either path if assymetric (ni >> nj or vice-versa). */
-  const bool ci_much_larger = ni >= DENSITY_CELL_COUNT_RATIO * nj;
-  const bool cj_much_larger = nj >= DENSITY_CELL_COUNT_RATIO * ni;
+  const bool ci_much_larger = ni >= tester_param * nj;
+  const bool cj_much_larger = nj >= tester_param * ni;
 
   const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
   const int cj_blocks = (nj + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
@@ -1192,7 +1192,7 @@ __global__ void cuda_kernel_gradient(
     const struct gpu_part_send_g *__restrict__ d_parts_send,
     struct gpu_part_recv_g *__restrict__ d_parts_recv, const float d_a,
     const float d_H, const int4 *__restrict__ d_cell_i_j_start_end,
-    const int2 *__restrict__ d_block_leaf_id, const double3 space_dim) {
+    const int2 *__restrict__ d_block_leaf_id, const double3 space_dim, const int tester_param) {
 
   /* Figure out which range of particles this block will work on. */
   const int bid = blockIdx.x;
@@ -1233,8 +1233,8 @@ __global__ void cuda_kernel_gradient(
 
   /* d_block_leaf_id is constructed using max(ni, nj). Therefore,
    * b_id_local naturally maps over the larger cell for either path if assymetric (ni >> nj or vice-versa). */
-  const bool ci_much_larger = ni >= DENSITY_CELL_COUNT_RATIO * nj;
-  const bool cj_much_larger = nj >= DENSITY_CELL_COUNT_RATIO * ni;
+  const bool ci_much_larger = ni >= tester_param * nj;
+  const bool cj_much_larger = nj >= tester_param * ni;
 
   const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
   const int cj_blocks = (nj + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
@@ -2100,7 +2100,7 @@ __global__ void cuda_kernel_force(
     const struct gpu_part_send_f *__restrict__ d_parts_send,
     struct gpu_part_recv_f *__restrict__ d_parts_recv, const float d_a,
     const float d_H, const int4 *__restrict__ d_cell_i_j_start_end,
-    const int2 *__restrict__ d_block_leaf_id, const double3 space_dim) {
+    const int2 *__restrict__ d_block_leaf_id, const double3 space_dim, const int tester_param) {
 
   /*TODO: Refactor this as it is repeated in all kernels*/
   /*FROM HERE*************************************************************/
@@ -2145,8 +2145,8 @@ __global__ void cuda_kernel_force(
 
   /* d_block_leaf_id is constructed using max(ni, nj). Therefore,
    * b_id_local naturally maps over the larger cell for either path if assymetric (ni >> nj or vice-versa). */
-  const bool ci_much_larger = ni >= DENSITY_CELL_COUNT_RATIO * nj;
-  const bool cj_much_larger = nj >= DENSITY_CELL_COUNT_RATIO * ni;
+  const bool ci_much_larger = ni >= tester_param * nj;
+  const bool cj_much_larger = nj >= tester_param * ni;
 
   const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
   const int cj_blocks = (nj + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
