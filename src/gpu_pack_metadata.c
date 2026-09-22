@@ -42,7 +42,8 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
 
   /* Grab some handles */
   const size_t pack_size = params->pack_size;
-  const size_t n_bundles = params->n_bundles;
+  /*TODO: Do this properly rather than set it to 1*/
+  const size_t n_bundles = 1;//params->n_bundles;
   const size_t leaf_buffer_size = params->leaf_buffer_size;
 
   md->ci_leaves =

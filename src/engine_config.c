@@ -946,7 +946,7 @@ void engine_config(int restart, int fof, struct engine *e,
   /* Setup GPU packing parameters. */
 #if defined(WITH_CUDA) || defined(WITH_HIP)
   int pack_size = parser_get_param_int(params, "Scheduler:gpu_pack_size");
-  int bundle_size = parser_get_param_int(params, "Scheduler:gpu_bundle_size");
+  int bundle_size = parser_get_param_int(params, "Scheduler:gpu_pack_size");
   int gpu_recursion_max_depth =
       parser_get_opt_param_int(params, "Scheduler:gpu_recursion_max_depth", 4);
   int gpu_part_buffer_size =

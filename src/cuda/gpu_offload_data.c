@@ -53,7 +53,8 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                            const size_t recv_struct_size) {
 
   /* Grab some handles */
-  const size_t n_bundles = params->n_bundles;
+  /*TODO: Do this properly rather than set it to 1*/
+  const size_t n_bundles = 1;//params->n_bundles;
   const size_t part_buffer_size = params->part_buffer_size;
 
   /* Initialise and set up metadata */
