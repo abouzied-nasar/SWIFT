@@ -531,9 +531,14 @@ __global__ void cuda_kernel_density(
 //  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
 //  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
 
-  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
+//  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
+//      ci_blocks >= MIN_SOURCE_BLOCKS;
+//  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
+//      cj_blocks >= MIN_SOURCE_BLOCKS;
+
+  const bool use_ci_source_parallel = cj_blocks <= TARGET_BLOCK_LIMIT &&
       ci_blocks >= MIN_SOURCE_BLOCKS;
-  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
+  const bool use_cj_source_parallel = ci_blocks <= TARGET_BLOCK_LIMIT &&
       cj_blocks >= MIN_SOURCE_BLOCKS;
 
   /* Get cell positions. The cell position is stored as the final entry in
@@ -1242,10 +1247,15 @@ __global__ void cuda_kernel_gradient(
 //  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
 //  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
 
-  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
-      ci_blocks >= MIN_SOURCE_BLOCKS;
-  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
-      cj_blocks >= MIN_SOURCE_BLOCKS;
+  //  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
+  //      ci_blocks >= MIN_SOURCE_BLOCKS;
+  //  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
+  //      cj_blocks >= MIN_SOURCE_BLOCKS;
+
+    const bool use_ci_source_parallel = cj_blocks <= TARGET_BLOCK_LIMIT &&
+        ci_blocks >= MIN_SOURCE_BLOCKS;
+    const bool use_cj_source_parallel = ci_blocks <= TARGET_BLOCK_LIMIT &&
+        cj_blocks >= MIN_SOURCE_BLOCKS;
 
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
@@ -2154,10 +2164,15 @@ __global__ void cuda_kernel_force(
 //  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
 //  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
 
-  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
-      ci_blocks >= MIN_SOURCE_BLOCKS;
-  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
-      cj_blocks >= MIN_SOURCE_BLOCKS;
+//  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
+//      ci_blocks >= MIN_SOURCE_BLOCKS;
+//  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
+//      cj_blocks >= MIN_SOURCE_BLOCKS;
+
+  const bool use_ci_source_parallel = cj_blocks <= TARGET_BLOCK_LIMIT &&
+        ci_blocks >= MIN_SOURCE_BLOCKS;
+  const bool use_cj_source_parallel = ci_blocks <= TARGET_BLOCK_LIMIT &&
+        cj_blocks >= MIN_SOURCE_BLOCKS;
 
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
