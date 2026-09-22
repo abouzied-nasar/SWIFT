@@ -71,7 +71,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
   const int i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
   /*Is the particle i_id in the cell we need to work on?*/
   const bool i_in_range = (i_id < i_end);
-  int i_has_neighbours = 0;
+  int i_has_neighbour = 0;
 
   /* Initialise particle i's data. Needed since we require definition
    * before checking if i_in_range below */
@@ -234,7 +234,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
         res_rot.y = fmaf(faci, curlry, res_rot.y);
         res_rot.z = fmaf(faci, curlrz, res_rot.z);
         res_rot.w = fmaf(-faci, dvdr, res_rot.w);
-        i_has_neighbours = 1;
+        i_has_neighbour = 1;
       }
     } /*Loop through parts in cell j and in current tile*/
     /* Ensure no thread is still reading from the current buffer before it may
@@ -243,7 +243,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
   }
 
   /*Conditional to prevent writing out of bounds of this computation*/
-  if (i_in_range && i_has_neighbours) {
+  if (i_in_range && i_has_neighbour) {
     /* Write results. */
     atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.x, res_rho.x);
     atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.y, res_rho.y);
@@ -264,8 +264,8 @@ struct density_block_partial {
   float4 rho;
   /* curl of velocity and velocity divergence */
   float4 rot;
-//  /*Do any "j" particles in this block interact with the particle i we are reducing values for?*/
-//  int has_neighbours
+  /*Do any "j" particles in this block interact with the particle i we are reducing values for?*/
+  int has_neighbour;
 };
 
 /**
@@ -364,6 +364,7 @@ __device__ __forceinline__ void neighbour_interactions_density_j_parallel(
     density_block_partial local;
     local.rho = make_float4(0.f, 0.f, 0.f, 0.f);
     local.rot = make_float4(0.f, 0.f, 0.f, 0.f);
+    local.has_neighbour = 0;
 
     if (j_in_range && j_id != i_id) {
 
@@ -411,6 +412,7 @@ __device__ __forceinline__ void neighbour_interactions_density_j_parallel(
         local.rot.y = fmaf(faci, curlry, local.rot.y);
         local.rot.z = fmaf(faci, curlrz, local.rot.z);
         local.rot.w = fmaf(-faci, dvdr, local.rot.w);
+        local.has_neighbour = 1;
       }
     }
 
@@ -436,23 +438,27 @@ __device__ __forceinline__ void neighbour_interactions_density_j_parallel(
         s_partial[tid].rot.y += s_partial[tid + offset].rot.y;
         s_partial[tid].rot.z += s_partial[tid + offset].rot.z;
         s_partial[tid].rot.w += s_partial[tid + offset].rot.w;
+        /* OR-reduce the neighbour flags so s_partial[0].has_neighbour is 1 if any
+         * thread in this block found a j-particle that interacts with the current
+         * target particle i. This lets us avoid global atomics when no block/i-particle
+         * interactions are found. */
+        s_partial[tid].has_neighbour |= s_partial[tid + offset].has_neighbour;
       }
       __syncthreads();
     }
 
-    /* Different blocks process different ranges of cell j. Consequently,
-     * the block-reduced results must still be atomically accumulated into
-     * the target particle. */
     if (tid == 0) {
       const density_block_partial result = s_partial[0];
-      atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.x, result.rho.x);
-      atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.y, result.rho.y);
-      atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.z, result.rho.z);
-      atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.w, result.rho.w);
-      atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.x, result.rot.x);
-      atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.y, result.rot.y);
-      atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.z, result.rot.z);
-      atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.w, result.rot.w);
+      if(result.has_neighbour){
+        atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.x, result.rho.x);
+        atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.y, result.rho.y);
+        atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.z, result.rho.z);
+        atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.w, result.rho.w);
+        atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.x, result.rot.x);
+        atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.y, result.rot.y);
+        atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.z, result.rot.z);
+        atomicAdd(&d_parts_recv[i_id].rot_vx_div_v.w, result.rot.w);
+      }
     }
 
     /* Ensure thread zero has finished reading s_partial[0] before the
@@ -691,7 +697,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
   const int i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
   /*Is the id in the cell we need to work on?*/
   const bool i_in_range = (i_id < i_end);
-  int i_has_neighbours = 0;
+  int i_has_neighbour = 0;
 
   /* Initialise particle i's data. Needed since we require definition
    * before checking if i_in_range below */
@@ -896,7 +902,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
 
         const float delta_u_factor = (energyi - energyj) * inv_r;
         lapui += mj * delta_u_factor * wi_dx * (1.0f / rhoj);
-        i_has_neighbours = 1;
+        i_has_neighbour = 1;
       }
     }
 
@@ -904,7 +910,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
   }
 
   /*Conditional to prevent writing out of bounds of this computation*/
-  if (i_in_range && i_has_neighbours) {
+  if (i_in_range && i_has_neighbour) {
     /*aviscmax*/
     atomicMaxFloat(&d_parts_recv[i_id].aviscmax_vsig_lapu.x, avisc_maxi);
     /*vsig*/
@@ -924,6 +930,8 @@ struct gradient_block_partial {
   float vsig;
   /* Sum of the thermal diffusion Laplacian contribution. */
   float lapu;
+  /*Do any "j" particles in this block interact with the particle i we are reducing values for?*/
+  int has_neighbour;
 };
 
 #include <cfloat>
@@ -1072,6 +1080,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient_j_parallel(
 
     /*Initialise Laplacian sum*/
     local.lapu = 0.f;
+    local.has_neighbour = 0;
 
     if (j_in_range && j_id != i_id) {
 
@@ -1116,6 +1125,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient_j_parallel(
         /* Calculate Del^2 u for the thermal diffusion coefficient. */
         const float delta_u_factor = (energyi - energyj) * inv_r;
         local.lapu += mj * delta_u_factor * wi_dx * (1.0f / rhoj);
+        local.has_neighbour = 1;
       }
     }
 
@@ -1138,6 +1148,11 @@ __device__ __forceinline__ void neighbour_interactions_gradient_j_parallel(
         s_partial[tid].vsig =
             fmaxf(s_partial[tid].vsig, s_partial[tid + offset].vsig);
         s_partial[tid].lapu += s_partial[tid + offset].lapu;
+        /* OR-reduce the neighbour flags so s_partial[0].has_neighbour is 1 if any
+         * thread in this block found a j-particle that interacts with the current
+         * target particle i. This lets us avoid global atomics when no block/i-particle
+         * interactions are found. */
+        s_partial[tid].has_neighbour |= s_partial[tid + offset].has_neighbour;
       }
       __syncthreads();
     }
@@ -1147,9 +1162,11 @@ __device__ __forceinline__ void neighbour_interactions_gradient_j_parallel(
      * the target particle. */
     if (tid == 0) {
       const gradient_block_partial result = s_partial[0];
-      atomicMaxFloat(&d_parts_recv[i_id].aviscmax_vsig_lapu.x, result.aviscmax);
-      atomicMaxFloat(&d_parts_recv[i_id].aviscmax_vsig_lapu.y, result.vsig);
-      atomicAdd(&d_parts_recv[i_id].aviscmax_vsig_lapu.z, result.lapu);
+      if(result.has_neighbour){
+        atomicMaxFloat(&d_parts_recv[i_id].aviscmax_vsig_lapu.x, result.aviscmax);
+        atomicMaxFloat(&d_parts_recv[i_id].aviscmax_vsig_lapu.y, result.vsig);
+        atomicAdd(&d_parts_recv[i_id].aviscmax_vsig_lapu.z, result.lapu);
+      }
     }
 
     /* Ensure thread zero has finished reading s_partial[0] before the
@@ -1406,7 +1423,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
   float fi = 0.f, balsi = 0.f, rhoi = 0.f, pressurei = 0.f;
   float ci = 0.f, energyi = 0.f, avisci = 0.f, adiffi = 0.f;
   int min_ngb_tbi = INT_MAX;
-  int i_has_neighbours = 0;
+  int i_has_neighbour = 0;
 
   float hi_inv = 0.f, hid_inv = 0.f, mi_inv = 0.f, rhoi_inv = 0.f,
         rhoi_inv2 = 0.f, hig2 = 0.f;
@@ -1709,7 +1726,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 
         /* Get the time derivative for h. */
         res_udt_hdt.y -= mj * dvdr * inv_r * rhoj_inv * wi_dr;
-        i_has_neighbours = 1;
+        i_has_neighbour = 1;
       }
     }
 
@@ -1717,7 +1734,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
   }
 
   /*Conditional to prevent writing out of bounds */
-  if (i_in_range && i_has_neighbours) {
+  if (i_in_range && i_has_neighbour) {
 
     atomicAdd(&d_parts_recv[i_id].a_hydro.x, res_ahydro.x);
     atomicAdd(&d_parts_recv[i_id].a_hydro.y, res_ahydro.y);
@@ -1744,6 +1761,8 @@ struct force_block_partial {
   float hdt;
   /*Minimum neighbour time bin*/
   int min_ngb_tb;
+  /*Do any "j" particles in this block interact with the particle i we are reducing values for?*/
+  int has_neighbour;
 };
 
 /**
@@ -1895,6 +1914,7 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
     local.udt = 0.f;
     local.hdt = 0.f;
     local.min_ngb_tb = INT_MAX;
+    local.has_neighbour = 0;
 
     if (j_in_range && j_id != i_id) {
 
@@ -2002,6 +2022,7 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
 
         /* Get the time derivative for h. */
         local.hdt -= mj * dvdr * inv_r * rhoj_inv * wi_dr;
+        local.has_neighbour = 1;
       }
     }
 
@@ -2026,6 +2047,11 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
         s_partial[tid].hdt += s_partial[tid + offset].hdt;
         s_partial[tid].min_ngb_tb =
             min(s_partial[tid].min_ngb_tb, s_partial[tid + offset].min_ngb_tb);
+        /* OR-reduce the neighbour flags so s_partial[0].has_neighbour is 1 if any
+         * thread in this block found a j-particle that interacts with the current
+         * target particle i. This lets us avoid global atomics when no block/i-particle
+         * interactions are found. */
+        s_partial[tid].has_neighbour |= s_partial[tid + offset].has_neighbour;
       }
       __syncthreads();
     }
@@ -2035,13 +2061,15 @@ __device__ __forceinline__ void neighbour_interactions_force_j_parallel(
      * the target particle. */
     if (tid == 0) {
       const force_block_partial result = s_partial[0];
-      atomicAdd(&d_parts_recv[i_id].a_hydro.x, result.ax);
-      atomicAdd(&d_parts_recv[i_id].a_hydro.y, result.ay);
-      atomicAdd(&d_parts_recv[i_id].a_hydro.z, result.az);
-      atomicAdd(&d_parts_recv[i_id].udt_hdt.x, result.udt);
-      atomicAdd(&d_parts_recv[i_id].udt_hdt.y, result.hdt);
-      if (result.min_ngb_tb > 0 && result.min_ngb_tb != INT_MAX)
-        atomicMin(&d_parts_recv[i_id].minngbtb, result.min_ngb_tb);
+  	  if(result.has_neighbour){
+        atomicAdd(&d_parts_recv[i_id].a_hydro.x, result.ax);
+        atomicAdd(&d_parts_recv[i_id].a_hydro.y, result.ay);
+        atomicAdd(&d_parts_recv[i_id].a_hydro.z, result.az);
+        atomicAdd(&d_parts_recv[i_id].udt_hdt.x, result.udt);
+        atomicAdd(&d_parts_recv[i_id].udt_hdt.y, result.hdt);
+        if (result.min_ngb_tb > 0 && result.min_ngb_tb != INT_MAX)
+        	atomicMin(&d_parts_recv[i_id].minngbtb, result.min_ngb_tb);
+  	  }
     }
 
     /* Ensure thread zero has finished reading s_partial[0] before the
