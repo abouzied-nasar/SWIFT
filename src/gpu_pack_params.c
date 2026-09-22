@@ -125,4 +125,5 @@ void gpu_pack_params_copy(const struct gpu_global_pack_params *src,
   dest->n_bundles = src->n_bundles;
   dest->leaf_buffer_size = src->leaf_buffer_size;
   dest->part_buffer_size = src->part_buffer_size;
+  dest->tester_param = src->tester_param;
 }

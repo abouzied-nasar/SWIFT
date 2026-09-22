@@ -104,6 +104,7 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
             gpu_pack_params->part_buffer_size);
     message("   Pack size:                  %i", gpu_pack_params->pack_size);
     message("   Bundle size:                %i", gpu_pack_params->bundle_size);
+    message("   Test param size:            %i", gpu_pack_params->tester_param);
     message("   free mem:                   %.3g GB",
             ((double)free_mem) / (1024. * 1024. * 1024.));
     message("   total mem:                  %.3g GB",
