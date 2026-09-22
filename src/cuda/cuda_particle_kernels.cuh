@@ -562,12 +562,20 @@ __global__ void cuda_kernel_density(
     return;
   }
 
+  /* Blocks were allocated using max(ni, nj), so not every block is necessarily
+   * required for both interaction directions.
+   * Skip a directional calculation entirely when b_id_local lies outside the
+   * block range required by that direction's target cell. This is intended to minimise atomic contentions*/
+  const bool do_ci_target = (b_id_local < ci_blocks);
+  const bool do_cj_target = (b_id_local < cj_blocks);
+
   /* Cell i is much larger than cell j: Blocks map over cell i. */
   if (use_ci_source_parallel) {
 
 	/* Do ci <- cj: Cell i is the larger target, so use the target-parallel
 	 * implementation.*/
-    neighbour_interactions_density(
+	if(do_ci_target)
+		neighbour_interactions_density(
         d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
         cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid);
 
@@ -578,7 +586,8 @@ __global__ void cuda_kernel_density(
 
     /* Do cj <- ci: Cell i is now the larger source. Continue to map threads over cell i
      * and reduce their contributions into target particles in cell j. */
-    neighbour_interactions_density_j_parallel(
+	if(do_cj_target)
+		neighbour_interactions_density_j_parallel(
         d_parts_send, d_parts_recv, cj_start, cj_particle_end, ci_start,
         ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid);
 
@@ -590,7 +599,9 @@ __global__ void cuda_kernel_density(
 
 	/* Do ci <- cj: Cell j is the larger source. Threads map over cell j and reduce their
 	 * contributions into target particles in cell i. */
-    neighbour_interactions_density_j_parallel(
+
+	  if(do_ci_target)
+		  neighbour_interactions_density_j_parallel(
         d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
         cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid);
 
@@ -600,7 +611,8 @@ __global__ void cuda_kernel_density(
 
 	/* Do cj <- ci: Cell j is then the larger target, so use the target-parallel
 	 * implementation. */
-    neighbour_interactions_density(
+	  if(do_cj_target)
+		  neighbour_interactions_density(
         d_parts_send, d_parts_recv, cj_start, cj_particle_end, ci_start,
         ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid);
 
@@ -611,12 +623,6 @@ __global__ void cuda_kernel_density(
    * Since blocks are allocated using max(ni, nj), some blocks will contain no
    * valid per-thread target particles for the smaller cell. The functions
    * handles this through i_in_range to ignore OOB particles. */
-  /* Blocks were allocated using max(ni, nj), so not every block is necessarily
-   * required for both interaction directions.
-   * Skip a directional calculation entirely when b_id_local lies outside the
-   * block range required by that direction's target cell. This is intended to minimise atomic contentions*/
-  const bool do_ci_target = (b_id_local < ci_blocks);
-  const bool do_cj_target = (b_id_local < cj_blocks);
   /*Do ci <- cj*/
   if(do_ci_target)
 	  neighbour_interactions_density(
@@ -1250,12 +1256,20 @@ __global__ void cuda_kernel_gradient(
     return;
   }
 
+  /* Blocks were allocated using max(ni, nj), so not every block is necessarily
+   * required for both interaction directions.
+   * Skip a directional calculation entirely when b_id_local lies outside the
+   * block range required by that direction's target cell. */
+  const bool do_ci_target = (b_id_local < ci_blocks);
+  const bool do_cj_target = (b_id_local < cj_blocks);
+
   /* Cell i is much larger than cell j: Blocks map over cell i. */
   if (use_ci_source_parallel) {
 
 	/* Do ci <- cj: Cell i is the larger target, so use the target-parallel
 	 * implementation.*/
-    neighbour_interactions_gradient(d_parts_send, d_parts_recv, ci_start,
+    if(do_ci_target)
+    	neighbour_interactions_gradient(d_parts_send, d_parts_recv, ci_start,
                                     ci_particle_end, cj_start, cj_particle_end,
                                     ci_target_shift, cj_source_shift,
                                     b_id_local, tid, d_a, d_H);
@@ -1267,7 +1281,8 @@ __global__ void cuda_kernel_gradient(
 
     /* Do cj <- ci: Cell i is now the larger source. Continue to map threads over cell i
      * and reduce their contributions into target particles in cell j. */
-    neighbour_interactions_gradient_j_parallel(
+    if(do_cj_target)
+    	neighbour_interactions_gradient_j_parallel(
         d_parts_send, d_parts_recv, cj_start, cj_particle_end, ci_start,
         ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a,
         d_H);
@@ -1280,7 +1295,8 @@ __global__ void cuda_kernel_gradient(
 
 	/* Do ci <- cj: Cell j is the larger source. Threads map over cell j and reduce their
 	 * contributions into target particles in cell i. */
-    neighbour_interactions_gradient_j_parallel(
+	if(do_ci_target)
+	  neighbour_interactions_gradient_j_parallel(
         d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
         cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a,
         d_H);
@@ -1291,7 +1307,8 @@ __global__ void cuda_kernel_gradient(
 
 	/* Do cj <- ci: Cell j is then the larger target, so use the target-parallel
 	 * implementation. */
-    neighbour_interactions_gradient(d_parts_send, d_parts_recv, cj_start,
+    if(do_cj_target)
+    	neighbour_interactions_gradient(d_parts_send, d_parts_recv, cj_start,
                                     cj_particle_end, ci_start, ci_particle_end,
                                     cj_target_shift, ci_source_shift,
                                     b_id_local, tid, d_a, d_H);
@@ -1303,12 +1320,7 @@ __global__ void cuda_kernel_gradient(
    * Since blocks are allocated using max(ni, nj), some blocks will contain no
    * valid per-thread target particles for the smaller cell. The functions
    * handles this through i_in_range to ignore OOB particles. */
-  /* Blocks were allocated using max(ni, nj), so not every block is necessarily
-   * required for both interaction directions.
-   * Skip a directional calculation entirely when b_id_local lies outside the
-   * block range required by that direction's target cell. */
-  const bool do_ci_target = (b_id_local < ci_blocks);
-  const bool do_cj_target = (b_id_local < cj_blocks);
+
   /*Do ci <- cj*/
   if (do_ci_target)
   neighbour_interactions_gradient(d_parts_send, d_parts_recv, ci_start,
@@ -2141,12 +2153,20 @@ __global__ void cuda_kernel_force(
     return;
   }
 
+  /* Blocks were allocated using max(ni, nj), so not every block is necessarily
+   * required for both interaction directions.
+   * Skip a directional calculation entirely when b_id_local lies outside the
+   * block range required by that direction's target cell. This is intended to minimise atomic contentions*/
+  const bool do_ci_target = (b_id_local < ci_blocks);
+  const bool do_cj_target = (b_id_local < cj_blocks);
+
   /* Cell i is much larger than cell j: Blocks map over cell i. */
   if (use_ci_source_parallel) {
 
 	/* Do ci <- cj: Cell i is the larger target, so use the target-parallel
 	 * implementation.*/
-    neighbour_interactions_force(d_parts_send, d_parts_recv, ci_start,
+	if(do_ci_target)
+		neighbour_interactions_force(d_parts_send, d_parts_recv, ci_start,
                                  ci_particle_end, cj_start, cj_particle_end,
                                  ci_target_shift, cj_source_shift, b_id_local,
                                  tid, d_a, d_H);
@@ -2158,7 +2178,8 @@ __global__ void cuda_kernel_force(
 
     /* Do cj <- ci: Cell i is now the larger source. Continue to map threads over cell i
      * and reduce their contributions into target particles in cell j. */
-    neighbour_interactions_force_j_parallel(
+	if(do_cj_target)
+		neighbour_interactions_force_j_parallel(
         d_parts_send, d_parts_recv, cj_start, cj_particle_end, ci_start,
         ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a,
         d_H);
@@ -2171,7 +2192,8 @@ __global__ void cuda_kernel_force(
 
 	/* Do ci <- cj: Cell j is the larger source. Threads map over cell j and reduce their
 	 * contributions into target particles in cell i. */
-    neighbour_interactions_force_j_parallel(
+	if(do_ci_target)
+		neighbour_interactions_force_j_parallel(
         d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
         cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a,
         d_H);
@@ -2182,7 +2204,8 @@ __global__ void cuda_kernel_force(
 
 	/* Do cj <- ci: Cell j is then the larger target, so use the target-parallel
 	 * implementation. */
-    neighbour_interactions_force(d_parts_send, d_parts_recv, cj_start,
+	if(do_cj_target)
+		neighbour_interactions_force(d_parts_send, d_parts_recv, cj_start,
                                  cj_particle_end, ci_start, ci_particle_end,
                                  cj_target_shift, ci_source_shift, b_id_local,
                                  tid, d_a, d_H);
@@ -2194,12 +2217,6 @@ __global__ void cuda_kernel_force(
    * Since blocks are allocated using max(ni, nj), some blocks will contain no
    * valid per-thread target particles for the smaller cell. The functions
    * handles this through i_in_range to ignore OOB particles. */
-  /* Blocks were allocated using max(ni, nj), so not every block is necessarily
-   * required for both interaction directions.
-   * Skip a directional calculation entirely when b_id_local lies outside the
-   * block range required by that direction's target cell. This is intended to minimise atomic contentions*/
-  const bool do_ci_target = (b_id_local < ci_blocks);
-  const bool do_cj_target = (b_id_local < cj_blocks);
   /*Do ci <- cj*/
   if(do_ci_target)
 	  neighbour_interactions_force(d_parts_send, d_parts_recv, ci_start,
