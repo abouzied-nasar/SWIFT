@@ -470,6 +470,10 @@ __device__ __forceinline__ void neighbour_interactions_density_j_parallel(
 #define TARGET_BLOCK_LIMIT 4
 #endif
 
+#ifndef MIN_SOURCE_BLOCKS
+#define MIN_SOURCE_BLOCKS 4
+#endif
+
 #ifndef DENSITY_CELL_COUNT_RATIO
 #define DENSITY_CELL_COUNT_RATIO 8
 #endif
@@ -524,8 +528,13 @@ __global__ void cuda_kernel_density(
   const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
   const int cj_blocks = (nj + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
-  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
-  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
+//  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
+//  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
+
+  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
+      ci_blocks >= MIN_SOURCE_BLOCKS;
+  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
+      cj_blocks >= MIN_SOURCE_BLOCKS;
 
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
@@ -1230,8 +1239,13 @@ __global__ void cuda_kernel_gradient(
   const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
   const int cj_blocks = (nj + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
-  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
-  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
+//  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
+//  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
+
+  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
+      ci_blocks >= MIN_SOURCE_BLOCKS;
+  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
+      cj_blocks >= MIN_SOURCE_BLOCKS;
 
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
@@ -2137,8 +2151,13 @@ __global__ void cuda_kernel_force(
   const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
   const int cj_blocks = (nj + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
-  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
-  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
+//  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT;
+//  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT;
+
+  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
+      ci_blocks >= MIN_SOURCE_BLOCKS;
+  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
+      cj_blocks >= MIN_SOURCE_BLOCKS;
 
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
