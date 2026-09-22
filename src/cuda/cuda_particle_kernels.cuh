@@ -574,7 +574,7 @@ __global__ void cuda_kernel_density(
     /* Both device functions reuse the same dynamic shared-memory
      * allocation. Ensure every thread has completed the first direction
      * before any thread begins the second direction. */
-    __syncthreads();
+//    __syncthreads();
 
     /* Do cj <- ci: Cell i is now the larger source. Continue to map threads over cell i
      * and reduce their contributions into target particles in cell j. */
@@ -596,7 +596,7 @@ __global__ void cuda_kernel_density(
 
     /* The two device functions interpret and reuse the same dynamic
      * shared-memory allocation differently. make sure we sync before continuing*/
-    __syncthreads();
+//    __syncthreads();
 
 	/* Do cj <- ci: Cell j is then the larger target, so use the target-parallel
 	 * implementation. */
@@ -611,17 +611,25 @@ __global__ void cuda_kernel_density(
    * Since blocks are allocated using max(ni, nj), some blocks will contain no
    * valid per-thread target particles for the smaller cell. The functions
    * handles this through i_in_range to ignore OOB particles. */
+  /* Blocks were allocated using max(ni, nj), so not every block is necessarily
+   * required for both interaction directions.
+   * Skip a directional calculation entirely when b_id_local lies outside the
+   * block range required by that direction's target cell. This is intended to minimise atomic contentions*/
+  const bool do_ci_target = (b_id_local < ci_blocks);
+  const bool do_cj_target = (b_id_local < cj_blocks);
   /*Do ci <- cj*/
-  neighbour_interactions_density(
+  if(do_ci_target)
+	  neighbour_interactions_density(
       d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
       cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid);
 
   /* Required because both calls reuse the same dynamic shared-memory
    * particle buffers. */
-  __syncthreads();
+//  __syncthreads();
 
   /*Now do cj <- ci*/
-  neighbour_interactions_density(
+  if(do_cj_target)
+	  neighbour_interactions_density(
       d_parts_send, d_parts_recv, cj_start, cj_particle_end, ci_start,
       ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid);
 }
@@ -1255,7 +1263,7 @@ __global__ void cuda_kernel_gradient(
     /* Both device functions reuse the same dynamic shared-memory
      * allocation. Ensure every thread has completed the first direction
      * before any thread begins the second direction. */
-    __syncthreads();
+//    __syncthreads();
 
     /* Do cj <- ci: Cell i is now the larger source. Continue to map threads over cell i
      * and reduce their contributions into target particles in cell j. */
@@ -1279,7 +1287,7 @@ __global__ void cuda_kernel_gradient(
 
     /* The two device functions interpret and reuse the same dynamic
      * shared-memory allocation differently. make sure we sync before continuing*/
-    __syncthreads();
+//    __syncthreads();
 
 	/* Do cj <- ci: Cell j is then the larger target, so use the target-parallel
 	 * implementation. */
@@ -1295,7 +1303,14 @@ __global__ void cuda_kernel_gradient(
    * Since blocks are allocated using max(ni, nj), some blocks will contain no
    * valid per-thread target particles for the smaller cell. The functions
    * handles this through i_in_range to ignore OOB particles. */
+  /* Blocks were allocated using max(ni, nj), so not every block is necessarily
+   * required for both interaction directions.
+   * Skip a directional calculation entirely when b_id_local lies outside the
+   * block range required by that direction's target cell. */
+  const bool do_ci_target = (b_id_local < ci_blocks);
+  const bool do_cj_target = (b_id_local < cj_blocks);
   /*Do ci <- cj*/
+  if (do_ci_target)
   neighbour_interactions_gradient(d_parts_send, d_parts_recv, ci_start,
                                   ci_particle_end, cj_start, cj_particle_end,
                                   ci_target_shift, cj_source_shift, b_id_local,
@@ -1303,9 +1318,10 @@ __global__ void cuda_kernel_gradient(
 
   /* Required because both calls reuse the same dynamic shared-memory
    * particle buffers. */
-  __syncthreads();
+//  __syncthreads();
 
   /*Now do cj <- ci*/
+  if (do_cj_target)
   neighbour_interactions_gradient(d_parts_send, d_parts_recv, cj_start,
                                   cj_particle_end, ci_start, ci_particle_end,
                                   cj_target_shift, ci_source_shift, b_id_local,
@@ -2138,7 +2154,7 @@ __global__ void cuda_kernel_force(
     /* Both device functions reuse the same dynamic shared-memory
      * allocation. Ensure every thread has completed the first direction
      * before any thread begins the second direction. */
-    __syncthreads();
+//    __syncthreads();
 
     /* Do cj <- ci: Cell i is now the larger source. Continue to map threads over cell i
      * and reduce their contributions into target particles in cell j. */
@@ -2162,7 +2178,7 @@ __global__ void cuda_kernel_force(
 
     /* The two device functions interpret and reuse the same dynamic
      * shared-memory allocation differently. make sure we sync before continuing*/
-    __syncthreads();
+//    __syncthreads();
 
 	/* Do cj <- ci: Cell j is then the larger target, so use the target-parallel
 	 * implementation. */
@@ -2178,18 +2194,26 @@ __global__ void cuda_kernel_force(
    * Since blocks are allocated using max(ni, nj), some blocks will contain no
    * valid per-thread target particles for the smaller cell. The functions
    * handles this through i_in_range to ignore OOB particles. */
+  /* Blocks were allocated using max(ni, nj), so not every block is necessarily
+   * required for both interaction directions.
+   * Skip a directional calculation entirely when b_id_local lies outside the
+   * block range required by that direction's target cell. This is intended to minimise atomic contentions*/
+  const bool do_ci_target = (b_id_local < ci_blocks);
+  const bool do_cj_target = (b_id_local < cj_blocks);
   /*Do ci <- cj*/
-  neighbour_interactions_force(d_parts_send, d_parts_recv, ci_start,
+  if(do_ci_target)
+	  neighbour_interactions_force(d_parts_send, d_parts_recv, ci_start,
                                ci_particle_end, cj_start, cj_particle_end,
                                ci_target_shift, cj_source_shift, b_id_local,
                                tid, d_a, d_H);
 
   /* Required because both calls reuse the same dynamic shared-memory
    * particle buffers. */
-  __syncthreads();
+//  __syncthreads();
 
   /*Now do cj <- ci*/
-  neighbour_interactions_force(d_parts_send, d_parts_recv, cj_start,
+  if(do_cj_target)
+	  neighbour_interactions_force(d_parts_send, d_parts_recv, cj_start,
                                cj_particle_end, ci_start, ci_particle_end,
                                cj_target_shift, ci_source_shift, b_id_local,
                                tid, d_a, d_H);
