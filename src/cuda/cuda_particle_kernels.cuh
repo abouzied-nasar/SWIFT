@@ -71,6 +71,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
   const int i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
   /*Is the particle i_id in the cell we need to work on?*/
   const bool i_in_range = (i_id < i_end);
+  int i_has_neighbours = 0;
 
   /* Initialise particle i's data. Needed since we require definition
    * before checking if i_in_range below */
@@ -233,6 +234,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
         res_rot.y = fmaf(faci, curlry, res_rot.y);
         res_rot.z = fmaf(faci, curlrz, res_rot.z);
         res_rot.w = fmaf(-faci, dvdr, res_rot.w);
+        i_has_neighbours = 1;
       }
     } /*Loop through parts in cell j and in current tile*/
     /* Ensure no thread is still reading from the current buffer before it may
@@ -241,7 +243,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
   }
 
   /*Conditional to prevent writing out of bounds of this computation*/
-  if (i_in_range) {
+  if (i_in_range && i_has_neighbours) {
     /* Write results. */
     atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.x, res_rho.x);
     atomicAdd(&d_parts_recv[i_id].rho_rhodh_wcount_wcount_dh.y, res_rho.y);
@@ -262,6 +264,8 @@ struct density_block_partial {
   float4 rho;
   /* curl of velocity and velocity divergence */
   float4 rot;
+//  /*Do any "j" particles in this block interact with the particle i we are reducing values for?*/
+//  int has_neighbours
 };
 
 /**
@@ -687,6 +691,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
   const int i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
   /*Is the id in the cell we need to work on?*/
   const bool i_in_range = (i_id < i_end);
+  int i_has_neighbours = 0;
 
   /* Initialise particle i's data. Needed since we require definition
    * before checking if i_in_range below */
@@ -891,6 +896,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
 
         const float delta_u_factor = (energyi - energyj) * inv_r;
         lapui += mj * delta_u_factor * wi_dx * (1.0f / rhoj);
+        i_has_neighbours = 1;
       }
     }
 
@@ -898,7 +904,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
   }
 
   /*Conditional to prevent writing out of bounds of this computation*/
-  if (i_in_range) {
+  if (i_in_range && i_has_neighbours) {
     /*aviscmax*/
     atomicMaxFloat(&d_parts_recv[i_id].aviscmax_vsig_lapu.x, avisc_maxi);
     /*vsig*/
@@ -1400,6 +1406,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
   float fi = 0.f, balsi = 0.f, rhoi = 0.f, pressurei = 0.f;
   float ci = 0.f, energyi = 0.f, avisci = 0.f, adiffi = 0.f;
   int min_ngb_tbi = INT_MAX;
+  int i_has_neighbours = 0;
 
   float hi_inv = 0.f, hid_inv = 0.f, mi_inv = 0.f, rhoi_inv = 0.f,
         rhoi_inv2 = 0.f, hig2 = 0.f;
@@ -1702,6 +1709,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 
         /* Get the time derivative for h. */
         res_udt_hdt.y -= mj * dvdr * inv_r * rhoj_inv * wi_dr;
+        i_has_neighbours = 1;
       }
     }
 
@@ -1709,7 +1717,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
   }
 
   /*Conditional to prevent writing out of bounds */
-  if (i_in_range) {
+  if (i_in_range && i_has_neighbours) {
 
     atomicAdd(&d_parts_recv[i_id].a_hydro.x, res_ahydro.x);
     atomicAdd(&d_parts_recv[i_id].a_hydro.y, res_ahydro.y);
