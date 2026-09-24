@@ -86,7 +86,7 @@ void gpu_launch_density(
   const size_t sh_mem = density_tiling_shared_bytes > density_reduction_shared_bytes ?
 		  density_tiling_shared_bytes : density_reduction_shared_bytes;
 
-  cuda_kernel_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
+  cuda_kernel_density_coarse<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
       d_parts_send, d_parts_recv, d_cell_i_j_start_end, d_block_leaf_id, space_dim, tester_param);
 
 }
@@ -136,7 +136,7 @@ void gpu_launch_gradient(
      used for prefetching while tile 0 is used for computations and vice-versa*/
 //    const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_g);  // 3072 bytes when TILE_J=64
 
-    cuda_kernel_gradient<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
+    cuda_kernel_gradient_coarse<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
         d_cell_i_j_start_end, d_block_leaf_id, space_dim, tester_param);
 }
@@ -192,7 +192,7 @@ void gpu_launch_force(
 
 //    const size_t shmem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_f);
 
-    cuda_kernel_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
+    cuda_kernel_force_coarse<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
         d_cell_i_j_start_end, d_block_leaf_id, space_dim, tester_param);
 }
