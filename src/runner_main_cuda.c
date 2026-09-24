@@ -232,6 +232,7 @@ void *runner_main_cuda(void *data) {
      * Currently we use gpu_buf_dens to hold md->n_active_leaves.
      * Could use any of the other buffers*/
     int offload = 0;
+    /*TODO: Could this be what is adding to idle time at the start of each step???*/
     offload = runner_GPU_offload_switch(r, sched, e, &gpu_buf_dens, /*timer off 0, on 1*/1);
     e->gpu_used = offload;
 
@@ -279,7 +280,6 @@ void *runner_main_cuda(void *data) {
 #ifdef SWIFT_DEBUG_TASKS
       /* Mark the thread we run on */
       t->rid = r->cpuid;
-
       /* And recover the pair direction */
       if (t->type == task_type_pair) {
         struct cell *ci_temp = ci;
@@ -290,6 +290,21 @@ void *runner_main_cuda(void *data) {
         t->sid = -1;
       }
 #endif
+      /* We need this for the GPU code so move outside of debug checks */
+      /*Check if this is a corner task. If so, mark corner_check as 1*/
+      int corner_pair_task = 0;
+      /*Mark task as offloaded for when we increment counters and set task markers
+       * at the end of the task*/
+      int task_offloaded = 0;
+      /* And recover the pair direction */
+      if (t->type == task_type_pair) {
+        struct cell *ci_temp = ci;
+        struct cell *cj_temp = cj;
+        double shift[3];
+        int sid = space_getsid_but_not_swap_cells(e->s, &ci_temp, &cj_temp, shift);
+        if(sid == 0 || sid == 2 || sid == 6 || sid == 8)
+        	corner_pair_task = 1;
+      }
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* Check that we haven't scheduled an inactive task */
@@ -317,6 +332,7 @@ void *runner_main_cuda(void *data) {
             if(offload){
               runner_doself_gpu_density(r, sched, &gpu_buf_dens, t, stream, d_a,
                                         d_H);
+              task_offloaded = 1;
             }else{
               runner_dosub_self1_density(r, ci, /*below_h_max=*/0, 0);
               int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
@@ -329,6 +345,7 @@ void *runner_main_cuda(void *data) {
             if(offload){
               runner_doself_gpu_gradient(r, sched, &gpu_buf_grad, t, stream, d_a,
                   d_H);
+              task_offloaded = 1;
             }else{
 #ifdef EXTRA_HYDRO_LOOP_TYPE2
               runner_dosub_self2_gradient(r, ci, /*below_h_max=*/0, 0);
@@ -345,6 +362,7 @@ void *runner_main_cuda(void *data) {
             if(offload){
               runner_doself_gpu_force(r, sched, &gpu_buf_forc, t, stream, d_a,
                   d_H);
+              task_offloaded = 1;
             }else{
               runner_dosub_self2_force(r, ci, /*below_h_max=*/0, 0);
               int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) -
@@ -418,9 +436,12 @@ void *runner_main_cuda(void *data) {
           /* GPU WORK */
           else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
-          if(offload){
+          const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density],
+        	      __ATOMIC_RELAXED);
+          if(offload && (!corner_pair_task || tasks_left == 1)){
             runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_dens, t,
                                       stream, d_a, d_H);
+            task_offloaded = 1;
           }else{
             runner_dosub_pair1_density(r, ci, cj, /*below_h_max=*/0, 0);
             int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
@@ -430,9 +451,12 @@ void *runner_main_cuda(void *data) {
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-          if(offload){
+          const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient],
+        		  __ATOMIC_RELAXED);
+          if(offload && (!corner_pair_task || tasks_left == 1)){
             runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_grad, t,
                                        stream, d_a, d_H);
+            task_offloaded = 1;
           }else{
 #ifdef EXTRA_HYDRO_LOOP_TYPE2
             runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 0);
@@ -446,9 +470,12 @@ void *runner_main_cuda(void *data) {
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-            if(offload){
+            const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force],
+                   __ATOMIC_RELAXED);
+            if(offload && (!corner_pair_task || tasks_left == 1)){
               runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_forc, t, stream,
                   d_a, d_H);
+              task_offloaded = 1;
             }else{
               runner_dosub_pair2_force(r, ci, cj, /*below_h_max=*/0, 0);
               int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) -
@@ -777,7 +804,7 @@ void *runner_main_cuda(void *data) {
       prev = t;
       if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
-        if(offload){
+        if(task_offloaded){
           /* Don't enqueue dependencies yet. Just signal the runners */
           t->skip = 1;
           t->toc = getticks();
@@ -791,7 +818,7 @@ void *runner_main_cuda(void *data) {
 #endif
       } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-        if(offload){
+        if(task_offloaded){
           /* Don't enqueue dependencies yet. Just signal the runners */
           t->skip = 1;
           t->toc = getticks();
@@ -805,7 +832,7 @@ void *runner_main_cuda(void *data) {
 #endif
       } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-        if(offload){
+        if(task_offloaded){
           /* Don't enqueue dependencies yet. Just signal the runners */
           t->skip = 1;
           t->toc = getticks();
