@@ -1074,8 +1074,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
        * Also, we only want to check if we are at the penultimate leaf computation
        * before offloading pack_size computations*/
       if(npacked < md->task_n_leaves - 1 && npacked < md->params.pack_size - 1){
-        struct cell *ci_next = md->ci_leaves[npacked + 1];
-        struct cell *cj_next = md->cj_leaves[npacked + 1];
+        struct cell *ci_next = md->ci_leaves[md->n_leaves_packed + 1];
+        struct cell *cj_next = md->cj_leaves[md->n_leaves_packed + 1];
         count_next = max(ci_next->hydro.count, cj_next->hydro.count);
       }
       /*TODO: Replicate this with a member of struct md rather than calculate repeatedly*/

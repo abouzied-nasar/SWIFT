@@ -353,7 +353,7 @@ static inline int queue_reserve_gpu_task(struct queue *q,
      * counter. The loop then checks the threshold again.
      * Use a "weak" CAS since we are in a while loop -> even if weak CAS
      * fails for some unexpected reason we will try again unless current_n_left
-     * exchanged with 1*/
+     * exchanged with a value <= 1*/
     if (__atomic_compare_exchange_n(
             &q->gpu_tasks_left[gpu_task_type], &current_n_left, new_n_left,
             /*weak=*/1, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
