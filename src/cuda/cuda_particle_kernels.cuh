@@ -41,10 +41,15 @@ extern "C" {
  * @brief Naive kernel computing the density interactions of a single particle
  *
  * @param pid index of particle to compute density for in the data arrays
- * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_send array of particle data received from CPU
  * @param d_parts_recv array of particle data to write results into
- * @param d_a current cosmological expansion factor
- * @param d_H current Hubble constant
+ * @param i_start, i_end. First and last particles of cell i
+ * @param j_start, j_end. First and last particles of cell j
+ * @param shift_*_d position Spatial shifts needed to bring particle positions
+ * within cell position frame of reference
+ * @param b_id_local ID of the block we use to count particles relative to
+ * the first block we use to count particles in the cell
+ * @param t_id ID of the CUDA thread
  */
 //TODO: When changing the file cuda_particle_kernels.cuh and then recompiling the compiler doesn't realise the file has changed
 __device__ __forceinline__ void neighbour_interactions_density(
@@ -240,7 +245,18 @@ __device__ __forceinline__ void neighbour_interactions_density(
   }
 
 }
-
+/**
+ * @brief Naive kernel computing the density interactions of a single particle
+ *
+ * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_recv array of particle data to write results into
+ * @param d_a current cosmological expansion factor
+ * @param d_H current Hubble constant
+ * @param d_cell_i_j_start_end. First and last particles of cells i and j
+ * @param d_block_leaf_id metadata to tell each CUDA block which leaf
+ * computation it will work on
+ * @param space_dim How big is the space we work within? Needed to evaluate periodic BCs
+ */
 __global__ void cuda_kernel_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     struct gpu_part_recv_d* __restrict__ d_parts_recv,
@@ -318,14 +334,14 @@ __global__ void cuda_kernel_density(
  * @brief Naive kernel computing the gradient interactions of a single particle
  *
  * @param pid index of particle to compute density for in the data arrays
- * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_send array of particle data received from CPU
  * @param d_parts_recv array of particle data to write results into
  * @param i_start first particle in cell i
  * @param i_end last particle in cell i
  * @param j_start first particle in cell j
  * @param j_end last particle in cell j
- * @param shift_i shifts for particles in cell i
- * @param shift_j shifts for particles in cell j
+ * @param shift_i_d shifts for particles in cell i
+ * @param shift_j_d shifts for particles in cell j
  * @param b_id_local within the GPU thread blocks acting on this cell what is my id.
  *        Needed to figure out which range of particles each CUDA block will work on
  * @param t_id the current threads id in the list of threads in the block
@@ -553,7 +569,18 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
   }
 
 }
-
+/**
+ * @brief Naive kernel computing the gradient interactions of a single particle per thread
+ *
+ * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_recv array of particle data to write results into
+ * @param d_a current cosmological expansion factor
+ * @param d_H current Hubble constant
+ * @param d_cell_i_j_start_end. First and last particles of cells i and j
+ * @param d_block_leaf_id metadata to tell each CUDA block which leaf
+ * computation it will work on
+ * @param space_dim How big is the space we work within? Needed to evaluate periodic BCs
+ */
 __global__ void cuda_kernel_gradient(
     const struct gpu_part_send_g* __restrict__ d_parts_send,
     struct gpu_part_recv_g*      __restrict__ d_parts_recv,
@@ -630,17 +657,16 @@ __global__ void cuda_kernel_gradient(
 }
 
 /**
- * @brief Naive kernel computing the gradient interactions of a single particle
+ * @brief Naive kernel computing the force interactions of a single particle per thread
  *
- * @param pid index of particle to compute density for in the data arrays
- * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_send array of particle data received from CPU
  * @param d_parts_recv array of particle data to write results into
  * @param i_start first particle in cell i
  * @param i_end last particle in cell i
  * @param j_start first particle in cell j
  * @param j_end last particle in cell j
- * @param shift_i shifts for particles in cell i
- * @param shift_j shifts for particles in cell j
+ * @param shift_i_d shifts for particles in cell i
+ * @param shift_j_d shifts for particles in cell j
  * @param b_id_local within the GPU thread blocks acting on this cell what is my id.
  *        Needed to figure out which range of particles each CUDA block will work on
  * @param t_id the current threads id in the list of threads in the block
@@ -967,7 +993,18 @@ __device__ __forceinline__ void neighbour_interactions_force(
 	}
 }
 
-
+/**
+ * @brief Naive kernel computing the force interactions of a single particle per thread
+ *
+ * @param d_parts_send array of particle data received from CPU
+ * @param d_parts_recv array of particle data to write results into
+ * @param d_a current cosmological expansion factor
+ * @param d_H current Hubble constant
+ * @param d_cell_i_j_start_end. First and last particles of cells i and j
+ * @param d_block_leaf_id metadata to tell each CUDA block which leaf
+ * computation it will work on
+ * @param space_dim How big is the space we work within? Needed to evaluate periodic BCs
+ */
 __global__ void cuda_kernel_force(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
     struct gpu_part_recv_f*      __restrict__ d_parts_recv,
