@@ -34,7 +34,6 @@ extern "C" {
 #include "device_functions.cuh"
 #include "gpu_part_structs.h"
 #include "inline.h"
-#include <stdio.h>
 
 #include <config.h>
 
