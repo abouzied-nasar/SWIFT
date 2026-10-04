@@ -165,24 +165,37 @@ __device__ void d_kernel_deval(float u, float *__restrict__ W,
   *dW_dx = dw_dx * kernel_constant * kernel_gamma_inv_dim_plus_one;
 }
 
-/*Function which compares two floats using int CUDA intrinsics*/
-__device__ float atomicMaxFloat(float* addr, float val) {
-    // 1. Convert the float bit-pattern to an integer
-    int val_as_int = __float_as_int(val);
+/* @brief Atomic maximum for two floats using CUDA compare-and-swap.
+ *
+ * @param addr Pointer to where we want to store the maximum value in global memory
+ * @param val  The value a CUDA thread calculates based on looping through a particle's neighbours
+ */
+__device__ void atomicMaxFloat(float* addr, float val) {
 
-    // 2. Handle the 'Negative Problem when the lexocographical order fails.
-    // If the number is negative, we flip the bits (except the sign bit)
-    // to ensure that -5.0 is "smaller" than -2.0 in integer space.
-    int transformed = (val_as_int >= 0) ? val_as_int : (0x80000000 - val_as_int);
+  /* Get a pointer to the float value's bits as stored in global memory but as an integer */
+  int* addr_as_int = (int*)addr;
+  /* Make a local copy of the bitwise representation of the value in global memory as an int */
+  int old = *addr_as_int;
+  /* The value we assume to currently be in global memory */
+  int assumed;
 
-    // 3. Perform the atomic operation on the transformed integer
-    int old_int = atomicMax((int*)addr, transformed);
+  /* Check to see if we should even try to swap the current max in global memory.
+   * If we need to try, we loop until we successfully update the value or another
+   * thread has updated it with a value greater than or equal to ours */
+  while(val > __int_as_float(old)) {
 
-    // 4. Transform the result back to the original float scale
-    int original_old = (old_int >= 0) ? old_int : (0x80000000 - old_int);
-
-    return __int_as_float(original_old);
+    /* We first assume that the old value has not changed */
+    assumed = old;
+    /* Try to replace the value only if it is still equal to assumed.
+     * If another thread has changed it, old is replaced with that new value */
+    old = atomicCAS(addr_as_int, assumed, __float_as_int(val));
+    /* If old is equal to assumed, no other thread changed the value before our
+     * atomic operation and we have successfully updated the maximum */
+    if(old == assumed)
+      break;
+  }
 }
+
 #ifdef __cplusplus
 }
 #endif
