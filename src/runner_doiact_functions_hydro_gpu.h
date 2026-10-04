@@ -648,13 +648,15 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
 }
 
+/* @brief Copy the metadata for where each cell (i and j) begins and ends for each leaf computation we want to offload
+ * into cell_i_j_start_end buffers we can copy to GPU and use to orchestrate it's computations
+ *
+ * @param buf Struct pointing to CPU and GPU buffers for particle data and the GPU orchestration metadata*/
 __attribute__((always_inline)) INLINE static void finalise_gpu_metadata(
     struct gpu_offload_data *restrict buf) {
 
   const struct gpu_pack_metadata *md = &buf->md;
   struct gpu_md *gpu_md = &buf->gpu_md;
-  /*Use tic for packing and tic2 for launch timing*/
-  TIMER_TIC;
   for(int i = 0; i < md->n_leaves_packed; i++){
 	  int index_i = md->my_index[i].x;
 	  int index_j = md->my_index[i].y;
@@ -663,7 +665,6 @@ __attribute__((always_inline)) INLINE static void finalise_gpu_metadata(
 	  gpu_md->cell_i_j_start_end[i].z = md->unique_start_end[index_j].x;
 	  gpu_md->cell_i_j_start_end[i].w = md->unique_start_end[index_j].y;
   }
-  TIMER_TOC(timer_gpu_pack_f);
 }
 
 /**
