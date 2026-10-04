@@ -188,8 +188,9 @@ __device__ void atomicMaxFloat(float* addr, float val) {
     assumed = old;
     /* Try to replace the value only if it is still equal to assumed.
      * If another thread has changed it, old is replaced with that new value */
+    /* Reinterpret val's bits as an int for atomicCAS without changing the stored float representation. */
     old = atomicCAS(addr_as_int, assumed, __float_as_int(val));
-    /* If old is equal to assumed, no other thread changed the value before our
+    /* If old is equal to assumed, no other thread changed the value in addr before our
      * atomic operation and we have successfully updated the maximum */
     if(old == assumed)
       break;
