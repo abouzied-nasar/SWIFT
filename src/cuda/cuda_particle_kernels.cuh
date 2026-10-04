@@ -62,7 +62,6 @@ __device__ __forceinline__ void neighbour_interactions_density(
 
 	/*Declare a variable to use up allocated shared memory*/
   extern __shared__ unsigned char smem[];
-  /* TODO: we need positions to be double so this needs re-working in the near future!*/
   /*Assign range of memory to use for x, y, z and h*/
   double2* s_x_y = reinterpret_cast<double2*>(smem);
   double2* s_z_h = reinterpret_cast<double2*>(s_x_y + 2 * GPU_THREAD_BLOCK_SIZE);
@@ -106,9 +105,6 @@ __device__ __forceinline__ void neighbour_interactions_density(
   float4 res_rho = make_float4(0.f, 0.f, 0.f, 0.f);
   /* curl of velocity (3 coordinates), velocity divergence */
   float4 res_rot = make_float4(0.f, 0.f, 0.f, 0.f);
-
-  /*const to avoid div by zero*/
-//  constexpr float eps = 1e-24f;
 
   /* Number of tiles. How many times to de we need to load GPU_
      * THREAD_BLOCK_SIZE particles to get through this cell? */
@@ -420,9 +416,6 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
   /* Cosmology terms for the signal velocity */
   const float fac_mu    = d_pow_three_gamma_minus_five_over_two(d_a);
   const float a2_Hubble = d_a * d_a * d_H;
-
-  /*const to avoid div by zero*/
-//  constexpr float eps = 1e-24f;
 
   /* Number of tiles. How many times to de we need to load GPU_
    * THREAD_BLOCK_SIZE particles to get through this cell? */
@@ -761,8 +754,6 @@ __device__ __forceinline__ void neighbour_interactions_force(
 	/* Cosmology terms for the signal velocity */
 	const float fac_mu    = d_pow_three_gamma_minus_five_over_two(d_a);
 	const float a2_Hubble = d_a * d_a * d_H;
-	/*const to avoid div by zero*/
-//	constexpr float eps = 1e-24f;
 
 	/* Number of tiles. How many times to de we need to load GPU_
 	 * THREAD_BLOCK_SIZE particles to get through this cell? */

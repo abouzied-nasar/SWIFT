@@ -442,10 +442,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   /* initialise to just some meaningless value to silence the compiler */
   cudaError_t cu_error = cudaErrorMemoryAllocation;
 
-  /*Copy the tasks' metadata to the GPU. Send it using stream[0] for now. N.B. this is not default stream ;).
-   * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
-   * NOTE: This could be removed outside conditionals since it's name, type and size are the same
-   *  for all task subtypes*/
+  /*Copy the tasks' metadata to the GPU. Send it using stream[0] for now.
+   * N.B. this is not the default stream, we allocate this individually for each CPU thread
+   * to allow concurrent offloading ;).
+   * TODO: Would be good to test if using stream 0, 1, 2 for dens, grad, forc
+   * offloads improves performance */
   cu_error =
       cudaMemcpyAsync(&buf->gpu_md.d_cell_i_j_start_end[0],
           &buf->gpu_md.cell_i_j_start_end[0],
