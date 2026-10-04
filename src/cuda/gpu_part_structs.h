@@ -33,6 +33,21 @@ extern "C" {
 #include "../align.h"
 #include "../timeline.h"
 
+
+/* Resolve deprecation of double4 and explicit alignment as part of definition from CUDA 13 onwards */
+#ifdef WITH_CUDA
+#if CUDART_VERSION >= 13000
+typedef double4_16a swift_double4;
+#else
+typedef double4 swift_double4;
+#endif
+#endif
+
+/*Let the user know which version of CUDA we compile with*/
+#define STRINGIFY_(x) #x
+#define STRINGIFY(x) STRINGIFY_(x)
+#pragma message("CUDART_VERSION = " STRINGIFY(CUDART_VERSION))
+
 /*! Container for particle data required for density calcs */
 struct gpu_part_data_d {
 #ifdef WITH_CUDA
@@ -54,7 +69,7 @@ struct gpu_cell_pos {
   /*! Cell position. This is set as the last entry in the
    * range of particles contained within a cell (i.e
    * N+1 contains info for cell position)*/
-  double4 x;
+  swift_double4 x;
 
 #endif
 };
