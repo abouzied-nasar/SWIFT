@@ -28,7 +28,7 @@ extern "C" {
 #include "error.h"
 #include "inline.h"
 #include "runner.h"
-#include "runner_gpu_pack_functions.h"
+#include "runner_gpu_unpack_functions.h"
 #include "scheduler.h"
 #include "space_getsid.h"
 #include "task.h"
