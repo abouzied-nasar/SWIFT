@@ -42,23 +42,20 @@ extern "C" {
 
 #include <config.h>
 #include <cuda.h>
-/* #include <cuda_device_runtime_api.h> */
-/* #include <cuda_profiler_api.h> */
-/* #include <cuda_runtime.h> */
 
 /**
  * @brief Launch the density computation on the GPU for a bundle of leaf cells.
  *
- * @param d_parts_send array on device containing particle data
- * @param d_parts_recv array on device to write results into
+ * @param d_parts_send buffer array on device containing particle data
+ * @param d_parts_recv buffer array on device to write results into
  * @param d_a current cosmological scale factor
  * @param d_H current Hubble constant
+ * @param num_blocks_x number of thread blocks to use in x-dimension
+ * @param d_cell_i_j_start_end index of first and last particles of cells i and j within
+ * the buffer arrays
+ * d_block_leaf_id index of leaf computation to work on for each CUDA block launched
+ * @param space_dim the dimensions of the space (box) containing the simulation
  * @param stream cuda stream to use
- * @param num_blockx_x number of thread blocks to use in x-dimension
- * @param num_blockx_y number of thread blocks to use in y-dimension
- * @param bundle_first_part index of first particle of this bundle in the
- * d_parts_* arrays
- * @param bundle_n_parts nr of particles in this bundle
  */
 void gpu_launch_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
@@ -70,8 +67,10 @@ void gpu_launch_density(
     const double3 space_dim,
     cudaStream_t stream){
 
-  /* Shared memory allocation. Need two tiles as another tile (1) is
-   used for prefetching while tile 0 is used for computations and vice-versa*/
+  /* Shared memory allocation. We use the tiling approach whereby each CUDA block grabs tiles of data from
+   * global memory (one tile per thread) and stores it in shared memory before beginning to work on it for the
+   * computations. We need to allocate two sets of tiles of shared memory as tile set 1 is used for pre-fetching
+   * data while tile set 0 is used for computations on available data and vice-versa. */
   const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * (sizeof(struct gpu_part_data_d));//(sizeof(float4) + sizeof(float4)); // 2048 bytes when TILE_J=64
 
   cuda_kernel_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
@@ -83,16 +82,16 @@ void gpu_launch_density(
 /**
  * @brief Launch the gradient computation on the GPU for a bundle of leaf cells.
  *
- * @param d_parts_send array on device containing particle data
- * @param d_parts_recv array on device to write results into
+ * @param d_parts_send buffer array on device containing particle data
+ * @param d_parts_recv buffer array on device to write results into
  * @param d_a current cosmological scale factor
  * @param d_H current Hubble constant
+ * @param num_blocks_x number of thread blocks to use in x-dimension
+ * @param d_cell_i_j_start_end index of first and last particles of cells i and j within
+ * the buffer arrays
+ * d_block_leaf_id index of leaf computation to work on for each CUDA block launched
+ * @param space_dim the dimensions of the space (box) containing the simulation
  * @param stream cuda stream to use
- * @param num_blockx_x number of thread blocks to use in x-dimension
- * @param num_blockx_y number of thread blocks to use in y-dimension
- * @param bundle_first_part index of first particle of this bundle in the
- * d_parts_* arrays
- * @param bundle_n_parts nr of particles in this bundle
  */
 void gpu_launch_gradient(
     const struct gpu_part_send_g* __restrict__ d_parts_send,
@@ -104,8 +103,10 @@ void gpu_launch_gradient(
     const double3 space_dim,
     cudaStream_t stream)
 {
-  /* Shared memory allocation. Need two tiles as another tile (1) is
-     used for prefetching while tile 0 is used for computations and vice-versa*/
+  /* Shared memory allocation. We use the tiling approach whereby each CUDA block grabs tiles of data from
+   * global memory (one tile per thread) and stores it in shared memory before beginning to work on it for the
+   * computations. We need to allocate two sets of tiles of shared memory as tile set 1 is used for pre-fetching
+   * data while tile set 0 is used for computations on available data and vice-versa. */
     const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_g);  // 3072 bytes when TILE_J=64
 
     cuda_kernel_gradient<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
@@ -116,16 +117,16 @@ void gpu_launch_gradient(
 /**
  * @brief Launch the force computation on the GPU for a bundle of leaf cells.
  *
- * @param d_parts_send array on device containing particle data
- * @param d_parts_recv array on device to write results into
+ * @param d_parts_send buffer array on device containing particle data
+ * @param d_parts_recv buffer array on device to write results into
  * @param d_a current cosmological scale factor
  * @param d_H current Hubble constant
+ * @param num_blocks_x number of thread blocks to use in x-dimension
+ * @param d_cell_i_j_start_end index of first and last particles of cells i and j within
+ * the buffer arrays
+ * d_block_leaf_id index of leaf computation to work on for each CUDA block launched
+ * @param space_dim the dimensions of the space (box) containing the simulation
  * @param stream cuda stream to use
- * @param num_blockx_x number of thread blocks to use in x-dimension
- * @param num_blockx_y number of thread blocks to use in y-dimension
- * @param bundle_first_part index of first particle of this bundle in the
- * d_parts_* arrays
- * @param bundle_n_parts nr of particles in this bundle
  */
 void gpu_launch_force(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
@@ -137,8 +138,10 @@ void gpu_launch_force(
     const double3 space_dim,
     cudaStream_t stream)
 {
-  /* Shared memory allocation. Need two tiles as another tile (1) is
-       used for prefetching while tile 0 is used for computations and vice-versa*/
+  /* Shared memory allocation. We use the tiling approach whereby each CUDA block grabs tiles of data from
+   * global memory (one tile per thread) and stores it in shared memory before beginning to work on it for the
+   * computations. We need to allocate two sets of tiles of shared memory as tile set 1 is used for pre-fetching
+   * data while tile set 0 is used for computations on available data and vice-versa. */
     const size_t shmem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_f);
 
     cuda_kernel_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
