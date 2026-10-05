@@ -56,7 +56,7 @@ struct gpu_part_data_d {
   double2 __align__(16) x_y;
   double2 __align__(16) z_h;
 
-  /*! Particle predicted velocity and mass -> ux, uy, uz, m */
+  /*! Particle predicted velocity and mass -> vx, vy, vz, m */
   float4 __align__(16) vx_m;
 
 #endif
@@ -74,9 +74,10 @@ struct gpu_cell_pos {
 #endif
 };
 
-/*! Over-arching union used to switch
- * between particle data and cell position. Saves us copying
- * cell positions to GPU individually*/
+/* Over-arching union used to switch between particle data and cell position within buffer array entries.
+ * Saves us copying cell positions to GPU separately from copying particle data. Allows copying everything over
+ * in one cuda_memcpy*/
+/* Particle and cell position data required for GPU density computations */
 struct gpu_part_send_d {
 #ifdef WITH_CUDA
   union {
@@ -95,7 +96,7 @@ struct gpu_part_recv_d {
   /*! rho, rho_dh, wcount, wcount_dh */
   float4 rho_rhodh_wcount_wcount_dh;
 
-  /*! Particle velocity curl; rot_ux and velocity divergence; div_v */
+  /*! Particle velocity curl; rot_vx and velocity divergence; div_v */
   float4 rot_vx_div_v;
 
 #endif
@@ -125,12 +126,15 @@ struct gpu_part_data_g {
 #endif
 };
 
-/*Particle and cell position data required for GPU density computations*/
+/* Over-arching union used to switch between particle data and cell position within buffer array entries.
+ * Saves us copying cell positions to GPU separately from copying particle data. Allows copying everything over
+ * in one cuda_memcpy*/
+/* Particle and cell position data required for GPU gradient computations */
 struct gpu_part_send_g{
   union {
-    /*! Container for particle data required for density calcs */
+    /*! Container for particle data required for gradient calcs */
     struct gpu_part_data_g p_data;
-    /*! Container for cell positions for density calcs */
+    /*! Container for cell positions for gradient calcs */
     struct gpu_cell_pos c_loc;
   };
 } ;
@@ -174,13 +178,16 @@ struct gpu_part_data_f {
 #endif
 };
 
-/*! Container for particle data required for force calcs */
+/* Over-arching union used to switch between particle data and cell position within buffer array entries.
+ * Saves us copying cell positions to GPU separately from copying particle data. Allows copying everything over
+ * in one cuda_memcpy*/
+/* Particle and cell position data required for GPU force computations */
 struct gpu_part_send_f {
 #ifdef WITH_CUDA
   union {
-    /*! Container for particle data required for density calcs */
+    /*! Container for particle data required for force calcs */
     struct gpu_part_data_f p_data;
-    /*! Container for cell positions for density calcs */
+    /*! Container for cell positions for force calcs */
     struct gpu_cell_pos c_loc;
   };
 #endif

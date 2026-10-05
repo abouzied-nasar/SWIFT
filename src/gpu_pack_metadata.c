@@ -66,15 +66,13 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
     md->unique_start_end[i].y = 0;
   }
 
-  /* Allocate hash table. For now using pack_size * 10 (a reasonable estimate)*/
+  /* Allocate hash table. For now using pack_size * 10 (a reasonable estimate)
+   * We will only ever have pack_size entries to hash through so pack_size gives us enough slots
+   * However, if we have >50% unique cells out of all cells we hash through hashing can become inifeccient
+   * The factor of 10 is overkill but gives us plenty of space*/
   /*TODO: */
   size_t hash_size = params->pack_size * 10;
   md->hash_table.entry = calloc(hash_size, sizeof(struct hash_entry));
-  for (size_t i = 0; i < hash_size; i++){
-    md->hash_table.entry[i].c = NULL;
-    md->hash_table.entry[i].index = 0;
-    md->hash_table.entry[i].occupied = 0;
-  }
 
   /*This is used to tell each cell in a pair where it's index is in the uniquely sorted array*/
   md->my_index = (int2 *)malloc(sizeof(int2) * params->pack_size);
