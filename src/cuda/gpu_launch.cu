@@ -61,7 +61,7 @@ void gpu_launch_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     struct gpu_part_recv_d* __restrict__ d_parts_recv,
     const float d_a, const float d_H,
-    int num_blocks_x,
+    const int num_blocks_x,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim,
@@ -71,7 +71,7 @@ void gpu_launch_density(
    * global memory (one tile per thread) and stores it in shared memory before beginning to work on it for the
    * computations. We need to allocate two sets of tiles of shared memory as tile set 1 is used for pre-fetching
    * data while tile set 0 is used for computations on available data and vice-versa. */
-  const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * (sizeof(struct gpu_part_data_d));//(sizeof(float4) + sizeof(float4)); // 2048 bytes when TILE_J=64
+  const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * (sizeof(struct gpu_part_data_d));
 
   cuda_kernel_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
       d_parts_send, d_parts_recv, d_a, d_H,
@@ -97,7 +97,7 @@ void gpu_launch_gradient(
     const struct gpu_part_send_g* __restrict__ d_parts_send,
     struct gpu_part_recv_g*      __restrict__ d_parts_recv,
     const float d_a, const float d_H,
-    int num_blocks_x,
+    const int num_blocks_x,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim,
@@ -107,7 +107,7 @@ void gpu_launch_gradient(
    * global memory (one tile per thread) and stores it in shared memory before beginning to work on it for the
    * computations. We need to allocate two sets of tiles of shared memory as tile set 1 is used for pre-fetching
    * data while tile set 0 is used for computations on available data and vice-versa. */
-    const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_g);  // 3072 bytes when TILE_J=64
+    const size_t sh_mem = 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_part_data_g);
 
     cuda_kernel_gradient<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
@@ -132,7 +132,7 @@ void gpu_launch_force(
     const struct gpu_part_send_f* __restrict__ d_parts_send,
     struct gpu_part_recv_f*      __restrict__ d_parts_recv,
     const float d_a, const float d_H,
-    int num_blocks_x,
+    const int num_blocks_x,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int2* __restrict__ d_block_leaf_id,
     const double3 space_dim,

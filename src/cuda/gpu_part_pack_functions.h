@@ -50,8 +50,8 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_density(
   const int limit_max_h = 1;
 
   /* Get the depth limits (if any) */
-  const char min_depth = limit_max_h ? c->depth : 0;
-  const char max_depth = limit_min_h ? c->depth : CHAR_MAX;
+  const char min_depth = limit_max_h /*1*/ ? c->depth : 0;
+  const char max_depth = limit_min_h /*0*/? c->depth : CHAR_MAX;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /* Get the limits in h (if any) */
@@ -247,11 +247,6 @@ __attribute__((always_inline)) INLINE static void gpu_unpack_part_force(
  * @param c the #cell
  * @param parts_buffer the buffer to pack into
  * @param pack_ind the first free index in the buffer arrays to copy data into
- * @param shift periodic boundary shift
- * @param cjstart start index of cell cj's particles (which cell ci is to be
- * interacted with) in buffer
- * @param cjend end index of cell cj's particles (which cell ci is to be
- * interacted with) in buffer
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
     const struct cell *restrict c,
@@ -290,14 +285,9 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_density(
  * @brief Packs the cell particle data for gradient interactions into
  * the CPU-side buffers.
  *
- * @param ci the #cell
+ * @param c the #cell
  * @param parts_buffer the buffer to pack into
  * @param pack_ind the first free index in the buffer arrays to copy data into
- * @param shift periodic boundary shift
- * @param cjstart start index of cell cj's particles (which cell ci is to be
- * interacted with) in buffer
- * @param cjend end index of cell cj's particles (which cell ci is to be
- * interacted with) in buffer
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
     const struct cell *restrict c,
@@ -346,11 +336,6 @@ __attribute__((always_inline)) INLINE static void gpu_pack_part_gradient(
  * @param ci the #cell
  * @param parts_buffer the buffer to pack into
  * @param pack_ind the first free index in the buffer arrays to copy data into
- * @param shift periodic boundary shift
- * @param cjstart start index of cell cj's particles (which cell ci is to be
- * interacted with) in buffer
- * @param cjend end index of cell cj's particles (which cell ci is to be
- * interacted with) in buffer
  */
 __attribute__((always_inline)) INLINE static void gpu_pack_part_force(
     const struct cell *restrict ci,
