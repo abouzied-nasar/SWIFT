@@ -71,7 +71,7 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
    * However, if we have >50% unique cells out of all cells we hash through hashing can become inifeccient
    * The factor of 10 is overkill but gives us plenty of space*/
   /*TODO: */
-  size_t hash_size = params->pack_size * 10;
+  uintptr_t hash_size = params->pack_size * 10;
   md->hash_table.entry = calloc(hash_size, sizeof(struct hash_entry));
 
   /*This is used to tell each cell in a pair where it's index is in the uniquely sorted array*/
@@ -142,7 +142,7 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
   md->hash_table.count = 0;
   md->n_blocks_packed = 0;
 
-  for(int i = 0; i < md->hash_size; i++){
+  for(uintptr_t i = 0; i < md->hash_size; i++){
       md->hash_table.entry[i].occupied = 0;
       md->hash_table.entry[i].c = NULL;
       md->hash_table.entry[i].index = 0;
@@ -150,10 +150,12 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
   for(int i = 0; i < md->params.pack_size; i++){
     md->my_index[i].x = 0;
     md->my_index[i].y = 0;
+  }
+  for(int i = 0; i < md->params.leaf_buffer_size; i++){
     md->unique_start_end[i].x = 0;
     md->unique_start_end[i].y = 0;
   }
-  for(int i = 0; i < 2 * md->params.pack_size; i++){
+  for(int i = 0; i < 2 * md->params.leaf_buffer_size; i++){
     md->unique_cells[i] = NULL;
   }
 

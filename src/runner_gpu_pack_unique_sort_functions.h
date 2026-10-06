@@ -23,13 +23,13 @@
 
 
 /* Simple hash function for pointers */
-__attribute__((always_inline)) INLINE static int hash_func(const struct cell *ptr, const int hash_size) {
+__attribute__((always_inline)) INLINE static uintptr_t hash_func(const struct cell *ptr, const uintptr_t hash_size) {
     return ((uintptr_t)ptr) % hash_size;
 }
 
 /* Insert into hash table. No need for probing as we will
  * only store one cell in each index of hash table*/
-__attribute__((always_inline)) INLINE static void hash_insert(const struct cell *restrict c, const int unique_count, const int h_id, struct hash_entry * ht) {
+__attribute__((always_inline)) INLINE static void hash_insert(const struct cell *restrict c, const int unique_count, const uintptr_t h_id, struct hash_entry * ht) {
     ht[h_id].c = (struct cell*)c;
     /*This is where the cell will be located in the unique_cells array*/
     ht[h_id].index = unique_count;
@@ -43,8 +43,10 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 
   /*Get the hash using the cell's pointer address*/
   struct gpu_pack_metadata *md = &buf->md;
-  int h_id = hash_func(c, hash_size);
-  int start = h_id;
+  uintptr_t h_id = hash_func(c, hash_size);
+#ifdef SWIFT_DEBUG_CHECKS
+  uintptr_t start = h_id;
+#endif
   const int n_leaves_packed = md->n_leaves_packed;
   int unique_count = md->n_unique;
   /*Do a linear probe of hash table
@@ -68,13 +70,17 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
       }
       return;
     }
-    //Add one to the cells pointer after converting to int and hash again
+    /*Add one to the hash table index and continue linear probing */
     h_id = (h_id + 1) % hash_size;
+#ifdef SWIFT_DEBUG_CHECKS
     if(h_id == start)
         error("hash table full");
+#endif
   }
-  if(h_id > hash_size)
+#ifdef SWIFT_DEBUG_CHECKS
+  if(h_id >= hash_size)
       error("Ran over hash table");
+#endif
 
   /*unique_cells is different from hash table.
    * This is just an array to keep track of

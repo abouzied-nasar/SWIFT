@@ -148,6 +148,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
         const int nextCnt  = min(GPU_THREAD_BLOCK_SIZE, j_end - nextBase);
 
         /*Now issue pre-fetch for next data set*/
+        /*TODO MI: would it maybe make more sense to do this in 3 separate loops to keep memory access contiguous?*/
         for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
           const int gj = nextBase + t;
 		  __pipeline_memcpy_async(&s_x_y[nextBuf * GPU_THREAD_BLOCK_SIZE + t], &d_parts_send[gj].p_data.x_y, sizeof(double2));

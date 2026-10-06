@@ -34,6 +34,7 @@ extern "C" {
 #include "gpu_pack_params.h"
 #include <cuda_runtime.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /* Hash table entry. TODO: Move declaration to a separate file maybe?
  * Used to construct a hash table (array) to find unique cells */
@@ -66,7 +67,7 @@ struct gpu_pack_metadata {
   /*Hash table used to find unique cells*/
   struct hash_table{
     struct hash_entry * entry;
-    int capacity;
+    uintptr_t capacity;
     int count;
   } hash_table;
 
@@ -132,7 +133,7 @@ struct gpu_pack_metadata {
 
   /*Size of our hash table. Typically set to a multiple of pack sze to ensure
    * we do not over-fill the hash table keeping it efficient*/
-  int hash_size;
+  uintptr_t hash_size;
 
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Size of the send_part struct used */
