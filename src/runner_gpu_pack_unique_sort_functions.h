@@ -142,18 +142,16 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 /* @brief Check to see if the two leaf cells for the current leaf computation within our task are unique in our list of cell data to offload.
  * If they are unique, pack their particle data into the offload buffers
  *
- * @param c the cell's pointer
- * @param hash_size the size of our hash_table
  * @param ht struct containing all the information above
  * @param buf struct containing metadata for packing/unpacking
- * @param ij switch for checking ci when ij == 0 and cj when ij == 1
+ * @param cii and cjj leaf computation cells i and j, respectively
  * @param task_subtype What kind of task are we packing
  */
-__attribute__((always_inline)) INLINE static void gpu_pack_particles_in_unique_list(const struct runner *r,
-                                      const struct scheduler *s,
+__attribute__((always_inline)) INLINE static void gpu_pack_particles_in_unique_list(
                                       struct gpu_offload_data *restrict buf,
-                                      const char timer, const struct task * t, const struct cell *restrict cii,
-                                      const struct cell *restrict cjj, const enum task_subtypes task_subtype) {
+                                      const struct cell *restrict cii,
+                                      const struct cell *restrict cjj,
+                                      const enum task_subtypes task_subtype) {
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (cii == NULL) error("Got NULL cell ci?");

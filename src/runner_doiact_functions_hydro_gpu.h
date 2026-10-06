@@ -716,7 +716,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
      * If cells are already packed, keep track of where
      * they're packed (index). If not, pack and store their index as unique*/
     /* Note that this increments md->count_parts, md->count_parts_unique and md->n_leaves_packed */
-      gpu_pack_particles_in_unique_list(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
+      gpu_pack_particles_in_unique_list(buf, cii, cjj, t->subtype);
 
       /*Record packing time*/
       if(t->subtype == task_subtype_gpu_density){
