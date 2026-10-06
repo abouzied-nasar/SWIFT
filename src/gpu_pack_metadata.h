@@ -72,9 +72,10 @@ struct gpu_pack_metadata {
   } hash_table;
 
   /*Array to guide each leaf computation to it's cell's/s' index in the
-   * array of unique cells. my_index.x -> ci, my_index.y -> cj
+   * array of unique cells. leaf_cell_indices_in_unique_list.x -> ci,
+   * leaf_cell_indices_in_unique_list.y -> cj
    * For self computations, ci==cj*/
-  int2 *my_index;
+  int2 *leaf_cell_indices_in_unique_list;
 
   /*number of unique cells we find*/
   int n_unique;

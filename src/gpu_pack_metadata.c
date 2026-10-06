@@ -75,7 +75,7 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
   md->hash_table.entry = calloc(hash_size, sizeof(struct hash_entry));
 
   /*This is used to tell each cell in a pair where it's index is in the uniquely sorted array*/
-  md->my_index = (int2 *)malloc(sizeof(int2) * params->pack_size);
+  md->leaf_cell_indices_in_unique_list = (int2 *)malloc(sizeof(int2) * params->pack_size);
 
   md->task_list = (struct task **)malloc(pack_size * sizeof(struct task *));
   for (size_t i = 0; i < pack_size; i++) md->task_list[i] = NULL;
@@ -148,8 +148,8 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
       md->hash_table.entry[i].index = 0;
   }
   for(int i = 0; i < md->params.pack_size; i++){
-    md->my_index[i].x = 0;
-    md->my_index[i].y = 0;
+    md->leaf_cell_indices_in_unique_list[i].x = 0;
+    md->leaf_cell_indices_in_unique_list[i].y = 0;
   }
   for(int i = 0; i < md->params.leaf_buffer_size; i++){
     md->unique_start_end[i].x = 0;
@@ -186,7 +186,7 @@ void gpu_pack_metadata_free(struct gpu_pack_metadata *md) {
   free((void *)md->cj_leaves);
   free((void *)md->unique_cells);
   free((void *)md->unique_start_end);
-  free((void *)md->my_index);
+  free((void *)md->leaf_cell_indices_in_unique_list);
   free((void *)md->task_list);
   free((void *)md->task_first_packed_leaf);
   free((void *)md->task_last_packed_leaf);

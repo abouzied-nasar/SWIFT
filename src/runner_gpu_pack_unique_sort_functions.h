@@ -22,13 +22,22 @@
 #define RUNNER_GPU_PACK_UNIQUE_SORT_FUNCTIONS_H
 
 
-/* Simple hash function for pointers */
+/* @brief Simple hash function for pointers
+ *
+ * @param ptr a pointer to the cell we want to determine if we have already packed or not
+ * @param hash_size the size of our hash_table
+ */
 __attribute__((always_inline)) INLINE static uintptr_t hash_func(const struct cell *ptr, const uintptr_t hash_size) {
     return ((uintptr_t)ptr) % hash_size;
 }
 
-/* Insert into hash table. No need for probing as we will
- * only store one cell in each index of hash table*/
+/* @brief Insert the cell's pointer into hash table
+ *
+ * @param c the cell's pointer
+ * @param unique_count how many unique cells have we found so far
+ * @param h_id the index of the cell c in our hash table
+ * @param ht struct containing all the information above
+ */
 __attribute__((always_inline)) INLINE static void hash_insert(const struct cell *restrict c, const int unique_count, const uintptr_t h_id, struct hash_entry * ht) {
     ht[h_id].c = (struct cell*)c;
     /*This is where the cell will be located in the unique_cells array*/
@@ -36,7 +45,15 @@ __attribute__((always_inline)) INLINE static void hash_insert(const struct cell 
     ht[h_id].occupied = 1;
 }
 
-/* Lookup in hash table */
+/* @brief Lookup in hash table
+ *
+ * @param c the cell's pointer
+ * @param hash_size the size of our hash_table
+ * @param ht struct containing all the information above
+ * @param buf struct containing metadata for packing/unpacking
+ * @param ij switch for checking ci when ij == 0 and cj when ij == 1
+ * @param task_subtype What kind of task are we packing
+ */
 __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const struct cell *restrict c, const int hash_size,
         struct hash_entry *restrict ht, struct gpu_offload_data *restrict buf, const int ij,
         const enum task_subtypes task_subtype) {
@@ -49,9 +66,8 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 #endif
   const int n_leaves_packed = md->n_leaves_packed;
   int unique_count = md->n_unique;
-  /*Do a linear probe of hash table
-   * TODO: If this becomes a large overhead look into
-   * optimising the hashing*/
+  /*Do a linear probe of hash table. Not the most efficient method but fit for our purpose
+   * TODO: If this becomes a large overhead look into optimising the hashing but unlikely*/
   while(ht[h_id].occupied){
     /*If we already have a cell hashed to h_id.
      * Return it's index in the array of
@@ -61,31 +77,26 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
        * The hash_lookup returns it's position in the sorted list
        * (not in the hash table)*/
       /*Check if this is ci*/
-      if(ij == 0){
-        md->my_index[n_leaves_packed].x = ht[h_id].index;
+      if(ij == 0 /*Flag for when we work on ci ij = 0*/){
+        md->leaf_cell_indices_in_unique_list[n_leaves_packed].x = ht[h_id].index;
       }
-      /*cell is cj*/
+      /*cell is cj ij = 1*/
       else{
-        md->my_index[n_leaves_packed].y = ht[h_id].index;
+        md->leaf_cell_indices_in_unique_list[n_leaves_packed].y = ht[h_id].index;
       }
       return;
     }
-    /*Add one to the hash table index and continue linear probing */
+    /*Check if the next hash table index is free*/
     h_id = (h_id + 1) % hash_size;
 #ifdef SWIFT_DEBUG_CHECKS
     if(h_id == start)
         error("hash table full");
 #endif
   }
-#ifdef SWIFT_DEBUG_CHECKS
-  if(h_id >= hash_size)
-      error("Ran over hash table");
-#endif
 
-  /*unique_cells is different from hash table.
-   * This is just an array to keep track of
-   * unique cells. Used for debugging but no longer necessary
-   * TODO: Remove unique_cells if no longer needed*/
+  /* Keep track of unique cells in md:
+   * Makes sense to have a separate copy for readability when finalising
+   * the packing before we offload*/
   md->unique_cells[unique_count] = (struct cell *)c;
   md->hash_table.count++;
   int c_count = c->hydro.count;
@@ -98,32 +109,29 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
     /*This cell has not been found yet.
      * Add to unique_cells and store it's index ascending
      * from index where we last inserted a unique cell*/
-    md->my_index[n_leaves_packed].x = unique_count;
-    /*Now pack the particles since this cell is unique*/
-    if(task_subtype == task_subtype_gpu_density)
-      gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
-    else if(task_subtype == task_subtype_gpu_gradient)
-      gpu_pack_part_gradient(c, buf->parts_send_g, md->count_parts_unique);
-    else if(task_subtype == task_subtype_gpu_force)
-      gpu_pack_part_force(c, buf->parts_send_f, md->count_parts_unique);
-    /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
-    md->count_parts_unique += c_count + 1;
+    md->leaf_cell_indices_in_unique_list[n_leaves_packed].x = unique_count;
   }
   else{ /*This is cj and it is unique*/
     /*This cell has not been found yet.
      * Add to unique_cells and store it's index ascending
      * from index where we last inserted a unique cell*/
-    md->my_index[n_leaves_packed].y = unique_count;
-    /*Now pack the particles since this cell is unique*/
-    if(task_subtype == task_subtype_gpu_density)
-      gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
-    else if(task_subtype == task_subtype_gpu_gradient)
-      gpu_pack_part_gradient(c, buf->parts_send_g, md->count_parts_unique);
-    else if(task_subtype == task_subtype_gpu_force)
-      gpu_pack_part_force(c, buf->parts_send_f, md->count_parts_unique);
-    /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
-    md->count_parts_unique += c_count + 1;
+    md->leaf_cell_indices_in_unique_list[n_leaves_packed].y = unique_count;
   }
+
+  /*Now pack the particles since this cell is unique*/
+  if(task_subtype == task_subtype_gpu_density)
+    gpu_pack_part_density(c, buf->parts_send_d, md->count_parts_unique);
+  else if(task_subtype == task_subtype_gpu_gradient)
+    gpu_pack_part_gradient(c, buf->parts_send_g, md->count_parts_unique);
+  else if(task_subtype == task_subtype_gpu_force)
+    gpu_pack_part_force(c, buf->parts_send_f, md->count_parts_unique);
+#ifdef SWIFT_DEBUG_CHECKS
+  else
+    error("Unknown task subtype %s", subtaskID_names[task_subtype]);
+#endif
+
+  /*Add one as we have packed the cells position in index count_parts_unique + cii_count*/
+  md->count_parts_unique += c_count + 1;
 
   /*Store pointers for this unique cell, update it's unique index in array of unique cells*/
   hash_insert(c, unique_count, h_id, ht);
@@ -131,7 +139,17 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 
 }
 
-__attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_list(const struct runner *r,
+/* @brief Check to see if the two leaf cells for the current leaf computation within our task are unique in our list of cell data to offload.
+ * If they are unique, pack their particle data into the offload buffers
+ *
+ * @param c the cell's pointer
+ * @param hash_size the size of our hash_table
+ * @param ht struct containing all the information above
+ * @param buf struct containing metadata for packing/unpacking
+ * @param ij switch for checking ci when ij == 0 and cj when ij == 1
+ * @param task_subtype What kind of task are we packing
+ */
+__attribute__((always_inline)) INLINE static void gpu_pack_particles_in_unique_list(const struct runner *r,
                                       const struct scheduler *s,
                                       struct gpu_offload_data *restrict buf,
                                       const char timer, const struct task * t, const struct cell *restrict cii,

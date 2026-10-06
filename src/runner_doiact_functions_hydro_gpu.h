@@ -454,8 +454,8 @@ __attribute__((always_inline)) INLINE static void finalise_gpu_metadata(
   const struct gpu_pack_metadata *md = &buf->md;
   struct gpu_md *gpu_md = &buf->gpu_md;
   for(int i = 0; i < md->n_leaves_packed; i++){
-	  int index_i = md->my_index[i].x;
-	  int index_j = md->my_index[i].y;
+	  int index_i = md->leaf_cell_indices_in_unique_list[i].x;
+	  int index_j = md->leaf_cell_indices_in_unique_list[i].y;
 	  gpu_md->cell_i_j_start_end[i].x = md->unique_start_end[index_i].x;
 	  gpu_md->cell_i_j_start_end[i].y = md->unique_start_end[index_i].y;
 	  gpu_md->cell_i_j_start_end[i].z = md->unique_start_end[index_j].x;
@@ -716,7 +716,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
      * If cells are already packed, keep track of where
      * they're packed (index). If not, pack and store their index as unique*/
     /* Note that this increments md->count_parts, md->count_parts_unique and md->n_leaves_packed */
-      pack_cell_particles_in_unique_list(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
+      gpu_pack_particles_in_unique_list(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
 
       /*Record packing time*/
       if(t->subtype == task_subtype_gpu_density){
