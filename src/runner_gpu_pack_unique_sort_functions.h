@@ -34,7 +34,7 @@ __attribute__((always_inline)) INLINE static uintptr_t hash_func(const struct ce
 /* @brief Insert the cell's pointer into hash table
  *
  * @param c the cell's pointer
- * @param unique_count how many unique cells have we found so far
+ * @param unique_count how many unique cells have we listed so far
  * @param h_id the index of the cell c in our hash table
  * @param ht struct containing all the information above
  */
@@ -106,13 +106,13 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
   md->unique_start_end[unique_count].y = md->count_parts_unique + c_count + 1;
 
   if(ij == 0){ /*This is ci and it is unique*/
-    /*This cell has not been found yet.
+    /*This cell has not been listed yet.
      * Add to unique_cells and store it's index ascending
      * from index where we last inserted a unique cell*/
     md->leaf_cell_indices_in_unique_list[n_leaves_packed].x = unique_count;
   }
   else{ /*This is cj and it is unique*/
-    /*This cell has not been found yet.
+    /*This cell has not been listed yet.
      * Add to unique_cells and store it's index ascending
      * from index where we last inserted a unique cell*/
     md->leaf_cell_indices_in_unique_list[n_leaves_packed].y = unique_count;
@@ -215,15 +215,13 @@ __attribute__((always_inline)) INLINE static void gpu_pack_particles_in_unique_l
 	  error("exceeded n_block_max due to insufficient gpu_part_buffer_size. Increase gpu_part_buffer_size in your *.yml file");
   ///////////////////////////////////////////////////////////////////////
 
-  /*Get a pointer to the full hash table and it's size
-   * TODO: Make this a dynamically sized hash table
-   * to use load factor to resize so that it is only ever 50% full*/
+  /*Get a pointer to the full hash table and it's size */
   struct hash_entry * ht = md->hash_table.entry;
   const int hash_size = md->hash_size;
 
-  /*Check if ci has already been found.
+  /*Check if ci has already been listed.
    * If so, return where it's unique copy
-   * is found in the hash table
+   * is listed in the hash table
    * Otherwise, add cell to hash table*/
   /*Flag that we're testing ci*/
   int ij = 0;
