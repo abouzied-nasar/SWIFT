@@ -303,7 +303,7 @@ void *runner_main_cuda(void *data) {
         double shift[3];
         int sid = space_getsid_but_not_swap_cells(e->s, &ci_temp, &cj_temp, shift);
         if(sid == 0 || sid == 2 || sid == 6 || sid == 8)
-        	corner_pair_task = 1;
+        	corner_pair_task = 0;
       }
 
 #ifdef SWIFT_DEBUG_CHECKS

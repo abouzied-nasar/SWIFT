@@ -466,16 +466,19 @@ __device__ __forceinline__ void neighbour_interactions_density_j_parallel(
     __syncthreads();
   }
 }
-#ifndef TARGET_BLOCK_LIMIT
-#define TARGET_BLOCK_LIMIT 4
+/*minimum number of blocks to use target-parallel implementation*/
+#ifndef MIN_TARGET_BLOCKS
+#define MIN_TARGET_BLOCKS 4
 #endif
 
+/*minimum number of blocks to use source-parallel implementation*/
 #ifndef MIN_SOURCE_BLOCKS
 #define MIN_SOURCE_BLOCKS 4
 #endif
 
+/*minimum cell particle count ratio to use source-parallel implementation*/
 #ifndef DENSITY_CELL_COUNT_RATIO
-#define DENSITY_CELL_COUNT_RATIO 8
+#define DENSITY_CELL_COUNT_RATIO 32
 #endif
 
 __global__ void cuda_kernel_density(
@@ -484,6 +487,8 @@ __global__ void cuda_kernel_density(
 	const int4 *__restrict__ d_cell_i_j_start_end,
     const int2 *__restrict__ d_block_leaf_id, const double3 space_dim,const int tester_param) {
 
+  /* Grab handles for path decision making parameters*/
+  const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param), min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
   /* Figure out which range of particles this block will work on. */
   const int bid = blockIdx.x;
   /* What is the leaf computation this block will work on? */
@@ -518,8 +523,8 @@ __global__ void cuda_kernel_density(
 
   /* d_block_leaf_id is constructed using max(ni, nj). Therefore,
    * b_id_local maps over the larger cell for either path if assymetric (ni >> nj or vice-versa). */
-  const bool ci_much_larger = ni >= tester_param * nj;
-  const bool cj_much_larger = nj >= tester_param * ni;
+  const bool ci_much_larger = ni >= min_count_ratio_for_source_parallel * nj;
+  const bool cj_much_larger = nj >= min_count_ratio_for_source_parallel * ni;
 
   /*How many CUDA blocks can ci and cj be split to?*/
   const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
@@ -529,11 +534,11 @@ __global__ void cuda_kernel_density(
    * a) ci is much larger. b) Using cj to parallelise work following standard "target" path will NOT create enough
    * blocks to be efficient. c) Using ci to parallelise following the "source" path will create enough blocks
    * to be efficient. If any condition is false, use source-parallel path.*/
-  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
-      ci_blocks >= MIN_SOURCE_BLOCKS;
-  /* Do the same for cj->ci */
-  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
-      cj_blocks >= MIN_SOURCE_BLOCKS;
+  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= min_blocks_for_target_parallel &&
+      ci_blocks >= min_blocks_for_source_parallel;
+  /* Do the same (but opposite) for cj->ci */
+  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= min_blocks_for_target_parallel &&
+      cj_blocks >= min_blocks_for_source_parallel;
 
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
@@ -1175,6 +1180,9 @@ __global__ void cuda_kernel_gradient(
     const float d_H, const int4 *__restrict__ d_cell_i_j_start_end,
     const int2 *__restrict__ d_block_leaf_id, const double3 space_dim, const int tester_param) {
 
+  /* Grab handles for path decision making parameters*/
+  const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param), min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
+
   /* Figure out which range of particles this block will work on. */
   const int bid = blockIdx.x;
   /* What is the leaf computation this block will work on? */
@@ -1210,8 +1218,8 @@ __global__ void cuda_kernel_gradient(
 
   /* d_block_leaf_id is constructed using max(ni, nj). Therefore,
    * b_id_local naturally maps over the larger cell for either path if assymetric (ni >> nj or vice-versa). */
-  const bool ci_much_larger = ni >= tester_param * nj;
-  const bool cj_much_larger = nj >= tester_param * ni;
+  const bool ci_much_larger = ni >= min_count_ratio_for_source_parallel * nj;
+  const bool cj_much_larger = nj >= min_count_ratio_for_source_parallel * ni;
 
   /*How many CUDA blocks can ci and cj be split to?*/
   const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
@@ -1221,11 +1229,11 @@ __global__ void cuda_kernel_gradient(
    * a) ci is much larger. b) Using cj to parallelise work following standard "target" path will NOT create enough
    * blocks to be efficient. c) Using ci to parallelise following the "source" path will create enough blocks
    * to be efficient. If any condition is false, use source-parallel path.*/
-  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
-      ci_blocks >= MIN_SOURCE_BLOCKS;
+  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= min_blocks_for_target_parallel &&
+      ci_blocks >= min_blocks_for_source_parallel;
    /* Do the same for cj->ci */
-  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
-      cj_blocks >= MIN_SOURCE_BLOCKS;
+  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= min_blocks_for_target_parallel &&
+      cj_blocks >= min_blocks_for_source_parallel;
 
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
@@ -2065,6 +2073,8 @@ __global__ void cuda_kernel_force(
 
   /*TODO: Refactor this as it is repeated in all kernels*/
   /*FROM HERE*************************************************************/
+  /* Grab handles for path decision making parameters*/
+  const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param), min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
   /* Figure out which range of particles this block will work on. */
   const int bid = blockIdx.x;
   /* What is the leaf computation this block will work on? */
@@ -2099,8 +2109,8 @@ __global__ void cuda_kernel_force(
 
   /* d_block_leaf_id is constructed using max(ni, nj). Therefore,
    * b_id_local naturally maps over the larger cell for either path if assymetric (ni >> nj or vice-versa). */
-  const bool ci_much_larger = ni >= tester_param * nj;
-  const bool cj_much_larger = nj >= tester_param * ni;
+  const bool ci_much_larger = ni >= min_count_ratio_for_source_parallel * nj;
+  const bool cj_much_larger = nj >= min_count_ratio_for_source_parallel * ni;
 
   /*How many CUDA blocks can ci and cj be split to?*/
   const int ci_blocks = (ni + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
@@ -2110,11 +2120,11 @@ __global__ void cuda_kernel_force(
    * a) ci is much larger. b) Using cj to parallelise work following standard "target" path will NOT create enough
    * blocks to be efficient. c) Using ci to parallelise following the "source" path will create enough blocks
    * to be efficient. If any condition is false, use source-parallel path.*/
-  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= TARGET_BLOCK_LIMIT &&
-      ci_blocks >= MIN_SOURCE_BLOCKS;
+  const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= min_blocks_for_target_parallel &&
+      ci_blocks >= min_blocks_for_source_parallel;
   /* Do the same for cj->ci */
-  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= TARGET_BLOCK_LIMIT &&
-      cj_blocks >= MIN_SOURCE_BLOCKS;
+  const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= min_blocks_for_target_parallel &&
+      cj_blocks >= min_blocks_for_source_parallel;
 
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
