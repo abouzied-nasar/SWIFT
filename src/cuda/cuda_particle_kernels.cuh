@@ -488,7 +488,7 @@ __global__ void cuda_kernel_density(
     const int2 *__restrict__ d_block_leaf_id, const double3 space_dim,const int tester_param) {
 
   /* Grab handles for path decision making parameters*/
-  const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param), min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
+  const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(MIN_SOURCE_BLOCKS), min_blocks_for_target_parallel(tester_param);
   /* Figure out which range of particles this block will work on. */
   const int bid = blockIdx.x;
   /* What is the leaf computation this block will work on? */
@@ -1181,7 +1181,7 @@ __global__ void cuda_kernel_gradient(
     const int2 *__restrict__ d_block_leaf_id, const double3 space_dim, const int tester_param) {
 
   /* Grab handles for path decision making parameters*/
-  const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param), min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
+  const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(MIN_SOURCE_BLOCKS), min_blocks_for_target_parallel(tester_param);
 
   /* Figure out which range of particles this block will work on. */
   const int bid = blockIdx.x;
@@ -2074,7 +2074,7 @@ __global__ void cuda_kernel_force(
   /*TODO: Refactor this as it is repeated in all kernels*/
   /*FROM HERE*************************************************************/
   /* Grab handles for path decision making parameters*/
-  const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param), min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
+  const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(MIN_SOURCE_BLOCKS), min_blocks_for_target_parallel(tester_param);
   /* Figure out which range of particles this block will work on. */
   const int bid = blockIdx.x;
   /* What is the leaf computation this block will work on? */
