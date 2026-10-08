@@ -123,14 +123,8 @@ __device__ __forceinline__ void neighbour_interactions_density(
       const int gj = base0 + t;
       __pipeline_memcpy_async(&s_x_y[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.x_y, sizeof(double2));
-    }
-    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
       __pipeline_memcpy_async(&s_z_h[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.z_h, sizeof(double2));
-    }
-    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
       __pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.vx_m, sizeof(float4));
     }
@@ -169,14 +163,8 @@ __device__ __forceinline__ void neighbour_interactions_density(
         const int gj = nextBase + t;
         __pipeline_memcpy_async(&s_x_y[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.x_y, sizeof(double2));
-      }
-      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
         __pipeline_memcpy_async(&s_z_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.z_h, sizeof(double2));
-      }
-      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
         __pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.vx_m, sizeof(float4));
       }
@@ -770,25 +758,13 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
       const int gj = base0 + t;
       __pipeline_memcpy_async(&s_x_y[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.x_y, sizeof(double2));
-    }
-    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
       __pipeline_memcpy_async(&s_z_h[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.z_h, sizeof(double2));
-    }
-    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
       __pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.vx_m, sizeof(float4));
-    }
-    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
       __pipeline_memcpy_async(
           &s_u_rho_c_aviscmax[0 * GPU_THREAD_BLOCK_SIZE + t],
           &d_parts_send[gj].p_data.u_rho_c_aviscmax, sizeof(float4));
-    }
-    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
       __pipeline_memcpy_async(&s_avisc_vsig[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.avisc_vsig,
                               sizeof(float4));
@@ -827,25 +803,13 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
         const int gj = nextBase + t;
         __pipeline_memcpy_async(&s_x_y[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.x_y, sizeof(double2));
-      }
-      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
         __pipeline_memcpy_async(&s_z_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.z_h, sizeof(double2));
-      }
-      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
         __pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.vx_m, sizeof(float4));
-      }
-      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
         __pipeline_memcpy_async(
             &s_u_rho_c_aviscmax[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
             &d_parts_send[gj].p_data.u_rho_c_aviscmax, sizeof(float4));
-      }
-      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
         __pipeline_memcpy_async(
             &s_avisc_vsig[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
             &d_parts_send[gj].p_data.avisc_vsig, sizeof(float4));
@@ -1518,31 +1482,16 @@ __device__ __forceinline__ void neighbour_interactions_force(
       const int gj = base0 + t;
       __pipeline_memcpy_async(&s_x_y[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.x_y, sizeof(double2));
-    }
-    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
       __pipeline_memcpy_async(&s_z_h[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.z_h, sizeof(double2));
-    }
-    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
       __pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.vx_m, sizeof(float4));
-    }
-    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
       __pipeline_memcpy_async(&s_u_r_f_p[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.u_rho_f_p,
                               sizeof(float4));
-    }
-    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
       __pipeline_memcpy_async(&s_b_c_av_ad[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.bals_c_avisc_adiff,
                               sizeof(float4));
-    }
-    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
       __pipeline_memcpy_async(&s_tb_min_ngb_tb[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.timebin_minngbtimebin,
                               sizeof(int2));
@@ -1581,31 +1530,16 @@ __device__ __forceinline__ void neighbour_interactions_force(
         const int gj = nextBase + t;
         __pipeline_memcpy_async(&s_x_y[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.x_y, sizeof(double2));
-      }
-      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
         __pipeline_memcpy_async(&s_z_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.z_h, sizeof(double2));
-      }
-      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
         __pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.vx_m, sizeof(float4));
-      }
-      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
         __pipeline_memcpy_async(&s_u_r_f_p[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.u_rho_f_p,
                                 sizeof(float4));
-      }
-      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
         __pipeline_memcpy_async(
             &s_b_c_av_ad[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
             &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
-      }
-      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
         __pipeline_memcpy_async(
             &s_tb_min_ngb_tb[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
             &d_parts_send[gj].p_data.timebin_minngbtimebin, sizeof(int2));
