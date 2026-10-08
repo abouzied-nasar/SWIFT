@@ -513,6 +513,8 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
 	  /*Save the id of the first block acting on this leaf comp.
 	   * Needed for indexing in kernel*/
 	  gpu_md->block_leaf_id[n_blocks_packed + b].y = n_blocks_packed;
+      gpu_md->block_leaf_id[n_blocks_packed + b].z = t->corner_pair_task;
+      gpu_md->block_leaf_id[n_blocks_packed + b].w = 0;
   }
 
   /* Check to see we've not somehow gone over the number of blocks we allocated */
@@ -614,7 +616,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   cu_error =
       cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id[0],
           &buf->gpu_md.block_leaf_id[0],
-          md->n_blocks_packed * sizeof(int2),
+          md->n_blocks_packed * sizeof(int4),
           cudaMemcpyHostToDevice, stream[0]);
 
   /*Get the number of cuda blocks we need to launch. No need for calculation here as

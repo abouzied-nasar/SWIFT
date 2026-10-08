@@ -305,6 +305,9 @@ struct task {
   /* Total time spent running this task */
   ticks total_ticks;
 
+  /*Set to 1 if the current task is a corner task. Set to zero otherwise*/
+  int corner_pair_task;
+
 #ifdef SWIFT_DEBUG_CHECKS
   /* When was this task last run? */
   integertime_t ti_run;

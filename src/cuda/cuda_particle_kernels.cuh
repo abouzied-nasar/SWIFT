@@ -485,7 +485,7 @@ __global__ void cuda_kernel_density(
     const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv,
 	const int4 *__restrict__ d_cell_i_j_start_end,
-    const int2 *__restrict__ d_block_leaf_id, const double3 space_dim,const int tester_param) {
+    const int4 *__restrict__ d_block_leaf_id, const double3 space_dim,const int tester_param) {
 
   /* Grab handles for path decision making parameters*/
   const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(MIN_SOURCE_BLOCKS), min_blocks_for_target_parallel(tester_param);
@@ -1178,7 +1178,7 @@ __global__ void cuda_kernel_gradient(
     const struct gpu_part_send_g *__restrict__ d_parts_send,
     struct gpu_part_recv_g *__restrict__ d_parts_recv, const float d_a,
     const float d_H, const int4 *__restrict__ d_cell_i_j_start_end,
-    const int2 *__restrict__ d_block_leaf_id, const double3 space_dim, const int tester_param) {
+    const int4 *__restrict__ d_block_leaf_id, const double3 space_dim, const int tester_param) {
 
   /* Grab handles for path decision making parameters*/
   const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(MIN_SOURCE_BLOCKS), min_blocks_for_target_parallel(tester_param);
@@ -1191,6 +1191,7 @@ __global__ void cuda_kernel_gradient(
    * know where in the group of blocks acting on a cell we are. bid_0 is the id
    * of the first block acting on this cell*/
   const int bid_0 = d_block_leaf_id[bid].y;
+  const int corner_computation = d_block_leaf_id[bid].z;
 
   /* Get the start and end positions of cells i and j. */
   const int4 cell_se = d_cell_i_j_start_end[leafid];
@@ -1230,10 +1231,10 @@ __global__ void cuda_kernel_gradient(
    * blocks to be efficient. c) Using ci to parallelise following the "source" path will create enough blocks
    * to be efficient. If any condition is false, use source-parallel path.*/
   const bool use_ci_source_parallel = ci_much_larger && cj_blocks <= min_blocks_for_target_parallel &&
-      ci_blocks >= min_blocks_for_source_parallel;
+      ci_blocks >= min_blocks_for_source_parallel && !corner_computation;
    /* Do the same for cj->ci */
   const bool use_cj_source_parallel = cj_much_larger && ci_blocks <= min_blocks_for_target_parallel &&
-      cj_blocks >= min_blocks_for_source_parallel;
+      cj_blocks >= min_blocks_for_source_parallel && !corner_computation;
 
   /* Get cell positions. The cell position is stored as the final entry in
    * each cell's packed particle range. */
@@ -2069,7 +2070,7 @@ __global__ void cuda_kernel_force(
     const struct gpu_part_send_f *__restrict__ d_parts_send,
     struct gpu_part_recv_f *__restrict__ d_parts_recv, const float d_a,
     const float d_H, const int4 *__restrict__ d_cell_i_j_start_end,
-    const int2 *__restrict__ d_block_leaf_id, const double3 space_dim, const int tester_param) {
+    const int4 *__restrict__ d_block_leaf_id, const double3 space_dim, const int tester_param) {
 
   /*TODO: Refactor this as it is repeated in all kernels*/
   /*FROM HERE*************************************************************/

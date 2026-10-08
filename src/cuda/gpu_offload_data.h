@@ -98,11 +98,13 @@ struct gpu_offload_data {
     int4 *d_cell_i_j_start_end;
     /*This array is used to tell each cuda block
      * which leaf computation it should work on and the id
-     * of the first cuda block which will work on this leaf computation*/
+     * of the first cuda block which will work on this leaf computation
+     * Entry z of block_leaf_id tells each block whether the cell it is working on is a pair task connected at the corner
+     * or not. Value of 0 means normal task, value of 1 means it is a corner task*/
     /*Host copy*/
-    int2 *block_leaf_id;
+    int4 *block_leaf_id;
     /*Device copy*/
-    int2 *d_block_leaf_id;
+    int4 *d_block_leaf_id;
   } gpu_md;
 
 #endif /* WITH_CUDA */
