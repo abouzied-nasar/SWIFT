@@ -468,17 +468,17 @@ __device__ __forceinline__ void neighbour_interactions_density_j_parallel(
 }
 /*minimum number of blocks to use target-parallel implementation*/
 #ifndef MIN_TARGET_BLOCKS
-#define MIN_TARGET_BLOCKS 4
+#define MIN_TARGET_BLOCKS 1
 #endif
 
 /*minimum number of blocks to use source-parallel implementation*/
 #ifndef MIN_SOURCE_BLOCKS
-#define MIN_SOURCE_BLOCKS 4
+#define MIN_SOURCE_BLOCKS 8
 #endif
 
 /*minimum cell particle count ratio to use source-parallel implementation*/
 #ifndef DENSITY_CELL_COUNT_RATIO
-#define DENSITY_CELL_COUNT_RATIO 32
+#define DENSITY_CELL_COUNT_RATIO 16
 #endif
 
 __global__ void cuda_kernel_density(

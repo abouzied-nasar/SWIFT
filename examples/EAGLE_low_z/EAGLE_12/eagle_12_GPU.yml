@@ -37,8 +37,8 @@ Snapshots:
 
 Scheduler:
   links_per_tasks:           500
-  gpu_pack_size:             1024      # (Conditional) How many leaf cells and pairs of leaf cells to pack for offloading. If running with GPU, this parameter is mandatory.
-  gpu_bundle_size:           1024       # (Conditional) How many leaf cells and pairs of leaf cells to pack into a bundle while offloading. `gpu_pack_size` total cells will be offloaded per cycle, in bundles of size `gpu_bundle_size`. When running with GPU, this parameter is mandatory.
+  gpu_pack_size:             2048      # (Conditional) How many leaf cells and pairs of leaf cells to pack for offloading. If running with GPU, this parameter is mandatory.
+  gpu_bundle_size:           2048       # (Conditional) How many leaf cells and pairs of leaf cells to pack into a bundle while offloading. `gpu_pack_size` total cells will be offloaded per cycle, in bundles of size `gpu_bundle_size`. When running with GPU, this parameter is mandatory.
   gpu_recursion_max_depth:   6         # (Optional) What is the maximal depth we can recurse down to from the task super level to the leaf cell levels? We need this information to estimate sufficient buffer space to allocate.
   gpu_part_buffer_size:      100000   # (Optional) Size for GPU particle buffer arrays. If not provided, will be guessed (probably badly.)
   gpu_tester_param:          8
@@ -64,7 +64,7 @@ Gravity:
   
 # Parameters for the hydrodynamics scheme
 SPH:
-  resolution_eta:        1.2348        # Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel).
+  resolution_eta:        2.01        # Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel).
   h_min_ratio:           0.1           # Minimal smoothing length in units of softening.
   h_max:                 0.5           # Maximal smoothing length in co-moving internal units.
   CFL_condition:         0.2           # Courant-Friedrich-Levy condition for time integration.

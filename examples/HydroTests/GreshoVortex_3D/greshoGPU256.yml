@@ -9,6 +9,7 @@ InternalUnitSystem:
 Scheduler:
   gpu_pack_size:             2048
   gpu_bundle_size:           2048
+  gpu_tester_param:          8
   gpu_recursion_max_depth:   4
   max_top_level_cells:       16  # Use 16 for 64^3 with replicate 2, 32 for replicate 4
   tasks_per_cell:            200
@@ -37,11 +38,11 @@ Statistics:
 
 # Parameters for the hydrodynamics scheme
 SPH:
-  resolution_eta:        1.9   # Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel).
+  resolution_eta:        2.01   # Target smoothing length in units of the mean inter-particle separation (1.2348 == 48Ngbs with the cubic spline kernel).
   CFL_condition:         0.1      # Courant-Friedrich-Levy condition for time integration.
   
 # Parameters related to the initial conditions
 InitialConditions:
   file_name:  greshoVortex.hdf5
   periodic:   1
-  replicate:  4     # assuming 64^3 base: 2=~2e6 particles, 4=~16e6 particles
+#  replicate:  2     # assuming 64^3 base: 2=~2e6 particles, 4=~16e6 particles
