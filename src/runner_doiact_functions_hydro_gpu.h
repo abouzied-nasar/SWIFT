@@ -321,6 +321,43 @@ static void runner_self_recurse_and_test_active(const struct runner *r,
 }
 
 /**
+ * @brief Atomically reserve a GPU task for CPU execution.
+ *
+ * A GPU task may only be moved to the CPU path if at least one other GPU task
+ * of the same type remains assigned to this queue. This guarantees that the
+ * CPU execution cannot consume the final GPU task needed to launch any packed
+ * leftovers held by this runner.
+ *
+ * The counter is decremented here when reservation is successful. The runner
+ * must not decrement it again after executing the task on the CPU.
+ *
+ * @param counter Pointer to the queue's gpu_tasks_left counter.
+ *
+ * @return 1 if the task was reserved for CPU execution, otherwise 0.
+ */
+__attribute__((always_inline)) INLINE static int
+runner_reserve_gpu_task_for_cpu(int *counter) {
+
+  int current_n_left =
+      __atomic_load_n(counter, __ATOMIC_ACQUIRE);
+
+  /* Only reserve this task for CPU execution if another GPU task is in the queue.
+   *
+   * This CAS races safely with GPU-task stealing, which modifies the same
+   * counter atomically. */
+  while (current_n_left > 1) {
+
+    const int new_n_left = current_n_left - 1;
+    if (__atomic_compare_exchange_n(
+            counter, &current_n_left, new_n_left,
+            /*weak=*/1, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE))
+      return 1;
+  }
+
+  return 0;
+}
+
+/**
  * @brief Decide if we will offload this time step.
  * Recurse through all local top level cells and see if we
  * have enough leaf level computations to offload.
@@ -498,41 +535,32 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
    * Each cell is split into count/BS chunks so that
    * multiple cuda blocks work on particles in each cell if cell is big enough*/
   const int n_blocks_packed = md->n_blocks_packed;
-  /*How many blocks will the current cell be split into*/
-//  int n_blocks_current;
-//  if(cii == cjj){
-//	  n_blocks_current = (cii_count + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-//  }else{/*This is a pair task need to take the max count of ci and cj*/
-	int n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-//  }
+
+  int n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+
+  const int n_blocks_max =
+      (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1) /
+      GPU_THREAD_BLOCK_SIZE;
+
+  if (n_blocks_packed + n_blocks_current > n_blocks_max)
+    error(
+        "Exceeded n_block_max "
+        "(gpu_part_buffer_size/GPU_THREAD_BLOCK_SIZE = %i). "
+        "n_blocks_current %i. n_blocks_packed %i. "
+        "Possibly due to cell(s) much larger than anticipated in a deep "
+        "hierarchy. Increasing gpu_part_buffer_size in the parameter file "
+        "could help.",
+        n_blocks_max, n_blocks_current, n_blocks_packed);
 
   /*Let the CUDA blocks know which parts of the data we send they need to work on*/
   for(int b = 0; b < n_blocks_current; b++){
-	  /*Which leaf computation will this block (n_blocks_packed + b) work on?*/
-	  gpu_md->block_leaf_id[n_blocks_packed + b].x = md->n_leaves_packed;
-	  /*Save the id of the first block acting on this leaf comp.
-	   * Needed for indexing in kernel*/
-	  gpu_md->block_leaf_id[n_blocks_packed + b].y = n_blocks_packed;
+      gpu_md->block_leaf_id[n_blocks_packed + b].x = md->n_leaves_packed;
+      gpu_md->block_leaf_id[n_blocks_packed + b].y = n_blocks_packed;
       gpu_md->block_leaf_id[n_blocks_packed + b].z = t->corner_pair_task;
       gpu_md->block_leaf_id[n_blocks_packed + b].w = 0;
   }
 
-  /* Check to see we've not somehow gone over the number of blocks we allocated */
-  /* TODO: Put in debug checks ifdef. Leave for now while dev'ing */
-  /* TODO: Implement a way to check for this before we offload. The condition should be:
-   * If: The next pack will exceed n_blocks_max, which also means that we exceed gpu_part_buffer_size
-   * Then: Offload what we have packed and re-start packing.*/
-  ///////////////////////////////////////////////////////////////////////
-  int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
   md->n_blocks_packed += n_blocks_current;
-  if(md->n_blocks_packed > n_blocks_max)
-	  error("Exceeded n_block_max (gpu_part_buffer_size/GPU_THREAD_BLOCK_SIZE = %i). "
-			  "n_blocks_current %i. n_blocks_packed %i. "
-			  "Possibly due to cell(s) much larger than anticipated in a  deep heirarchy. "
-			  "Increasing gpu_part_buffer_size in *.yml file could help", n_blocks_max,
-			  n_blocks_current, md->n_blocks_packed);
-  ///////////////////////////////////////////////////////////////////////
-
   /*Get a pointer to the full hash table and it's size
    * TODO: Make this a dynamically sized hash table
    * to use load factor to resize so that it is only ever 50% full*/
