@@ -437,53 +437,94 @@ void *runner_main_cuda(void *data) {
           /* GPU WORK */
           else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
-          const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density],
-        	      __ATOMIC_RELAXED);
-          if(offload && (!corner_pair_task || tasks_left == 1)){
-//          if(offload){
-            runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_dens, t,
-                                      stream, d_a, d_H);
-            task_offloaded = 1;
-          }else{
-            runner_dosub_pair1_density(r, ci, cj, /*below_h_max=*/0, 0);
-            int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) -
-                1;
+            if (offload) {
+              /* Non-corner tasks always use the GPU.
+               * A corner task may use the CPU only if we can atomically reserve it
+               * without consuming the final GPU task assigned to this queue. */
+              const int run_on_cpu = corner_pair_task &&
+                  runner_reserve_gpu_task_for_cpu(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]);
+
+              if (!run_on_cpu) {
+                runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_dens, t, stream, d_a, d_H);
+                task_offloaded = 1;
+              } else {
+                /* The GPU-task counter was already decremented by
+                 * runner_reserve_gpu_task_for_cpu(). */
+                runner_dosub_pair1_density(r, ci, cj, /*below_h_max=*/0, 0);
+              }
+
+            } else {
+              runner_dosub_pair1_density(r, ci, cj, /*below_h_max=*/0, 0);
+              const int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density]) - 1;
+
+            #ifdef SWIFT_DEBUG_CHECKS
+              if (count < 0)
+                error("Negative density GPU-task counter for queue %d: %d",
+                      qid, count);
+            #endif
+
               if (count < 1) gpu_buf_dens.md.launch_leftovers = 1;
-          }
+            }
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-          const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient],
-        		  __ATOMIC_RELAXED);
-          if(offload && (!corner_pair_task || tasks_left == 1)){
-//          if(offload){
-            runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_grad, t,
-                                       stream, d_a, d_H);
-            task_offloaded = 1;
-          }else{
+            if (offload) {
+
+              const int run_on_cpu = corner_pair_task &&
+                  runner_reserve_gpu_task_for_cpu(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]);
+              if (!run_on_cpu) {
+                runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_grad, t, stream, d_a, d_H);
+                task_offloaded = 1;
+              } else {
+                /* The GPU-task counter was already decremented by
+                 * runner_reserve_gpu_task_for_cpu().*/
 #ifdef EXTRA_HYDRO_LOOP_TYPE2
-            runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 0);
+                runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 0);
 #else
-            runner_dosub_pair1_gradient(r, ci, cj, /*below_h_max=*/0, 0);
-#endif  // EXTRA_HYDRO_LOOP_TYPE2
-            int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) -
-                1;
+                runner_dosub_pair1_gradient(r, ci, cj, /*below_h_max=*/0, 0);
+#endif
+              }
+
+            } else {
+
+#ifdef EXTRA_HYDRO_LOOP_TYPE2
+              runner_dosub_pair2_gradient(r, ci, cj, /*below_h_max=*/0, 0);
+#else
+              runner_dosub_pair1_gradient(r, ci, cj, /*below_h_max=*/0, 0);
+#endif
+
+              const int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient]) - 1;
+#ifdef SWIFT_DEBUG_CHECKS
+              if (count < 0)
+                error("Negative gradient GPU-task counter for queue %d: %d",
+                      qid, count);
+#endif
               if (count < 1) gpu_buf_grad.md.launch_leftovers = 1;
-          }
+            }
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-            const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force],
-                   __ATOMIC_RELAXED);
-            if(offload && (!corner_pair_task || tasks_left == 1)){
-//            if(offload){
-              runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_forc, t, stream,
-                  d_a, d_H);
-              task_offloaded = 1;
-            }else{
+            if (offload) {
+
+              const int run_on_cpu = corner_pair_task && runner_reserve_gpu_task_for_cpu(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]);
+              if (!run_on_cpu) {
+
+                runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_forc, t, stream, d_a, d_H);
+                task_offloaded = 1;
+              } else {
+                /* The GPU-task counter was already decremented by
+                 * runner_reserve_gpu_task_for_cpu().*/
+                runner_dosub_pair2_force(r, ci, cj, /*below_h_max=*/0, 0);
+              }
+            } else {
+
               runner_dosub_pair2_force(r, ci, cj, /*below_h_max=*/0, 0);
-              int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) -
-                  1;
+              const int count = atomic_dec(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force]) - 1;
+            #ifdef SWIFT_DEBUG_CHECKS
+              if (count < 0)
+                error("Negative force GPU-task counter for queue %d: %d",
+                      qid, count);
+            #endif
               if (count < 1) gpu_buf_forc.md.launch_leftovers = 1;
             }
 #endif
