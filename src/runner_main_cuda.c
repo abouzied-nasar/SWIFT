@@ -437,10 +437,10 @@ void *runner_main_cuda(void *data) {
           /* GPU WORK */
           else if (t->subtype == task_subtype_gpu_density) {
 #ifdef GPUOFFLOAD_DENSITY
-//          const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density],
-//        	      __ATOMIC_RELAXED);
-//          if(offload && (!corner_pair_task || tasks_left == 1)){
-          if(offload){
+          const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_density],
+        	      __ATOMIC_RELAXED);
+          if(offload && (!corner_pair_task || tasks_left == 1)){
+//          if(offload){
             runner_dopair_gpu_density(r, sched, ci, cj, &gpu_buf_dens, t,
                                       stream, d_a, d_H);
             task_offloaded = 1;
@@ -453,10 +453,10 @@ void *runner_main_cuda(void *data) {
 #endif
           } else if (t->subtype == task_subtype_gpu_gradient) {
 #ifdef GPUOFFLOAD_GRADIENT
-//          const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient],
-//        		  __ATOMIC_RELAXED);
-//          if(offload && (!corner_pair_task || tasks_left == 1)){
-          if(offload){
+          const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_gradient],
+        		  __ATOMIC_RELAXED);
+          if(offload && (!corner_pair_task || tasks_left == 1)){
+//          if(offload){
             runner_dopair_gpu_gradient(r, sched, ci, cj, &gpu_buf_grad, t,
                                        stream, d_a, d_H);
             task_offloaded = 1;
@@ -473,10 +473,10 @@ void *runner_main_cuda(void *data) {
 #endif
           } else if (t->subtype == task_subtype_gpu_force) {
 #ifdef GPUOFFLOAD_FORCE
-//            const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force],
-//                   __ATOMIC_RELAXED);
-//            if(offload && (!corner_pair_task || tasks_left == 1)){
-            if(offload){
+            const int tasks_left = __atomic_load_n(&sched->queues[qid].gpu_tasks_left[gpu_task_type_hydro_force],
+                   __ATOMIC_RELAXED);
+            if(offload && (!corner_pair_task || tasks_left == 1)){
+//            if(offload){
               runner_dopair_gpu_force(r, sched, ci, cj, &gpu_buf_forc, t, stream,
                   d_a, d_H);
               task_offloaded = 1;
