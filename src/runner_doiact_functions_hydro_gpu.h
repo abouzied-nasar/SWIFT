@@ -538,9 +538,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
 
   int n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
 
-  const int n_blocks_max =
-      (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1) /
-      GPU_THREAD_BLOCK_SIZE;
+  const int n_blocks_max = md->params.cuda_blockid_buffer_size;
 
   if (n_blocks_packed + n_blocks_current > n_blocks_max)
     error(
@@ -630,6 +628,19 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   /* initialise to just some meaningless value to silence the compiler */
   cudaError_t cu_error = cudaErrorMemoryAllocation;
 
+  /*Check that something hasn't gone terribly wrong and we've somehow run over our buffer sizes for metadata*/
+  if (leaves_packed > md->params.cell_start_end_buffer_size)
+    error(
+        "Attempting to launch with more cell metadata entries than allocated. "
+        "leaves_packed=%d capacity=%d task_subtype=%s cpuid=%d",
+        leaves_packed, md->params.cell_start_end_buffer_size,
+        subtaskID_names[task_subtype], r->cpuid);
+  if (md->n_blocks_packed > md->params.cuda_blockid_buffer_size)
+    error(
+        "Attempting to launch with more CUDA block metadata entries than "
+        "allocated. n_blocks_packed=%d capacity=%d task_subtype=%s cpuid=%d",
+        md->n_blocks_packed, md->params.cuda_blockid_buffer_size,
+        subtaskID_names[task_subtype], r->cpuid);
   /*Copy the tasks' metadata to the GPU. Send it using stream[0] for now. N.B. this is not default stream ;).
    * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
    * NOTE: This could be removed outside conditionals since it's name, type and size are the same
@@ -640,12 +651,29 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
           leaves_packed * sizeof(int4),
           cudaMemcpyHostToDevice, stream[0]);
 
+  if (cu_error != cudaSuccess)
+    error(
+        "CUDA cell metadata copy failed: CUDA error '%s' for task_subtype %s: "
+        "cpuid=%i leaves_packed=%i capacity=%i",
+        cudaGetErrorString(cu_error), subtaskID_names[task_subtype],
+        r->cpuid, leaves_packed,
+        md->params.cell_start_end_buffer_size);
+
   /*Copy the metadata to GPU telling each cuda block what sections of the unique particle data to work on.*/
   cu_error =
       cudaMemcpyAsync(&buf->gpu_md.d_block_leaf_id[0],
           &buf->gpu_md.block_leaf_id[0],
           md->n_blocks_packed * sizeof(int4),
           cudaMemcpyHostToDevice, stream[0]);
+
+  if (cu_error != cudaSuccess)
+    error(
+        "CUDA block metadata copy failed: CUDA error '%s' for task_subtype %s: "
+        "cpuid=%i n_blocks_packed=%i capacity=%i copy_size=%zu",
+        cudaGetErrorString(cu_error), subtaskID_names[task_subtype],
+        r->cpuid, md->n_blocks_packed,
+        md->params.cuda_blockid_buffer_size,
+        (size_t)md->n_blocks_packed * sizeof(int4));
 
   /*Get the number of cuda blocks we need to launch. No need for calculation here as
    * this is calculated while we pack*/
@@ -949,6 +977,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   struct gpu_pack_metadata *md = &buf->md;
   int *task_first_packed_leaf = md->task_first_packed_leaf;
   int *task_last_packed_leaf = md->task_last_packed_leaf;
+
   /* Should we early exit? */
   if ((md->task_n_leaves == 0) &&
       (!md->launch_leftovers ||
@@ -971,6 +1000,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     /* This could be benign if I failed to account for some weird scenario, but
      * an active self task should have at least one active self cell to do work
      * on. */
+
     if (t->type == task_type_self)
       error("Found active self task with zero interactions.");
 #endif
@@ -997,6 +1027,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 #ifdef SWIFT_DEBUG_CHECKS
   /* Check whether we'll be writing out of bounds. Allow for the special case
    * where we find a task with zero leaf cell pair interactions */
+
   if (tind > md->params.pack_size ||
       ((tind == md->params.pack_size && md->task_n_leaves != 0)))
     error(
@@ -1006,11 +1037,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         md->task_n_leaves);
 #endif
 
-  /*TODO: Note: This was md->n_leaves not md->n_leaves_packed, come back to this after
-   * editing the function to follow unique sorting algo*/
   /* Keep track of index of first leaf cell pairs in lists per super-level pair
    * task in case we are packing more than one super-level task into this
    * buffer. */
+
   task_first_packed_leaf[tind] = md->n_leaves_packed;
   /* Same for the first particle index in particle buffers */
   md->task_first_packed_part[tind] = md->count_parts;
@@ -1028,33 +1058,36 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   if (md->n_leaves_packed != md->n_leaves)
     error("Found leaf_pairs_packed=%d and n_leaves=%d", md->n_leaves_packed,
           md->n_leaves);
+
 #endif
 
   /* Update the total number of leaf interactions we found through the
    * recursion. */
+
   md->n_leaves += md->task_n_leaves;
 
   /* How many leaf cell interactions do we want to offload at once? */
   const int target_n_leaves = md->params.pack_size;
 
-  /* Counter for how many leaf cells of this task we've packed */
+  /* Maximum number of block metadata entries that can be held by one
+   * offload buffer */
+  const int n_blocks_max = md->params.cuda_blockid_buffer_size;
+
+  /* Number of leaves from the current task processed so far. */
   int npacked = 0;
 
   /* Is this task's cell data currently unlocked? It comes in locked, but we
    * may unlock it during the offloading. */
+
   char unlocked = 0;
 
   /* Do we have a task with no active cells, but are launching leftovers? */
   char launch_empty_task_leftovers =
       (md->task_n_leaves == 0) && md->launch_leftovers;
 
-  /* Now we go on to pack the particle data into the buffers. If we find enough
-   * data (leaf cell pairs) for an offload, we launch. If there are leaf cell
-   * pairs to pack after the launch, we pack those too after the launch and
-   * unpacking is complete. By the end, all data will have been packed and some
-   * of it (possibly all of it) will have been solved on the GPU already. */
-
-  while ((npacked < md->task_n_leaves) || launch_empty_task_leftovers){
+  /* Pack and launch until every leaf interaction belonging to this task has
+   * been processed */
+  while ((npacked < md->task_n_leaves) || launch_empty_task_leftovers) {
 
     /* We only need this for the first entry into the main loop. */
     launch_empty_task_leftovers = 0;
@@ -1064,97 +1097,160 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
      * afterwards, so read the correct up-to-date task index here each time. */
     tind = md->tasks_in_list - 1;
 
-    /* Lock this task's cell data. */
+    /* Re-acquire the task locks if they were released for the previous GPU
+     * launch */
     if (unlocked) {
       /* Spin until you get the lock. */
       while (task_lock(t) != 1) {
       };
+
       unlocked = 0;
     }
 
+    /* Set when the current leaf fits in an empty buffer but does not fit in
+     * the partially filled buffer. In that case, launch the existing batch
+     * and retry the same leaf after the buffers have been reset */
+    char launch_before_over_filling = 0;
+
+    if (md->task_n_leaves > 0) {
+
 #ifdef SWIFT_DEBUG_CHECKS
-    if (md->n_leaves_packed >= md->params.leaf_buffer_size)
-      error("Writing out of ci_leaves array bounds: %d/%d", md->n_leaves_packed,
-            md->params.leaf_buffer_size);
+      if (md->n_leaves_packed >= md->params.leaf_buffer_size)
+        error(
+            "Writing out of ci_leaves array bounds: %d/%d",
+            md->n_leaves_packed, md->params.leaf_buffer_size);
 #endif
 
-    /* Grab handles. */
-    struct cell *cii = md->ci_leaves[md->n_leaves_packed];
-    struct cell *cjj = md->cj_leaves[md->n_leaves_packed];
+      /* Grab handles. */
+      struct cell *cii = md->ci_leaves[md->n_leaves_packed];
+      struct cell *cjj = md->cj_leaves[md->n_leaves_packed];
 
-    char launch_before_over_filling = 0;
-    if (md->task_n_leaves > 0) {
 #ifdef SWIFT_DEBUG_CHECKS
+      if (cii == NULL)
+        error(
+            "Found NULL cell cii while packing leaf %d/%d.",
+            md->n_leaves_packed, md->n_leaves);
+
+      if (cjj == NULL)
+        error(
+            "Found NULL cell cjj while packing leaf %d/%d.",
+            md->n_leaves_packed, md->n_leaves);
+
       if (cii->hydro.count == 0)
         error(
             "Found cell cii with particle count=0 during packing. "
             "It should have been excluded during the recursion.");
+
       if (cjj->hydro.count == 0)
         error(
             "Found cell cjj with particle count=0 during packing. "
             "It should have been excluded during the recursion.");
 #endif
-      TIMER_TIC;
 
-      /* Check to see if we will go over packing limits in the next step
-       * Necessary if cell heirarchy gets very deep and we have very large cells*/
-      uint count_next = 0;
-      /* Note we will have checked the task_n_leaves'th leaf computation to see
-       * if it will overfill buffers before we start to pack so no issues here.
-       * Also, we only want to check if we are at the penultimate leaf computation
-       * before offloading pack_size computations*/
-      if(npacked < md->task_n_leaves - 1 && npacked < md->params.pack_size - 1){
-        struct cell *ci_next = md->ci_leaves[md->n_leaves_packed + 1];
-        struct cell *cj_next = md->cj_leaves[md->n_leaves_packed + 1];
-        count_next = max(ci_next->hydro.count, cj_next->hydro.count);
-      }
-      /*TODO: Replicate this with a member of struct md rather than calculate repeatedly*/
-      int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-      /* Get how many blocks we have now */
-      int n_blocks_current = md->n_blocks_packed + (max(cii->hydro.count, cjj->hydro.count)+ GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-      /* Get how many blocks we will end up with in the next packing cycle*/
-      int n_blocks_next = n_blocks_current + (count_next + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
-      /* If we need to, raise the flag*/
-      launch_before_over_filling = (n_blocks_next >= n_blocks_max) ? 1 : 0;
-      /* Test to see if cells i and j have already been packed
-       * cells i and j are the same cell for self tasks but use the same
-       * function as for the pairs.
-       * If cells are already packed, keep track of where
-       * they're packed (index). If not, pack and store their index as unique*/
-      /* Note that this increments md->count_parts, md->count_parts_unique and md->n_leaves_packed */
-      pack_cell_particles_in_unique_list(r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
+      /* Number of blocks needed by this individual leaf interaction.
+       * This uses the larger cell because block_leaf_id currently assigns
+       * enough blocks to cover max(cii_count, cjj_count) */
+      const int n_blocks_current = (max(cii->hydro.count, cjj->hydro.count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
 
-      /*Record packing time*/
-      if(t->subtype == task_subtype_gpu_density){
-    	TIMER_TOC(timer_gpu_pack_d);
-      }
-      else if(t->subtype == task_subtype_gpu_gradient){
-    	TIMER_TOC(timer_gpu_pack_g);
-      }
-      else if(t->subtype == task_subtype_gpu_force){
-    	TIMER_TOC(timer_gpu_pack_f);
-      }
 #ifdef SWIFT_DEBUG_CHECKS
-      else {
-        error("Unknown task subtype %s", subtaskID_names[t->subtype]);
-      }
+      /* A single leaf interaction should always fit in an empty buffer unless the buffer is pathologically miniscule.
+       * Instead a failure here indicates a pathologically large cell containing > tens of thousands of particles */
+      if (n_blocks_current > n_blocks_max)
+        error(
+            "A single GPU leaf interaction exceeds block buffer capacity. Something is up with how the run was setup!!!"
+            "ci_count=%d cj_count=%d required_blocks=%d capacity=%d thread_block_size=%d ci_depth=%d cj_depth=%d self=%d.",
+            cii->hydro.count, cjj->hydro.count, n_blocks_current, n_blocks_max, GPU_THREAD_BLOCK_SIZE, cii->depth, cjj->depth,
+            cii == cjj);
 #endif
 
-      /* record how many leaves we've packed in total during this while loop */
-      npacked++;
+      /* Safety check */
+      if (n_blocks_current > n_blocks_max)
+        error(
+            "Pathological GPU leaf interaction: a single leaf exceeds the "
+            "block buffer. ci_count=%d cj_count=%d required_blocks=%d "
+            "capacity=%d thread_block_size=%d. Check the cell hierarchy and "
+            "GPU buffer configuration.",
+            cii->hydro.count, cjj->hydro.count, n_blocks_current,
+            n_blocks_max, GPU_THREAD_BLOCK_SIZE);
+
+      /* The current leaf fits in an empty buffer. Does it also fit in the current partially filled buffer? */
+      if (md->n_blocks_packed + n_blocks_current > n_blocks_max) {
+
+#ifdef SWIFT_DEBUG_CHECKS
+        /* The leaf fits in an empty buffer, failure to fit here must mean that the current buffer already contains packed work */
+        if (md->n_blocks_packed == 0)
+          error(
+              "GPU block capacity check is inconsistent: current leaf "
+              "requires %d/%d blocks but does not fit in an empty buffer.",
+              n_blocks_current, n_blocks_max);
+
+        if (md->n_leaves_packed == 0)
+          error(
+              "GPU block metadata contains %d packed blocks but no packed "
+              "leaves.",
+              md->n_blocks_packed);
+#endif
+
+        /* Do not pack this leaf and do not increment npacked. Launch the
+         * existing buffer, reset it, and retry this same leaf */
+        launch_before_over_filling = 1;
+
+      } else {
+
+        TIMER_TIC;
+
+        /* The current leaf fits. Pack it normally. This increments count_parts, count_parts_unique,
+         * n_blocks_packed and n_leaves_packed */
+        pack_cell_particles_in_unique_list(
+            r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
+
+        /* Record packing time. */
+        if (t->subtype == task_subtype_gpu_density) {
+
+          TIMER_TOC(timer_gpu_pack_d);
+
+        } else if (t->subtype == task_subtype_gpu_gradient) {
+
+          TIMER_TOC(timer_gpu_pack_g);
+
+        } else if (t->subtype == task_subtype_gpu_force) {
+
+          TIMER_TOC(timer_gpu_pack_f);
+        }
+#ifdef SWIFT_DEBUG_CHECKS
+        else {
+          error(
+              "Unknown task subtype %s",
+              subtaskID_names[t->subtype]);
+        }
+#endif
+
+        /* Only increment this after the leaf has actually been packed. In particular, do not increment it when launching before
+         * overfilling, because that leaf must be retried after reset */
+        npacked++;
+      }
     }
 
-    /* Update the current last leaf cell pair index of this task. */
-    /* md->leaf_pairs_packed was incremented in runner_dopair_gpu_pack_<*>. */
+    /* Update the last packed leaf index belonging to this task. If the current leaf was deferred due to block capacity,
+     * leave with the previous value */
     task_last_packed_leaf[tind] = md->n_leaves_packed;
 
     /* Can we launch? */
     if (md->n_leaves_packed == target_n_leaves) md->launch = 1;
 
-    /* Are we launching, or are we launching leftovers AND have packed all
-     * remaining leaves or are we launching before exceeding buffer array size? */
+    /* Launch when:
+     * 1. The normal packing target has been reached.
+     * 2. We are flushing leftovers and have packed all leaves from this task.
+     * 3. The current leaf would overfill the partially occupied block buffer. */
     if (md->launch ||
         (md->launch_leftovers && (npacked == md->task_n_leaves)) || launch_before_over_filling) {
+
+#ifdef SWIFT_DEBUG_CHECKS
+      /* A capacity-triggered launch must contain some previously packed work */
+      if (launch_before_over_filling && md->n_leaves_packed == 0)
+        error(
+            "Attempting capacity-triggered GPU launch with no packed leaves.");
+#endif
 
       /* Let others touch data while we're doing GPU computations.
        * We need this task's data released for the unpacking procedure: If
@@ -1187,11 +1283,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
         /* Unpack the results into CPU memory */
         runner_dopair_gpu_unpack_force(r, s, buf, npacked);
-
       }
 #ifdef SWIFT_DEBUG_CHECKS
       else {
-        error("Unknown task subtype %s", subtaskID_names[t->subtype]);
+        error(
+            "Unknown task subtype %s", subtaskID_names[t->subtype]);
       }
 #endif
 
@@ -1208,35 +1304,53 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
          * buffers and the metadata, then fill in whatever's necessary for us
          * to continue. After this operation, there will be no packed data in
          * the buffers. The only thing we need is the list of leaf cells that
-         * are yet to be packed and offloaded, and associated counters.*/
+         * are yet to be packed and offloaded, and associated counters.
+         * This includes the capacity-triggered path where the
+         * current leaf was deliberately not packed.*/
 
         /* Store this before it's gone. */
         /* How many leaves do we still need to go through? */
-        int n_leaves_new = md->n_leaves - md->n_leaves_packed;
+        const int n_leaves_new =
+            md->n_leaves - md->n_leaves_packed;
+
         /* How many leaves does this task have in total? */
-        int task_n_leaves = md->task_n_leaves;
+        const int task_n_leaves = md->task_n_leaves;
+
         /* Store launch_leftovers in case we still need to do that after we
          * finish packing all leaf cell pairs */
-        char launch_leftovers = md->launch_leftovers;
+        const char launch_leftovers = md->launch_leftovers;
+
+#ifdef SWIFT_DEBUG_CHECKS
+        if (n_leaves_new <= 0)
+          error(
+              "GPU packing bookkeeping inconsistent: npacked=%d "
+              "task_n_leaves=%d, but no unpacked leaves remain.",
+              npacked, md->task_n_leaves);
+#endif
 
         /* Shift the leaf cells down to index 0 in their arrays. */
         /* Reminder: md->n_leaves_packed is the current number of leaf pairs
          * in the buffers. md->n_leaves is the total number of leaf pairs we
-         * have identified for offloading, including all of this task's leaves.
-         */
+         * have identified for offloading, including all of this task's leaves */
         for (int i = md->n_leaves_packed; i < md->n_leaves; i++) {
+
           const int shift_ind = i - md->n_leaves_packed;
+
           md->ci_leaves[shift_ind] = md->ci_leaves[i];
           md->cj_leaves[shift_ind] = md->cj_leaves[i];
+
 #ifdef SWIFT_DEBUG_CHECKS
-          md->ci_leaves[i] = NULL;
-          md->cj_leaves[i] = NULL;
+          if (shift_ind != i) {
+            md->ci_leaves[i] = NULL;
+            md->cj_leaves[i] = NULL;
+          }
 #endif
         }
 
         /* Reset all the buffers and metadata. We still need the rest of the
          * leaf cells we found during the recursion but haven't packed yet, so
          * don't reset those. */
+
         gpu_pack_metadata_reset(md, /*reset_leaves_lists=*/0);
         gpu_data_buffers_reset(buf);
 
@@ -1249,17 +1363,14 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         md->tasks_in_list = 1;
 
         /* Whatever the remaining leaf cells are, they will belong to the
-         * current task. Any previous task will already have been offloaded. */
+        * current task. Any previous task will already have been offloaded. */
         task_first_packed_leaf[0] = 0; /* First index is now 0 */
         task_last_packed_leaf[0] = 0;  /* Nothing's packed yet. */
         /* Same for first particle index of task */
         md->task_first_packed_part[0] = 0;
-
-      } /* Launched, but not finished packing */
-    } /* if launch or launch_leftovers */
-    if(launch_before_over_filling)
-      message("Launched before overfilling");
-  } /* while npacked < md->task_n_leaves */
+      }/* Launched, but not finished packing */
+    }/* if launch or launch_leftovers */
+  }/* while npacked < md->task_n_leaves */
 
   /* We're done with this task's data: Everything we'll need has been copied
    * into buffers. So we can release the cell locks now. */
