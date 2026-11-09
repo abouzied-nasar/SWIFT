@@ -117,7 +117,7 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
    * most decent GPUs have > 32 GB. Also a good fail-safe for when other users
    * use same GPU*/
   size_t GB2Byte = (1024 * 1024 * 1024);
-  if(free_mem * GB2Byte > 32)
+  if(free_mem > 32 * GB2Byte)
 	  safe_free_mem =  free_mem - 5 * GB2Byte;
   else
 	  safe_free_mem =  free_mem * 90 / 100;
