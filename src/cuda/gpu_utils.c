@@ -146,7 +146,7 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
   double mem_req_leaf_computation = sizeof(int4);
 
   /* Memory required per CUDA block launched, each CUDA block needs to know which cell it will work on */
-  double mem_req_CUDA_block = sizeof(int2);
+  double mem_req_CUDA_block = sizeof(int4);
 
   /* Now we need to figure out how much memory to assign to what */
   /* We need one instance of block_ID per GPU_THREAD_BLOCK_SIZE particles */
