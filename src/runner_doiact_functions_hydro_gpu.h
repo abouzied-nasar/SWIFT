@@ -1353,6 +1353,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
 
           md->ci_leaves[shift_ind] = md->ci_leaves[i];
           md->cj_leaves[shift_ind] = md->cj_leaves[i];
+          md->leaf_sid[shift_ind] = md->leaf_sid[i];
+          md->leaf_rshift[shift_ind] = md->leaf_rshift[i];
 
 #ifdef SWIFT_DEBUG_CHECKS
           if (shift_ind != i) {
