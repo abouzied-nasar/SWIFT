@@ -60,6 +60,12 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
   md->leaf_rshift =
       (double *)malloc(params->leaf_buffer_size * sizeof(double));
 
+  /*Be a good boy and init!*/
+  for (int i = 0; i < params->leaf_buffer_size; i++) {
+    md->leaf_sid[i] = -1;
+    md->leaf_rshift[i] = 0.0;
+  }
+
   /*Allocate memory for unique cells.
    * 2x size of ci_leaves just in case all leaves are unique*/
   md->unique_cells =
@@ -166,6 +172,13 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
     md->unique_cells[i] = NULL;
   }
 
+  if (reset_leaves_lists) {
+    for (int i = 0; i < md->params.leaf_buffer_size; i++) {
+      md->leaf_sid[i] = -1;
+      md->leaf_rshift[i] = 0.0;
+    }
+  }
+
 #ifdef SWIFT_DEBUG_CHECKS
   const struct gpu_global_pack_params pars = md->params;
   int n_bundles = pars.n_bundles;
@@ -200,6 +213,8 @@ void gpu_pack_metadata_free(struct gpu_pack_metadata *md) {
   free((void *)md->task_first_packed_part);
   free((void *)md->bundle_first_part);
   free((void *)md->hash_table.entry);
+  free((void *)md->leaf_sid);
+  free((void *)md->leaf_rshift);
 }
 
 #ifdef __cplusplus
