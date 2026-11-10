@@ -56,6 +56,14 @@ struct gpu_pack_metadata {
   struct cell **ci_leaves;
   struct cell **cj_leaves;
 
+  /* Direction of each pair leaf computation needed for sorting.
+   * Value to set for self computations is -1 as we do not need to sort */
+  int *leaf_sid;
+
+  /* Periodic shifts projected onto runner_shift[leaf_sid].
+   * Self computations use 0 as no shift necessary */
+  double *leaf_rshift;
+
   /*Data required for unique sorting*/
   /*list of unique cells we extract in the leaf cell lists above*/
   struct cell **unique_cells;

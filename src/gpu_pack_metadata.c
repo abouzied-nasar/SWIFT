@@ -54,6 +54,12 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
       (struct cell **)malloc(leaf_buffer_size * sizeof(struct cell *));
   for (size_t i = 0; i < leaf_buffer_size; i++) md->cj_leaves[i] = 0;
 
+  md->leaf_sid =
+      (int *)malloc(params->leaf_buffer_size * sizeof(int));
+
+  md->leaf_rshift =
+      (double *)malloc(params->leaf_buffer_size * sizeof(double));
+
   /*Allocate memory for unique cells.
    * 2x size of ci_leaves just in case all leaves are unique*/
   md->unique_cells =
