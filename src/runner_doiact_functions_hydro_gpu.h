@@ -33,6 +33,7 @@ extern "C" {
 #include "space_getsid.h"
 #include "task.h"
 #include "timers.h"
+#include "sort_part.h"
 
 #ifdef WITH_CUDA
 #include "cuda/cuda_config.h"
@@ -117,8 +118,18 @@ static void runner_dopair_gpu_recurse(const struct runner *r,
           ind, md->params.leaf_buffer_size, depth);
     }
 
+#ifdef SWIFT_DEBUG_CHECKS
+  if (sid < 0 || sid >= 13)
+    error("Invalid GPU pair-leaf sort direction sid=%d.", sid);
+#endif
+
     ci_leaves[ind] = ci;
     cj_leaves[ind] = cj;
+    md->leaf_sid[ind] = sid;
+    md->leaf_rshift[ind] =
+        shift[0] * runner_shift[sid][0] +
+        shift[1] * runner_shift[sid][1] +
+        shift[2] * runner_shift[sid][2];
 
     /* Increment the counter. */
     md->task_n_leaves++;
@@ -195,6 +206,10 @@ static void runner_doself_gpu_recurse(const struct runner *r,
     /* Not a typo: Store same cell in ci and cj leaf arrays */
     ci_leaves[ind] = ci;
     cj_leaves[ind] = ci;
+    /* Again, not a typo! If we get here we have called self recurse and this
+     * is a self computation. Mark it as such! */
+    md->leaf_sid[ind] = -1;
+    md->leaf_rshift[ind] = 0.0;
 
     /* Increment the counter. */
     md->task_n_leaves++;
