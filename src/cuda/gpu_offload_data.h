@@ -41,6 +41,27 @@ extern "C" {
  * CUDA-specific goes in here. Everything else goes into gpu_pack_metadata
  * struct.*/
 
+/*! Sort entry used by GPU pair interactions */
+struct gpu_sort_entry {
+  /* Particle position projected along the sort direction */
+  float d;
+  /* Absolute index of the particle in the packed GPU particle buffer
+   * In CPU sorted code this represents local index within a cell (I think!)*/
+  int i;
+};
+
+/*! Location of the sorted particle lists for a leaf computation */
+struct gpu_leaf_sort_metadata {
+  /* Index where ci's sorted particle list starts in sort_entries */
+  int ci_sort_start;
+  /* Number of particles in ci's sorted particle list */
+  int ci_sort_count;
+  /* Index where cj's sorted particle list starts in sort_entries */
+  int cj_sort_start;
+  /* Number of particles in cj's sorted particle list */
+  int cj_sort_count;
+};
+
 /*! Struct to hold all data for the transfer of a single task (sub)type. */
 struct gpu_offload_data {
 #ifdef WITH_CUDA
@@ -105,6 +126,11 @@ struct gpu_offload_data {
     int4 *block_leaf_id;
     /*Device copy*/
     int4 *d_block_leaf_id;
+    /* CPU-side compact directional sort entries for packed pair leaves */
+    struct gpu_sort_entry *sort_entries;
+    /* CPU-side location of each leaf's sort entries */
+    struct gpu_leaf_sort_metadata *leaf_sort_metadata;
+
   } gpu_md;
 
 #endif /* WITH_CUDA */

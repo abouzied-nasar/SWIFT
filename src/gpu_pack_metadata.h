@@ -130,6 +130,9 @@ struct gpu_pack_metadata {
    *  computations*/
   int n_blocks_packed;
 
+  /* Number of sort entries packed for the current launch */
+  int n_sort_entries_packed;
+
   /*! Are these buffers ready to trigger launch on GPU? */
   char launch;
 

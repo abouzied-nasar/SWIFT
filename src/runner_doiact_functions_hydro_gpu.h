@@ -508,6 +508,35 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 
 }
 
+/**
+ * @brief Copy one sort into the GPU sort buffer
+ *
+ * @param sort CPU sort entries
+ * @param count Number of particles in the cell
+ * @param packed_start Start of the cell in the particle buffer
+ * @param gpu_md GPU metadata arrays
+ * @param sort_start First entry to write in the sort buffer
+ */
+INLINE static void gpu_pack_cell_sort(
+    const struct sort_entry *sort, const int count,
+    const int packed_start, const struct gpu_md *gpu_md,
+    const int sort_start) {
+
+  for (int k = 0; k < count; k++) {
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (sort[k].i < 0 || sort[k].i >= count)
+      error(
+          "Invalid CPU directional sort index while packing GPU sort: "
+          "k=%d sort_index=%d count=%d",
+          k, sort[k].i, count);
+#endif
+
+    gpu_md->sort_entries[sort_start + k].d = sort[k].d;
+    gpu_md->sort_entries[sort_start + k].i = packed_start + sort[k].i;
+  }
+}
+
 __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_list(const struct runner *r,
                                       const struct scheduler *s,
                                       struct gpu_offload_data *restrict buf,
@@ -591,6 +620,65 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   /*Flag that we're testing cj*/
   ij = 1;
   hash_lookup_and_pack(cjj, hash_size, ht, buf, ij, task_subtype);
+
+  const int leaf_id = md->n_leaves_packed;
+  struct gpu_leaf_sort_metadata *leaf_sort =
+      &gpu_md->leaf_sort_metadata[leaf_id];
+
+  /* Self computations use the existing unsorted interactions. Mark them as such */
+  if (cii == cjj) {
+
+    leaf_sort->ci_sort_start = -1;
+    leaf_sort->ci_sort_count = 0;
+    leaf_sort->cj_sort_start = -1;
+    leaf_sort->cj_sort_count = 0;
+
+  } else {
+
+    const int sid = md->leaf_sid[leaf_id];
+
+    const struct sort_entry *sort_i =
+        cell_get_hydro_sorts(cii, sid);
+    const struct sort_entry *sort_j =
+        cell_get_hydro_sorts(cjj, sid);
+
+#ifdef SWIFT_DEBUG_CHECKS
+    if (sort_i == NULL || sort_j == NULL)
+      error(
+          "Missing CPU directional sort while packing GPU leaf: "
+          "leaf_id=%d sid=%d",
+          leaf_id, sid);
+#endif
+
+    /* Get the cells' index in the unique list of cells*/
+    const int unique_i = md->my_index[leaf_id].x;
+    const int unique_j = md->my_index[leaf_id].y;
+    /*Where do they start and end in the buffers?*/
+    const int ci_packed_start =
+        md->unique_start_end[unique_i].x;
+    const int cj_packed_start =
+        md->unique_start_end[unique_j].x;
+    const int ci_sort_start =
+        md->n_sort_entries_packed;
+    const int cj_sort_start =
+        ci_sort_start + cii_count;
+
+    /*Sort the cells*/
+    gpu_pack_cell_sort(
+        sort_i, cii_count, ci_packed_start,
+        gpu_md, ci_sort_start);
+    gpu_pack_cell_sort(
+        sort_j, cjj_count, cj_packed_start,
+        gpu_md, cj_sort_start);
+
+    /*Take notes*/
+    leaf_sort->ci_sort_start = ci_sort_start;
+    leaf_sort->ci_sort_count = cii_count;
+    leaf_sort->cj_sort_start = cj_sort_start;
+    leaf_sort->cj_sort_count = cjj_count;
+    md->n_sort_entries_packed +=
+        cii_count + cjj_count;
+  }
 
   /* Now finish up bookkeeping*/
   /* Update incremented pack length accordingly */

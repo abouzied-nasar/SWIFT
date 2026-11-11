@@ -109,10 +109,8 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
                             size_of_cell_start_end);
   swift_assert(cu_error == cudaSuccess);
 
-  /*Since we have unique sorting this should be quite a bit less than
-   * the space needed to store enough blocks to work on part_buffer_size
-   * particles. Possibly problematic as 10 pulled out of the air...*/
-  const size_t n_blocks = params->cuda_blockid_buffer_size;//(10 * part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+  /*Maximum number of CUDA blocks we require to work on an offload*/
+  const size_t n_blocks = params->cuda_blockid_buffer_size;
 
   /*Allocate memory for array containing
    * leaf_computation_id for each cuda block*/
@@ -123,6 +121,25 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
   /*Repeat for device copy*/
   cu_error = cudaMalloc((void **)&buf->gpu_md.d_block_leaf_id,
                             n_blocks * sizeof(int4));
+  swift_assert(cu_error == cudaSuccess);
+
+  /* Each pair leaf requires ni + nj sort entries and ni + nj is at most
+    *twice the particle count used to calculate number of CUDA blocks we need.
+    *Still an estimate since we don't know how many parts will be in a
+    *a cell, could be 10s or 1000s*/
+  const size_t sort_buffer_size = 2 * n_blocks * GPU_THREAD_BLOCK_SIZE;
+
+  /* Allocate host memory for compact directional sort entries */
+  cu_error = cudaMallocHost(
+      (void **)&buf->gpu_md.sort_entries,
+      sort_buffer_size * sizeof(struct gpu_sort_entry));
+  swift_assert(cu_error == cudaSuccess);
+
+  /* Allocate one sort metadata entry per leaf computation */
+  cu_error = cudaMallocHost(
+      (void **)&buf->gpu_md.leaf_sort_metadata,
+      params->leaf_buffer_size *
+          sizeof(struct gpu_leaf_sort_metadata));
   swift_assert(cu_error == cudaSuccess);
 
 }
@@ -195,6 +212,12 @@ void gpu_data_buffers_free(struct gpu_offload_data *buf) {
   swift_assert(cu_error == cudaSuccess);
 
   free((void *)buf->event_end);
+
+  cu_error = cudaFreeHost(buf->gpu_md.sort_entries);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaFreeHost(buf->gpu_md.leaf_sort_metadata);
+  swift_assert(cu_error == cudaSuccess);
 }
 
 #ifdef __cplusplus
