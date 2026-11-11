@@ -34,6 +34,8 @@ void gpu_launch_density(
     int num_blocks_x,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int4* __restrict__ d_block_leaf_id,
+    const struct gpu_sort_entry* __restrict__ d_sort_entries,
+    const struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
     const double3 space_dim,
     cudaStream_t stream, const int tester_param);
 void gpu_launch_gradient(
@@ -43,6 +45,8 @@ void gpu_launch_gradient(
     int num_blocks_x,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int4* __restrict__ d_block_leaf_id,
+    const struct gpu_sort_entry* __restrict__ d_sort_entries,
+    const struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
     const double3 space_dim,
     cudaStream_t stream, const int tester_param);
 void gpu_launch_force(
@@ -52,6 +56,8 @@ void gpu_launch_force(
     int num_blocks_x,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int4* __restrict__ d_block_leaf_id,
+    const struct gpu_sort_entry* __restrict__ d_sort_entries,
+    const struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
     const double3 space_dim,
     cudaStream_t stream, const int tester_param);
 

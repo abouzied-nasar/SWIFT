@@ -484,8 +484,11 @@ __device__ __forceinline__ void neighbour_interactions_density_j_parallel(
 __global__ void cuda_kernel_density(
     const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv,
-	const int4 *__restrict__ d_cell_i_j_start_end,
-    const int4 *__restrict__ d_block_leaf_id, const double3 space_dim,const int tester_param) {
+    const int4 *__restrict__ d_cell_i_j_start_end,
+    const int4 *__restrict__ d_block_leaf_id,
+    const struct gpu_sort_entry *__restrict__ d_sort_entries,
+    const struct gpu_leaf_sort_metadata *__restrict__ d_leaf_sort_metadata,
+    const double3 space_dim, const int tester_param) {
 
   /* Grab handles for path decision making parameters*/
   const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param), min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
@@ -1178,7 +1181,11 @@ __global__ void cuda_kernel_gradient(
     const struct gpu_part_send_g *__restrict__ d_parts_send,
     struct gpu_part_recv_g *__restrict__ d_parts_recv, const float d_a,
     const float d_H, const int4 *__restrict__ d_cell_i_j_start_end,
-    const int4 *__restrict__ d_block_leaf_id, const double3 space_dim, const int tester_param) {
+    const int4 *__restrict__ d_block_leaf_id,
+    const struct gpu_sort_entry *__restrict__ d_sort_entries,
+    const struct gpu_leaf_sort_metadata *__restrict__ d_leaf_sort_metadata,
+    const double3 space_dim, const int tester_param) {
+
 
   /* Grab handles for path decision making parameters*/
   const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param), min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
@@ -2070,7 +2077,10 @@ __global__ void cuda_kernel_force(
     const struct gpu_part_send_f *__restrict__ d_parts_send,
     struct gpu_part_recv_f *__restrict__ d_parts_recv, const float d_a,
     const float d_H, const int4 *__restrict__ d_cell_i_j_start_end,
-    const int4 *__restrict__ d_block_leaf_id, const double3 space_dim, const int tester_param) {
+    const int4 *__restrict__ d_block_leaf_id,
+    const struct gpu_sort_entry *__restrict__ d_sort_entries,
+    const struct gpu_leaf_sort_metadata *__restrict__ d_leaf_sort_metadata,
+    const double3 space_dim, const int tester_param) {
 
   /*TODO: Refactor this as it is repeated in all kernels*/
   /*FROM HERE*************************************************************/

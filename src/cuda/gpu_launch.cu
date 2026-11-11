@@ -67,6 +67,8 @@ void gpu_launch_density(
     int num_blocks_x,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int4* __restrict__ d_block_leaf_id,
+    const struct gpu_sort_entry* __restrict__ d_sort_entries,
+    const struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
     const double3 space_dim,
     cudaStream_t stream, const int tester_param){
 
@@ -87,7 +89,8 @@ void gpu_launch_density(
 		  density_tiling_shared_bytes : density_reduction_shared_bytes;
 
   cuda_kernel_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
-      d_parts_send, d_parts_recv, d_cell_i_j_start_end, d_block_leaf_id, space_dim, tester_param);
+      d_parts_send, d_parts_recv, d_cell_i_j_start_end, d_block_leaf_id, d_sort_entries,
+      d_leaf_sort_metadata, space_dim, tester_param);
 
 }
 
@@ -112,6 +115,8 @@ void gpu_launch_gradient(
     int num_blocks_x,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int4* __restrict__ d_block_leaf_id,
+    const struct gpu_sort_entry* __restrict__ d_sort_entries,
+    const struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
     const double3 space_dim,
     cudaStream_t stream, const int tester_param)
 {
@@ -138,7 +143,8 @@ void gpu_launch_gradient(
 
     cuda_kernel_gradient<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
-        d_cell_i_j_start_end, d_block_leaf_id, space_dim, tester_param);
+        d_cell_i_j_start_end, d_block_leaf_id, d_sort_entries,
+        d_leaf_sort_metadata, space_dim, tester_param);
 }
 
 /**
@@ -162,6 +168,8 @@ void gpu_launch_force(
     int num_blocks_x,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int4* __restrict__ d_block_leaf_id,
+    const struct gpu_sort_entry* __restrict__ d_sort_entries,
+    const struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
     const double3 space_dim,
     cudaStream_t stream, const int tester_param)
 {
@@ -194,7 +202,8 @@ void gpu_launch_force(
 
     cuda_kernel_force<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, shmem, stream>>>(
         d_parts_send, d_parts_recv, d_a, d_H,
-        d_cell_i_j_start_end, d_block_leaf_id, space_dim, tester_param);
+        d_cell_i_j_start_end, d_block_leaf_id, d_sort_entries,
+        d_leaf_sort_metadata, space_dim, tester_param);
 }
 
 #ifdef __cplusplus
