@@ -142,6 +142,19 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
           sizeof(struct gpu_leaf_sort_metadata));
   swift_assert(cu_error == cudaSuccess);
 
+  /* Allocate device memory for the compact directional sort entries */
+  cu_error = cudaMalloc(
+      (void **)&buf->gpu_md.d_sort_entries,
+      sort_buffer_size * sizeof(struct gpu_sort_entry));
+  swift_assert(cu_error == cudaSuccess);
+
+  /* Allocate device memory for the sort metadata of each leaf computation */
+  cu_error = cudaMalloc(
+      (void **)&buf->gpu_md.d_leaf_sort_metadata,
+      params->leaf_buffer_size *
+          sizeof(struct gpu_leaf_sort_metadata));
+  swift_assert(cu_error == cudaSuccess);
+
 }
 
 /**
@@ -217,6 +230,12 @@ void gpu_data_buffers_free(struct gpu_offload_data *buf) {
   swift_assert(cu_error == cudaSuccess);
 
   cu_error = cudaFreeHost(buf->gpu_md.leaf_sort_metadata);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaFree(buf->gpu_md.d_sort_entries);
+  swift_assert(cu_error == cudaSuccess);
+
+  cu_error = cudaFree(buf->gpu_md.d_leaf_sort_metadata);
   swift_assert(cu_error == cudaSuccess);
 }
 

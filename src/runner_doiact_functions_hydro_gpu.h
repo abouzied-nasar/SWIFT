@@ -509,18 +509,17 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 }
 
 /**
- * @brief Copy one sort into the GPU sort buffer
+ * @brief Copy a CPU directional sort into a GPU sort buffer
  *
- * @param sort CPU sort entries
+ * @param sort CPU directional sort entries
  * @param count Number of particles in the cell
- * @param packed_start Start of the cell in the particle buffer
- * @param gpu_md GPU metadata arrays
- * @param sort_start First entry to write in the sort buffer
+ * @param packed_start Where the cell starts in the packed particle buffer
+ * @param gpu_md GPU metadata
+ * @param sort_start First entry to write in the GPU sort buffer
  */
-INLINE static void gpu_pack_cell_sort(
-    const struct sort_entry *sort, const int count,
-    const int packed_start, const struct gpu_md *gpu_md,
-    const int sort_start) {
+__attribute__((always_inline)) INLINE static void gpu_pack_cell_sort(
+    const struct sort_entry *sort, const int count, const int packed_start,
+    const struct gpu_md *gpu_md, const int sort_start) {
 
   for (int k = 0; k < count; k++) {
 
@@ -532,8 +531,13 @@ INLINE static void gpu_pack_cell_sort(
           k, sort[k].i, count);
 #endif
 
+    /* Store the projected particle position */
     gpu_md->sort_entries[sort_start + k].d = sort[k].d;
-    gpu_md->sort_entries[sort_start + k].i = packed_start + sort[k].i;
+
+    /* Convert the cell-local CPU particle index into the absolute
+      *index in the packed GPU particle buffer */
+    gpu_md->sort_entries[sort_start + k].i =
+        packed_start + sort[k].i;
   }
 }
 
@@ -559,6 +563,27 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   if (cii_count == 0 || cjj_count == 0)
     error("Empty cells should've been excluded during the recursion.");
 #endif
+
+  /* Check that the directional sorts for this pair fit in the sort buffer */
+  if (cii != cjj) {
+
+    const size_t sort_buffer_size =
+        2 * (size_t)md->params.cuda_blockid_buffer_size *
+        GPU_THREAD_BLOCK_SIZE;
+
+    const size_t required_sort_entries =
+        (size_t)cii_count + cjj_count;
+
+    if ((size_t)md->n_sort_entries_packed +
+            required_sort_entries >
+        sort_buffer_size)
+      error(
+          "Exceeded GPU directional sort buffer capacity: "
+          "packed=%d required=%zu capacity=%zu",
+          md->n_sort_entries_packed,
+          required_sort_entries,
+          sort_buffer_size);
+  }
 
   /* Get how many particles we've packed until now */
   int pack_ind = md->count_parts_unique;
@@ -637,6 +662,14 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
 
     const int sid = md->leaf_sid[leaf_id];
 
+#ifdef SWIFT_DEBUG_CHECKS
+    if (sid < 0 || sid >= 13)
+      error(
+          "Invalid sort direction while packing GPU leaf: "
+          "leaf_id=%d sid=%d",
+          leaf_id, sid);
+#endif
+
     const struct sort_entry *sort_i =
         cell_get_hydro_sorts(cii, sid);
     const struct sort_entry *sort_j =
@@ -663,7 +696,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     const int cj_sort_start =
         ci_sort_start + cii_count;
 
-    /*Sort the cells*/
+    /*Pack the CPU sorts*/
     gpu_pack_cell_sort(
         sort_i, cii_count, ci_packed_start,
         gpu_md, ci_sort_start);
@@ -678,6 +711,27 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     leaf_sort->cj_sort_count = cjj_count;
     md->n_sort_entries_packed +=
         cii_count + cjj_count;
+#ifdef SWIFT_DEBUG_CHECKS
+
+    /* Check that ci's packed directional sort remains ordered */
+    for (int k = 1; k < cii_count; k++)
+      if (gpu_md->sort_entries[ci_sort_start + k].d <
+          gpu_md->sort_entries[ci_sort_start + k - 1].d)
+        error(
+            "Packed ci sort is not ordered: "
+            "leaf=%d sid=%d k=%d",
+            leaf_id, sid, k);
+
+    /* Check that cj's packed directional sort remains ordered */
+    for (int k = 1; k < cjj_count; k++)
+      if (gpu_md->sort_entries[cj_sort_start + k].d <
+          gpu_md->sort_entries[cj_sort_start + k - 1].d)
+        error(
+            "Packed cj sort is not ordered: "
+            "leaf=%d sid=%d k=%d",
+            leaf_id, sid, k);
+
+#endif
   }
 
   /* Now finish up bookkeeping*/
@@ -744,6 +798,20 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
         "allocated. n_blocks_packed=%d capacity=%d task_subtype=%s cpuid=%d",
         md->n_blocks_packed, md->params.cuda_blockid_buffer_size,
         subtaskID_names[task_subtype], r->cpuid);
+  /*Check that we have not gone over the capacity of the sorting metadata */
+  const size_t sort_buffer_size = 2 * (size_t)md->params.cuda_blockid_buffer_size * GPU_THREAD_BLOCK_SIZE;
+
+  if ((size_t)md->n_sort_entries_packed > sort_buffer_size)
+    error("Attempting to launch with more directional sort entries than "
+        "allocated packed=%d capacity=%zu task_subtype=%s cpuid=%d",
+        md->n_sort_entries_packed, sort_buffer_size,
+        subtaskID_names[task_subtype], r->cpuid);
+
+  if (leaves_packed > md->params.leaf_buffer_size)
+    error("Attempting to launch with more leaf sort metadata entries than "
+        "allocated leaves_packed=%d capacity=%d task_subtype=%s cpuid=%d",
+        leaves_packed, md->params.leaf_buffer_size,
+        subtaskID_names[task_subtype], r->cpuid);
   /*Copy the tasks' metadata to the GPU. Send it using stream[0] for now. N.B. this is not default stream ;).
    * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
    * NOTE: This could be removed outside conditionals since it's name, type and size are the same
@@ -777,6 +845,43 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
         r->cpuid, md->n_blocks_packed,
         md->params.cuda_blockid_buffer_size,
         (size_t)md->n_blocks_packed * sizeof(int4));
+
+  /* Copy the sort metadata for the packed leaf computations */
+  cu_error = cudaMemcpyAsync(
+      &buf->gpu_md.d_leaf_sort_metadata[0],
+      &buf->gpu_md.leaf_sort_metadata[0],
+      leaves_packed *
+          sizeof(struct gpu_leaf_sort_metadata),
+      cudaMemcpyHostToDevice, stream[0]);
+
+  if (cu_error != cudaSuccess)
+    error(
+        "CUDA leaf sort metadata copy failed: CUDA error '%s' for "
+        "task_subtype %s cpuid=%d leaves_packed=%d capacity=%d",
+        cudaGetErrorString(cu_error),
+        subtaskID_names[task_subtype], r->cpuid,
+        leaves_packed, md->params.leaf_buffer_size);
+
+  /* Copy the directional sort entries required by pair computations. Do this only if we
+   * have packed at least 1 pair task. If all tasks packed are selfs then sort_entries_packed
+   * will be zero */
+  if (md->n_sort_entries_packed > 0) {
+
+    cu_error = cudaMemcpyAsync(
+        &buf->gpu_md.d_sort_entries[0],
+        &buf->gpu_md.sort_entries[0],
+        md->n_sort_entries_packed *
+            sizeof(struct gpu_sort_entry),
+        cudaMemcpyHostToDevice, stream[0]);
+
+    if (cu_error != cudaSuccess)
+      error(
+          "CUDA directional sort copy failed: CUDA error '%s' for "
+          "task_subtype %s cpuid=%d sort_entries=%d capacity=%zu",
+          cudaGetErrorString(cu_error),
+          subtaskID_names[task_subtype], r->cpuid,
+          md->n_sort_entries_packed, sort_buffer_size);
+  }
 
   /*Get the number of cuda blocks we need to launch. No need for calculation here as
    * this is calculated while we pack*/
@@ -1448,6 +1553,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
           if (shift_ind != i) {
             md->ci_leaves[i] = NULL;
             md->cj_leaves[i] = NULL;
+            md->leaf_sid[i] = -1;
+            md->leaf_rshift[i] = 0.0;
           }
 #endif
         }

@@ -24,6 +24,7 @@
  */
 
 #include "gpu_utils.h"
+#include "gpu_offload_data.h"
 
 #include "cuda_config.h"
 #include "gpu_pack_params.h"
@@ -116,9 +117,9 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
    * Otherwise use up 90% of available memory. Pulled out of the air but
    * most decent GPUs have > 32 GB. Also a good fail-safe for when other users
    * use same GPU*/
-  size_t GB2Byte = (1024 * 1024 * 1024);
-  if(free_mem > 32 * GB2Byte)
-	  safe_free_mem =  free_mem - 5 * GB2Byte;
+  const size_t GB2Byte = 1024ULL * 1024ULL * 1024ULL;
+  if (free_mem > 32ULL * GB2Byte)
+    safe_free_mem = free_mem - 5ULL * GB2Byte;
   else
 	  safe_free_mem =  free_mem * 90 / 100;
 
@@ -143,10 +144,11 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
 		  + mem_recv_d + mem_recv_g + mem_recv_f;
 
   /* Memory required per leaf computation launched */
-  double mem_req_leaf_computation = sizeof(int4);
+  double mem_req_leaf_computation = sizeof(int4) + 3 * sizeof(struct gpu_leaf_sort_metadata);
 
-  /* Memory required per CUDA block launched, each CUDA block needs to know which cell it will work on */
-  double mem_req_CUDA_block = sizeof(int4);
+  /* Memory required per CUDA block launched including the worst-case
+    *directional sort storage associated with that block */
+  double mem_req_CUDA_block = sizeof(int*) + 3 * 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_sort_entry);
 
   /* Now we need to figure out how much memory to assign to what */
   /* We need one instance of block_ID per GPU_THREAD_BLOCK_SIZE particles */
