@@ -657,6 +657,8 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     leaf_sort->ci_sort_count = 0;
     leaf_sort->cj_sort_start = -1;
     leaf_sort->cj_sort_count = 0;
+    leaf_sort->ci_first = 0;
+    leaf_sort->cj_last = -1;
 
   } else {
 
@@ -683,42 +685,59 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
           leaf_id, sid);
 #endif
 
+    /* Get the total movement since the cells were last sorted */
+    const float dx_max = cii->hydro.dx_max_sort +  cjj->hydro.dx_max_sort;
+    /* Use the largest smoothing length in ci to get a conservative boundary */
+    const float hi_max = cii->hydro.h_max * kernel_gamma;
+    /* Find the first sorted ci particle which can potentially reach cj */
+    int ci_first = cii_count;
+    while (ci_first > 0 && sort_i[ci_first - 1].d + hi_max + dx_max - md->leaf_rshift[leaf_id] > sort_j[0].d)
+      ci_first--;
+    /* Use the largest smoothing length in cj to get a conservative boundary */
+    const float hj_max = cjj->hydro.h_max * kernel_gamma;
+    /* Find the last sorted cj particle which can potentially reach ci */
+    int cj_last = -1;
+
+    while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - hj_max - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d)
+      cj_last++;
+
     /* Get the cells' index in the unique list of cells*/
     const int unique_i = md->my_index[leaf_id].x;
     const int unique_j = md->my_index[leaf_id].y;
     /*Where do they start and end in the buffers?*/
-    const int ci_packed_start =
-        md->unique_start_end[unique_i].x;
-    const int cj_packed_start =
-        md->unique_start_end[unique_j].x;
-    const int ci_sort_start =
-        md->n_sort_entries_packed;
-    const int cj_sort_start =
-        ci_sort_start + cii_count;
+    const int ci_packed_start = md->unique_start_end[unique_i].x;
+    const int cj_packed_start = md->unique_start_end[unique_j].x;
+    const int ci_sort_start = md->n_sort_entries_packed;
+    const int cj_sort_start = ci_sort_start + cii_count;
 
     /*Pack the CPU sorts*/
-    gpu_pack_cell_sort(
-        sort_i, cii_count, ci_packed_start,
-        gpu_md, ci_sort_start);
-    gpu_pack_cell_sort(
-        sort_j, cjj_count, cj_packed_start,
-        gpu_md, cj_sort_start);
+    gpu_pack_cell_sort(sort_i, cii_count, ci_packed_start, gpu_md, ci_sort_start);
+    gpu_pack_cell_sort(sort_j, cjj_count, cj_packed_start, gpu_md, cj_sort_start);
 
     /*Take notes*/
     leaf_sort->ci_sort_start = ci_sort_start;
     leaf_sort->ci_sort_count = cii_count;
     leaf_sort->cj_sort_start = cj_sort_start;
     leaf_sort->cj_sort_count = cjj_count;
-    md->n_sort_entries_packed +=
-        cii_count + cjj_count;
-#ifdef SWIFT_DEBUG_CHECKS
+    leaf_sort->ci_first = ci_first;
+    leaf_sort->cj_last = cj_last;
+    md->n_sort_entries_packed += cii_count + cjj_count;
 
+#ifdef SWIFT_DEBUG_CHECKS
+    if (ci_first < 0 || ci_first > cii_count)
+      error("Invalid first sorted ci target particle "
+          "leaf=%d ci_first=%d count=%d",
+          leaf_id, ci_first, cii_count);
+
+    if (cj_last < -1 || cj_last >= cjj_count)
+      error("Invalid last sorted cj target particle "
+          "leaf=%d cj_last=%d count=%d",
+          leaf_id, cj_last, cjj_count);
     /* Check that ci's packed directional sort remains ordered */
     for (int k = 1; k < cii_count; k++)
       if (gpu_md->sort_entries[ci_sort_start + k].d <
           gpu_md->sort_entries[ci_sort_start + k - 1].d)
-        error(
-            "Packed ci sort is not ordered: "
+        error("Packed ci sort is not ordered: "
             "leaf=%d sid=%d k=%d",
             leaf_id, sid, k);
 
@@ -726,8 +745,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     for (int k = 1; k < cjj_count; k++)
       if (gpu_md->sort_entries[cj_sort_start + k].d <
           gpu_md->sort_entries[cj_sort_start + k - 1].d)
-        error(
-            "Packed cj sort is not ordered: "
+        error("Packed cj sort is not ordered: "
             "leaf=%d sid=%d k=%d",
             leaf_id, sid, k);
 

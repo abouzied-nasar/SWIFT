@@ -30,6 +30,7 @@
 #include "gpu_pack_params.h"
 #include "runner.h"
 #include "gpu_part_structs.h"
+#include "gpu_sort_structs.h"
 
 #include <cuda.h>
 #include <cuda_runtime.h>

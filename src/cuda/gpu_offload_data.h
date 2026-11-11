@@ -34,33 +34,13 @@ extern "C" {
 #include "gpu_pack_metadata.h"
 #include "gpu_pack_params.h"
 #include "gpu_part_structs.h"
+#include "gpu_sort_structs.h"
 
 #include <cuda_runtime.h>
 
 /* Rule-of-thumb: Everything related to actual particle data and everything
  * CUDA-specific goes in here. Everything else goes into gpu_pack_metadata
  * struct.*/
-
-/*! Sort entry used by GPU pair interactions */
-struct gpu_sort_entry {
-  /* Particle position projected along the sort direction */
-  float d;
-  /* Absolute index of the particle in the packed GPU particle buffer
-   * In CPU sorted code this represents local index within a cell (I think!)*/
-  int i;
-};
-
-/*! Location of the sorted particle lists for a leaf computation */
-struct gpu_leaf_sort_metadata {
-  /* Index where ci's sorted particle list starts in sort_entries */
-  int ci_sort_start;
-  /* Number of particles in ci's sorted particle list */
-  int ci_sort_count;
-  /* Index where cj's sorted particle list starts in sort_entries */
-  int cj_sort_start;
-  /* Number of particles in cj's sorted particle list */
-  int cj_sort_count;
-};
 
 /*! Struct to hold all data for the transfer of a single task (sub)type. */
 struct gpu_offload_data {
