@@ -269,6 +269,58 @@ struct density_block_partial {
   int has_neighbour;
 };
 
+/* Find the sorted source range required by the targets in this CUDA block */
+__device__ __forceinline__ void get_density_source_range(const struct gpu_sort_entry * __restrict__ d_sort_entries,
+    float *s_boundary, const int j_sort_start, const int j_sort_count, const float i_source_boundary, const bool source_from_left,
+    const int tid, int *block_j_first, int *block_j_last) {
+
+  /* Store one source boundary per target thread */
+  s_boundary[tid] = i_source_boundary;
+  __syncthreads();
+
+  /* Reduce the target boundaries to the source range required by this CUDA block */
+  for (int offset = GPU_THREAD_BLOCK_SIZE >> 1; offset > 0; offset >>= 1) {
+    if (tid < offset) {
+      if (source_from_left)
+        s_boundary[tid] = fmaxf(s_boundary[tid], s_boundary[tid + offset]);
+      else
+        s_boundary[tid] = fminf(s_boundary[tid], s_boundary[tid + offset]);
+    }
+    __syncthreads();
+  }
+
+  /* Find the sorted source range required by at least one target in this CUDA block */
+  if (tid == 0) {
+    if (source_from_left) {
+      int left = 0;
+      int right = j_sort_count;
+      while (left < right) {
+        const int middle = left + (right - left) / 2;
+        if (d_sort_entries[j_sort_start + middle].d < s_boundary[0])
+          left = middle + 1;
+        else
+          right = middle;
+      }
+      *block_j_first = 0;
+      *block_j_last = left;
+    } else {
+      int left = 0;
+      int right = j_sort_count;
+      while (left < right) {
+        const int middle = left + (right - left) / 2;
+        if (d_sort_entries[j_sort_start + middle].d <= s_boundary[0])
+          left = middle + 1;
+        else
+          right = middle;
+      }
+      *block_j_first = left;
+      *block_j_last = j_sort_count;
+    }
+  }
+
+  __syncthreads();
+}
+
 /**
  * @brief Naive kernel computing the density interactions of a single particle
  * assigning one CUDA thread to each particle in cell i and looping over cell j
@@ -287,13 +339,18 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
     struct gpu_part_recv_d *__restrict__ d_parts_recv,
     const struct gpu_sort_entry *__restrict__ d_sort_entries,
     int i_sort_start, int i_sort_first, int i_sort_count,
-    int i_start, int i_end,
-    int j_start, int j_end,
+    int j_sort_start, int j_sort_count,
+    const float dx_max, const float rshift, const bool source_from_left,
     const double3 shift_i_d, const double3 shift_j_d,
     int b_id_local, int tid) {
 
   /*Declare a variable to use up allocated shared memory*/
   extern __shared__ unsigned char smem[];
+  /* Use the start of shared memory to reduce the target source boundaries */
+  float *s_boundary = reinterpret_cast<float *>(smem);
+  /* Store the source range required by all targets in this CUDA block */
+  __shared__ int block_j_first;
+  __shared__ int block_j_last;
   /*Assign range of memory to use for x, y, z and h*/
   double2 *s_x_y = reinterpret_cast<double2 *>(smem);
   double2 *s_z_h =
@@ -310,8 +367,13 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
   const int i_sort_id = i_sort_first + i_target_id;
   /* Get the target particle's absolute index in the packed particle buffer */
   int i_id = -1;
-  if (i_in_range)
-    i_id = d_sort_entries[i_sort_start + i_sort_id].i;
+  /* Get the target particle's position along the pair sort direction */
+  float i_sort_d = 0.f;
+  if (i_in_range) {
+    const struct gpu_sort_entry i_sort = d_sort_entries[i_sort_start + i_sort_id];
+    i_id = i_sort.i;
+    i_sort_d = i_sort.d;
+  }
 
   int i_has_neighbour = 0;
 
@@ -342,6 +404,18 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
     hi_inv = 1.0f / hi;
   }
 
+  /* Calculate the farthest sorted source position which can interact with this target */
+  float i_source_boundary = 0.f;
+  /*Do a max reduction. Assign -CUDART_INF_F if our thread is out of range*/
+  if (source_from_left)
+    i_source_boundary = i_in_range ? i_sort_d + hi * kernel_gamma + dx_max - rshift : -CUDART_INF_F;
+  /*Do a min reduction. Assign CUDART_INF_F if our thread is out of range*/
+  else
+    i_source_boundary = i_in_range ? i_sort_d - hi * kernel_gamma - dx_max + rshift : CUDART_INF_F;
+
+  /* Find the source range required by the targets in this CUDA block */
+  get_density_source_range(d_sort_entries, s_boundary, j_sort_start, j_sort_count, i_source_boundary, source_from_left, tid, &block_j_first, &block_j_last);
+
   /* Prep output */
   /* rho, rho_dh, wcount, wcount_dh */
   float4 res_rho = make_float4(0.f, 0.f, 0.f, 0.f);
@@ -353,16 +427,16 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
 
   /* Number of tiles. How many times to de we need to load GPU_
    * THREAD_BLOCK_SIZE particles to get through this cell? */
-  const int numTiles =
-      (j_end - j_start + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+  const int numTiles = (block_j_last - block_j_first + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
   /* Prefetch tile 0 into buffer 0 */
   if (numTiles > 0) {
-    const int base0 = j_start;
-    const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, j_end - base0);
+    const int base0 = block_j_first;
+    const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, block_j_last - base0);
 
     for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
+      const int j_sort_id = base0 + t;
+      const int gj = d_sort_entries[j_sort_start + j_sort_id].i;
       __pipeline_memcpy_async(&s_x_y[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.x_y, sizeof(double2));
       __pipeline_memcpy_async(&s_z_h[0 * GPU_THREAD_BLOCK_SIZE + t],
@@ -377,8 +451,8 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
 
     /*Is this tile 0 or 1 (ping-pong tile execution and prefetching)*/
     const int buf = tile & 1;  // 0 or 1 (ping-pong)
-    const int base = j_start + tile * GPU_THREAD_BLOCK_SIZE;
-    const int tileCount = min(GPU_THREAD_BLOCK_SIZE, j_end - base);
+    const int base = block_j_first + tile * GPU_THREAD_BLOCK_SIZE;
+    const int tileCount = min(GPU_THREAD_BLOCK_SIZE, block_j_last - base);
 
     /* Make sure the current tile (already committed) is resident in shared
      * memory */
@@ -394,15 +468,16 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
        * is odd*/
       const int nextBuf = nextTile & 1;
       /*Where does the next tile begin in the buffer array?*/
-      const int nextBase = j_start + nextTile * GPU_THREAD_BLOCK_SIZE;
+      const int nextBase = block_j_first + nextTile * GPU_THREAD_BLOCK_SIZE;
       /*What is the number of required threads in the next tile? If we are at
        * the end of cell j's range in the buffer only read to the end of the
        * range*/
-      const int nextCnt = min(GPU_THREAD_BLOCK_SIZE, j_end - nextBase);
+      const int nextCnt = min(GPU_THREAD_BLOCK_SIZE, block_j_last - nextBase);
 
       /*Now issue pre-fetch for next data set*/
       for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
+        const int j_sort_id = nextBase + t;
+        const int gj = d_sort_entries[j_sort_start + j_sort_id].i;
         __pipeline_memcpy_async(&s_x_y[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.x_y, sizeof(double2));
         __pipeline_memcpy_async(&s_z_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
@@ -420,7 +495,16 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
       for (int t = 0; t < tileCount; ++t) {
 
         /*grab the particle's index in the buffer array*/
-        const int j_idx = base + t;
+        const int j_sort_id = base + t;
+        /* Get the source particle's sorted position and packed particle index */
+        const struct gpu_sort_entry j_sort = d_sort_entries[j_sort_start + j_sort_id];
+        /* Skip source particles which cannot reach this target particle */
+        if (source_from_left) {
+          if (j_sort.d >= i_source_boundary) continue;
+        } else {
+          if (j_sort.d <= i_source_boundary) continue;
+        }
+        const int j_idx = j_sort.i;
         /* Exclude self contribution. This happens at a later step. */
         if (j_idx == i_id) continue;
 

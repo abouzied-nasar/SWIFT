@@ -10,7 +10,7 @@ struct gpu_sort_entry {
   int i;
 };
 
-/*! Location of the sorted particle lists for a leaf computation */
+/* Location of the sorted particle lists for a leaf computation */
 struct gpu_leaf_sort_metadata {
   /* Index where ci's sorted particle list starts in sort_entries */
   int ci_sort_start;
@@ -24,6 +24,10 @@ struct gpu_leaf_sort_metadata {
   int ci_first;
   /* Last sorted particle in cj which can potentially interact with ci */
   int cj_last;
+  /* Maximum combined displacement since the two cells were sorted */
+  float dx_max;
+  /* Periodic shift projected onto the pair sort direction */
+  float rshift;
 };
 
 #endif

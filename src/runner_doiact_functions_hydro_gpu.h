@@ -756,6 +756,8 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     leaf_sort->cj_sort_count = 0;
     leaf_sort->ci_first = 0;
     leaf_sort->cj_last = -1;
+    leaf_sort->dx_max = 0.f;
+    leaf_sort->rshift = 0.f;
 
   } else {
 
@@ -802,6 +804,8 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     leaf_sort->cj_sort_count = cjj_count;
     leaf_sort->ci_first = range.ci_first;
     leaf_sort->cj_last = range.cj_last;
+    leaf_sort->dx_max = cii->hydro.dx_max_sort + cjj->hydro.dx_max_sort;
+    leaf_sort->rshift = md->leaf_rshift[leaf_id];
     md->n_sort_entries_packed += cii_count + cjj_count;
 
 #ifdef SWIFT_DEBUG_CHECKS
