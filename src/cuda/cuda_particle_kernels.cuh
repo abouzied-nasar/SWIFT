@@ -38,6 +38,7 @@ extern "C" {
 
 #include <config.h>
 #include <stdio.h>
+#include <cfloat>
 
 /**
  * @brief Naive kernel computing the density interactions of a single particle
@@ -406,12 +407,12 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
 
   /* Calculate the farthest sorted source position which can interact with this target */
   float i_source_boundary = 0.f;
-  /*Do a max reduction. Assign -CUDART_INF_F if our thread is out of range*/
+  /*Do a max reduction. Assign -FLT_MAX if our thread is out of range*/
   if (source_from_left)
-    i_source_boundary = i_in_range ? i_sort_d + hi * kernel_gamma + dx_max - rshift : -CUDART_INF_F;
-  /*Do a min reduction. Assign CUDART_INF_F if our thread is out of range*/
+    i_source_boundary = i_in_range ? i_sort_d + hi * kernel_gamma + dx_max - rshift : -FLT_MAX;
+  /*Do a min reduction. Assign FLT_MAX if our thread is out of range*/
   else
-    i_source_boundary = i_in_range ? i_sort_d - hi * kernel_gamma - dx_max + rshift : CUDART_INF_F;
+    i_source_boundary = i_in_range ? i_sort_d - hi * kernel_gamma - dx_max + rshift : FLT_MAX;
 
   /* Find the source range required by the targets in this CUDA block */
   get_density_source_range(d_sort_entries, s_boundary, j_sort_start, j_sort_count, i_source_boundary, source_from_left, tid, &block_j_first, &block_j_last);
@@ -936,27 +937,16 @@ __global__ void cuda_kernel_density(
   /*Testing to see if the kernel works*/
   /* Use sorted target particles for pair interactions */
   /* Interact the reduced ci target range with the complete cj source cell */
-  neighbour_interactions_density_sorted(
-      d_parts_send, d_parts_recv, d_sort_entries,
-      leaf_sort.ci_sort_start,
-      leaf_sort.ci_first,
-      ci_target_count,
-      ci_start, ci_particle_end,
-      cj_start, cj_particle_end,
-      ci_target_shift, cj_source_shift,
+  neighbour_interactions_density_sorted(d_parts_send, d_parts_recv, d_sort_entries, leaf_sort.ci_sort_start,
+      leaf_sort.ci_first, ci_target_count, leaf_sort.cj_sort_start, leaf_sort.cj_sort_count, leaf_sort.dx_max,
+      leaf_sort.rshift, true /*Source range comes from the low end of cj*/, ci_target_shift, cj_source_shift,
       b_id_local, tid);
 
   /* Repeat for the opposite interaction direction */
   /* Interact the reduced cj target range with the complete ci source cell */
-  neighbour_interactions_density_sorted(
-      d_parts_send, d_parts_recv, d_sort_entries,
-      leaf_sort.cj_sort_start,
-      0,
-      cj_target_count,
-      cj_start, cj_particle_end,
-      ci_start, ci_particle_end,
-      cj_target_shift, ci_source_shift,
-      b_id_local, tid);
+  neighbour_interactions_density_sorted(d_parts_send, d_parts_recv, d_sort_entries, leaf_sort.cj_sort_start,
+      0, cj_target_count, leaf_sort.ci_sort_start, leaf_sort.ci_sort_count, leaf_sort.dx_max, leaf_sort.rshift,
+      false /*Source range comes from the high end of ci*/, cj_target_shift, ci_source_shift, b_id_local, tid);
   return;
 
   /* Cell i is much larger than cell j: Blocks map over cell i. */
@@ -1302,8 +1292,6 @@ struct gradient_block_partial {
   /*Do any "j" particles in this block interact with the particle i we are reducing values for?*/
   int has_neighbour;
 };
-
-#include <cfloat>
 
 /**
  * @brief Compute i <- j gradient interactions while assigning one particle
