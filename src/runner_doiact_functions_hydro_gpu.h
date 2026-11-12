@@ -34,6 +34,7 @@ extern "C" {
 #include "task.h"
 #include "timers.h"
 #include "sort_part.h"
+#include <string.h>
 
 #ifdef WITH_CUDA
 #include "cuda/cuda_config.h"
@@ -508,6 +509,89 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 
 }
 
+/* Candidate density target ranges for one pair leaf */
+struct gpu_density_target_range {
+  /* First candidate position in ci's sorted list */
+  int ci_first;
+
+  /* Last candidate position in cj's sorted list */
+  int cj_last;
+
+  /* Number of candidate target particles in ci */
+  int ci_target_count;
+
+  /* Number of candidate target particles in cj */
+  int cj_target_count;
+};
+
+/* Calculate conservative density target ranges for one pair leaf */
+__attribute__((always_inline)) INLINE static struct gpu_density_target_range gpu_get_density_target_range(const struct cell *cii, const struct cell *cjj, const struct gpu_pack_metadata *md, const int leaf_id) {
+
+  const int cii_count = cii->hydro.count;
+  const int cjj_count = cjj->hydro.count;
+  const int sid = md->leaf_sid[leaf_id];
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (cii == cjj)
+    error("Attempting to calculate a directional density range for a self leaf leaf_id=%d", leaf_id);
+
+  if (cii_count <= 0 || cjj_count <= 0)
+    error("Attempting to calculate a directional density range for empty cells leaf_id=%d ci_count=%d cj_count=%d", leaf_id, cii_count, cjj_count);
+
+  if (sid < 0 || sid >= 13)
+    error("Invalid sort direction while calculating density target ranges leaf_id=%d sid=%d", leaf_id, sid);
+#endif
+
+  const struct sort_entry *sort_i = cell_get_hydro_sorts(cii, sid);
+  const struct sort_entry *sort_j = cell_get_hydro_sorts(cjj, sid);
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (sort_i == NULL || sort_j == NULL)
+    error("Missing CPU directional sort while calculating density target ranges leaf_id=%d sid=%d", leaf_id, sid);
+#endif
+
+  /* Get the total movement since the cells were last sorted */
+  const float dx_max = cii->hydro.dx_max_sort + cjj->hydro.dx_max_sort;
+
+  /* Use the largest smoothing length in ci to get a conservative boundary */
+  const float hi_max = cii->hydro.h_max * kernel_gamma;
+
+  /* Find the first sorted ci particle which can potentially reach cj */
+  int ci_first = cii_count;
+  while (ci_first > 0 && sort_i[ci_first - 1].d + hi_max + dx_max - md->leaf_rshift[leaf_id] > sort_j[0].d)
+    ci_first--;
+
+  /* Use the largest smoothing length in cj to get a conservative boundary */
+  const float hj_max = cjj->hydro.h_max * kernel_gamma;
+
+  /* Find the last sorted cj particle which can potentially reach ci */
+  int cj_last = -1;
+  while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - hj_max - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d)
+    cj_last++;
+
+  struct gpu_density_target_range range;
+  range.ci_first = ci_first;
+  range.cj_last = cj_last;
+  range.ci_target_count = cii_count - ci_first;
+  range.cj_target_count = cj_last + 1;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  if (range.ci_first < 0 || range.ci_first > cii_count)
+    error("Invalid first sorted ci target particle leaf=%d ci_first=%d count=%d", leaf_id, range.ci_first, cii_count);
+
+  if (range.cj_last < -1 || range.cj_last >= cjj_count)
+    error("Invalid last sorted cj target particle leaf=%d cj_last=%d count=%d", leaf_id, range.cj_last, cjj_count);
+
+  if (range.ci_target_count < 0 || range.ci_target_count > cii_count)
+    error("Invalid ci density target count leaf=%d target_count=%d count=%d", leaf_id, range.ci_target_count, cii_count);
+
+  if (range.cj_target_count < 0 || range.cj_target_count > cjj_count)
+    error("Invalid cj density target count leaf=%d target_count=%d count=%d", leaf_id, range.cj_target_count, cjj_count);
+#endif
+
+  return range;
+}
+
 /**
  * @brief Copy a CPU directional sort into a GPU sort buffer
  *
@@ -558,6 +642,19 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   const int cii_count = cii->hydro.count;
   const int cjj_count = cjj->hydro.count;
 
+  const int leaf_id = md->n_leaves_packed;
+
+  /* Use complete target ranges unless this is a density pair computation */
+  struct gpu_density_target_range range;
+  range.ci_first = 0;
+  range.cj_last = cjj_count - 1;
+  range.ci_target_count = cii_count;
+  range.cj_target_count = cjj_count;
+
+  /* Calculate reduced target ranges for density pair computations */
+  if (cii != cjj && task_subtype == task_subtype_gpu_density)
+    range = gpu_get_density_target_range(cii, cjj, md, leaf_id);
+
 #ifdef SWIFT_DEBUG_CHECKS
   /* Anything to do here? */
   if (cii_count == 0 || cjj_count == 0)
@@ -599,13 +696,15 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
         pack_ind, cii_count, cjj_count, md->params.part_buffer_size,
         subtaskID_names[task_subtype], cii == cjj);
   }
+
   /*Figure out where cells start for controlling GPU computations*/
   /*How many blocks have we packed so far?
    * Each cell is split into count/BS chunks so that
    * multiple cuda blocks work on particles in each cell if cell is big enough*/
   const int n_blocks_packed = md->n_blocks_packed;
-
-  int n_blocks_current = (max(cii_count, cjj_count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+  /* Launch enough blocks to cover the larger candidate target range */
+  const int n_target_particles = max(range.ci_target_count, range.cj_target_count);
+  const int n_blocks_current = (n_target_particles + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
   const int n_blocks_max = md->params.cuda_blockid_buffer_size;
 
@@ -646,9 +745,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   ij = 1;
   hash_lookup_and_pack(cjj, hash_size, ht, buf, ij, task_subtype);
 
-  const int leaf_id = md->n_leaves_packed;
-  struct gpu_leaf_sort_metadata *leaf_sort =
-      &gpu_md->leaf_sort_metadata[leaf_id];
+  struct gpu_leaf_sort_metadata *leaf_sort = &gpu_md->leaf_sort_metadata[leaf_id];
 
   /* Self computations use the existing unsorted interactions. Mark them as such */
   if (cii == cjj) {
@@ -685,22 +782,6 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
           leaf_id, sid);
 #endif
 
-    /* Get the total movement since the cells were last sorted */
-    const float dx_max = cii->hydro.dx_max_sort +  cjj->hydro.dx_max_sort;
-    /* Use the largest smoothing length in ci to get a conservative boundary */
-    const float hi_max = cii->hydro.h_max * kernel_gamma;
-    /* Find the first sorted ci particle which can potentially reach cj */
-    int ci_first = cii_count;
-    while (ci_first > 0 && sort_i[ci_first - 1].d + hi_max + dx_max - md->leaf_rshift[leaf_id] > sort_j[0].d)
-      ci_first--;
-    /* Use the largest smoothing length in cj to get a conservative boundary */
-    const float hj_max = cjj->hydro.h_max * kernel_gamma;
-    /* Find the last sorted cj particle which can potentially reach ci */
-    int cj_last = -1;
-
-    while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - hj_max - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d)
-      cj_last++;
-
     /* Get the cells' index in the unique list of cells*/
     const int unique_i = md->my_index[leaf_id].x;
     const int unique_j = md->my_index[leaf_id].y;
@@ -719,20 +800,11 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     leaf_sort->ci_sort_count = cii_count;
     leaf_sort->cj_sort_start = cj_sort_start;
     leaf_sort->cj_sort_count = cjj_count;
-    leaf_sort->ci_first = ci_first;
-    leaf_sort->cj_last = cj_last;
+    leaf_sort->ci_first = range.ci_first;
+    leaf_sort->cj_last = range.cj_last;
     md->n_sort_entries_packed += cii_count + cjj_count;
 
 #ifdef SWIFT_DEBUG_CHECKS
-    if (ci_first < 0 || ci_first > cii_count)
-      error("Invalid first sorted ci target particle "
-          "leaf=%d ci_first=%d count=%d",
-          leaf_id, ci_first, cii_count);
-
-    if (cj_last < -1 || cj_last >= cjj_count)
-      error("Invalid last sorted cj target particle "
-          "leaf=%d cj_last=%d count=%d",
-          leaf_id, cj_last, cjj_count);
     /* Check that ci's packed directional sort remains ordered */
     for (int k = 1; k < cii_count; k++)
       if (gpu_md->sort_entries[ci_sort_start + k].d <
@@ -789,6 +861,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   /* How many leaves have we packed? */
   const int leaves_packed = md->n_leaves_packed;
 
+  /*Get the number of cuda blocks we need to launch. No need for calculation here as
+   * this is calculated while we pack*/
+  const int n_blocks = md->n_blocks_packed;
+
   /*Send to GPU to have an idea of space size for periodics*/
   double3 space_dim;
   space_dim.x = r->e->s->dim[0];
@@ -830,6 +906,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
         "allocated leaves_packed=%d capacity=%d task_subtype=%s cpuid=%d",
         leaves_packed, md->params.leaf_buffer_size,
         subtaskID_names[task_subtype], r->cpuid);
+  /* A fully pruned density batch can contain leaves but require no CUDA blocks */
+  if (n_blocks == 0) {
+
+  #ifdef SWIFT_DEBUG_CHECKS
+    if (task_subtype != task_subtype_gpu_density)
+      error("Found zero CUDA blocks for non-density task subtype=%s leaves_packed=%d", subtaskID_names[task_subtype], leaves_packed);
+  #endif
+
+    memset(&buf->parts_recv_d[0], 0, md->count_parts_unique * sizeof(struct gpu_part_recv_d));
+    return;
+  }
   /*Copy the tasks' metadata to the GPU. Send it using stream[0] for now. N.B. this is not default stream ;).
    * TODO: Make this one asynchronous copy via events to stop kernel launch before this happens
    * NOTE: This could be removed outside conditionals since it's name, type and size are the same
@@ -900,10 +987,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
           subtaskID_names[task_subtype], r->cpuid,
           md->n_sort_entries_packed, sort_buffer_size);
   }
-
-  /*Get the number of cuda blocks we need to launch. No need for calculation here as
-   * this is calculated while we pack*/
-  const int n_blocks = md->n_blocks_packed;
 
   /*TODO: Refactor this if at all possible*/
   if (task_subtype == task_subtype_gpu_density){
@@ -1376,7 +1459,17 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       /* Number of blocks needed by this individual leaf interaction.
        * This uses the larger cell because block_leaf_id currently assigns
        * enough blocks to cover max(cii_count, cjj_count) */
-      const int n_blocks_current = (max(cii->hydro.count, cjj->hydro.count) + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
+      struct gpu_density_target_range range;
+      range.ci_first = 0;
+      range.cj_last = cjj->hydro.count - 1;
+      range.ci_target_count = cii->hydro.count;
+      range.cj_target_count = cjj->hydro.count;
+
+      if (cii != cjj && t->subtype == task_subtype_gpu_density)
+        range = gpu_get_density_target_range(cii, cjj, md, md->n_leaves_packed);
+
+      const int n_target_particles = max(range.ci_target_count, range.cj_target_count);
+      const int n_blocks_current = (n_target_particles + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* A single leaf interaction should always fit in an empty buffer unless the buffer is pathologically miniscule.
