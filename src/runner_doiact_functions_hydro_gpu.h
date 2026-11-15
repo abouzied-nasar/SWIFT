@@ -1386,6 +1386,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
   /* Maximum number of block metadata entries that can be held by one
    * offload buffer */
   const int n_blocks_max = md->params.cuda_blockid_buffer_size;
+  /* Maximum number of directional sort entries that can be held by one offload buffer */
+  const size_t sort_buffer_size = 2 * (size_t)md->params.cuda_blockid_buffer_size * GPU_THREAD_BLOCK_SIZE;
 
   /* Number of leaves from the current task processed so far. */
   int npacked = 0;
@@ -1476,6 +1478,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       /*How many parts and cuda blocks do we need for the current leaf computation?*/
       const int n_target_particles = max(range.ci_target_count, range.cj_target_count);
       const int n_blocks_current = (n_target_particles + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+      /* Number of sort entries required by this leaf */
+      const size_t n_sort_entries_current = cii != cjj && n_blocks_current > 0 ? (size_t)cii->hydro.count + cjj->hydro.count : 0;
 
 #ifdef SWIFT_DEBUG_CHECKS
       /* A single leaf interaction should always fit in an empty buffer unless the buffer is pathologically miniscule.
@@ -1486,6 +1490,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
             "ci_count=%d cj_count=%d required_blocks=%d capacity=%d thread_block_size=%d ci_depth=%d cj_depth=%d self=%d.",
             cii->hydro.count, cjj->hydro.count, n_blocks_current, n_blocks_max, GPU_THREAD_BLOCK_SIZE, cii->depth, cjj->depth,
             cii == cjj);
+      /* Safety check */
+      if (n_sort_entries_current > sort_buffer_size)
+        error(
+            "Pathological GPU leaf interaction: a single leaf exceeds the "
+            "sort buffer size. ci_count=%d cj_count=%d required_sort_entries=%zu "
+            "capacity=%zu. Check the cell hierarchy depth and GPU buffer configuration.",
+            cii->hydro.count, cjj->hydro.count, n_sort_entries_current, sort_buffer_size);
 #endif
 
       /* Safety check */
@@ -1497,9 +1508,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
             "GPU buffer configuration.",
             cii->hydro.count, cjj->hydro.count, n_blocks_current,
             n_blocks_max, GPU_THREAD_BLOCK_SIZE);
-
+      /* Check whether this leaf fits in the remaining block and sort metadata buffers */
+      const int block_buffer_full = md->n_blocks_packed + n_blocks_current > n_blocks_max;
+      const int sort_buffer_full = (size_t)md->n_sort_entries_packed + n_sort_entries_current > sort_buffer_size;
       /* The current leaf fits in an empty buffer. Does it also fit in the current partially filled buffer? */
-      if (md->n_blocks_packed + n_blocks_current > n_blocks_max) {
+      if (block_buffer_full || sort_buffer_full) {
 
 #ifdef SWIFT_DEBUG_CHECKS
         /* The leaf fits in an empty buffer, failure to fit here must mean that the current buffer already contains packed work */
@@ -1566,7 +1579,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
     /* Launch when:
      * 1. The normal packing target has been reached.
      * 2. We are flushing leftovers and have packed all leaves from this task.
-     * 3. The current leaf would overfill the partially occupied block buffer. */
+     * 3. The current leaf would overfill the partially occupied block or sort buffers */
     if (md->launch ||
         (md->launch_leftovers && (npacked == md->task_n_leaves)) || launch_before_over_filling) {
 
