@@ -510,7 +510,7 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 }
 
 /* Candidate density target ranges for one pair leaf */
-struct gpu_density_target_range {
+struct gpu_sorted_pair_range {
   /* First candidate position in ci's sorted list */
   int ci_first;
 
@@ -525,7 +525,7 @@ struct gpu_density_target_range {
 };
 
 /* Calculate conservative density target ranges for one pair leaf */
-__attribute__((always_inline)) INLINE static struct gpu_density_target_range gpu_get_density_target_range(const struct cell *cii, const struct cell *cjj, const struct gpu_pack_metadata *md, const int leaf_id) {
+__attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_get_sorted_pair_range(const struct cell *cii, const struct cell *cjj, const struct gpu_pack_metadata *md, const int leaf_id) {
 
   const int cii_count = cii->hydro.count;
   const int cjj_count = cjj->hydro.count;
@@ -569,7 +569,7 @@ __attribute__((always_inline)) INLINE static struct gpu_density_target_range gpu
   while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - hj_max - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d)
     cj_last++;
 
-  struct gpu_density_target_range range;
+  struct gpu_sorted_pair_range range;
   range.ci_first = ci_first;
   range.cj_last = cj_last;
   range.ci_target_count = cii_count - ci_first;
@@ -645,7 +645,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   const int leaf_id = md->n_leaves_packed;
 
   /* Use complete target ranges unless this is a density pair computation */
-  struct gpu_density_target_range range;
+  struct gpu_sorted_pair_range range;
   range.ci_first = 0;
   range.cj_last = cjj_count - 1;
   range.ci_target_count = cii_count;
@@ -653,7 +653,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
 
   /* Calculate reduced target ranges for density pair computations */
   if (cii != cjj && task_subtype == task_subtype_gpu_density)
-    range = gpu_get_density_target_range(cii, cjj, md, leaf_id);
+    range = gpu_get_sorted_pair_range(cii, cjj, md, leaf_id);
 
 #ifdef SWIFT_DEBUG_CHECKS
   /* Anything to do here? */
@@ -1466,14 +1466,14 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       /* Number of blocks needed by this individual leaf interaction.
        * This uses the larger cell because block_leaf_id currently assigns
        * enough blocks to cover max(cii_count, cjj_count) */
-      struct gpu_density_target_range range;
+      struct gpu_sorted_pair_range range;
       range.ci_first = 0;
       range.cj_last = cjj->hydro.count - 1;
       range.ci_target_count = cii->hydro.count;
       range.cj_target_count = cjj->hydro.count;
 
       if (cii != cjj && t->subtype == task_subtype_gpu_density)
-        range = gpu_get_density_target_range(cii, cjj, md, md->n_leaves_packed);
+        range = gpu_get_sorted_pair_range(cii, cjj, md, md->n_leaves_packed);
 
       /*How many parts and cuda blocks do we need for the current leaf computation?*/
       const int n_target_particles = max(range.ci_target_count, range.cj_target_count);

@@ -271,7 +271,7 @@ struct density_block_partial {
 };
 
 /* Find the sorted source range required by the targets in this CUDA block */
-__device__ __forceinline__ void get_density_source_range(const struct gpu_sort_entry * __restrict__ d_sort_entries,
+__device__ __forceinline__ void get_sorted_source_range(const struct gpu_sort_entry * __restrict__ d_sort_entries,
     float *s_boundary, const int j_sort_start, const int j_sort_count, const float i_source_boundary, const bool source_from_left,
     const int tid, int *block_j_first, int *block_j_last) {
 
@@ -415,7 +415,7 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
     i_source_boundary = i_in_range ? i_sort_d - hi * kernel_gamma - dx_max + rshift : FLT_MAX;
 
   /* Find the source range required by the targets in this CUDA block */
-  get_density_source_range(d_sort_entries, s_boundary, j_sort_start, j_sort_count, i_source_boundary, source_from_left, tid, &block_j_first, &block_j_last);
+  get_sorted_source_range(d_sort_entries, s_boundary, j_sort_start, j_sort_count, i_source_boundary, source_from_left, tid, &block_j_first, &block_j_last);
 
   /* Prep output */
   /* rho, rho_dh, wcount, wcount_dh */
