@@ -747,8 +747,9 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
 
   struct gpu_leaf_sort_metadata *leaf_sort = &gpu_md->leaf_sort_metadata[leaf_id];
 
-  /* Self computations use the existing unsorted interactions. Mark them as such */
-  if (cii == cjj) {
+  /* Self computations use the existing unsorted interactions. Mark them as such
+   * Also, if we have no work for a pair task n_blocks_current == 0 so we don't need to pack metadata*/
+  if (cii == cjj || n_blocks_current == 0) {
 
     leaf_sort->ci_sort_start = -1;
     leaf_sort->ci_sort_count = 0;
@@ -1472,6 +1473,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       if (cii != cjj && t->subtype == task_subtype_gpu_density)
         range = gpu_get_density_target_range(cii, cjj, md, md->n_leaves_packed);
 
+      /*How many parts and cuda blocks do we need for the current leaf computation?*/
       const int n_target_particles = max(range.ci_target_count, range.cj_target_count);
       const int n_blocks_current = (n_target_particles + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
