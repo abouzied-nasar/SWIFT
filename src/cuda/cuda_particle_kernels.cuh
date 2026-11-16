@@ -270,6 +270,15 @@ struct density_block_partial {
   int has_neighbour;
 };
 
+/* Get the conservative source boundary for one sorted target particle */
+__device__ __forceinline__ float get_sorted_source_boundary(const float i_sort_d, const float i_reach, const float dx_max,
+    const float rshift, const bool source_from_left, const bool i_in_range) {
+  if (source_from_left)
+    return i_in_range ? i_sort_d + i_reach + dx_max - rshift : -FLT_MAX;
+  else
+    return i_in_range ? i_sort_d - i_reach - dx_max + rshift : FLT_MAX;
+}
+
 /* Find the sorted source range required by the targets in this CUDA block */
 __device__ __forceinline__ void get_sorted_source_range(const struct gpu_sort_entry * __restrict__ d_sort_entries,
     float *s_boundary, const int j_sort_start, const int j_sort_count, const float i_source_boundary, const bool source_from_left,
@@ -405,14 +414,9 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
     hi_inv = 1.0f / hi;
   }
 
-  /* Calculate the farthest sorted source position which can interact with this target */
-  float i_source_boundary = 0.f;
-  /*Do a max reduction. Assign -FLT_MAX if our thread is out of range*/
-  if (source_from_left)
-    i_source_boundary = i_in_range ? i_sort_d + hi * kernel_gamma + dx_max - rshift : -FLT_MAX;
-  /*Do a min reduction. Assign FLT_MAX if our thread is out of range*/
-  else
-    i_source_boundary = i_in_range ? i_sort_d - hi * kernel_gamma - dx_max + rshift : FLT_MAX;
+  /* Calculate the furthest sorted source position which can interact with this target */
+  const float i_reach = hi * kernel_gamma;
+  const float i_source_boundary = get_sorted_source_boundary(i_sort_d, i_reach, dx_max, rshift, source_from_left, i_in_range);
 
   /* Find the source range required by the targets in this CUDA block */
   get_sorted_source_range(d_sort_entries, s_boundary, j_sort_start, j_sort_count, i_source_boundary, source_from_left, tid, &block_j_first, &block_j_last);

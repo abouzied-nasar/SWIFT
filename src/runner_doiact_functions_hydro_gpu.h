@@ -524,8 +524,24 @@ struct gpu_sorted_pair_range {
   int cj_target_count;
 };
 
+/* Get conservative interaction reaches for a sorted pair computation */
+__attribute__((always_inline)) INLINE static void gpu_get_sorted_pair_reaches(const struct cell *cii, const struct cell *cjj, const enum task_subtypes task_subtype, float *ci_reach, float *cj_reach) {
+
+  if (task_subtype == task_subtype_gpu_density || task_subtype == task_subtype_gpu_gradient) {
+    *ci_reach = cii->hydro.h_max * kernel_gamma;
+    *cj_reach = cjj->hydro.h_max * kernel_gamma;
+  } else if (task_subtype == task_subtype_gpu_force) {
+    const float pair_reach = max(cii->hydro.h_max, cjj->hydro.h_max) * kernel_gamma;
+    *ci_reach = pair_reach;
+    *cj_reach = pair_reach;
+  } else {
+    error("Unsupported task subtype while calculating sorted pair reaches subtype=%s", subtaskID_names[task_subtype]);
+  }
+}
+
 /* Calculate conservative density target ranges for one pair leaf */
-__attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_get_sorted_pair_range(const struct cell *cii, const struct cell *cjj, const struct gpu_pack_metadata *md, const int leaf_id) {
+__attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_get_sorted_pair_range(const struct cell *cii, const struct cell *cjj,
+    const struct gpu_pack_metadata *md, const int leaf_id, const float ci_reach, const float cj_reach) {
 
   const int cii_count = cii->hydro.count;
   const int cjj_count = cjj->hydro.count;
@@ -553,20 +569,14 @@ __attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_ge
   /* Get the total movement since the cells were last sorted */
   const float dx_max = cii->hydro.dx_max_sort + cjj->hydro.dx_max_sort;
 
-  /* Use the largest smoothing length in ci to get a conservative boundary */
-  const float hi_max = cii->hydro.h_max * kernel_gamma;
-
   /* Find the first sorted ci particle which can potentially reach cj */
   int ci_first = cii_count;
-  while (ci_first > 0 && sort_i[ci_first - 1].d + hi_max + dx_max - md->leaf_rshift[leaf_id] > sort_j[0].d)
+  while (ci_first > 0 && sort_i[ci_first - 1].d + ci_reach + dx_max - md->leaf_rshift[leaf_id] > sort_j[0].d)
     ci_first--;
-
-  /* Use the largest smoothing length in cj to get a conservative boundary */
-  const float hj_max = cjj->hydro.h_max * kernel_gamma;
 
   /* Find the last sorted cj particle which can potentially reach ci */
   int cj_last = -1;
-  while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - hj_max - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d)
+  while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - cj_reach - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d)
     cj_last++;
 
   struct gpu_sorted_pair_range range;
@@ -652,8 +662,12 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   range.cj_target_count = cjj_count;
 
   /* Calculate reduced target ranges for density pair computations */
-  if (cii != cjj && task_subtype == task_subtype_gpu_density)
-    range = gpu_get_sorted_pair_range(cii, cjj, md, leaf_id);
+  if (cii != cjj && task_subtype == task_subtype_gpu_density) {
+    /*Calculate how far ci can see into cj and vice-versa */
+    float ci_reach, cj_reach;
+    gpu_get_sorted_pair_reaches(cii, cjj, task_subtype, &ci_reach, &cj_reach);
+    range = gpu_get_sorted_pair_range(cii, cjj, md, leaf_id, ci_reach, cj_reach);
+  }
 
 #ifdef SWIFT_DEBUG_CHECKS
   /* Anything to do here? */
@@ -798,7 +812,8 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     gpu_pack_cell_sort(sort_i, cii_count, ci_packed_start, gpu_md, ci_sort_start);
     gpu_pack_cell_sort(sort_j, cjj_count, cj_packed_start, gpu_md, cj_sort_start);
 
-    /*Take notes*/
+    /*Take notes
+     * TODO: Maybe move this into gpu_pack_cell_sort?*/
     leaf_sort->ci_sort_start = ci_sort_start;
     leaf_sort->ci_sort_count = cii_count;
     leaf_sort->cj_sort_start = cj_sort_start;
@@ -1472,8 +1487,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       range.ci_target_count = cii->hydro.count;
       range.cj_target_count = cjj->hydro.count;
 
-      if (cii != cjj && t->subtype == task_subtype_gpu_density)
-        range = gpu_get_sorted_pair_range(cii, cjj, md, md->n_leaves_packed);
+      /* Calculate reduced target ranges for density pair computations */
+      if (cii != cjj && t->subtype == task_subtype_gpu_density) {
+        /*Calculate how far ci can see into cj and vice-versa */
+        float ci_reach, cj_reach;
+        gpu_get_sorted_pair_reaches(cii, cjj, t->subtype, &ci_reach, &cj_reach);
+        range = gpu_get_sorted_pair_range(cii, cjj, md, md->n_leaves_packed, ci_reach, cj_reach);
+      }
 
       /*How many parts and cuda blocks do we need for the current leaf computation?*/
       const int n_target_particles = max(range.ci_target_count, range.cj_target_count);
@@ -1587,7 +1607,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       /* A capacity-triggered launch must contain some previously packed work */
       if (launch_before_over_filling && md->n_leaves_packed == 0)
         error(
-            "Attempting capacity-triggered GPU launch with no packed leaves.");
+            "Attempting capacity-triggered GPU launch with no packed leaves. Something is seriously wrong!");
 #endif
 
       /* Let others touch data while we're doing GPU computations.
