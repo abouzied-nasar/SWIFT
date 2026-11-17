@@ -662,7 +662,8 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   range.cj_target_count = cjj_count;
 
   /* Calculate reduced target ranges for density pair computations */
-  if (cii != cjj && task_subtype == task_subtype_gpu_density) {
+  if (cii != cjj && (task_subtype == task_subtype_gpu_density ||
+      task_subtype == task_subtype_gpu_gradient)) {
     /*Calculate how far ci can see into cj and vice-versa */
     float ci_reach, cj_reach;
     gpu_get_sorted_pair_reaches(cii, cjj, task_subtype, &ci_reach, &cj_reach);
@@ -926,15 +927,16 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
         "allocated leaves_packed=%d capacity=%d task_subtype=%s cpuid=%d",
         leaves_packed, md->params.leaf_buffer_size,
         subtaskID_names[task_subtype], r->cpuid);
-  /* A fully pruned density batch can contain leaves but require no CUDA blocks */
+  /* A fully pruned density or gradient batch can contain leaves but require no CUDA blocks */
   if (n_blocks == 0) {
-
   #ifdef SWIFT_DEBUG_CHECKS
-    if (task_subtype != task_subtype_gpu_density)
-      error("Found zero CUDA blocks for non-density task subtype=%s leaves_packed=%d", subtaskID_names[task_subtype], leaves_packed);
+    if (task_subtype != task_subtype_gpu_density && (task_subtype != task_subtype_gpu_gradient))
+      error("Found zero CUDA blocks for unsupported task subtype=%s leaves_packed=%d", subtaskID_names[task_subtype], leaves_packed);
   #endif
-
-    memset(&buf->parts_recv_d[0], 0, md->count_parts_unique * sizeof(struct gpu_part_recv_d));
+    if (task_subtype == task_subtype_gpu_density)
+      memset(&buf->parts_recv_d[0], 0, md->count_parts_unique * sizeof(struct gpu_part_recv_d));
+    else if (task_subtype == task_subtype_gpu_gradient)
+      memset(&buf->parts_recv_g[0], 0, md->count_parts_unique * sizeof(struct gpu_part_recv_g));
     return;
   }
   /*Copy the tasks' metadata to the GPU. Send it using stream[0] for now. N.B. this is not default stream ;).
@@ -1488,7 +1490,8 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       range.cj_target_count = cjj->hydro.count;
 
       /* Calculate reduced target ranges for density pair computations */
-      if (cii != cjj && t->subtype == task_subtype_gpu_density) {
+      if (cii != cjj && (t->subtype == task_subtype_gpu_density ||
+          t->subtype == task_subtype_gpu_gradient)) {
         /*Calculate how far ci can see into cj and vice-versa */
         float ci_reach, cj_reach;
         gpu_get_sorted_pair_reaches(cii, cjj, t->subtype, &ci_reach, &cj_reach);

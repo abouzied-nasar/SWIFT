@@ -1283,6 +1283,314 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
   }
 }
 
+/**
+ * @brief Naive kernel computing the gradient interactions of a single particle
+ *
+ * @param d_parts_send array of particle data received from CPU
+ * @param d_parts_recv array of particle data to write results into
+ * @param i_start first particle in cell i
+ * @param i_end last particle in cell i
+ * @param j_start first particle in cell j
+ * @param j_end last particle in cell j
+ * @param shift_i shifts for particles in cell i
+ * @param shift_j shifts for particles in cell j
+ * @param b_id_local within the GPU thread blocks acting on this cell what is my
+ * id. Needed to figure out which range of particles each CUDA block will work
+ * on
+ * @param t_id the current threads id in the list of threads in the block
+ * @param d_a current cosmological expansion factor
+ * @param d_H current Hubble constant
+ */
+__device__ __forceinline__ void neighbour_interactions_gradient_sorted(
+    const struct gpu_part_send_g *__restrict__ d_parts_send,
+    struct gpu_part_recv_g *__restrict__ d_parts_recv,
+    const struct gpu_sort_entry *__restrict__ d_sort_entries,
+    int i_sort_start, int i_sort_first, int i_sort_count,
+    int j_sort_start, int j_sort_count,
+    const float dx_max, const float rshift, const bool source_from_left,
+    const double3 shift_i_d, const double3 shift_j_d,
+    int b_id_local, int tid, float d_a, float d_H) {
+
+  /*Declare a variable to use up allocated shared memory*/
+  extern __shared__ unsigned char smem[];
+  /* Use the start of shared memory to reduce the target source boundaries */
+  float *s_boundary = reinterpret_cast<float *>(smem);
+  /* Store the source range required by all targets in this CUDA block */
+  __shared__ int block_j_first;
+  __shared__ int block_j_last;
+  /* TODO: Should add float2 in shared for avisc and vsig*/
+  /*Assign range of memory to use for x, y, z and h*/
+  double2 *s_x_y = reinterpret_cast<double2 *>(smem);
+  double2 *s_z_h =
+      reinterpret_cast<double2 *>(s_x_y + 2 * GPU_THREAD_BLOCK_SIZE);
+  /*Assign range of memory to use for velocity (u, v, w) and mass*/
+  float4 *s_vx_m =
+      reinterpret_cast<float4 *>(s_z_h + 2 * GPU_THREAD_BLOCK_SIZE);
+  /*Assign range of memory to use for energy u, density rho, speed of sound c,
+   * alpha visc*/
+  float4 *s_u_rho_c_aviscmax =
+      reinterpret_cast<float4 *>(s_vx_m + 2 * GPU_THREAD_BLOCK_SIZE);
+  /*Assign range of memory to use for energy u, density rho, speed of sound c,
+   * alpha visc*/
+  float4 *s_avisc_vsig = reinterpret_cast<float4 *>(s_u_rho_c_aviscmax +
+                                                    2 * GPU_THREAD_BLOCK_SIZE);
+
+  /* Map this thread to its position in the reduced sorted target list */
+  const int i_target_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid;
+  /* Check that this thread maps to a candidate target particle */
+  const bool i_in_range = (i_target_id < i_sort_count);
+  /* Map the reduced target index back into the complete sorted list */
+  const int i_sort_id = i_sort_first + i_target_id;
+  /* Get the target particle's absolute index in the packed particle buffer */
+  int i_id = -1;
+  /* Get the target particle's position along the pair sort direction */
+  float i_sort_d = 0.f;
+  if (i_in_range) {
+    const struct gpu_sort_entry i_sort = d_sort_entries[i_sort_start + i_sort_id];
+    i_id = i_sort.i;
+    i_sort_d = i_sort.d;
+  }
+
+  int i_has_neighbour = 0;
+
+  /* Initialise particle i's data. Needed since we require definition
+   * before checking if i_in_range below */
+  float xi = 0.f, yi = 0.f, zi = 0.f, hi = 0.f;
+  float vxi = 0.f, vyi = 0.f, vzi = 0.f;
+  float energyi = 0.f, ci = 0.f;
+  float vsigi = 0.f, lapui = 0.f, avisc_maxi = 0.f;
+  float hi_inv = 0.f, hig2 = 0.f;
+
+  /*Do not do any calculation if i_id is not in cell i range of particles*/
+  if (i_in_range) {
+
+    /* First, grab handles. */
+    const struct gpu_part_data_g pi = d_parts_send[i_id].p_data;
+
+    /*Calculate i's position local to the cell*/
+    xi = (pi.x_y.x - shift_i_d.x);
+    yi = (pi.x_y.y - shift_i_d.y);
+    zi = (pi.z_h.x - shift_i_d.z);
+    /*Get particle i smoothing length*/
+    hi = (pi.z_h.y);
+    /*Find my velocities, mass not needed for particle i*/
+    vxi = pi.vx_m.x;
+    vyi = pi.vx_m.y;
+    vzi = pi.vx_m.z;
+
+    /*Now get energy i and speed of sound from u_rho_c_aviscmax (u, rho, c,
+     * aviscmax) rho not needed*/
+    energyi = pi.u_rho_c_aviscmax.x;
+    /*rhoi  = pi.u_rho_c_aviscmax.y;*/
+    ci = pi.u_rho_c_aviscmax.z;
+    /* Get previous value of avisc and vsig. lapu will be incremented while
+     * for avisc we want to find the maximum. Set lapu to zero. We read the
+     * actula avisc for i here not aviscmax*/
+    avisc_maxi = pi.u_rho_c_aviscmax.w;
+    /*Now get vsigi. avisc i not needed since we use aviscmax above*/
+    vsigi = pi.avisc_vsig.y;
+    /*lapui incremeneted at the end. Initialise to zero for j loop*/
+    lapui = 0.f;
+    /*Calculate smoothing length related parameters*/
+    hi_inv = 1.0f / hi;
+    hig2 = (hi * hi) * kernel_gamma2;
+  }
+
+  /* Calculate the furthest sorted source position which can interact with this target */
+  const float i_reach = hi * kernel_gamma;
+  const float i_source_boundary = get_sorted_source_boundary(i_sort_d, i_reach, dx_max, rshift, source_from_left, i_in_range);
+
+  /* Find the source range required by the targets in this CUDA block */
+  get_sorted_source_range(d_sort_entries, s_boundary, j_sort_start, j_sort_count, i_source_boundary, source_from_left, tid, &block_j_first, &block_j_last);
+
+  /* Cosmology terms for the signal velocity */
+  const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);
+  const float a2_Hubble = d_a * d_a * d_H;
+
+  /*const to avoid div by zero*/
+  //  constexpr float eps = 1e-24f;
+
+  /* Number of tiles. How many times to de we need to load GPU_
+   * THREAD_BLOCK_SIZE particles to get through this cell? */
+  const int numTiles = (block_j_last - block_j_first + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+
+  /* Prefetch tile 0 into buffer 0 */
+  if (numTiles > 0) {
+    const int base0 = block_j_first;
+    const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, block_j_last - base0);
+
+    for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
+      const int j_sort_id = base0 + t;
+      const int gj = d_sort_entries[j_sort_start + j_sort_id].i;
+      __pipeline_memcpy_async(&s_x_y[0 * GPU_THREAD_BLOCK_SIZE + t],
+                              &d_parts_send[gj].p_data.x_y, sizeof(double2));
+      __pipeline_memcpy_async(&s_z_h[0 * GPU_THREAD_BLOCK_SIZE + t],
+                              &d_parts_send[gj].p_data.z_h, sizeof(double2));
+      __pipeline_memcpy_async(&s_vx_m[0 * GPU_THREAD_BLOCK_SIZE + t],
+                              &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+      __pipeline_memcpy_async(
+          &s_u_rho_c_aviscmax[0 * GPU_THREAD_BLOCK_SIZE + t],
+          &d_parts_send[gj].p_data.u_rho_c_aviscmax, sizeof(float4));
+      __pipeline_memcpy_async(&s_avisc_vsig[0 * GPU_THREAD_BLOCK_SIZE + t],
+                              &d_parts_send[gj].p_data.avisc_vsig,
+                              sizeof(float4));
+    }
+    __pipeline_commit();
+  }
+  /* Loop over tiles prefetching of "next" tile while computing "current" */
+  for (int tile = 0; tile < numTiles; ++tile) {
+
+    /*Is this tile 0 or 1 (ping-pong tile execution and prefetching)*/
+    const int buf = tile & 1;
+    const int base = block_j_first + tile * GPU_THREAD_BLOCK_SIZE;
+    const int tileCount = min(GPU_THREAD_BLOCK_SIZE, block_j_last - base);
+
+    /* Make sure the current tile (already committed) is resident in shared
+     * memory */
+    __pipeline_wait_prior(0);
+    __syncthreads();
+
+    /* Initiate prefetch for the next tile (overlaps with compute further in the
+     * loop) */
+    const int nextTile = tile + 1;
+    if (nextTile < numTiles) {
+      /*If nextTile & 1 == 0. nextTile is even. If nextTile & 1 == 1, nextTile
+       * is odd*/
+      const int nextBuf = nextTile & 1;
+      /*Where does the next tile begin in the buffer array?*/
+      const int nextBase = block_j_first + nextTile * GPU_THREAD_BLOCK_SIZE;
+      /*What is the number of required threads in the next tile? If we are at
+       * the end of cell j's range in the buffer only read to the end of the
+       * range*/
+      const int nextCnt = min(GPU_THREAD_BLOCK_SIZE, block_j_last - nextBase);
+
+      /*Now issue pre-fetch for next data set*/
+      for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
+        const int j_sort_id = nextBase + t;
+        const int gj = d_sort_entries[j_sort_start + j_sort_id].i;
+        __pipeline_memcpy_async(&s_x_y[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
+                                &d_parts_send[gj].p_data.x_y, sizeof(double2));
+        __pipeline_memcpy_async(&s_z_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
+                                &d_parts_send[gj].p_data.z_h, sizeof(double2));
+        __pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
+                                &d_parts_send[gj].p_data.vx_m, sizeof(float4));
+        __pipeline_memcpy_async(
+            &s_u_rho_c_aviscmax[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
+            &d_parts_send[gj].p_data.u_rho_c_aviscmax, sizeof(float4));
+        __pipeline_memcpy_async(
+            &s_avisc_vsig[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
+            &d_parts_send[gj].p_data.avisc_vsig, sizeof(float4));
+      }
+      /*Commit but don't sync, syncing is done at the end of computations*/
+      __pipeline_commit();
+    }
+    /* Run computations on the current tile (buf)*/
+    if (i_in_range) {
+      /* Start the neighbour interactions */
+#pragma unroll 4
+      for (int t = 0; t < tileCount; ++t) {
+
+        /* We need to construct the maximal signal velocity between our particle
+         * and all of it's neighbours */
+        /*grab the particle's index in the buffer array*/
+        const int j_sort_id = base + t;
+        /* Get the source particle's sorted position and packed particle index */
+        const struct gpu_sort_entry j_sort = d_sort_entries[j_sort_start + j_sort_id];
+        /* Skip source particles which cannot reach this target particle */
+        if (source_from_left) {
+          if (j_sort.d >= i_source_boundary) continue;
+        } else {
+          if (j_sort.d <= i_source_boundary) continue;
+        }
+        const int j_idx = j_sort.i;
+        /* Exclude self contribution. This happens at a later step. */
+        if (j_idx == i_id) continue;
+
+        /* First, grab handles. */
+        const double2 pj_x_y =
+            s_x_y[buf * GPU_THREAD_BLOCK_SIZE + t];  // unshifted
+        const double2 pj_z_h =
+            s_z_h[buf * GPU_THREAD_BLOCK_SIZE + t];  // unshifted
+        const float4 pj_vx_m = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
+        /*Get rho, visc, energy and speed of sound*/
+        const float4 pj_u_rho_c_aviscmax =
+            s_u_rho_c_aviscmax[buf * GPU_THREAD_BLOCK_SIZE + t];
+        /*TODO: This is over-kill for since we only need avisc for particles j
+         *  but leave as-is for now until I work out a better data arrangement:
+         *  We need vsig from CPU for particle i but not it's neighbours
+         *  and we need aviscmax and vsig for particle i and not it's
+         * neighbours*/
+        const float4 pj_avisc_vsig =
+            s_avisc_vsig[buf * GPU_THREAD_BLOCK_SIZE + t];
+        const float xj = (pj_x_y.x - shift_j_d.x);
+        const float yj = (pj_x_y.y - shift_j_d.y);
+        const float zj = (pj_z_h.x - shift_j_d.z);
+
+        /*Find particle distances*/
+        const float xij = xi - xj;
+        const float yij = yi - yj;
+        const float zij = zi - zj;
+
+        const float r2 = fmaf(xij, xij, fmaf(yij, yij, zij * zij));
+        if (!(r2 < hig2)) continue;
+
+        const float vxj = pj_vx_m.x, vyj = pj_vx_m.y, vzj = pj_vx_m.z,
+                    mj = pj_vx_m.w;
+
+        const float energyj = pj_u_rho_c_aviscmax.x;
+        const float rhoj = pj_u_rho_c_aviscmax.y;
+        const float cj = pj_u_rho_c_aviscmax.z;
+
+        const float aviscj = pj_avisc_vsig.x;
+
+        avisc_maxi = fmaxf(avisc_maxi, aviscj);
+        const float inv_r = rsqrtf(r2);
+        const float r = r2 * inv_r;
+
+        const float dvx = vxi - vxj;
+        const float dvy = vyi - vyj;
+        const float dvz = vzi - vzj;
+
+        const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij));
+        const float dvdr_Hubble = dvdr + a2_Hubble * r2;
+
+        /* Are the particles moving towards each others ? */
+        const float omega_ij = fminf(dvdr_Hubble, 0.f);
+        const float mu_ij =
+            fac_mu * inv_r * omega_ij; /* This is 0 or negative */
+
+        /* Signal velocity (update running max across neighbors; initialised as
+         * vsigi) */
+        const float new_v_sig = ci + cj - const_viscosity_beta * mu_ij;
+        /* Update if we need to */
+        vsigi = fmaxf(vsigi, new_v_sig);
+
+        /* Calculate Del^2 u for the thermal diffusion coefficient. */
+        /* Need to get some kernel values F_ij = wi_dx */
+        float wi, wi_dx;
+        const float ui = r * hi_inv;
+        d_kernel_deval(ui, &wi, &wi_dx);
+
+        const float delta_u_factor = (energyi - energyj) * inv_r;
+        lapui += mj * delta_u_factor * wi_dx * (1.0f / rhoj);
+        i_has_neighbour = 1;
+      }
+    }
+
+    __syncthreads();
+  }
+
+  /*Conditional to prevent writing out of bounds of this computation*/
+  if (i_in_range && i_has_neighbour) {
+    /*aviscmax*/
+    atomicMaxFloat(&d_parts_recv[i_id].aviscmax_vsig_lapu.x, avisc_maxi);
+    /*vsig*/
+    atomicMaxFloat(&d_parts_recv[i_id].aviscmax_vsig_lapu.y, vsigi);
+    /*lapu*/
+    atomicAdd(&d_parts_recv[i_id].aviscmax_vsig_lapu.z, lapui);
+  }
+}
+
 /*For use in optimising the kernel in-case we have greatly disparate cell-sizes:
  * Instead of using shared memory for pre-fetching we use shared memory for
  * thread-block-wise reductions before writing to global memory*/
@@ -1562,6 +1870,8 @@ __global__ void cuda_kernel_gradient(
    * of the first block acting on this cell*/
   const int bid_0 = d_block_leaf_id[bid].y;
   const int corner_computation = d_block_leaf_id[bid].z;
+  /* Get the directional sort metadata for this leaf computation */
+  const struct gpu_leaf_sort_metadata leaf_sort = d_leaf_sort_metadata[leafid];
 
   /* Get the start and end positions of cells i and j. */
   const int4 cell_se = d_cell_i_j_start_end[leafid];
@@ -1650,6 +1960,44 @@ __global__ void cuda_kernel_gradient(
 		cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
     return;
   }
+
+  /* Get the number of sorted ci particles which can potentially reach cj */
+  const int ci_target_count = leaf_sort.ci_sort_count - leaf_sort.ci_first;
+
+  /* Get the number of sorted cj particles which can potentially reach ci */
+  const int cj_target_count = leaf_sort.cj_last + 1;
+
+  /* Check that the reduced gradient target ranges are valid */
+  if ((ci_target_count < 0 ||
+       ci_target_count > leaf_sort.ci_sort_count ||
+       cj_target_count < 0 ||
+       cj_target_count > leaf_sort.cj_sort_count) &&
+      b_id_local == 0 && tid == 0)
+    printf(
+        "Invalid reduced gradient target range leaf=%d "
+        "ci_first=%d ci_count=%d ci_targets=%d "
+        "cj_last=%d cj_count=%d cj_targets=%d\n",
+        leafid,
+        leaf_sort.ci_first,
+        leaf_sort.ci_sort_count,
+        ci_target_count,
+        leaf_sort.cj_last,
+        leaf_sort.cj_sort_count,
+        cj_target_count);
+
+  /* Use sorted target particles for pair interactions */
+  /* Interact the reduced ci target range with the complete cj source cell */
+  neighbour_interactions_gradient_sorted(d_parts_send, d_parts_recv, d_sort_entries, leaf_sort.ci_sort_start,
+      leaf_sort.ci_first, ci_target_count, leaf_sort.cj_sort_start, leaf_sort.cj_sort_count, leaf_sort.dx_max,
+      leaf_sort.rshift, true /*Source range comes from the low end of cj*/, ci_target_shift, cj_source_shift,
+      b_id_local, tid, d_a, d_H);
+
+  /* Repeat for the opposite interaction direction */
+  /* Interact the reduced cj target range with the complete ci source cell */
+  neighbour_interactions_gradient_sorted(d_parts_send, d_parts_recv, d_sort_entries, leaf_sort.cj_sort_start,
+      0, cj_target_count, leaf_sort.ci_sort_start, leaf_sort.ci_sort_count, leaf_sort.dx_max, leaf_sort.rshift,
+      false /*Source range comes from the high end of ci*/, cj_target_shift, ci_source_shift, b_id_local, tid, d_a, d_H);
+  return;
 
   /* Cell i is much larger than cell j: Blocks map over cell i. */
   if (use_ci_source_parallel) {
