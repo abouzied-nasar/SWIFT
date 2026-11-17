@@ -525,7 +525,7 @@ __attribute__((always_inline)) INLINE static void gpu_get_sorted_pair_reaches(co
   }
 }
 
-/* Calculate conservative density target ranges for one pair leaf */
+/* Calculate conservative pruned target ranges for one pair leaf */
 __attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_get_sorted_pair_range(const struct cell *cii, const struct cell *cjj,
     const struct gpu_pack_metadata *md, const int leaf_id, struct gpu_sorted_pair_range range) {
 
@@ -535,13 +535,13 @@ __attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_ge
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (cii == cjj)
-    error("Attempting to calculate a directional density range for a self leaf leaf_id=%d", leaf_id);
+    error("Attempting to calculate a directional sorted range for a self leaf leaf_id=%d", leaf_id);
 
   if (cii_count <= 0 || cjj_count <= 0)
-    error("Attempting to calculate a directional density range for empty cells leaf_id=%d ci_count=%d cj_count=%d", leaf_id, cii_count, cjj_count);
+    error("Attempting to calculate a directional sorted range for empty cells leaf_id=%d ci_count=%d cj_count=%d", leaf_id, cii_count, cjj_count);
 
   if (sid < 0 || sid >= 13)
-    error("Invalid sort direction while calculating density target ranges leaf_id=%d sid=%d", leaf_id, sid);
+    error("Invalid sort direction while calculating sorted target ranges leaf_id=%d sid=%d", leaf_id, sid);
 #endif
 
   const struct sort_entry *sort_i = cell_get_hydro_sorts(cii, sid);
@@ -549,7 +549,7 @@ __attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_ge
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (sort_i == NULL || sort_j == NULL)
-    error("Missing CPU directional sort while calculating density target ranges leaf_id=%d sid=%d", leaf_id, sid);
+    error("Missing CPU directional sort while calculating sorted target ranges leaf_id=%d sid=%d", leaf_id, sid);
 #endif
 
   /* Get the total movement since the cells were last sorted */
@@ -639,7 +639,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
 
   const int leaf_id = md->n_leaves_packed;
 
-  /* Use complete target ranges unless this is a density pair computation */
+  /* Use complete target ranges unless this is a sorted pair computation */
   struct gpu_sorted_pair_range range;
   range.ci_first = 0;
   range.cj_last = cjj_count - 1;
@@ -648,7 +648,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   range.ci_reach = 0.f;
   range.cj_reach = 0.f;
 
-  /* Calculate reduced target ranges for density pair computations */
+  /* Calculate reduced target ranges for sorted pair computations */
   if (cii != cjj && (task_subtype == task_subtype_gpu_density ||
       task_subtype == task_subtype_gpu_gradient ||
       task_subtype == task_subtype_gpu_force)) {
@@ -705,9 +705,9 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
    * Each cell is split into count/BS chunks so that
    * multiple cuda blocks work on particles in each cell if cell is big enough*/
   const int n_blocks_packed = md->n_blocks_packed;
-  /* Launch enough blocks to cover the larger candidate target range */
-  const int n_target_particles = max(range.ci_target_count, range.cj_target_count);
-  const int n_blocks_current = (n_target_particles + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+  /* Launch enough blocks to cover the larger (conservative) pruned target range */
+  const int n_pruned_targets = max(range.ci_target_count, range.cj_target_count);
+  const int n_blocks_current = (n_pruned_targets + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
   const int n_blocks_max = md->params.cuda_blockid_buffer_size;
 
@@ -1483,7 +1483,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       range.ci_reach = 0.f;
       range.cj_reach = 0.f;
 
-      /* Calculate reduced target ranges for density pair computations */
+      /* Calculate reduced target ranges for sorted pair computations */
       if (cii != cjj && (t->subtype == task_subtype_gpu_density ||
           t->subtype == task_subtype_gpu_gradient ||
           t->subtype == task_subtype_gpu_force)) {
@@ -1492,9 +1492,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         range = gpu_get_sorted_pair_range(cii, cjj, md, md->n_leaves_packed, range);
       }
 
-      /*How many parts and cuda blocks do we need for the current leaf computation?*/
-      const int n_target_particles = max(range.ci_target_count, range.cj_target_count);
-      const int n_blocks_current = (n_target_particles + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+      /*How many cuda blocks do we need for the larger (conservative) pruned target range?*/
+      const int n_pruned_targets = max(range.ci_target_count, range.cj_target_count);
+      const int n_blocks_current = (n_pruned_targets + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
       /* Number of sort entries required by this leaf */
       const size_t n_sort_entries_current = cii != cjj && n_blocks_current > 0 ? (size_t)cii->hydro.count + cjj->hydro.count : 0;
 
