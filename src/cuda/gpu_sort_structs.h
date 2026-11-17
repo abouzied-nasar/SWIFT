@@ -28,6 +28,28 @@ struct gpu_leaf_sort_metadata {
   float dx_max;
   /* Periodic shift projected onto the pair sort direction */
   float rshift;
+  /* Conservative interaction reach */
+  float max_reach;
+};
+
+/* Candidate density target ranges for one pair leaf */
+struct gpu_sorted_pair_range {
+  /* First candidate position in ci's sorted list */
+  int ci_first;
+
+  /* Last candidate position in cj's sorted list */
+  int cj_last;
+
+  /* Number of candidate target particles in ci */
+  int ci_target_count;
+
+  /* Number of candidate target particles in cj */
+  int cj_target_count;
+
+  /* Maximum interaction reach of particles in cell i */
+  float ci_reach;
+  /* Maximum interaction reach of particles in cell j */
+  float cj_reach;
 };
 
 #endif

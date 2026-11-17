@@ -509,31 +509,17 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 
 }
 
-/* Candidate density target ranges for one pair leaf */
-struct gpu_sorted_pair_range {
-  /* First candidate position in ci's sorted list */
-  int ci_first;
-
-  /* Last candidate position in cj's sorted list */
-  int cj_last;
-
-  /* Number of candidate target particles in ci */
-  int ci_target_count;
-
-  /* Number of candidate target particles in cj */
-  int cj_target_count;
-};
-
 /* Get conservative interaction reaches for a sorted pair computation */
-__attribute__((always_inline)) INLINE static void gpu_get_sorted_pair_reaches(const struct cell *cii, const struct cell *cjj, const enum task_subtypes task_subtype, float *ci_reach, float *cj_reach) {
+__attribute__((always_inline)) INLINE static void gpu_get_sorted_pair_reaches(const struct cell *cii, const struct cell *cjj,
+    const enum task_subtypes task_subtype, struct gpu_sorted_pair_range *range) {
 
   if (task_subtype == task_subtype_gpu_density || task_subtype == task_subtype_gpu_gradient) {
-    *ci_reach = cii->hydro.h_max * kernel_gamma;
-    *cj_reach = cjj->hydro.h_max * kernel_gamma;
+    range->ci_reach = cii->hydro.h_max * kernel_gamma;
+    range->cj_reach = cjj->hydro.h_max * kernel_gamma;
   } else if (task_subtype == task_subtype_gpu_force) {
     const float pair_reach = max(cii->hydro.h_max, cjj->hydro.h_max) * kernel_gamma;
-    *ci_reach = pair_reach;
-    *cj_reach = pair_reach;
+    range->ci_reach = pair_reach;
+    range->cj_reach = pair_reach;
   } else {
     error("Unsupported task subtype while calculating sorted pair reaches subtype=%s", subtaskID_names[task_subtype]);
   }
@@ -541,7 +527,7 @@ __attribute__((always_inline)) INLINE static void gpu_get_sorted_pair_reaches(co
 
 /* Calculate conservative density target ranges for one pair leaf */
 __attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_get_sorted_pair_range(const struct cell *cii, const struct cell *cjj,
-    const struct gpu_pack_metadata *md, const int leaf_id, const float ci_reach, const float cj_reach) {
+    const struct gpu_pack_metadata *md, const int leaf_id, struct gpu_sorted_pair_range range) {
 
   const int cii_count = cii->hydro.count;
   const int cjj_count = cjj->hydro.count;
@@ -571,15 +557,14 @@ __attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_ge
 
   /* Find the first sorted ci particle which can potentially reach cj */
   int ci_first = cii_count;
-  while (ci_first > 0 && sort_i[ci_first - 1].d + ci_reach + dx_max - md->leaf_rshift[leaf_id] > sort_j[0].d)
+  while (ci_first > 0 && sort_i[ci_first - 1].d + range.ci_reach + dx_max - md->leaf_rshift[leaf_id] > sort_j[0].d)
     ci_first--;
 
   /* Find the last sorted cj particle which can potentially reach ci */
   int cj_last = -1;
-  while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - cj_reach - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d)
+  while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - range.cj_reach - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d)
     cj_last++;
 
-  struct gpu_sorted_pair_range range;
   range.ci_first = ci_first;
   range.cj_last = cj_last;
   range.ci_target_count = cii_count - ci_first;
@@ -660,14 +645,17 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   range.cj_last = cjj_count - 1;
   range.ci_target_count = cii_count;
   range.cj_target_count = cjj_count;
+  range.ci_reach = 0.f;
+  range.cj_reach = 0.f;
 
   /* Calculate reduced target ranges for density pair computations */
   if (cii != cjj && (task_subtype == task_subtype_gpu_density ||
-      task_subtype == task_subtype_gpu_gradient)) {
+      task_subtype == task_subtype_gpu_gradient ||
+      task_subtype == task_subtype_gpu_force)) {
     /*Calculate how far ci can see into cj and vice-versa */
-    float ci_reach, cj_reach;
-    gpu_get_sorted_pair_reaches(cii, cjj, task_subtype, &ci_reach, &cj_reach);
-    range = gpu_get_sorted_pair_range(cii, cjj, md, leaf_id, ci_reach, cj_reach);
+    gpu_get_sorted_pair_reaches(cii, cjj, task_subtype, &range);
+    /*Calculate ranges for sorted particle interactions (where to start and stop searching for neighbours)*/
+    range = gpu_get_sorted_pair_range(cii, cjj, md, leaf_id, range);
   }
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -774,6 +762,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     leaf_sort->cj_last = -1;
     leaf_sort->dx_max = 0.f;
     leaf_sort->rshift = 0.f;
+    leaf_sort->max_reach = 0.f;
 
   } else {
 
@@ -823,6 +812,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     leaf_sort->cj_last = range.cj_last;
     leaf_sort->dx_max = cii->hydro.dx_max_sort + cjj->hydro.dx_max_sort;
     leaf_sort->rshift = md->leaf_rshift[leaf_id];
+    leaf_sort->max_reach = max(range.ci_reach, range.cj_reach);
     md->n_sort_entries_packed += cii_count + cjj_count;
 
 #ifdef SWIFT_DEBUG_CHECKS
@@ -927,16 +917,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
         "allocated leaves_packed=%d capacity=%d task_subtype=%s cpuid=%d",
         leaves_packed, md->params.leaf_buffer_size,
         subtaskID_names[task_subtype], r->cpuid);
-  /* A fully pruned density or gradient batch can contain leaves but require no CUDA blocks */
+  /* A fully pruned batch can contain leaves but require no CUDA blocks */
   if (n_blocks == 0) {
-  #ifdef SWIFT_DEBUG_CHECKS
-    if (task_subtype != task_subtype_gpu_density && (task_subtype != task_subtype_gpu_gradient))
+#ifdef SWIFT_DEBUG_CHECKS
+    if (task_subtype != task_subtype_gpu_density && task_subtype != task_subtype_gpu_gradient && task_subtype != task_subtype_gpu_force)
       error("Found zero CUDA blocks for unsupported task subtype=%s leaves_packed=%d", subtaskID_names[task_subtype], leaves_packed);
-  #endif
+#endif
     if (task_subtype == task_subtype_gpu_density)
       memset(&buf->parts_recv_d[0], 0, md->count_parts_unique * sizeof(struct gpu_part_recv_d));
     else if (task_subtype == task_subtype_gpu_gradient)
       memset(&buf->parts_recv_g[0], 0, md->count_parts_unique * sizeof(struct gpu_part_recv_g));
+    else if (task_subtype == task_subtype_gpu_force)
+      memset(&buf->parts_recv_f[0], 0, md->count_parts_unique * sizeof(struct gpu_part_recv_f));
     return;
   }
   /*Copy the tasks' metadata to the GPU. Send it using stream[0] for now. N.B. this is not default stream ;).
@@ -1488,14 +1480,16 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       range.cj_last = cjj->hydro.count - 1;
       range.ci_target_count = cii->hydro.count;
       range.cj_target_count = cjj->hydro.count;
+      range.ci_reach = 0.f;
+      range.cj_reach = 0.f;
 
       /* Calculate reduced target ranges for density pair computations */
       if (cii != cjj && (t->subtype == task_subtype_gpu_density ||
-          t->subtype == task_subtype_gpu_gradient)) {
+          t->subtype == task_subtype_gpu_gradient ||
+          t->subtype == task_subtype_gpu_force)) {
         /*Calculate how far ci can see into cj and vice-versa */
-        float ci_reach, cj_reach;
-        gpu_get_sorted_pair_reaches(cii, cjj, t->subtype, &ci_reach, &cj_reach);
-        range = gpu_get_sorted_pair_range(cii, cjj, md, md->n_leaves_packed, ci_reach, cj_reach);
+        gpu_get_sorted_pair_reaches(cii, cjj, t->subtype, &range);
+        range = gpu_get_sorted_pair_range(cii, cjj, md, md->n_leaves_packed, range);
       }
 
       /*How many parts and cuda blocks do we need for the current leaf computation?*/

@@ -1859,7 +1859,7 @@ __global__ void cuda_kernel_gradient(
 
 
   /* Grab handles for path decision making parameters*/
-  const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param), min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
+  const int min_count_ratio_for_source_parallel(GRADIENT_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param), min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
 
   /* Figure out which range of particles this block will work on. */
   const int bid = blockIdx.x;
@@ -2085,8 +2085,11 @@ __global__ void cuda_kernel_gradient(
  */
 __device__ __forceinline__ void neighbour_interactions_force(
     const struct gpu_part_send_f *__restrict__ d_parts_send,
-    struct gpu_part_recv_f *__restrict__ d_parts_recv, int i_start, int i_end,
-    int j_start, int j_end, const double3 shift_i_d, const double3 shift_j_d,
+    struct gpu_part_recv_f *__restrict__ d_parts_recv,
+    const struct gpu_sort_entry *__restrict__ d_sort_entries,
+    const int i_sort_start, const int i_sort_first, const int i_sort_count,
+    const bool use_sorted_targets, int i_start, int i_end, int j_start,
+    int j_end, const double3 shift_i_d, const double3 shift_j_d,
     int b_id_local, int tid, float d_a, float d_H) {
 
   /*Declare a variable to use up allocated shared memory*/
@@ -2113,10 +2116,11 @@ __device__ __forceinline__ void neighbour_interactions_force(
   int2 *s_tb_min_ngb_tb =
       reinterpret_cast<int2 *>(s_b_c_av_ad + 2 * GPU_THREAD_BLOCK_SIZE);
 
-  /*Map this thread to its i-particle*/
-  const int i_id = b_id_local * GPU_THREAD_BLOCK_SIZE + tid + i_start;
-  /*Is the id in the cell we need to work on?*/
-  const bool i_in_range = (i_id < i_end);
+  /* Map this thread to its target particle */
+  const int i_offset = b_id_local * GPU_THREAD_BLOCK_SIZE + tid;
+  const bool i_in_range = use_sorted_targets ? i_offset < i_sort_count : i_start + i_offset < i_end;
+  const int i_sort_position = i_sort_first + i_offset;
+  const int i_id = i_in_range ? (use_sorted_targets ? d_sort_entries[i_sort_start + i_sort_position].i : i_start + i_offset) : i_start;
 
   /* Initialise particle i's data. Needed since we require definition
    * before checking if i_in_range below */
@@ -2796,7 +2800,8 @@ __global__ void cuda_kernel_force(
   /*TODO: Refactor this as it is repeated in all kernels*/
   /*FROM HERE*************************************************************/
   /* Grab handles for path decision making parameters*/
-  const int min_count_ratio_for_source_parallel(DENSITY_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param), min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
+  const int min_count_ratio_for_source_parallel(FORCE_CELL_COUNT_RATIO), min_blocks_for_source_parallel(tester_param),
+      min_blocks_for_target_parallel(MIN_TARGET_BLOCKS);
   /* Figure out which range of particles this block will work on. */
   const int bid = blockIdx.x;
   /* What is the leaf computation this block will work on? */
@@ -2890,26 +2895,38 @@ __global__ void cuda_kernel_force(
    * and/or the neighbour_interaction functions so we only have one cuda_kernel function instead of 3*/
   /* Self interaction: Only 1 kernel call is required */
   if (ci_start == cj_start) {
-    neighbour_interactions_force(d_parts_send, d_parts_recv, ci_start,
-                                 ci_particle_end, cj_start, cj_particle_end,
-                                 ci_target_shift, cj_source_shift, b_id_local,
-                                 tid, d_a, d_H);
+    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, ci_start, ci_particle_end,
+        cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
     return;
   }
+
+  /* Get the directional sort metadata for this leaf computation */
+  const struct gpu_leaf_sort_metadata leaf_sort = d_leaf_sort_metadata[leafid];
+
+  /* Get the reduced target ranges for both interaction directions */
+  const int ci_target_count = leaf_sort.ci_sort_count - leaf_sort.ci_first;
+  const int cj_target_count = leaf_sort.cj_last + 1;
+
+  /* Use sorted target particles for pair interactions */
+  neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, leaf_sort.ci_sort_start, leaf_sort.ci_first,
+      ci_target_count, true, ci_start, ci_particle_end, cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
+
+  neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, leaf_sort.cj_sort_start, 0, cj_target_count, true,
+      cj_start, cj_particle_end, ci_start, ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a, d_H);
+
+  return;
 
   /* Cell i is much larger than cell j: Blocks map over cell i. */
   if (use_ci_source_parallel) {
 
-	/* Do ci <- cj: Cell i is the larger target, so use the target-parallel
-	 * implementation.*/
-	neighbour_interactions_force(d_parts_send, d_parts_recv, ci_start,
-                                 ci_particle_end, cj_start, cj_particle_end,
-                                 ci_target_shift, cj_source_shift, b_id_local,
-                                 tid, d_a, d_H);
+    /* Do ci <- cj: Cell i is the larger target, so use the target-parallel
+     * implementation.*/
+    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, ci_start, ci_particle_end,
+        cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
 
     /* Do cj <- ci: Cell i is now the larger source. Continue to map threads over cell i
      * and reduce their contributions into target particles in cell j. */
-	neighbour_interactions_force_j_parallel(
+    neighbour_interactions_force_j_parallel(
         d_parts_send, d_parts_recv, cj_start, cj_particle_end, ci_start,
         ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a,
         d_H);
@@ -2920,19 +2937,17 @@ __global__ void cuda_kernel_force(
   /* Cell j is much larger than cell i: Blocks map over cell j. */
   if (use_cj_source_parallel) {
 
-	/* Do ci <- cj: Cell j is the larger source. Threads map over cell j and reduce their
-	 * contributions into target particles in cell i. */
-	neighbour_interactions_force_j_parallel(
+    /* Do ci <- cj: Cell j is the larger source. Threads map over cell j and reduce their
+     * contributions into target particles in cell i. */
+    neighbour_interactions_force_j_parallel(
         d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
         cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a,
         d_H);
 
-	/* Do cj <- ci: Cell j is then the larger target, so use the target-parallel
-	 * implementation. */
-	neighbour_interactions_force(d_parts_send, d_parts_recv, cj_start,
-                                 cj_particle_end, ci_start, ci_particle_end,
-                                 cj_target_shift, ci_source_shift, b_id_local,
-                                 tid, d_a, d_H);
+    /* Do cj <- ci: Cell j is then the larger target, so use the target-parallel
+     * implementation. */
+    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, cj_start, cj_particle_end,
+        ci_start, ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a, d_H);
 
     return;
   }
@@ -2949,18 +2964,16 @@ __global__ void cuda_kernel_force(
    * This is intended to minimise atomic contentions, etc.*/
   const bool do_ci_target = (b_id_local < ci_blocks);
   const bool do_cj_target = (b_id_local < cj_blocks);
+
   /*Do ci <- cj*/
   if(do_ci_target)
-	  neighbour_interactions_force(d_parts_send, d_parts_recv, ci_start,
-                               ci_particle_end, cj_start, cj_particle_end,
-                               ci_target_shift, cj_source_shift, b_id_local,
-                               tid, d_a, d_H);
+    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, ci_start, ci_particle_end,
+        cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
+
   /*Now do cj <- ci*/
   if(do_cj_target)
-	  neighbour_interactions_force(d_parts_send, d_parts_recv, cj_start,
-                               cj_particle_end, ci_start, ci_particle_end,
-                               cj_target_shift, ci_source_shift, b_id_local,
-                               tid, d_a, d_H);
+    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, cj_start, cj_particle_end,
+        ci_start, ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a, d_H);
 }
 
 #ifdef __cplusplus
