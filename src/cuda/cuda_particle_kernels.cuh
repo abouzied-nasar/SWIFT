@@ -2088,8 +2088,10 @@ __device__ __forceinline__ void neighbour_interactions_force(
     struct gpu_part_recv_f *__restrict__ d_parts_recv,
     const struct gpu_sort_entry *__restrict__ d_sort_entries,
     const int i_sort_start, const int i_sort_first, const int i_sort_count,
-    const bool use_sorted_targets, int i_start, int i_end, int j_start,
-    int j_end, const double3 shift_i_d, const double3 shift_j_d,
+    const int j_sort_start, const int j_sort_count, const bool reverse_sorted_pair,
+    const float dx_max, const float rshift, const float max_reach,
+    const bool use_sorted_targets, int i_start, int i_end, int j_start, int j_end,
+    const double3 shift_i_d, const double3 shift_j_d,
     int b_id_local, int tid, float d_a, float d_H) {
 
   /*Declare a variable to use up allocated shared memory*/
@@ -2121,6 +2123,45 @@ __device__ __forceinline__ void neighbour_interactions_force(
   const bool i_in_range = use_sorted_targets ? i_offset < i_sort_count : i_start + i_offset < i_end;
   const int i_sort_position = i_sort_first + i_offset;
   const int i_id = i_in_range ? (use_sorted_targets ? d_sort_entries[i_sort_start + i_sort_position].i : i_start + i_offset) : i_start;
+
+  /* Start with the full source range */
+  int pruned_j_start = j_start;
+  int pruned_j_end = j_end;
+
+  /* Restrict the source range to particles which can interact with at least
+   * one target assigned to this CUDA block */
+  if (use_sorted_targets) {
+
+    const int block_target_first = i_sort_first + b_id_local * GPU_THREAD_BLOCK_SIZE;
+    const int block_target_count = min(GPU_THREAD_BLOCK_SIZE, i_sort_count - b_id_local * GPU_THREAD_BLOCK_SIZE);
+
+    if (block_target_count > 0) {
+
+      if (!reverse_sorted_pair) {
+
+        /* ci <- cj: Use the lowest projected ci position in this block */
+        const float target_d = d_sort_entries[i_sort_start + block_target_first].d;
+        int j_last = j_sort_count - 1;
+
+        while (j_last >= 0 && d_sort_entries[j_sort_start + j_last].d - max_reach - dx_max + rshift >= target_d)
+          j_last--;
+
+        pruned_j_end = j_start + j_last + 1;
+
+      } else {
+
+        /* cj <- ci: Use the highest projected cj position in this block */
+        const int block_target_last = block_target_first + block_target_count - 1;
+        const float target_d = d_sort_entries[i_sort_start + block_target_last].d;
+        int j_first = 0;
+
+        while (j_first < j_sort_count && d_sort_entries[j_sort_start + j_first].d + max_reach + dx_max - rshift <= target_d)
+          j_first++;
+
+        pruned_j_start = j_start + j_first;
+      }
+    }
+  }
 
   /* Initialise particle i's data. Needed since we require definition
    * before checking if i_in_range below */
@@ -2191,18 +2232,72 @@ __device__ __forceinline__ void neighbour_interactions_force(
   /*const to avoid div by zero*/
   //	constexpr float eps = 1e-24f;
 
-  /* Number of tiles. How many times to de we need to load GPU_
-   * THREAD_BLOCK_SIZE particles to get through this cell? */
-  const int numTiles =
-      (j_end - j_start + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+  /* Sorted pair interactions traverse a block-common source sort range while
+   * self interactions traverse the contiguous packed particle range */
+  if (tid == 0) {
+
+    int source_first = use_sorted_targets ? 0 : j_start;
+    int source_end = use_sorted_targets ? j_sort_count : j_end;
+
+    if (use_sorted_targets) {
+
+      const int block_target_offset = b_id_local * GPU_THREAD_BLOCK_SIZE;
+      const int block_target_count = min(GPU_THREAD_BLOCK_SIZE, i_sort_count - block_target_offset);
+
+      if (block_target_count > 0) {
+
+        const int block_target_first = i_sort_first + block_target_offset;
+        const int block_target_last = block_target_first + block_target_count - 1;
+
+        if (!reverse_sorted_pair) {
+
+          /* ci <- cj: Retain source particles below the largest projected
+           * target reach in this block */
+          const float target_d_max = d_sort_entries[i_sort_start + block_target_last].d;
+          const float source_d_max = target_d_max + max_reach + dx_max - rshift;
+
+          source_end = 0;
+          while (source_end < j_sort_count && d_sort_entries[j_sort_start + source_end].d < source_d_max) source_end++;
+
+        } else {
+
+          /* cj <- ci: Retain source particles above the smallest projected
+           * target reach in this block */
+          const float target_d_min = d_sort_entries[i_sort_start + block_target_first].d;
+          const float source_d_min = target_d_min - max_reach - dx_max + rshift;
+
+          source_first = 0;
+          while (source_first < j_sort_count && d_sort_entries[j_sort_start + source_first].d <= source_d_min) source_first++;
+        }
+
+      } else {
+
+        /* This CUDA block has no targets in this interaction direction */
+        source_first = 0;
+        source_end = 0;
+      }
+    }
+
+    s_tb_min_ngb_tb[0].x = source_first;
+    s_tb_min_ngb_tb[0].y = source_end;
+  }
+
+  __syncthreads();
+
+  const int source_first = s_tb_min_ngb_tb[0].x;
+  const int source_end = s_tb_min_ngb_tb[0].y;
+
+  /* Number of source tiles required by this CUDA block */
+  const int numTiles = (source_end - source_first + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
   /* Prefetch tile 0 into buffer 0 */
   if (numTiles > 0) {
-    const int base0 = j_start;
-    const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, j_end - base0);
+    const int base0 = source_first;
+    const int tileCount0 = min(GPU_THREAD_BLOCK_SIZE, source_end - base0);
 
     for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
-      const int gj = base0 + t;
+      const int source_position = base0 + t;
+      const int gj = use_sorted_targets ? d_sort_entries[j_sort_start + source_position].i : source_position;
       __pipeline_memcpy_async(&s_x_y[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.x_y, sizeof(double2));
       __pipeline_memcpy_async(&s_z_h[0 * GPU_THREAD_BLOCK_SIZE + t],
@@ -2221,36 +2316,35 @@ __device__ __forceinline__ void neighbour_interactions_force(
     }
     __pipeline_commit();
   }
+
   /* Loop over tiles prefetching of "next" tile while computing "current" */
   for (int tile = 0; tile < numTiles; ++tile) {
 
     /*Is this tile 0 or 1 (ping-pong tile execution and prefetching)*/
-    const int buf = tile & 1;  // 0 or 1 (ping-pong)
-    const int base = j_start + tile * GPU_THREAD_BLOCK_SIZE;
-    const int tileCount = min(GPU_THREAD_BLOCK_SIZE, j_end - base);
+    const int buf = tile & 1;
+    const int base = source_first + tile * GPU_THREAD_BLOCK_SIZE;
+    const int tileCount = min(GPU_THREAD_BLOCK_SIZE, source_end - base);
 
-    /* Make sure the current tile (already committed) is resident in shared
-     * memory */
+    /* Make sure the current tile is resident in shared memory */
     __pipeline_wait_prior(0);
     __syncthreads();
 
-    /* Initiate prefetch for the next tile (overlaps with compute further in the
-     * loop) */
+    /* Initiate prefetch for the next tile */
     const int nextTile = tile + 1;
     if (nextTile < numTiles) {
       /*If nextTile & 1 == 0. nextTile is even. If nextTile & 1 == 1, nextTile
        * is odd*/
       const int nextBuf = nextTile & 1;
       /*Where does the next tile begin in the buffer array?*/
-      const int nextBase = j_start + nextTile * GPU_THREAD_BLOCK_SIZE;
+      const int nextBase = source_first + nextTile * GPU_THREAD_BLOCK_SIZE;
       /*What is the number of required threads in the next tile? If we are at
        * the end of cell j's range in the buffer only read to the end of the
        * range*/
-      const int nextCnt = min(GPU_THREAD_BLOCK_SIZE, j_end - nextBase);
+      const int nextCnt = min(GPU_THREAD_BLOCK_SIZE, source_end - nextBase);
 
-      /*Now issue pre-fetch for next data set*/
       for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
-        const int gj = nextBase + t;
+        const int source_position = nextBase + t;
+        const int gj = use_sorted_targets ? d_sort_entries[j_sort_start + source_position].i : source_position;
         __pipeline_memcpy_async(&s_x_y[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.x_y, sizeof(double2));
         __pipeline_memcpy_async(&s_z_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
@@ -2258,8 +2352,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
         __pipeline_memcpy_async(&s_vx_m[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.vx_m, sizeof(float4));
         __pipeline_memcpy_async(&s_u_r_f_p[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
-                                &d_parts_send[gj].p_data.u_rho_f_p,
-                                sizeof(float4));
+                                &d_parts_send[gj].p_data.u_rho_f_p, sizeof(float4));
         __pipeline_memcpy_async(
             &s_b_c_av_ad[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
             &d_parts_send[gj].p_data.bals_c_avisc_adiff, sizeof(float4));
@@ -2267,11 +2360,10 @@ __device__ __forceinline__ void neighbour_interactions_force(
             &s_tb_min_ngb_tb[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
             &d_parts_send[gj].p_data.timebin_minngbtimebin, sizeof(int2));
       }
-      /*Commit but don't sync, syncing is done at the end of computations*/
       __pipeline_commit();
     }
 
-    /* Run computations on the current tile (buf)*/
+    /* Run computations on the current source tile */
     if (i_in_range) {
       /* Start the neighbour interactions */
 #pragma unroll 4
@@ -2279,25 +2371,23 @@ __device__ __forceinline__ void neighbour_interactions_force(
 
         /* We need to construct the maximal signal velocity between our particle
          * and all of it's neighbours */
-        /*grab the particle's index in the buffer array*/
-        const int j_idx = base + t;
-        /* Exclude self contribution. This happens at a later step. */
-        if (j_idx == i_id) continue;  // self for self-pairs
+        /* Self interactions use packed particle positions directly */
+        if (!use_sorted_targets && base + t == i_id) continue;
 
-        /* First, grab handles. */
+        /* First, grab handles */
         const double2 pj_x_y =
-            s_x_y[buf * GPU_THREAD_BLOCK_SIZE + t];  // unshifted
+            s_x_y[buf * GPU_THREAD_BLOCK_SIZE + t];
         const double2 pj_z_h =
-            s_z_h[buf * GPU_THREAD_BLOCK_SIZE + t];  // unshifted
+            s_z_h[buf * GPU_THREAD_BLOCK_SIZE + t];
 
-        /*Calculate particle position relative to cell position and get
-         * smoothing length*/
+        /* Calculate particle position relative to cell position and get
+         * smoothing length */
         const float xj = (pj_x_y.x - shift_j_d.x);
         const float yj = (pj_x_y.y - shift_j_d.y);
         const float zj = (pj_z_h.x - shift_j_d.z);
         const float hj = pj_z_h.y;
 
-        /*Find particle distances*/
+        /* Find particle distances */
         const float xij = xi - xj;
         const float yij = yi - yj;
         const float zij = zi - zj;
@@ -2307,7 +2397,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
 
         if (!((r2 < hig2) || (r2 < hjg2))) continue;
 
-        /* Grab remaining required handles. */
+        /* Grab remaining required handles */
         const float4 pj_vx_m = s_vx_m[buf * GPU_THREAD_BLOCK_SIZE + t];
         const float4 pj_u_r_f_p = s_u_r_f_p[buf * GPU_THREAD_BLOCK_SIZE + t];
         const float4 pj_b_c_av_ad =
@@ -2329,9 +2419,8 @@ __device__ __forceinline__ void neighbour_interactions_force(
         const float aviscj = pj_b_c_av_ad.z;
         const float adiffj = pj_b_c_av_ad.w;
 
-        /*second condition is a fix for if min_ngb_tbi is zero.
-         * Unsure why that would be but hey ho*/
-
+        /* Second condition is a fix for if min_ngb_tbi is zero.
+         * Unsure why that would be but hey ho */
         if (pj_tb_min_ngb_tb.x > 0)
           min_ngb_tbi = min(pj_tb_min_ngb_tb.x, min_ngb_tbi);
 
@@ -2341,13 +2430,13 @@ __device__ __forceinline__ void neighbour_interactions_force(
         /* Get the kernel for hj */
         float wi, wi_dx, wj, wj_dx;
 
-        const float ui = r * hi_inv;  // r / hi
+        const float ui = r * hi_inv;
         d_kernel_deval(ui, &wi, &wi_dx);
         const float wi_dr = hid_inv * wi_dx;
 
         const float hj_inv = 1.0f / hj;
-        const float hjd_inv = d_pow_dimension_plus_one(hj_inv); /* 1/h^(d+1) */
-        const float uj = r * hj_inv;                            // r / hj
+        const float hjd_inv = d_pow_dimension_plus_one(hj_inv);
+        const float uj = r * hj_inv;
         d_kernel_deval(uj, &wj, &wj_dx);
         const float wj_dr = hjd_inv * wj_dx;
 
@@ -2355,12 +2444,12 @@ __device__ __forceinline__ void neighbour_interactions_force(
         const float dvx = vxi - vxj;
         const float dvy = vyi - vyj;
         const float dvz = vzi - vzj;
-        const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij));  // dv · r
+        const float dvdr = fmaf(dvx, xij, fmaf(dvy, yij, dvz * zij));
 
         /* Includes the hubble flow term; not used for du/dt */
         const float dvdr_Hubble = dvdr + a2_Hubble * r2;
 
-        /* Are the particles moving towards each others ? */
+        /* Are the particles moving towards each other ? */
         const float omega_ij = fminf(dvdr_Hubble, 0.f);
         const float mu_ij =
             fac_mu * inv_r * omega_ij; /* This is 0 or negative */
@@ -2400,7 +2489,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
         res_ahydro.y -= mj * acc * yij;
         res_ahydro.z -= mj * acc * zij;
 
-        /* Get the time derivative for u. */
+        /* Get the time derivative for u */
         const float sph_du_term_i = P_over_rho2_i * dvdr * inv_r * wi_dr;
 
         /* Viscosity term */
@@ -2411,10 +2500,7 @@ __device__ __forceinline__ void neighbour_interactions_force(
          * the alpha from the highest pressure particle to dominate, so that the
          * diffusion limited particles always take precedence - another trick to
          * allow the scheme to work with thermal feedback. */
-        float alpha_diff =
-            (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
-        // if (fabsf(pressurei + pressurej) < 1e-10f) alpha_diff = 0.f; //
-        // optional safe guard
+        float alpha_diff = (pressurei * adiffi + pressurej * adiffj) / (pressurei + pressurej);
         const float v_diff =
             alpha_diff * 0.5f *
             (sqrtf(2.f * fabsf(pressurei - pressurej) * rhoij_inv) +
@@ -2895,8 +2981,8 @@ __global__ void cuda_kernel_force(
    * and/or the neighbour_interaction functions so we only have one cuda_kernel function instead of 3*/
   /* Self interaction: Only 1 kernel call is required */
   if (ci_start == cj_start) {
-    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, ci_start, ci_particle_end,
-        cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
+    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, 0, 0, false, 0.f, 0.f, 0.f, false, ci_start,
+        ci_particle_end, cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
     return;
   }
 
@@ -2909,71 +2995,73 @@ __global__ void cuda_kernel_force(
 
   /* Use sorted target particles for pair interactions */
   neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, leaf_sort.ci_sort_start, leaf_sort.ci_first,
-      ci_target_count, true, ci_start, ci_particle_end, cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
+      ci_target_count, leaf_sort.cj_sort_start, leaf_sort.cj_sort_count, false, leaf_sort.dx_max, leaf_sort.rshift, leaf_sort.max_reach,
+      true, ci_start, ci_particle_end, cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
 
-  neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, leaf_sort.cj_sort_start, 0, cj_target_count, true,
-      cj_start, cj_particle_end, ci_start, ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a, d_H);
+  neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, leaf_sort.cj_sort_start, 0, cj_target_count,
+      leaf_sort.ci_sort_start, leaf_sort.ci_sort_count, true, leaf_sort.dx_max, leaf_sort.rshift, leaf_sort.max_reach,
+      true, cj_start, cj_particle_end, ci_start, ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a, d_H);
 
   return;
 
-  /* Cell i is much larger than cell j: Blocks map over cell i. */
-  if (use_ci_source_parallel) {
-
-    /* Do ci <- cj: Cell i is the larger target, so use the target-parallel
-     * implementation.*/
-    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, ci_start, ci_particle_end,
-        cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
-
-    /* Do cj <- ci: Cell i is now the larger source. Continue to map threads over cell i
-     * and reduce their contributions into target particles in cell j. */
-    neighbour_interactions_force_j_parallel(
-        d_parts_send, d_parts_recv, cj_start, cj_particle_end, ci_start,
-        ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a,
-        d_H);
-
-    return;
-  }
-
-  /* Cell j is much larger than cell i: Blocks map over cell j. */
-  if (use_cj_source_parallel) {
-
-    /* Do ci <- cj: Cell j is the larger source. Threads map over cell j and reduce their
-     * contributions into target particles in cell i. */
-    neighbour_interactions_force_j_parallel(
-        d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
-        cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a,
-        d_H);
-
-    /* Do cj <- ci: Cell j is then the larger target, so use the target-parallel
-     * implementation. */
-    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, cj_start, cj_particle_end,
-        ci_start, ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a, d_H);
-
-    return;
-  }
-
-  /* Similar cell sizes: Use the target-parallel implementation for both directions.
-   * Since blocks are allocated using max(ni, nj), some blocks will contain no
-   * valid per-thread target particles for the smaller cell. The functions
-   * handles this through i_in_range to ignore OOB particles. */
-
-  /* Blocks were allocated using max(ni, nj), so not every block is necessarily
-   * required for both interaction directions.
-   * Skip a calculation when b_id_local lies outside the
-   * block range required by that target cell.
-   * This is intended to minimise atomic contentions, etc.*/
-  const bool do_ci_target = (b_id_local < ci_blocks);
-  const bool do_cj_target = (b_id_local < cj_blocks);
-
-  /*Do ci <- cj*/
-  if(do_ci_target)
-    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, ci_start, ci_particle_end,
-        cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
-
-  /*Now do cj <- ci*/
-  if(do_cj_target)
-    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, cj_start, cj_particle_end,
-        ci_start, ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a, d_H);
+//  /* Cell i is much larger than cell j: Blocks map over cell i. */
+//  if (use_ci_source_parallel) {
+//
+//    /* Do ci <- cj: Cell i is the larger target, so use the target-parallel
+//     * implementation.*/
+//    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, ci_start, ci_particle_end,
+//        cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
+//
+//    /* Do cj <- ci: Cell i is now the larger source. Continue to map threads over cell i
+//     * and reduce their contributions into target particles in cell j. */
+//    neighbour_interactions_force_j_parallel(
+//        d_parts_send, d_parts_recv, cj_start, cj_particle_end, ci_start,
+//        ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a,
+//        d_H);
+//
+//    return;
+//  }
+//
+//  /* Cell j is much larger than cell i: Blocks map over cell j. */
+//  if (use_cj_source_parallel) {
+//
+//    /* Do ci <- cj: Cell j is the larger source. Threads map over cell j and reduce their
+//     * contributions into target particles in cell i. */
+//    neighbour_interactions_force_j_parallel(
+//        d_parts_send, d_parts_recv, ci_start, ci_particle_end, cj_start,
+//        cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a,
+//        d_H);
+//
+//    /* Do cj <- ci: Cell j is then the larger target, so use the target-parallel
+//     * implementation. */
+//    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, cj_start, cj_particle_end,
+//        ci_start, ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a, d_H);
+//
+//    return;
+//  }
+//
+//  /* Similar cell sizes: Use the target-parallel implementation for both directions.
+//   * Since blocks are allocated using max(ni, nj), some blocks will contain no
+//   * valid per-thread target particles for the smaller cell. The functions
+//   * handles this through i_in_range to ignore OOB particles. */
+//
+//  /* Blocks were allocated using max(ni, nj), so not every block is necessarily
+//   * required for both interaction directions.
+//   * Skip a calculation when b_id_local lies outside the
+//   * block range required by that target cell.
+//   * This is intended to minimise atomic contentions, etc.*/
+//  const bool do_ci_target = (b_id_local < ci_blocks);
+//  const bool do_cj_target = (b_id_local < cj_blocks);
+//
+//  /*Do ci <- cj*/
+//  if(do_ci_target)
+//    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, ci_start, ci_particle_end,
+//        cj_start, cj_particle_end, ci_target_shift, cj_source_shift, b_id_local, tid, d_a, d_H);
+//
+//  /*Now do cj <- ci*/
+//  if(do_cj_target)
+//    neighbour_interactions_force(d_parts_send, d_parts_recv, d_sort_entries, 0, 0, 0, false, cj_start, cj_particle_end,
+//        ci_start, ci_particle_end, cj_target_shift, ci_source_shift, b_id_local, tid, d_a, d_H);
 }
 
 #ifdef __cplusplus
