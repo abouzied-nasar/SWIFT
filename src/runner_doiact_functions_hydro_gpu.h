@@ -556,14 +556,30 @@ __attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_ge
   const float dx_max = cii->hydro.dx_max_sort + cjj->hydro.dx_max_sort;
 
   /* Find the first sorted ci particle which can potentially reach cj */
-  int ci_first = cii_count;
-  while (ci_first > 0 && sort_i[ci_first - 1].d + range.ci_reach + dx_max - md->leaf_rshift[leaf_id] > sort_j[0].d)
-    ci_first--;
+  const float ci_boundary = sort_j[0].d - range.ci_reach - dx_max + md->leaf_rshift[leaf_id];
+  int ci_left = 0;
+  int ci_right = cii_count;
+  while (ci_left < ci_right) {
+    const int ci_mid = ci_left + (ci_right - ci_left) / 2;
+    if (sort_i[ci_mid].d <= ci_boundary)
+      ci_left = ci_mid + 1;
+    else
+      ci_right = ci_mid;
+  }
+  const int ci_first = ci_left;
 
   /* Find the last sorted cj particle which can potentially reach ci */
-  int cj_last = -1;
-  while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - range.cj_reach - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d)
-    cj_last++;
+  const float cj_boundary = sort_i[cii_count - 1].d + range.cj_reach + dx_max - md->leaf_rshift[leaf_id];
+  int cj_left = 0;
+  int cj_right = cjj_count;
+  while (cj_left < cj_right) {
+    const int cj_mid = cj_left + (cj_right - cj_left) / 2;
+    if (sort_j[cj_mid].d < cj_boundary)
+      cj_left = cj_mid + 1;
+    else
+      cj_right = cj_mid;
+  }
+  const int cj_last = cj_left - 1;
 
   range.ci_first = ci_first;
   range.cj_last = cj_last;
