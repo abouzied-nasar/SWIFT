@@ -624,7 +624,8 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
                                       const struct scheduler *s,
                                       struct gpu_offload_data *restrict buf,
                                       const char timer, const struct task * t, const struct cell *restrict cii,
-                                      const struct cell *restrict cjj, const enum task_subtypes task_subtype) {
+                                      const struct cell *restrict cjj, const enum task_subtypes task_subtype,
+                                      const struct gpu_sorted_pair_range range, const int n_blocks_current) {
 
 #ifdef SWIFT_DEBUG_CHECKS
   if (cii == NULL) error("Got NULL cell ci?");
@@ -638,25 +639,6 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   const int cjj_count = cjj->hydro.count;
 
   const int leaf_id = md->n_leaves_packed;
-
-  /* Use complete target ranges unless this is a sorted pair computation */
-  struct gpu_sorted_pair_range range;
-  range.ci_first = 0;
-  range.cj_last = cjj_count - 1;
-  range.ci_target_count = cii_count;
-  range.cj_target_count = cjj_count;
-  range.ci_reach = 0.f;
-  range.cj_reach = 0.f;
-
-  /* Calculate reduced target ranges for sorted pair computations */
-  if (cii != cjj && (task_subtype == task_subtype_gpu_density ||
-      task_subtype == task_subtype_gpu_gradient ||
-      task_subtype == task_subtype_gpu_force)) {
-    /*Calculate how far ci can see into cj and vice-versa */
-    gpu_get_sorted_pair_reaches(cii, cjj, task_subtype, &range);
-    /*Calculate ranges for sorted particle interactions (where to start and stop searching for neighbours)*/
-    range = gpu_get_sorted_pair_range(cii, cjj, md, leaf_id, range);
-  }
 
 #ifdef SWIFT_DEBUG_CHECKS
   /* Anything to do here? */
@@ -705,9 +687,6 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
    * Each cell is split into count/BS chunks so that
    * multiple cuda blocks work on particles in each cell if cell is big enough*/
   const int n_blocks_packed = md->n_blocks_packed;
-  /* Launch enough blocks to cover the larger (conservative) pruned target range */
-  const int n_pruned_targets = max(range.ci_target_count, range.cj_target_count);
-  const int n_blocks_current = (n_pruned_targets + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
 
   const int n_blocks_max = md->params.cuda_blockid_buffer_size;
 
@@ -1557,7 +1536,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         /* The current leaf fits. Pack it normally. This increments count_parts, count_parts_unique,
          * n_blocks_packed and n_leaves_packed */
         pack_cell_particles_in_unique_list(
-            r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype);
+            r, s, buf, /*timer=*/1, t, cii, cjj, t->subtype, range, n_blocks_current);
 
         /* Record packing time. */
         if (t->subtype == task_subtype_gpu_density) {
