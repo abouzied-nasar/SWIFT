@@ -29,14 +29,12 @@ extern "C" {
 #endif
 
 #include "gpu_offload_data.h"
-
 #include "cuda_config.h"
-
 #include "task.h"
 
 #include <cuda.h>
 #include <cuda_runtime.h>
-
+#include <string.h>
 /**
  * @brief initialise GPU data buffers (including their associated metadata)
  *
@@ -148,6 +146,21 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
       sort_buffer_size * sizeof(struct gpu_sort_entry));
   swift_assert(cu_error == cudaSuccess);
 
+  /* A pair leaf can add at most two unique cell and sort requests */
+  const size_t sort_request_capacity = 2 * params->leaf_buffer_size;
+  /* Allocate the compact GPU sort request list */
+  buf->gpu_md.sort_requests = (struct gpu_sort_request *)malloc(
+      sort_request_capacity * sizeof(struct gpu_sort_request));
+  swift_assert(buf->gpu_md.sort_requests != NULL);
+  /* Allocate direct lookup array for every unique cell and sort direction */
+  buf->gpu_md.sort_request_index = (int *)malloc(
+      2 * params->leaf_buffer_size * 13 * sizeof(int));
+  swift_assert(buf->gpu_md.sort_request_index != NULL);
+  buf->gpu_md.n_sort_requests = 0;
+  /* Set to -1 to mark all sort requests as un-set */
+  memset(buf->gpu_md.sort_request_index, -1,
+      2 * params->leaf_buffer_size * 13 * sizeof(int));
+
   /* Allocate device memory for the sort metadata of each leaf computation */
   cu_error = cudaMalloc(
       (void **)&buf->gpu_md.d_leaf_sort_metadata,
@@ -171,6 +184,10 @@ void gpu_data_buffers_init_step(struct gpu_offload_data *buf) {
  * @brief reset (zero out) the data buffers.
  */
 void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
+
+  buf->gpu_md.n_sort_requests = 0;
+  memset(buf->gpu_md.sort_request_index, -1,
+      2 * buf->md.params.leaf_buffer_size * 13 * sizeof(int));
 
 #ifdef SWIFT_DEBUG_CHECKS
 
@@ -237,6 +254,11 @@ void gpu_data_buffers_free(struct gpu_offload_data *buf) {
 
   cu_error = cudaFree(buf->gpu_md.d_leaf_sort_metadata);
   swift_assert(cu_error == cudaSuccess);
+
+  free((void *)buf->gpu_md.sort_requests);
+
+  free((void *)buf->gpu_md.sort_request_index);
+
 }
 
 #ifdef __cplusplus

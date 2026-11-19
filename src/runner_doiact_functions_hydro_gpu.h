@@ -620,6 +620,77 @@ __attribute__((always_inline)) INLINE static void gpu_pack_cell_sort(
   }
 }
 
+/**
+ * @brief Find or pack a directional sort for one unique cell
+ *
+ * @param sort CPU directional sort entries
+ * @param count Number of particles in the cell
+ * @param packed_start Where the cell starts in the packed particle buffer
+ * @param unique_index Index of the cell in the unique cell list
+ * @param sid Directional sort index
+ * @param md GPU packing metadata
+ * @param gpu_md GPU metadata
+ *
+ * @return First entry belonging to the directional sort in sort_entries
+ */
+__attribute__((always_inline)) INLINE static int gpu_get_or_pack_cell_sort(
+    const struct sort_entry *sort, const int count, const int packed_start,
+    const int unique_index, const int sid,
+    struct gpu_pack_metadata *md, struct gpu_md *gpu_md) {
+#ifdef SWIFT_DEBUG_CHECKS
+  if (unique_index < 0 || unique_index >= 2 * md->params.leaf_buffer_size)
+    error(
+        "Invalid unique cell index while registering GPU sort request: "
+        "unique_index=%d capacity=%d",
+        unique_index, 2 * md->params.leaf_buffer_size);
+  if (sid < 0 || sid >= 13)
+    error(
+        "Invalid sort direction while registering GPU sort request: "
+        "unique_index=%d sid=%d",
+        unique_index, sid);
+#endif
+  const int lookup_index = unique_index * 13 + sid;
+  const int existing_request = gpu_md->sort_request_index[lookup_index];
+  if (existing_request >= 0) {
+#ifdef SWIFT_DEBUG_CHECKS
+    const struct gpu_sort_request *request =
+        &gpu_md->sort_requests[existing_request];
+    if (request->packed_start != packed_start || request->count != count ||
+        request->sid != sid)
+      error(
+          "Inconsistent existing GPU sort request: "
+          "request=%d unique_index=%d sid=%d packed_start=%d/%d count=%d/%d",
+          existing_request, unique_index, sid, request->packed_start,
+          packed_start, request->count, count);
+#endif
+    return gpu_md->sort_requests[existing_request].sort_start;
+  }
+  const int request_index = gpu_md->n_sort_requests;
+  if (request_index >= 2 * md->params.leaf_buffer_size)
+    error(
+        "Exceeded GPU sort request capacity: "
+        "requests=%d capacity=%d",
+        request_index, 2 * md->params.leaf_buffer_size);
+  const size_t sort_buffer_size =
+      2 * (size_t)md->params.cuda_blockid_buffer_size *
+      GPU_THREAD_BLOCK_SIZE;
+  if ((size_t)md->n_sort_entries_packed + count > sort_buffer_size)
+    error(
+        "Exceeded GPU directional sort buffer capacity while registering "
+        "sort request: packed=%d required=%d capacity=%zu",
+        md->n_sort_entries_packed, count, sort_buffer_size);
+  const int sort_start = md->n_sort_entries_packed;
+  gpu_pack_cell_sort(sort, count, packed_start, gpu_md, sort_start);
+  gpu_md->sort_requests[request_index].packed_start = packed_start;
+  gpu_md->sort_requests[request_index].count = count;
+  gpu_md->sort_requests[request_index].sort_start = sort_start;
+  gpu_md->sort_requests[request_index].sid = sid;
+  gpu_md->sort_request_index[lookup_index] = request_index;
+  gpu_md->n_sort_requests++;
+  md->n_sort_entries_packed += count;
+  return sort_start;
+}
+
 __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_list(const struct runner *r,
                                       const struct scheduler *s,
                                       struct gpu_offload_data *restrict buf,
@@ -634,7 +705,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
   /* Grab some handles. */
   /* packing data and metadata */
   struct gpu_pack_metadata *md = &buf->md;
-  const struct gpu_md *gpu_md = &buf->gpu_md;
+  struct gpu_md *gpu_md = &buf->gpu_md;
   const int cii_count = cii->hydro.count;
   const int cjj_count = cjj->hydro.count;
 
@@ -774,15 +845,12 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     /*Where do they start and end in the buffers?*/
     const int ci_packed_start = md->unique_start_end[unique_i].x;
     const int cj_packed_start = md->unique_start_end[unique_j].x;
-    const int ci_sort_start = md->n_sort_entries_packed;
-    const int cj_sort_start = ci_sort_start + cii_count;
 
-    /*Pack the CPU sorts*/
-    gpu_pack_cell_sort(sort_i, cii_count, ci_packed_start, gpu_md, ci_sort_start);
-    gpu_pack_cell_sort(sort_j, cjj_count, cj_packed_start, gpu_md, cj_sort_start);
-
-    /*Take notes
-     * TODO: Maybe move this into gpu_pack_cell_sort?*/
+    const int ci_sort_start = gpu_get_or_pack_cell_sort(
+        sort_i, cii_count, ci_packed_start, unique_i, sid, md, gpu_md);
+    const int cj_sort_start = gpu_get_or_pack_cell_sort(
+        sort_j, cjj_count, cj_packed_start, unique_j, sid, md, gpu_md);
+    /*Take notes*/
     leaf_sort->ci_sort_start = ci_sort_start;
     leaf_sort->ci_sort_count = cii_count;
     leaf_sort->cj_sort_start = cj_sort_start;
@@ -792,7 +860,6 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     leaf_sort->dx_max = cii->hydro.dx_max_sort + cjj->hydro.dx_max_sort;
     leaf_sort->rshift = md->leaf_rshift[leaf_id];
     leaf_sort->max_reach = max(range.ci_reach, range.cj_reach);
-    md->n_sort_entries_packed += cii_count + cjj_count;
 
 #ifdef SWIFT_DEBUG_CHECKS
     /* Check that ci's packed directional sort remains ordered */
@@ -854,6 +921,13 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   /*Get the number of cuda blocks we need to launch. No need for calculation here as
    * this is calculated while we pack*/
   const int n_blocks = md->n_blocks_packed;
+
+#ifdef SWIFT_DEBUG_CHECKS
+  message(
+      "GPU sort requests: leaves=%d requests=%d entries=%d",
+      leaves_packed, buf->gpu_md.n_sort_requests,
+      md->n_sort_entries_packed);
+#endif
 
   /*Send to GPU to have an idea of space size for periodics*/
   double3 space_dim;

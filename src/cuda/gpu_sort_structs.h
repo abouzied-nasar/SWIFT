@@ -9,6 +9,18 @@ struct gpu_sort_entry {
   int i;
 };
 
+/* Request for GPU to construct one directional sort for a unique packed cell */
+struct gpu_sort_request {
+  /* First particle belonging to the cell in the packed particle buffer */
+  int packed_start;
+  /* Number of particles belonging to the cell */
+  int count;
+  /* First entry reserved for this sort in sort_entries */
+  int sort_start;
+  /* Direction used to project and sort the particles */
+  int sid;
+};
+
 /* Location of the sorted particle lists for a leaf computation */
 struct gpu_leaf_sort_metadata {
   /* Index where ci's sorted particle list starts in sort_entries */
