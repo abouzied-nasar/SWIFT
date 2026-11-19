@@ -46,6 +46,16 @@ extern "C" {
 /* #include <cuda_profiler_api.h> */
 /* #include <cuda_runtime.h> */
 
+void gpu_launch_prepare_density_sorts(
+    const struct gpu_part_send_d *__restrict__ d_parts_send,
+    const struct gpu_sort_request *__restrict__ d_sort_requests,
+    struct gpu_sort_entry *__restrict__ d_sort_entries,
+    const int n_sort_requests, cudaStream_t stream) {
+  if (n_sort_requests == 0) return;
+  cuda_kernel_prepare_density_sorts<<<n_sort_requests, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(d_parts_send, d_sort_requests, d_sort_entries, n_sort_requests);
+}
+
+
 /**
  * @brief Launch the density computation on the GPU for a bundle of leaf cells.
  *

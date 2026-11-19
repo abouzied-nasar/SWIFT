@@ -39,6 +39,62 @@ extern "C" {
 #include <config.h>
 #include <stdio.h>
 #include <cfloat>
+#include <limits.h>
+
+/**
+ * @brief Construct temporary directional sorts from packed density particles
+ *
+ * @param d_parts_send Packed density particle data
+ * @param d_sort_requests Compact directional sort requests
+ * @param d_sort_entries Output directional sort entries
+ * @param n_sort_requests Number of directional sort requests
+ */
+__global__ void cuda_kernel_prepare_density_sorts(
+    const struct gpu_part_send_d *__restrict__ d_parts_send,
+    const struct gpu_sort_request *__restrict__ d_sort_requests,
+    struct gpu_sort_entry *__restrict__ d_sort_entries,
+    const int n_sort_requests) {
+  const int request_id = blockIdx.x;
+  if (request_id >= n_sort_requests) return;
+  const struct gpu_sort_request request = d_sort_requests[request_id];
+  if (request.count > GPU_SHARED_SORT_MAX_ENTRIES) return;
+  int padded_count = 1;
+  while (padded_count < request.count) padded_count <<= 1;
+  __shared__ struct gpu_sort_entry entries[GPU_SHARED_SORT_MAX_ENTRIES];
+  for (int local_id = threadIdx.x; local_id < padded_count; local_id += blockDim.x) {
+    if (local_id < request.count) {
+      const int packed_id = request.packed_start + local_id;
+      const struct gpu_part_data_d part = d_parts_send[packed_id].p_data;
+      const double d = part.x_y.x * gpu_runner_shift[request.sid][0] + part.x_y.y * gpu_runner_shift[request.sid][1] + part.z_h.x * gpu_runner_shift[request.sid][2];
+      entries[local_id].d = (float)d;
+      entries[local_id].i = packed_id;
+    } else {
+      entries[local_id].d = FLT_MAX;
+      entries[local_id].i = INT_MAX;
+    }
+  }
+  __syncthreads();
+  for (int sequence_size = 2; sequence_size <= padded_count; sequence_size <<= 1) {
+    for (int comparison_distance = sequence_size >> 1; comparison_distance > 0; comparison_distance >>= 1) {
+      for (int local_id = threadIdx.x; local_id < padded_count; local_id += blockDim.x) {
+        const int partner = local_id ^ comparison_distance;
+        if (partner > local_id) {
+          const bool ascending = (local_id & sequence_size) == 0;
+          const struct gpu_sort_entry entry = entries[local_id];
+          const struct gpu_sort_entry partner_entry = entries[partner];
+          const bool swap = ascending ? gpu_sort_entry_after(entry, partner_entry) : gpu_sort_entry_after(partner_entry, entry);
+          if (swap) {
+            entries[local_id] = partner_entry;
+            entries[partner] = entry;
+          }
+        }
+      }
+      __syncthreads();
+    }
+  }
+  for (int local_id = threadIdx.x; local_id < request.count; local_id += blockDim.x)
+    d_sort_entries[request.sort_start + local_id] = entries[local_id];
+}
 
 /**
  * @brief Naive kernel computing the density interactions of a single particle

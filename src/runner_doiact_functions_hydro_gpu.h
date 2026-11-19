@@ -35,6 +35,7 @@ extern "C" {
 #include "timers.h"
 #include "sort_part.h"
 #include <string.h>
+#include <math.h>
 
 #ifdef WITH_CUDA
 #include "cuda/cuda_config.h"
@@ -685,6 +686,8 @@ __attribute__((always_inline)) INLINE static int gpu_get_or_pack_cell_sort(
   gpu_md->sort_requests[request_index].count = count;
   gpu_md->sort_requests[request_index].sort_start = sort_start;
   gpu_md->sort_requests[request_index].sid = sid;
+  if (count > gpu_md->max_sort_request_count)
+    gpu_md->max_sort_request_count = count;
   gpu_md->sort_request_index[lookup_index] = request_index;
   gpu_md->n_sort_requests++;
   md->n_sort_entries_packed += count;
@@ -897,6 +900,72 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
 }
 
 /**
+ * @brief Validate temporary GPU-generated directional sorts
+ *
+ * @param buf GPU offload buffers
+ */
+__attribute__((always_inline)) INLINE static void gpu_validate_density_sorts(
+    const struct gpu_offload_data *restrict buf) {
+
+  const struct gpu_md *gpu_md = &buf->gpu_md;
+  for (int request_id = 0; request_id < gpu_md->n_sort_requests; request_id++) {
+    const struct gpu_sort_request *request = &gpu_md->sort_requests[request_id];
+    if (request->count > GPU_SHARED_SORT_MAX_ENTRIES) {
+    #ifdef SWIFT_DEBUG_CHECKS
+      message(
+          "Using CPU directional sort fallback: request=%d sid=%d count=%d "
+          "GPU_shared_sort_limit=%d",
+          request_id, request->sid, request->count,
+          GPU_SHARED_SORT_MAX_ENTRIES);
+    #endif
+      continue;
+    }
+    for (int local_id = 0; local_id < request->count; local_id++) {
+      const struct gpu_sort_entry entry = gpu_md->sort_entries[request->sort_start + local_id];
+      if (entry.i < request->packed_start || entry.i >= request->packed_start + request->count)
+        error(
+            "GPU directional sort contains an invalid particle index: "
+            "request=%d sid=%d local_id=%d entry_i=%d packed_start=%d count=%d",
+            request_id, request->sid, local_id, entry.i,
+            request->packed_start, request->count);
+      const struct gpu_part_data_d part = buf->parts_send_d[entry.i].p_data;
+      const double d = part.x_y.x * runner_shift[request->sid][0] + part.x_y.y * runner_shift[request->sid][1] + part.z_h.x * runner_shift[request->sid][2];
+      const float expected_d = (float)d;
+      const float tolerance = 1e-6f * (1.f + fabsf(expected_d));
+      if (fabsf(entry.d - expected_d) > tolerance)
+        error(
+            "GPU directional sort contains an incorrect projection: "
+            "request=%d sid=%d local_id=%d entry_d=%g expected_d=%g "
+            "difference=%g tolerance=%g",
+            request_id, request->sid, local_id, entry.d, expected_d,
+            fabsf(entry.d - expected_d), tolerance);
+      if (local_id > 0) {
+        const struct gpu_sort_entry previous = gpu_md->sort_entries[request->sort_start + local_id - 1];
+        if (previous.d > entry.d || (previous.d == entry.d && previous.i > entry.i))
+          error(
+              "GPU directional sort is not ordered: "
+              "request=%d sid=%d local_id=%d previous=(%g,%d) current=(%g,%d)",
+              request_id, request->sid, local_id,
+              previous.d, previous.i, entry.d, entry.i);
+      }
+    }
+#ifdef SWIFT_DEBUG_CHECKS
+    for (int cell_local_id = 0; cell_local_id < request->count; cell_local_id++) {
+      const int expected_i = request->packed_start + cell_local_id;
+      int occurrences = 0;
+      for (int local_id = 0; local_id < request->count; local_id++)
+        occurrences += gpu_md->sort_entries[request->sort_start + local_id].i == expected_i;
+      if (occurrences != 1)
+        error(
+            "GPU directional sort does not contain each particle exactly once: "
+            "request=%d sid=%d particle=%d occurrences=%d",
+            request_id, request->sid, expected_i, occurrences);
+    }
+#endif
+  }
+}
+
+/**
  * @brief Generic function to launch GPU computations: Copies CPU buffer data
  * asynchronously over to the GPU, calls the solver, then copies data back.
  *
@@ -924,9 +993,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
 #ifdef SWIFT_DEBUG_CHECKS
   message(
-      "GPU sort requests: leaves=%d requests=%d entries=%d",
+      "GPU sort requests: leaves=%d requests=%d entries=%d max_count=%d",
       leaves_packed, buf->gpu_md.n_sort_requests,
-      md->n_sort_entries_packed);
+      md->n_sort_entries_packed, buf->gpu_md.max_sort_request_count);
 #endif
 
   /*Send to GPU to have an idea of space size for periodics*/
@@ -1034,6 +1103,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
         subtaskID_names[task_subtype], r->cpuid,
         leaves_packed, md->params.leaf_buffer_size);
 
+  /* Copy the compact directional sort requests */
+  if (gpu_md->n_sort_requests > 0) {
+    cu_error = cudaMemcpyAsync(&buf->gpu_md.d_sort_requests[0], &buf->gpu_md.sort_requests[0],
+        gpu_md->n_sort_requests * sizeof(struct gpu_sort_request), cudaMemcpyHostToDevice, stream[0]);
+    if (cu_error != cudaSuccess)
+      error(
+          "CUDA directional sort request copy failed: CUDA error '%s' for "
+          "task_subtype %s cpuid=%d sort_requests=%d capacity=%d",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
+          gpu_md->n_sort_requests, 2 * md->params.leaf_buffer_size);
+  }
+
   /* Copy the directional sort entries required by pair computations. Do this only if we
    * have packed at least 1 pair task. If all tasks packed are selfs then sort_entries_packed
    * will be zero */
@@ -1089,6 +1170,10 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
           cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
     }
 
+    /* Construct GPU directional sorts before launching density */
+    gpu_launch_prepare_density_sorts(buf->d_parts_send_d, gpu_md->d_sort_requests,
+        gpu_md->d_sort_entries, gpu_md->n_sort_requests, stream[0]);
+
     /*"Once more unto the breach dear friends, once more!"
      *Issue instruction to launch GPU computations*/
     gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
@@ -1098,11 +1183,22 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
     /*"The wheel is come full circle; I am here"
      *  Results are ready to copy back to CPU BUFFERS */
-    cu_error =
         cudaMemcpyAsync(&buf->parts_recv_d[0],
             &buf->d_parts_recv_d[0],
             md->count_parts_unique * sizeof(struct gpu_part_recv_d),
             cudaMemcpyDeviceToHost, stream[0]);
+
+    /* Copy the GPU directional sorts back for validation */
+    if (md->n_sort_entries_packed > 0) {
+      cu_error = cudaMemcpyAsync(&gpu_md->sort_entries[0], &gpu_md->d_sort_entries[0], md->n_sort_entries_packed * sizeof(struct gpu_sort_entry), cudaMemcpyDeviceToHost, stream[0]);
+      if (cu_error != cudaSuccess)
+        error(
+            "CUDA temporary directional sort copy failed: CUDA error '%s' for "
+            "task_subtype %s cpuid=%d sort_entries=%d",
+            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
+            md->n_sort_entries_packed);
+    }
+
   }
   else if (task_subtype == task_subtype_gpu_gradient){
 
@@ -1222,6 +1318,11 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
         "Stream synchronize: CUDA error '%s' for task_subtype %s: cpuid=%i ",
         cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
   }
+
+#ifdef SWIFT_DEBUG_CHECKS
+if (task_subtype == task_subtype_gpu_density && gpu_md->n_sort_requests > 0)
+  gpu_validate_density_sorts(buf);
+#endif
 
   /*Check to see if the kernel returned any errors.
    * If we get here without crashing due to "error" call
@@ -1536,13 +1637,14 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
       range.ci_reach = 0.f;
       range.cj_reach = 0.f;
 
-      /* Calculate reduced target ranges for sorted pair computations */
+      /* Calculate target ranges for sorted pair computations */
       if (cii != cjj && (t->subtype == task_subtype_gpu_density ||
           t->subtype == task_subtype_gpu_gradient ||
           t->subtype == task_subtype_gpu_force)) {
         /*Calculate how far ci can see into cj and vice-versa */
         gpu_get_sorted_pair_reaches(cii, cjj, t->subtype, &range);
-        range = gpu_get_sorted_pair_range(cii, cjj, md, md->n_leaves_packed, range);
+        if (t->subtype != task_subtype_gpu_density)
+          range = gpu_get_sorted_pair_range(cii, cjj, md, md->n_leaves_packed, range);
       }
 
       /*How many cuda blocks do we need for the larger (conservative) pruned target range?*/

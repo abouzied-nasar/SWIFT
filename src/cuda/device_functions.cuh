@@ -22,6 +22,7 @@
 #include "../../config.h"
 
 #include <math.h>
+#include "gpu_sort_structs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -183,6 +184,29 @@ __device__ float atomicMaxFloat(float* addr, float val) {
 
     return __int_as_float(original_old);
 }
+
+/* Direction vectors used to project particle positions */
+__device__ __constant__ double gpu_runner_shift[13][3] = {
+    {5.773502691896258e-01, 5.773502691896258e-01, 5.773502691896258e-01},
+    {7.071067811865475e-01, 7.071067811865475e-01, 0.0},
+    {5.773502691896258e-01, 5.773502691896258e-01, -5.773502691896258e-01},
+    {7.071067811865475e-01, 0.0, 7.071067811865475e-01},
+    {1.0, 0.0, 0.0},
+    {7.071067811865475e-01, 0.0, -7.071067811865475e-01},
+    {5.773502691896258e-01, -5.773502691896258e-01, 5.773502691896258e-01},
+    {7.071067811865475e-01, -7.071067811865475e-01, 0.0},
+    {5.773502691896258e-01, -5.773502691896258e-01, -5.773502691896258e-01},
+    {0.0, 7.071067811865475e-01, 7.071067811865475e-01},
+    {0.0, 1.0, 0.0},
+    {0.0, 7.071067811865475e-01, -7.071067811865475e-01},
+    {0.0, 0.0, 1.0}};
+
+__device__ __forceinline__ bool gpu_sort_entry_after(
+    const struct gpu_sort_entry a,
+    const struct gpu_sort_entry b) {
+  return a.d > b.d || (a.d == b.d && a.i > b.i);
+}
+
 #ifdef __cplusplus
 }
 #endif

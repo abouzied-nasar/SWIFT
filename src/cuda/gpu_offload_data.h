@@ -112,8 +112,12 @@ struct gpu_offload_data {
     struct gpu_sort_entry *d_sort_entries;
     /* Compact list of unique cell and direction sort requests */
     struct gpu_sort_request *sort_requests;
+    /* Device copy of the compact directional sort requests */
+    struct gpu_sort_request *d_sort_requests;
     /* GPU sort request index for each unique cell and sort direction */
     int *sort_request_index;
+    /* Maximum particle count in a single sort request */
+    int max_sort_request_count;
     /* Number of unique sort requests in sort_requests */
     int n_sort_requests;
     /* CPU-side location of each leaf's sort entries */

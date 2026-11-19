@@ -146,6 +146,10 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
       sort_buffer_size * sizeof(struct gpu_sort_entry));
   swift_assert(cu_error == cudaSuccess);
 
+  /* Allocate device memory for compact directional sort requests */
+  cu_error = cudaMalloc((void **)&buf->gpu_md.d_sort_requests, 2 * params->leaf_buffer_size * sizeof(struct gpu_sort_request));
+  swift_assert(cu_error == cudaSuccess);
+
   /* A pair leaf can add at most two unique cell and sort requests */
   const size_t sort_request_capacity = 2 * params->leaf_buffer_size;
   /* Allocate the compact GPU sort request list */
@@ -157,6 +161,7 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf,
       2 * params->leaf_buffer_size * 13 * sizeof(int));
   swift_assert(buf->gpu_md.sort_request_index != NULL);
   buf->gpu_md.n_sort_requests = 0;
+  buf->gpu_md.max_sort_request_count = 0;
   /* Set to -1 to mark all sort requests as un-set */
   memset(buf->gpu_md.sort_request_index, -1,
       2 * params->leaf_buffer_size * 13 * sizeof(int));
@@ -186,8 +191,9 @@ void gpu_data_buffers_init_step(struct gpu_offload_data *buf) {
 void gpu_data_buffers_reset(struct gpu_offload_data *buf) {
 
   buf->gpu_md.n_sort_requests = 0;
+  buf->gpu_md.max_sort_request_count = 0;
   memset(buf->gpu_md.sort_request_index, -1,
-      2 * buf->md.params.leaf_buffer_size * 13 * sizeof(int));
+         2 * buf->md.params.leaf_buffer_size * 13 * sizeof(int));
 
 #ifdef SWIFT_DEBUG_CHECKS
 
@@ -252,7 +258,7 @@ void gpu_data_buffers_free(struct gpu_offload_data *buf) {
   cu_error = cudaFree(buf->gpu_md.d_sort_entries);
   swift_assert(cu_error == cudaSuccess);
 
-  cu_error = cudaFree(buf->gpu_md.d_leaf_sort_metadata);
+  cu_error = cudaFree(buf->gpu_md.d_sort_requests);
   swift_assert(cu_error == cudaSuccess);
 
   free((void *)buf->gpu_md.sort_requests);

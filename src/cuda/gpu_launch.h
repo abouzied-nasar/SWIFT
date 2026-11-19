@@ -27,6 +27,12 @@ extern "C" {
 
 #include <cuda_runtime.h>
 
+void gpu_launch_prepare_density_sorts(
+    const struct gpu_part_send_d* __restrict__ d_parts_send,
+    const struct gpu_sort_request* __restrict__ d_sort_requests,
+    struct gpu_sort_entry* __restrict__ d_sort_entries,
+    const int n_sort_requests, cudaStream_t stream);
+
 void gpu_launch_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     struct gpu_part_recv_d* __restrict__ d_parts_recv,
