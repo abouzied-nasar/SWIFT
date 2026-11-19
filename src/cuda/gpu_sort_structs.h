@@ -5,8 +5,7 @@
 struct gpu_sort_entry {
   /* Particle position projected along the sort direction */
   float d;
-  /* Absolute index of the particle in the packed GPU particle buffer
-   * In CPU sorted code this represents local index within a cell (I think!)*/
+  /* Absolute index of the particle in the packed GPU particle buffer */
   int i;
 };
 
