@@ -146,10 +146,6 @@ struct gpu_pack_metadata {
    * we do not over-fill the hash table keeping it efficient*/
   int hash_size;
 
-  unsigned int total_ci_range_iterations;
-  unsigned int total_cj_range_iterations;
-  unsigned int total_range_searches;
-
 #ifdef SWIFT_DEBUG_CHECKS
   /*! Size of the send_part struct used */
   size_t send_struct_size;

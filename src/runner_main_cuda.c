@@ -894,11 +894,6 @@ void *runner_main_cuda(void *data) {
       }
     } /* Loop while there are tasks */
 #ifdef CUDA_PROFILER
-    message("Step %i ci_its_dens %i cj _its_dens %i n_its_dens %i\n", step, gpu_buf_dens.md.total_ci_range_iterations,
-        gpu_buf_dens.md.total_cj_range_iterations, gpu_buf_dens.md.total_range_searches);
-    gpu_buf_dens.md.total_range_searches = 0;
-    gpu_buf_dens.md.total_ci_range_iterations = 0;
-    gpu_buf_dens.md.total_cj_range_iterations = 0;
     if (step == 4) cudaProfilerStop();
 #endif
   } /* main loop. */

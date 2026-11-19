@@ -527,7 +527,7 @@ __attribute__((always_inline)) INLINE static void gpu_get_sorted_pair_reaches(co
 
 /* Calculate conservative pruned target ranges for one pair leaf */
 __attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_get_sorted_pair_range(const struct cell *cii, const struct cell *cjj,
-    struct gpu_pack_metadata *md, const int leaf_id, struct gpu_sorted_pair_range range) {
+    const struct gpu_pack_metadata *md, const int leaf_id, struct gpu_sorted_pair_range range) {
 
   const int cii_count = cii->hydro.count;
   const int cjj_count = cjj->hydro.count;
@@ -557,19 +557,14 @@ __attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_ge
 
   /* Find the first sorted ci particle which can potentially reach cj */
   int ci_first = cii_count;
-  while (ci_first > 0 && sort_i[ci_first - 1].d + range.ci_reach + dx_max - md->leaf_rshift[leaf_id] > sort_j[0].d){
+  while (ci_first > 0 && sort_i[ci_first - 1].d + range.ci_reach + dx_max - md->leaf_rshift[leaf_id] > sort_j[0].d)
     ci_first--;
-    md->total_ci_range_iterations++;
-  }
 
   /* Find the last sorted cj particle which can potentially reach ci */
   int cj_last = -1;
-  while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - range.cj_reach - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d){
+  while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - range.cj_reach - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d)
     cj_last++;
-    md->total_cj_range_iterations++;
-  }
 
-  md->total_range_searches++;
   range.ci_first = ci_first;
   range.cj_last = cj_last;
   range.ci_target_count = cii_count - ci_first;
