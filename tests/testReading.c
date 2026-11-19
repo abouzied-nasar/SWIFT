@@ -74,33 +74,33 @@ int main(int argc, char *argv[]) {
                  /*remap_ids=*/0, &ics_metadata);
 
   /* Check global properties read are correct */
-  assert(dim[0] == boxSize);
-  assert(dim[1] == boxSize);
-  assert(dim[2] == boxSize);
-  assert(Ngas == L * L * L);
-  assert(Ngpart == L * L * L);
+  swift_assert(dim[0] == boxSize);
+  swift_assert(dim[1] == boxSize);
+  swift_assert(dim[2] == boxSize);
+  swift_assert(Ngas == L * L * L);
+  swift_assert(Ngpart == L * L * L);
 
   /* Check particles */
   for (size_t n = 0; n < Ngas; ++n) {
 
     /* Check that indices are in a reasonable range */
     unsigned long long index = part_get_id(&parts[n]);
-    assert(index < Ngas);
+    swift_assert(index < Ngas);
 
     /* Check masses */
     float mass = hydro_get_mass(&parts[n]);
     float correct_mass = boxSize * boxSize * boxSize * rho / Ngas;
-    assert(mass == correct_mass);
+    swift_assert(mass == correct_mass);
 
     /* Check smoothing length */
     float h = part_get_h(&parts[n]);
     float correct_h = 2.251 * boxSize / L;
-    assert(h == correct_h);
+    swift_assert(h == correct_h);
 
     /* Check velocity */
-    assert(part_get_v_ind(&parts[n], 0) == 0.);
-    assert(part_get_v_ind(&parts[n], 1) == 0.);
-    assert(part_get_v_ind(&parts[n], 2) == 0.);
+    swift_assert(part_get_v_ind(&parts[n], 0) == 0.);
+    swift_assert(part_get_v_ind(&parts[n], 1) == 0.);
+    swift_assert(part_get_v_ind(&parts[n], 2) == 0.);
 
     /* Check positions */
     k = index % 4;
@@ -109,17 +109,17 @@ int main(int argc, char *argv[]) {
     double correct_x = i * boxSize / L + boxSize / (2 * L);
     double correct_y = j * boxSize / L + boxSize / (2 * L);
     double correct_z = k * boxSize / L + boxSize / (2 * L);
-    assert(part_get_x_ind(&parts[n], 0) == correct_x);
-    assert(part_get_x_ind(&parts[n], 1) == correct_y);
-    assert(part_get_x_ind(&parts[n], 2) == correct_z);
+    swift_assert(part_get_x_ind(&parts[n], 0) == correct_x);
+    swift_assert(part_get_x_ind(&parts[n], 1) == correct_y);
+    swift_assert(part_get_x_ind(&parts[n], 2) == correct_z);
 
     /* Check accelerations */
-    assert(part_get_a_hydro_ind(&parts[n], 0) == 0.);
-    assert(part_get_a_hydro_ind(&parts[n], 1) == 0.);
-    assert(part_get_a_hydro_ind(&parts[n], 2) == 0.);
+    swift_assert(part_get_a_hydro_ind(&parts[n], 0) == 0.);
+    swift_assert(part_get_a_hydro_ind(&parts[n], 1) == 0.);
+    swift_assert(part_get_a_hydro_ind(&parts[n], 2) == 0.);
 
 #ifdef CHEMISTRY_GRACKLE
-    assert(parts[n].chemistry_data.he_density == he_density);
+    swift_assert(parts[n].chemistry_data.he_density == he_density);
 #endif
   }
 
