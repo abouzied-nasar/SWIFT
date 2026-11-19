@@ -96,9 +96,9 @@ int main(int argc, char *argv[]) {
   message("Sample variance is %f, exact: %f (rel. %e).", var, sigma2, err_sig);
   message("Sample skewness is %f, exact: %f (rel. %e).", mu3, skewns, err_skew);
 
-  assert(fabs(err_mu) < 1e-3);
-  assert(fabs(err_sig) < 1e-2);
-  assert(fabs(err_skew) < 1e-2);
+  swift_assert(fabs(err_mu) < 1e-3);
+  swift_assert(fabs(err_sig) < 1e-2);
+  swift_assert(fabs(err_skew) < 1e-2);
 
   /* Construct Kolmogorov-Smirnov statistic by integrating the histogram */
   double sum_empirical = 0.;
@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
   message("KS statistic = %e (99%% that KS < %e)\n", KS_statistic, crit_val);
 
   /* We should not reject this */
-  assert(KS_statistic < crit_val);
+  swift_assert(KS_statistic < crit_val);
 
   free(histogram1);
 

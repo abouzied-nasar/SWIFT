@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
     /* check accuracy */
     tmp = (tmp - a) / a;
     message("Accuracy of %g at a=%g", tmp, a);
-    assert(fabs(tmp) < TOLERANCE);
+    swift_assert(fabs(tmp) < TOLERANCE);
   }
 
   message("Start checking comoving distance computation...");
@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
     /* check accuracy */
     tmp = (tmp - a) / a;
     message("Accuracy of %g at a=%g", tmp, a);
-    assert(fabs(tmp) < TOLERANCE);
+    swift_assert(fabs(tmp) < TOLERANCE);
   }
 
   message("Everything seems fine with cosmology.");
