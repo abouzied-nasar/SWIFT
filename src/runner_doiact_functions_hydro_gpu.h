@@ -527,7 +527,7 @@ __attribute__((always_inline)) INLINE static void gpu_get_sorted_pair_reaches(co
 
 /* Calculate conservative pruned target ranges for one pair leaf */
 __attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_get_sorted_pair_range(const struct cell *cii, const struct cell *cjj,
-    const struct gpu_pack_metadata *md, const int leaf_id, struct gpu_sorted_pair_range range) {
+    struct gpu_pack_metadata *md, const int leaf_id, struct gpu_sorted_pair_range range) {
 
   const int cii_count = cii->hydro.count;
   const int cjj_count = cjj->hydro.count;
@@ -556,31 +556,20 @@ __attribute__((always_inline)) INLINE static struct gpu_sorted_pair_range gpu_ge
   const float dx_max = cii->hydro.dx_max_sort + cjj->hydro.dx_max_sort;
 
   /* Find the first sorted ci particle which can potentially reach cj */
-  const float ci_boundary = sort_j[0].d - range.ci_reach - dx_max + md->leaf_rshift[leaf_id];
-  int ci_left = 0;
-  int ci_right = cii_count;
-  while (ci_left < ci_right) {
-    const int ci_mid = ci_left + (ci_right - ci_left) / 2;
-    if (sort_i[ci_mid].d <= ci_boundary)
-      ci_left = ci_mid + 1;
-    else
-      ci_right = ci_mid;
+  int ci_first = cii_count;
+  while (ci_first > 0 && sort_i[ci_first - 1].d + range.ci_reach + dx_max - md->leaf_rshift[leaf_id] > sort_j[0].d){
+    ci_first--;
+    md->total_ci_range_iterations++;
   }
-  const int ci_first = ci_left;
 
   /* Find the last sorted cj particle which can potentially reach ci */
-  const float cj_boundary = sort_i[cii_count - 1].d + range.cj_reach + dx_max - md->leaf_rshift[leaf_id];
-  int cj_left = 0;
-  int cj_right = cjj_count;
-  while (cj_left < cj_right) {
-    const int cj_mid = cj_left + (cj_right - cj_left) / 2;
-    if (sort_j[cj_mid].d < cj_boundary)
-      cj_left = cj_mid + 1;
-    else
-      cj_right = cj_mid;
+  int cj_last = -1;
+  while (cj_last < cjj_count - 1 && sort_j[cj_last + 1].d - range.cj_reach - dx_max + md->leaf_rshift[leaf_id] < sort_i[cii_count - 1].d){
+    cj_last++;
+    md->total_cj_range_iterations++;
   }
-  const int cj_last = cj_left - 1;
 
+  md->total_range_searches++;
   range.ci_first = ci_first;
   range.cj_last = cj_last;
   range.ci_target_count = cii_count - ci_first;
