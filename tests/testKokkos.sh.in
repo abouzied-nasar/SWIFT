@@ -1,0 +1,3 @@
+#!/bin/sh
+# Run on the hardware selected when building Kokkos.
+exec "@abs_top_builddir@/swift_kokkos" --kokkos-check

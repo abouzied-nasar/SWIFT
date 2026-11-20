@@ -112,6 +112,16 @@ swift_SOURCES = swift.c
 swift_CFLAGS = $(MYFLAGS) $(AM_CFLAGS) -DENGINE_POLICY="engine_policy_keep $(ENGINE_POLICY_SETAFFINITY)"
 swift_LDADD =  src/libswiftsim.la argparse/libargparse.la $(VELOCIRAPTOR_LIBS) $(EXTRA_LIBS) $(LD_CSDS)
 
+# Optional Kokkos target; compile SWIFT as C and link the C++ backend.
+if HAVEKOKKOS
+bin_PROGRAMS += swift_kokkos
+swift_kokkos_SOURCES = swift.c
+swift_kokkos_CFLAGS = $(swift_CFLAGS) -DWITH_KOKKOS
+swift_kokkos_LDADD = src/libswiftsim_kokkos.la src/libswift_kokkos.la argparse/libargparse.la $(VELOCIRAPTOR_LIBS) $(EXTRA_LIBS) $(LD_CSDS) $(KOKKOS_LIBS)
+swift_kokkos_LDFLAGS = $(AM_LDFLAGS) $(KOKKOS_LDFLAGS)
+swift_kokkos_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CXX $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=link $(CXX) $(CXXFLAGS) $(KOKKOS_CXXFLAGS) $(swift_kokkos_LDFLAGS) $(LDFLAGS) -o $@
+endif
+
 # Sources for swift_mpi, do we need an affinity policy for MPI?
 swift_mpi_SOURCES = swift.c
 swift_mpi_CFLAGS = $(MYFLAGS) $(AM_CFLAGS) $(MPI_FLAGS) -DENGINE_POLICY="engine_policy_keep $(ENGINE_POLICY_SETAFFINITY)"
@@ -152,3 +162,5 @@ fof_mpi_LDADD =  src/.libs/libswiftsim_mpi.a argparse/.libs/libargparse.a $(MPI_
 
 # Non-standard files that should be part of the distribution.
 EXTRA_DIST = INSTALL.swift .clang-format format.sh
+
+EXTRA_DIST += tools/kokkos/cosma-env.sh
