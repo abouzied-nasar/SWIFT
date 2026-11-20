@@ -1002,6 +1002,90 @@ AC_ARG_WITH([cuda-arch],
    [with_cuda_arch="native"]
 )
 
+# Optional Kokkos backend, built by the normal Automake rules.
+AC_ARG_WITH([kokkos],
+  [AS_HELP_STRING([--with-kokkos=PREFIX], [build the Kokkos target using an installed Kokkos (default: no)])],
+  [with_kokkos="$withval"], [with_kokkos="no"])
+AC_ARG_WITH([kokkos-backend],
+  [AS_HELP_STRING([--with-kokkos-backend=serial|cuda], [Kokkos execution backend (default: serial)])],
+  [with_kokkos_backend="$withval"], [with_kokkos_backend="serial"])
+AC_ARG_WITH([kokkos-cuda-arch],
+  [AS_HELP_STRING([--with-kokkos-cuda-arch=ARCH], [CUDA architecture matching Kokkos (default: sm_80)])],
+  [with_kokkos_cuda_arch="$withval"], [with_kokkos_cuda_arch="sm_80"])
+AC_ARG_VAR([KOKKOS_CPPFLAGS], [additional Kokkos include/preprocessor flags])
+AC_ARG_VAR([KOKKOS_CXXFLAGS], [additional Kokkos C++ compiler flags])
+AC_ARG_VAR([KOKKOS_LDFLAGS], [additional Kokkos linker search flags])
+AC_ARG_VAR([KOKKOS_LIBS], [Kokkos libraries (default: -lkokkoscore -ldl -lpthread, plus -lcuda for CUDA)])
+have_kokkos="no"
+AS_IF([test "x$with_kokkos" != "xno"], [
+  AS_CASE([$with_kokkos], [/*], [],
+    [AC_MSG_ERROR([--with-kokkos requires an absolute installation prefix])])
+  AS_CASE([$with_kokkos_backend], [serial|cuda], [],
+    [AC_MSG_ERROR([supported Kokkos backends are serial and cuda])])
+  KOKKOS_CPPFLAGS="-I$with_kokkos/include $KOKKOS_CPPFLAGS"
+  AS_IF([test -f "$with_kokkos/lib64/libkokkoscore.a" || test -f "$with_kokkos/lib64/libkokkoscore.so"],
+    [kokkos_libdir="$with_kokkos/lib64"], [kokkos_libdir="$with_kokkos/lib"])
+  KOKKOS_LDFLAGS="-L$kokkos_libdir -Wl,-rpath,$kokkos_libdir $KOKKOS_LDFLAGS"
+  AS_IF([test -z "$KOKKOS_LIBS"], [
+    KOKKOS_LIBS="-lkokkoscore -ldl -lpthread"
+    AS_IF([test "x$with_kokkos_backend" = "xcuda"], [KOKKOS_LIBS="$KOKKOS_LIBS -lcuda"])
+  ])
+  AS_IF([test "x$with_kokkos_backend" = "xcuda"], [
+    KOKKOS_CXXFLAGS="-std=c++20 --extended-lambda --expt-relaxed-constexpr -arch=$with_kokkos_cuda_arch $KOKKOS_CXXFLAGS"
+  ], [KOKKOS_CXXFLAGS="-std=c++20 $KOKKOS_CXXFLAGS"])
+  swift_save_CPPFLAGS="$CPPFLAGS"
+  swift_save_CXXFLAGS="$CXXFLAGS"
+  swift_save_LDFLAGS="$LDFLAGS"
+  swift_save_LIBS="$LIBS"
+  CPPFLAGS="$CPPFLAGS $KOKKOS_CPPFLAGS"
+  CXXFLAGS="$CXXFLAGS $KOKKOS_CXXFLAGS"
+  LDFLAGS="$LDFLAGS $KOKKOS_LDFLAGS"
+  LIBS="$KOKKOS_LIBS $LIBS"
+  AC_LANG_PUSH([C++])
+  AC_MSG_CHECKING([whether Kokkos matches the selected backend])
+  AS_IF([test "x$with_kokkos_backend" = "xcuda"], [
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <Kokkos_Core.hpp>
+#include <type_traits>
+#ifndef KOKKOS_ENABLE_CUDA
+#error Kokkos was not built with CUDA
+#endif
+static_assert(std::is_same_v<Kokkos::DefaultExecutionSpace, Kokkos::Cuda>);
+]], [[]])], [], [AC_MSG_FAILURE([CUDA Kokkos headers/compiler mismatch; set CXX to nvcc_wrapper and inspect config.log])])
+  ], [
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+#include <Kokkos_Core.hpp>
+#include <type_traits>
+#ifndef KOKKOS_ENABLE_SERIAL
+#error Kokkos was not built with Serial
+#endif
+static_assert(std::is_same_v<Kokkos::DefaultExecutionSpace, Kokkos::Serial>);
+]], [[]])], [], [AC_MSG_FAILURE([Serial Kokkos headers/compiler mismatch; inspect config.log])])
+  ])
+  AC_MSG_RESULT([yes])
+  AC_MSG_CHECKING([whether CXX can compile and link a Kokkos kernel])
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <Kokkos_Core.hpp>]], [[
+Kokkos::initialize();
+int sum = 0;
+Kokkos::parallel_reduce("configure_check", 4,
+    KOKKOS_LAMBDA(const int i, int &value) { value += i; }, sum);
+Kokkos::finalize();
+return sum == 6 ? 0 : 1;
+]])], [AC_MSG_RESULT([yes])],
+    [AC_MSG_FAILURE([cannot compile/link Kokkos; check CXX, KOKKOS_* flags and config.log])])
+  AC_LANG_POP([C++])
+  CPPFLAGS="$swift_save_CPPFLAGS"
+  CXXFLAGS="$swift_save_CXXFLAGS"
+  LDFLAGS="$swift_save_LDFLAGS"
+  LIBS="$swift_save_LIBS"
+  have_kokkos="yes"
+])
+AC_SUBST([KOKKOS_CPPFLAGS])
+AC_SUBST([KOKKOS_CXXFLAGS])
+AC_SUBST([KOKKOS_LDFLAGS])
+AC_SUBST([KOKKOS_LIBS])
+AM_CONDITIONAL([HAVEKOKKOS], [test "x$have_kokkos" = "xyes"])
+
 # Check for CUDA
 have_cuda="no"
 AC_ARG_WITH([cuda],
@@ -3448,6 +3532,7 @@ AM_CONDITIONAL([HAVE_MOVING_MESH], [test "$enable_moving_mesh" = "yes"])
 # Handle .in files.
 AC_CONFIG_FILES([Makefile src/Makefile examples/Makefile examples/Cooling/CoolingRates/Makefile doc/Makefile doc/Doxyfile tests/Makefile])
 AC_CONFIG_FILES([argparse/Makefile tools/Makefile])
+AC_CONFIG_FILES([tests/testKokkos.sh], [chmod +x tests/testKokkos.sh])
 AC_CONFIG_FILES([tests/testReading.sh], [chmod +x tests/testReading.sh])
 AC_CONFIG_FILES([tests/testActivePair.sh], [chmod +x tests/testActivePair.sh])
 AC_CONFIG_FILES([tests/test27cells.sh], [chmod +x tests/test27cells.sh])
@@ -3495,6 +3580,9 @@ AC_MSG_RESULT([
     - parallel          : $have_parallel_hdf5
    LUSTRE API enabled   : $have_lustreapi
    METIS/ParMETIS       : $have_metis / $have_parmetis
+   Kokkos enabled       : $have_kokkos
+    - backend           : $with_kokkos_backend
+    - prefix            : $with_kokkos
    CUDA enabled         : $have_cuda
     - flags             : $NVCC_FLAGS
    HIP enabled          : $have_hip

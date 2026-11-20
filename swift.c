@@ -44,6 +44,10 @@
 #include "argparse.h"
 #include "swift.h"
 
+#ifdef WITH_KOKKOS
+#include "kokkos/swift_kokkos.h"
+#endif
+
 /* Engine policy flags. */
 #ifndef ENGINE_POLICY
 #define ENGINE_POLICY engine_policy_none
@@ -80,6 +84,20 @@ static int handle_cmdparam(struct argparse *self,
  *
  */
 int main(int argc, char *argv[]) {
+
+#ifdef WITH_KOKKOS
+  /* Build integration only: hydrodynamics still uses the CPU implementation. */
+  if (swift_kokkos_initialize() != 0) return EXIT_FAILURE;
+  if (atexit(swift_kokkos_finalize) != 0) {
+    swift_kokkos_finalize();
+    return EXIT_FAILURE;
+  }
+  if (argc == 2 && strcmp(argv[1], "--kokkos-check") == 0)
+    return swift_kokkos_self_test();
+  printf(
+      "Kokkos backend: %s (build integration; hydrodynamics remains on CPU)\n",
+      swift_kokkos_backend());
+#endif
 
   struct clocks_time tic, toc;
   struct engine e;
