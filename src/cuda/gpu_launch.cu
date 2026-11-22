@@ -55,6 +55,17 @@ void gpu_launch_prepare_density_sorts(
   cuda_kernel_prepare_density_sorts<<<n_sort_requests, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(d_parts_send, d_sort_requests, d_sort_entries, n_sort_requests);
 }
 
+void gpu_launch_prepare_density_target_ranges(
+    const struct gpu_sort_entry *__restrict__ d_sort_entries,
+    struct gpu_leaf_sort_metadata *__restrict__ d_leaf_sort_metadata,
+    const int n_leaves, cudaStream_t stream) {
+
+  if (n_leaves == 0) return;
+  const int n_threads = GPU_THREAD_BLOCK_SIZE;
+  const int n_blocks = (n_leaves + n_threads - 1) / n_threads;
+  cuda_kernel_prepare_density_target_ranges<<<n_blocks, n_threads, 0, stream>>>(d_sort_entries, d_leaf_sort_metadata, n_leaves);
+
+}
 
 /**
  * @brief Launch the density computation on the GPU for a bundle of leaf cells.

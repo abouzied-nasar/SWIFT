@@ -97,6 +97,47 @@ __global__ void cuda_kernel_prepare_density_sorts(
 }
 
 /**
+ * @brief Derive density target ranges from fresh GPU directional sorts
+ *
+ * @param d_sort_entries GPU-generated directional sort entries
+ * @param d_leaf_sort_metadata Per-leaf directional sort metadata
+ * @param n_leaves Number of packed leaf computations
+ */
+__global__ void cuda_kernel_prepare_density_target_ranges(
+    const struct gpu_sort_entry *__restrict__ d_sort_entries,
+    struct gpu_leaf_sort_metadata *__restrict__ d_leaf_sort_metadata,
+    const int n_leaves) {
+  const int leaf_id = blockIdx.x * blockDim.x + threadIdx.x;
+  if (leaf_id >= n_leaves) return;
+  struct gpu_leaf_sort_metadata leaf_sort = d_leaf_sort_metadata[leaf_id];
+  if (leaf_sort.ci_sort_start < 0 || leaf_sort.cj_sort_start < 0) return;
+  const float ci_limit = d_sort_entries[leaf_sort.cj_sort_start].d - leaf_sort.ci_reach + leaf_sort.rshift;
+  int left = 0;
+  int right = leaf_sort.ci_sort_count;
+  while (left < right) {
+    const int middle = left + (right - left) / 2;
+    if (d_sort_entries[leaf_sort.ci_sort_start + middle].d <= ci_limit)
+      left = middle + 1;
+    else
+      right = middle;
+  }
+  leaf_sort.ci_first = left;
+  const float cj_limit = d_sort_entries[leaf_sort.ci_sort_start + leaf_sort.ci_sort_count - 1].d + leaf_sort.cj_reach - leaf_sort.rshift;
+  left = 0;
+  right = leaf_sort.cj_sort_count;
+  while (left < right) {
+    const int middle = left + (right - left) / 2;
+    if (d_sort_entries[leaf_sort.cj_sort_start + middle].d < cj_limit)
+      left = middle + 1;
+    else
+      right = middle;
+  }
+  leaf_sort.cj_last = left - 1;
+  leaf_sort.dx_max = 0.f;
+  d_leaf_sort_metadata[leaf_id] = leaf_sort;
+}
+
+/**
  * @brief Naive kernel computing the density interactions of a single particle
  * assigning one CUDA thread to each particle in cell i and looping over cell j
  * particles

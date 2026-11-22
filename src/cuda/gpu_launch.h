@@ -24,6 +24,7 @@
 extern "C" {
 #endif
 #include "gpu_part_structs.h"
+#include "gpu_sort_structs.h"
 
 #include <cuda_runtime.h>
 
@@ -32,6 +33,11 @@ void gpu_launch_prepare_density_sorts(
     const struct gpu_sort_request* __restrict__ d_sort_requests,
     struct gpu_sort_entry* __restrict__ d_sort_entries,
     const int n_sort_requests, cudaStream_t stream);
+
+void gpu_launch_prepare_density_target_ranges(
+    const struct gpu_sort_entry* __restrict__ d_sort_entries,
+    struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
+    const int n_leaves, cudaStream_t stream);
 
 void gpu_launch_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,

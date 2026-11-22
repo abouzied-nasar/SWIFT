@@ -42,6 +42,10 @@ struct gpu_leaf_sort_metadata {
   float dx_max;
   /* Periodic shift projected onto the pair sort direction */
   float rshift;
+  /* Conservative interaction reach of particles in ci */
+  float ci_reach;
+  /* Conservative interaction reach of particles in cj */
+  float cj_reach;
   /* Conservative interaction reach */
   float max_reach;
 };

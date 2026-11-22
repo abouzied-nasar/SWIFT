@@ -629,14 +629,15 @@ __attribute__((always_inline)) INLINE static void gpu_pack_cell_sort(
  * @param packed_start Where the cell starts in the packed particle buffer
  * @param unique_index Index of the cell in the unique cell list
  * @param sid Directional sort index
+ * @param pack_cpu_sort Whether to copy the existing CPU sort into sort_entries
  * @param md GPU packing metadata
  * @param gpu_md GPU metadata
  *
  * @return First entry belonging to the directional sort in sort_entries
  */
-__attribute__((always_inline)) INLINE static int gpu_get_or_pack_cell_sort(
+__attribute__((always_inline)) INLINE static int gpu_get_or_register_cell_sort(
     const struct sort_entry *sort, const int count, const int packed_start,
-    const int unique_index, const int sid,
+    const int unique_index, const int sid, const int pack_cpu_sort,
     struct gpu_pack_metadata *md, struct gpu_md *gpu_md) {
 #ifdef SWIFT_DEBUG_CHECKS
   if (unique_index < 0 || unique_index >= 2 * md->params.leaf_buffer_size)
@@ -650,6 +651,11 @@ __attribute__((always_inline)) INLINE static int gpu_get_or_pack_cell_sort(
         "unique_index=%d sid=%d",
         unique_index, sid);
 #endif
+  if (!pack_cpu_sort && count > GPU_SHARED_SORT_MAX_ENTRIES)
+    error(
+        "Density GPU directional sort request exceeds the shared-memory "
+        "implementation limit: count=%d limit=%d unique_index=%d sid=%d",
+        count, GPU_SHARED_SORT_MAX_ENTRIES, unique_index, sid);
   const int lookup_index = unique_index * 13 + sid;
   const int existing_request = gpu_md->sort_request_index[lookup_index];
   if (existing_request >= 0) {
@@ -681,7 +687,8 @@ __attribute__((always_inline)) INLINE static int gpu_get_or_pack_cell_sort(
         "sort request: packed=%d required=%d capacity=%zu",
         md->n_sort_entries_packed, count, sort_buffer_size);
   const int sort_start = md->n_sort_entries_packed;
-  gpu_pack_cell_sort(sort, count, packed_start, gpu_md, sort_start);
+  if (pack_cpu_sort)
+    gpu_pack_cell_sort(sort, count, packed_start, gpu_md, sort_start);
   gpu_md->sort_requests[request_index].packed_start = packed_start;
   gpu_md->sort_requests[request_index].count = count;
   gpu_md->sort_requests[request_index].sort_start = sort_start;
@@ -815,6 +822,8 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     leaf_sort->cj_last = -1;
     leaf_sort->dx_max = 0.f;
     leaf_sort->rshift = 0.f;
+    leaf_sort->ci_reach = 0.f;
+    leaf_sort->cj_reach = 0.f;
     leaf_sort->max_reach = 0.f;
 
   } else {
@@ -829,16 +838,15 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
           leaf_id, sid);
 #endif
 
+    const int pack_cpu_sort = task_subtype != task_subtype_gpu_density;
     const struct sort_entry *sort_i =
-        cell_get_hydro_sorts(cii, sid);
+        pack_cpu_sort ? cell_get_hydro_sorts(cii, sid) : NULL;
     const struct sort_entry *sort_j =
-        cell_get_hydro_sorts(cjj, sid);
-
+        pack_cpu_sort ? cell_get_hydro_sorts(cjj, sid) : NULL;
 #ifdef SWIFT_DEBUG_CHECKS
-    if (sort_i == NULL || sort_j == NULL)
+    if (pack_cpu_sort && (sort_i == NULL || sort_j == NULL))
       error(
-          "Missing CPU directional sort while packing GPU leaf: "
-          "leaf_id=%d sid=%d",
+          "Missing CPU directional sort while packing GPU leaf: " "leaf_id=%d sid=%d",
           leaf_id, sid);
 #endif
 
@@ -849,10 +857,11 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     const int ci_packed_start = md->unique_start_end[unique_i].x;
     const int cj_packed_start = md->unique_start_end[unique_j].x;
 
-    const int ci_sort_start = gpu_get_or_pack_cell_sort(
-        sort_i, cii_count, ci_packed_start, unique_i, sid, md, gpu_md);
-    const int cj_sort_start = gpu_get_or_pack_cell_sort(
-        sort_j, cjj_count, cj_packed_start, unique_j, sid, md, gpu_md);
+    const int ci_sort_start = gpu_get_or_register_cell_sort(
+        sort_i, cii_count, ci_packed_start, unique_i, sid, pack_cpu_sort, md, gpu_md);
+    const int cj_sort_start = gpu_get_or_register_cell_sort(
+        sort_j, cjj_count, cj_packed_start, unique_j, sid, pack_cpu_sort, md, gpu_md);
+
     /*Take notes*/
     leaf_sort->ci_sort_start = ci_sort_start;
     leaf_sort->ci_sort_count = cii_count;
@@ -860,27 +869,28 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
     leaf_sort->cj_sort_count = cjj_count;
     leaf_sort->ci_first = range.ci_first;
     leaf_sort->cj_last = range.cj_last;
-    leaf_sort->dx_max = cii->hydro.dx_max_sort + cjj->hydro.dx_max_sort;
+    leaf_sort->dx_max = task_subtype == task_subtype_gpu_density ? 0.f :
+        cii->hydro.dx_max_sort + cjj->hydro.dx_max_sort;
     leaf_sort->rshift = md->leaf_rshift[leaf_id];
+    leaf_sort->ci_reach = range.ci_reach;
+    leaf_sort->cj_reach = range.cj_reach;
     leaf_sort->max_reach = max(range.ci_reach, range.cj_reach);
 
+
 #ifdef SWIFT_DEBUG_CHECKS
-    /* Check that ci's packed directional sort remains ordered */
-    for (int k = 1; k < cii_count; k++)
-      if (gpu_md->sort_entries[ci_sort_start + k].d <
-          gpu_md->sort_entries[ci_sort_start + k - 1].d)
-        error("Packed ci sort is not ordered: "
-            "leaf=%d sid=%d k=%d",
-            leaf_id, sid, k);
+    if (pack_cpu_sort) {
 
-    /* Check that cj's packed directional sort remains ordered */
-    for (int k = 1; k < cjj_count; k++)
-      if (gpu_md->sort_entries[cj_sort_start + k].d <
-          gpu_md->sort_entries[cj_sort_start + k - 1].d)
-        error("Packed cj sort is not ordered: "
-            "leaf=%d sid=%d k=%d",
-            leaf_id, sid, k);
+      /* Check that ci's packed directional sort remains ordered */
+      for (int k = 1; k < cii_count; k++)
+        if (gpu_md->sort_entries[ci_sort_start + k].d < gpu_md->sort_entries[ci_sort_start + k - 1].d)
+          error("Packed ci sort is not ordered: leaf=%d sid=%d k=%d", leaf_id, sid, k);
 
+      /* Check that cj's packed directional sort remains ordered */
+      for (int k = 1; k < cjj_count; k++)
+        if (gpu_md->sort_entries[cj_sort_start + k].d < gpu_md->sort_entries[cj_sort_start + k - 1].d)
+          error("Packed cj sort is not ordered: leaf=%d sid=%d k=%d", leaf_id, sid, k);
+
+    }
 #endif
   }
 
@@ -1118,7 +1128,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
   /* Copy the directional sort entries required by pair computations. Do this only if we
    * have packed at least 1 pair task. If all tasks packed are selfs then sort_entries_packed
    * will be zero */
-  if (md->n_sort_entries_packed > 0) {
+  if (task_subtype != task_subtype_gpu_density && md->n_sort_entries_packed > 0) {
 
     cu_error = cudaMemcpyAsync(
         &buf->gpu_md.d_sort_entries[0],
@@ -1170,9 +1180,12 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
           cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
     }
 
-    /* Construct GPU directional sorts before launching density */
+    /* Construct fresh density directional sorts on the GPU */
     gpu_launch_prepare_density_sorts(buf->d_parts_send_d, gpu_md->d_sort_requests,
         gpu_md->d_sort_entries, gpu_md->n_sort_requests, stream[0]);
+    /* Derive density target ranges from the fresh GPU sorts */
+    gpu_launch_prepare_density_target_ranges(gpu_md->d_sort_entries,
+        gpu_md->d_leaf_sort_metadata, leaves_packed, stream[0]);
 
     /*"Once more unto the breach dear friends, once more!"
      *Issue instruction to launch GPU computations*/
@@ -1188,16 +1201,18 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
             md->count_parts_unique * sizeof(struct gpu_part_recv_d),
             cudaMemcpyDeviceToHost, stream[0]);
 
+#ifdef SWIFT_DEBUG_CHECKS
     /* Copy the GPU directional sorts back for validation */
     if (md->n_sort_entries_packed > 0) {
       cu_error = cudaMemcpyAsync(&gpu_md->sort_entries[0], &gpu_md->d_sort_entries[0], md->n_sort_entries_packed * sizeof(struct gpu_sort_entry), cudaMemcpyDeviceToHost, stream[0]);
       if (cu_error != cudaSuccess)
         error(
-            "CUDA temporary directional sort copy failed: CUDA error '%s' for "
+            "CUDA directional sort validation copy failed: CUDA error '%s' for "
             "task_subtype %s cpuid=%d sort_entries=%d",
             cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
             md->n_sort_entries_packed);
     }
+#endif
 
   }
   else if (task_subtype == task_subtype_gpu_gradient){
