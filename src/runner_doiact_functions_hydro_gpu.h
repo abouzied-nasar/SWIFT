@@ -651,11 +651,6 @@ __attribute__((always_inline)) INLINE static int gpu_get_or_register_cell_sort(
         "unique_index=%d sid=%d",
         unique_index, sid);
 #endif
-  if (!pack_cpu_sort && count > GPU_SHARED_SORT_MAX_ENTRIES)
-    error(
-        "Density GPU directional sort request exceeds the shared-memory "
-        "implementation limit: count=%d limit=%d unique_index=%d sid=%d",
-        count, GPU_SHARED_SORT_MAX_ENTRIES, unique_index, sid);
   const int lookup_index = unique_index * 13 + sid;
   const int existing_request = gpu_md->sort_request_index[lookup_index];
   if (existing_request >= 0) {
@@ -910,7 +905,7 @@ __attribute__((always_inline)) INLINE static void pack_cell_particles_in_unique_
 }
 
 /**
- * @brief Validate temporary GPU-generated directional sorts
+ * @brief Validate GPU-generated density directional sorts
  *
  * @param buf GPU offload buffers
  */
@@ -919,60 +914,45 @@ __attribute__((always_inline)) INLINE static void gpu_validate_density_sorts(
 
   const struct gpu_md *gpu_md = &buf->gpu_md;
   for (int request_id = 0; request_id < gpu_md->n_sort_requests; request_id++) {
+
     const struct gpu_sort_request *request = &gpu_md->sort_requests[request_id];
-    if (request->count > GPU_SHARED_SORT_MAX_ENTRIES) {
-    #ifdef SWIFT_DEBUG_CHECKS
-      message(
-          "Using CPU directional sort fallback: request=%d sid=%d count=%d "
-          "GPU_shared_sort_limit=%d",
-          request_id, request->sid, request->count,
-          GPU_SHARED_SORT_MAX_ENTRIES);
-    #endif
-      continue;
-    }
     for (int local_id = 0; local_id < request->count; local_id++) {
+
       const struct gpu_sort_entry entry = gpu_md->sort_entries[request->sort_start + local_id];
       if (entry.i < request->packed_start || entry.i >= request->packed_start + request->count)
-        error(
-            "GPU directional sort contains an invalid particle index: "
-            "request=%d sid=%d local_id=%d entry_i=%d packed_start=%d count=%d",
-            request_id, request->sid, local_id, entry.i,
-            request->packed_start, request->count);
+        error("GPU directional sort contains an invalid particle index: request=%d sid=%d local_id=%d entry_i=%d packed_start=%d count=%d", request_id, request->sid, local_id, entry.i, request->packed_start, request->count);
+
       const struct gpu_part_data_d part = buf->parts_send_d[entry.i].p_data;
       const double d = part.x_y.x * runner_shift[request->sid][0] + part.x_y.y * runner_shift[request->sid][1] + part.z_h.x * runner_shift[request->sid][2];
       const float expected_d = (float)d;
       const float tolerance = 1e-6f * (1.f + fabsf(expected_d));
       if (fabsf(entry.d - expected_d) > tolerance)
-        error(
-            "GPU directional sort contains an incorrect projection: "
-            "request=%d sid=%d local_id=%d entry_d=%g expected_d=%g "
-            "difference=%g tolerance=%g",
-            request_id, request->sid, local_id, entry.d, expected_d,
-            fabsf(entry.d - expected_d), tolerance);
+        error("GPU directional sort contains an incorrect projection: request=%d sid=%d local_id=%d entry_d=%g expected_d=%g difference=%g tolerance=%g", request_id, request->sid, local_id, entry.d, expected_d, fabsf(entry.d - expected_d), tolerance);
+
       if (local_id > 0) {
+
         const struct gpu_sort_entry previous = gpu_md->sort_entries[request->sort_start + local_id - 1];
-        if (previous.d > entry.d || (previous.d == entry.d && previous.i > entry.i))
-          error(
-              "GPU directional sort is not ordered: "
-              "request=%d sid=%d local_id=%d previous=(%g,%d) current=(%g,%d)",
-              request_id, request->sid, local_id,
-              previous.d, previous.i, entry.d, entry.i);
+        if (previous.d > entry.d)
+          error("GPU directional sort is not ordered: request=%d sid=%d local_id=%d previous=(%g,%d) current=(%g,%d)", request_id, request->sid, local_id, previous.d, previous.i, entry.d, entry.i);
+
       }
     }
 #ifdef SWIFT_DEBUG_CHECKS
     for (int cell_local_id = 0; cell_local_id < request->count; cell_local_id++) {
+
       const int expected_i = request->packed_start + cell_local_id;
       int occurrences = 0;
+
       for (int local_id = 0; local_id < request->count; local_id++)
         occurrences += gpu_md->sort_entries[request->sort_start + local_id].i == expected_i;
+
       if (occurrences != 1)
-        error(
-            "GPU directional sort does not contain each particle exactly once: "
-            "request=%d sid=%d particle=%d occurrences=%d",
-            request_id, request->sid, expected_i, occurrences);
+        error("GPU directional sort does not contain each particle exactly once: request=%d sid=%d particle=%d occurrences=%d", request_id, request->sid, expected_i, occurrences);
+
     }
 #endif
   }
+
 }
 
 /**
@@ -1180,30 +1160,46 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
           cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid);
     }
 
-    /* Construct fresh density directional sorts on the GPU */
-    gpu_launch_prepare_density_sorts(buf->d_parts_send_d, gpu_md->d_sort_requests,
-        gpu_md->d_sort_entries, gpu_md->n_sort_requests, stream[0]);
-    /* Derive density target ranges from the fresh GPU sorts */
-    gpu_launch_prepare_density_target_ranges(gpu_md->d_sort_entries,
-        gpu_md->d_leaf_sort_metadata, leaves_packed, stream[0]);
+    /* Construct and sort fresh density directional keys and values on the GPU */
+    cu_error = gpu_launch_prepare_density_sorts(buf->d_parts_send_d, gpu_md->d_sort_requests,
+        gpu_md->d_density_sort_keys_in, gpu_md->d_density_sort_keys_out, gpu_md->d_density_sort_values_in,
+        gpu_md->d_density_sort_values_out, gpu_md->d_density_sort_offsets, gpu_md->d_density_sort_temp_storage,
+        gpu_md->density_sort_temp_storage_bytes, md->n_sort_entries_packed, gpu_md->n_sort_requests, stream[0]);
+    if (cu_error != cudaSuccess)
+      error("CUDA density segmented sort failed: CUDA error '%s' for task_subtype %s cpuid=%d sort_entries=%d sort_requests=%d",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid, md->n_sort_entries_packed,
+          gpu_md->n_sort_requests);
+    /* Derive density target ranges from the fresh GPU sort keys */
+    gpu_launch_prepare_density_target_ranges(gpu_md->d_density_sort_keys_out, gpu_md->d_leaf_sort_metadata,
+        leaves_packed, stream[0]);
 
     /*"Once more unto the breach dear friends, once more!"
      *Issue instruction to launch GPU computations*/
-    gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H,
-        n_blocks, gpu_md->d_cell_i_j_start_end,
-        gpu_md->d_block_leaf_id, gpu_md->d_sort_entries, gpu_md->d_leaf_sort_metadata,
-        space_dim, stream[0], tester_param);
+    gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H, n_blocks, gpu_md->d_cell_i_j_start_end,
+        gpu_md->d_block_leaf_id, gpu_md->d_density_sort_keys_out, gpu_md->d_density_sort_values_out,
+        gpu_md->d_leaf_sort_metadata, space_dim, stream[0], tester_param);
 
     /*"The wheel is come full circle; I am here"
      *  Results are ready to copy back to CPU BUFFERS */
-        cudaMemcpyAsync(&buf->parts_recv_d[0],
-            &buf->d_parts_recv_d[0],
-            md->count_parts_unique * sizeof(struct gpu_part_recv_d),
-            cudaMemcpyDeviceToHost, stream[0]);
+    cudaMemcpyAsync(&buf->parts_recv_d[0],
+        &buf->d_parts_recv_d[0],
+        md->count_parts_unique * sizeof(struct gpu_part_recv_d),
+        cudaMemcpyDeviceToHost, stream[0]);
 
 #ifdef SWIFT_DEBUG_CHECKS
-    /* Copy the GPU directional sorts back for validation */
+    /* Pack the density SoA directional sorts for CPU validation */
     if (md->n_sort_entries_packed > 0) {
+
+      gpu_launch_pack_density_sort_entries(gpu_md->d_density_sort_keys_out, gpu_md->d_density_sort_values_out, gpu_md->d_sort_entries, md->n_sort_entries_packed, stream[0]);
+      cu_error = cudaGetLastError();
+      if (cu_error != cudaSuccess)
+        error(
+            "CUDA density directional sort validation packing failed: CUDA error '%s' for "
+            "task_subtype %s cpuid=%d sort_entries=%d",
+            cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
+            md->n_sort_entries_packed);
+
+      /* Copy the GPU directional sorts back for validation */
       cu_error = cudaMemcpyAsync(&gpu_md->sort_entries[0], &gpu_md->d_sort_entries[0], md->n_sort_entries_packed * sizeof(struct gpu_sort_entry), cudaMemcpyDeviceToHost, stream[0]);
       if (cu_error != cudaSuccess)
         error(
@@ -1211,6 +1207,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
             "task_subtype %s cpuid=%d sort_entries=%d",
             cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid,
             md->n_sort_entries_packed);
+
     }
 #endif
 

@@ -28,6 +28,7 @@
  * When included in cuda_particle_kernels.cuh compiler complains with
  * error: this declaration may not have extern "C" linkage */
 #include <cuda_pipeline.h>
+#include <cub/device/device_segmented_sort.cuh>
 
 /* ifdef __cplusplus prevents name mangling. C code sees exact names
  of functions rather than mangled template names produced by C++ */
@@ -46,25 +47,84 @@ extern "C" {
 /* #include <cuda_profiler_api.h> */
 /* #include <cuda_runtime.h> */
 
-void gpu_launch_prepare_density_sorts(
-    const struct gpu_part_send_d *__restrict__ d_parts_send,
-    const struct gpu_sort_request *__restrict__ d_sort_requests,
-    struct gpu_sort_entry *__restrict__ d_sort_entries,
-    const int n_sort_requests, cudaStream_t stream) {
-  if (n_sort_requests == 0) return;
-  cuda_kernel_prepare_density_sorts<<<n_sort_requests, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(d_parts_send, d_sort_requests, d_sort_entries, n_sort_requests);
+size_t gpu_density_segmented_sort_temp_storage_bytes(
+    const size_t n_items, const int n_segments) {
+
+  size_t temp_storage_bytes = 0;
+  const cudaError_t cu_error = cub::DeviceSegmentedSort::SortPairs(
+      NULL, temp_storage_bytes,
+      (const float *)NULL, (float *)NULL,
+      (const int *)NULL, (int *)NULL,
+      n_items, n_segments,
+      (const int *)NULL, (const int *)NULL);
+  if (cu_error != cudaSuccess) return 0;
+
+  return temp_storage_bytes;
+}
+
+cudaError_t gpu_density_segmented_sort_query(
+    void *d_temp_storage, size_t *temp_storage_bytes,
+    const float *d_keys_in, float *d_keys_out,
+    const int *d_values_in, int *d_values_out,
+    const size_t n_items, const int n_segments, const int *d_offsets,
+    cudaStream_t stream) {
+
+  return cub::DeviceSegmentedSort::SortPairs(
+      d_temp_storage, *temp_storage_bytes,
+      d_keys_in, d_keys_out,
+      d_values_in, d_values_out,
+      n_items, n_segments,
+      d_offsets, d_offsets + 1, stream);
+
+}
+
+cudaError_t gpu_launch_prepare_density_sorts(
+ const struct gpu_part_send_d *__restrict__ d_parts_send,
+ const struct gpu_sort_request *__restrict__ d_sort_requests,
+ float *__restrict__ d_sort_keys_in, float *__restrict__ d_sort_keys_out,
+ int *__restrict__ d_sort_values_in, int *__restrict__ d_sort_values_out,
+ int *__restrict__ d_sort_offsets, void *d_sort_temp_storage,
+ const size_t sort_temp_storage_bytes, const size_t n_sort_entries,
+ const int n_sort_requests, cudaStream_t stream) {
+
+ if (n_sort_requests == 0) return cudaSuccess;
+
+ cuda_kernel_prepare_density_sort_inputs<<<n_sort_requests, GPU_THREAD_BLOCK_SIZE, 0, stream>>>(d_parts_send, d_sort_requests, d_sort_keys_in, d_sort_values_in, d_sort_offsets, n_sort_requests);
+
+ cudaError_t cu_error = cudaGetLastError();
+
+ if (cu_error != cudaSuccess) return cu_error;
+
+ size_t temp_storage_bytes = sort_temp_storage_bytes;
+
+ return cub::DeviceSegmentedSort::SortPairs(d_sort_temp_storage, temp_storage_bytes, d_sort_keys_in, d_sort_keys_out, d_sort_values_in, d_sort_values_out, n_sort_entries, n_sort_requests, d_sort_offsets, d_sort_offsets + 1, stream);
 }
 
 void gpu_launch_prepare_density_target_ranges(
-    const struct gpu_sort_entry *__restrict__ d_sort_entries,
-    struct gpu_leaf_sort_metadata *__restrict__ d_leaf_sort_metadata,
-    const int n_leaves, cudaStream_t stream) {
+ const float *__restrict__ d_sort_keys,
+ struct gpu_leaf_sort_metadata *__restrict__ d_leaf_sort_metadata,
+ const int n_leaves, cudaStream_t stream) {
 
-  if (n_leaves == 0) return;
-  const int n_threads = GPU_THREAD_BLOCK_SIZE;
-  const int n_blocks = (n_leaves + n_threads - 1) / n_threads;
-  cuda_kernel_prepare_density_target_ranges<<<n_blocks, n_threads, 0, stream>>>(d_sort_entries, d_leaf_sort_metadata, n_leaves);
+ if (n_leaves == 0) return;
+ const int n_threads = GPU_THREAD_BLOCK_SIZE;
+ const int n_blocks = (n_leaves + n_threads - 1) / n_threads;
+ cuda_kernel_prepare_density_target_ranges<<<n_blocks, n_threads, 0, stream>>>(d_sort_keys, d_leaf_sort_metadata, n_leaves);
 
+}
+
+void gpu_launch_pack_density_sort_entries(
+ const float *__restrict__ d_sort_keys,
+ const int *__restrict__ d_sort_values,
+ struct gpu_sort_entry *__restrict__ d_sort_entries,
+ const int n_sort_entries, cudaStream_t stream) {
+
+ if (n_sort_entries == 0) return;
+
+ const int n_threads = GPU_THREAD_BLOCK_SIZE;
+
+ const int n_blocks = (n_sort_entries + n_threads - 1) / n_threads;
+
+ cuda_kernel_pack_density_sort_entries<<<n_blocks, n_threads, 0, stream>>>(d_sort_keys, d_sort_values, d_sort_entries, n_sort_entries);
 }
 
 /**
@@ -88,7 +148,8 @@ void gpu_launch_density(
     int num_blocks_x,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int4* __restrict__ d_block_leaf_id,
-    const struct gpu_sort_entry* __restrict__ d_sort_entries,
+    const float* __restrict__ d_sort_keys,
+    const int* __restrict__ d_sort_values,
     const struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
     const double3 space_dim,
     cudaStream_t stream, const int tester_param){
@@ -110,8 +171,8 @@ void gpu_launch_density(
 		  density_tiling_shared_bytes : density_reduction_shared_bytes;
 
   cuda_kernel_density<<<num_blocks_x, GPU_THREAD_BLOCK_SIZE, sh_mem, stream>>>(
-      d_parts_send, d_parts_recv, d_cell_i_j_start_end, d_block_leaf_id, d_sort_entries,
-      d_leaf_sort_metadata, space_dim, tester_param);
+      d_parts_send, d_parts_recv, d_cell_i_j_start_end, d_block_leaf_id, d_sort_keys,
+      d_sort_values, d_leaf_sort_metadata, space_dim, tester_param);
 
 }
 

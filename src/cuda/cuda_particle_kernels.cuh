@@ -42,92 +42,71 @@ extern "C" {
 #include <limits.h>
 
 /**
- * @brief Construct temporary directional sorts from packed density particles
+ * @brief Generate density directional sort keys, values and segment offsets
  *
  * @param d_parts_send Packed density particle data
  * @param d_sort_requests Compact directional sort requests
- * @param d_sort_entries Output directional sort entries
- * @param n_sort_requests Number of directional sort requests
+ * @param d_sort_keys Input projection keys for the segmented sort
+ * @param d_sort_values Input packed particle indices for the segmented sort
+ * @param d_sort_offsets Contiguous segmented sort boundaries
+ * @param n_sort_requests Number of unique directional sort requests
  */
-__global__ void cuda_kernel_prepare_density_sorts(
+__global__ void cuda_kernel_prepare_density_sort_inputs(
     const struct gpu_part_send_d *__restrict__ d_parts_send,
     const struct gpu_sort_request *__restrict__ d_sort_requests,
-    struct gpu_sort_entry *__restrict__ d_sort_entries,
+    float *__restrict__ d_sort_keys,
+    int *__restrict__ d_sort_values,
+    int *__restrict__ d_sort_offsets,
     const int n_sort_requests) {
   const int request_id = blockIdx.x;
   if (request_id >= n_sort_requests) return;
   const struct gpu_sort_request request = d_sort_requests[request_id];
-  if (request.count > GPU_SHARED_SORT_MAX_ENTRIES) return;
-  int padded_count = 1;
-  while (padded_count < request.count) padded_count <<= 1;
-  __shared__ struct gpu_sort_entry entries[GPU_SHARED_SORT_MAX_ENTRIES];
-  for (int local_id = threadIdx.x; local_id < padded_count; local_id += blockDim.x) {
-    if (local_id < request.count) {
-      const int packed_id = request.packed_start + local_id;
-      const struct gpu_part_data_d part = d_parts_send[packed_id].p_data;
-      const double d = part.x_y.x * gpu_runner_shift[request.sid][0] + part.x_y.y * gpu_runner_shift[request.sid][1] + part.z_h.x * gpu_runner_shift[request.sid][2];
-      entries[local_id].d = (float)d;
-      entries[local_id].i = packed_id;
-    } else {
-      entries[local_id].d = FLT_MAX;
-      entries[local_id].i = INT_MAX;
-    }
+  if (threadIdx.x == 0) {
+    d_sort_offsets[request_id] = request.sort_start;
+    if (request_id == n_sort_requests - 1) d_sort_offsets[n_sort_requests] = request.sort_start + request.count;
   }
-  __syncthreads();
-  for (int sequence_size = 2; sequence_size <= padded_count; sequence_size <<= 1) {
-    for (int comparison_distance = sequence_size >> 1; comparison_distance > 0; comparison_distance >>= 1) {
-      for (int local_id = threadIdx.x; local_id < padded_count; local_id += blockDim.x) {
-        const int partner = local_id ^ comparison_distance;
-        if (partner > local_id) {
-          const bool ascending = (local_id & sequence_size) == 0;
-          const struct gpu_sort_entry entry = entries[local_id];
-          const struct gpu_sort_entry partner_entry = entries[partner];
-          const bool swap = ascending ? gpu_sort_entry_after(entry, partner_entry) : gpu_sort_entry_after(partner_entry, entry);
-          if (swap) {
-            entries[local_id] = partner_entry;
-            entries[partner] = entry;
-          }
-        }
-      }
-      __syncthreads();
-    }
+  for (int local_id = threadIdx.x; local_id < request.count; local_id += blockDim.x) {
+    const int packed_id = request.packed_start + local_id;
+    const int sort_position = request.sort_start + local_id;
+    const struct gpu_part_data_d part = d_parts_send[packed_id].p_data;
+    const double d = part.x_y.x * gpu_runner_shift[request.sid][0] + part.x_y.y * gpu_runner_shift[request.sid][1] + part.z_h.x * gpu_runner_shift[request.sid][2];
+    d_sort_keys[sort_position] = (float)d;
+    d_sort_values[sort_position] = packed_id;
   }
-  for (int local_id = threadIdx.x; local_id < request.count; local_id += blockDim.x)
-    d_sort_entries[request.sort_start + local_id] = entries[local_id];
 }
 
 /**
- * @brief Derive density target ranges from fresh GPU directional sorts
+ * @brief Derive density target ranges from fresh GPU directional sort keys
  *
- * @param d_sort_entries GPU-generated directional sort entries
+ * @param d_sort_keys GPU-generated sorted directional projection keys
  * @param d_leaf_sort_metadata Per-leaf directional sort metadata
  * @param n_leaves Number of packed leaf computations
  */
 __global__ void cuda_kernel_prepare_density_target_ranges(
-    const struct gpu_sort_entry *__restrict__ d_sort_entries,
+    const float *__restrict__ d_sort_keys,
     struct gpu_leaf_sort_metadata *__restrict__ d_leaf_sort_metadata,
     const int n_leaves) {
   const int leaf_id = blockIdx.x * blockDim.x + threadIdx.x;
   if (leaf_id >= n_leaves) return;
   struct gpu_leaf_sort_metadata leaf_sort = d_leaf_sort_metadata[leaf_id];
   if (leaf_sort.ci_sort_start < 0 || leaf_sort.cj_sort_start < 0) return;
-  const float ci_limit = d_sort_entries[leaf_sort.cj_sort_start].d - leaf_sort.ci_reach + leaf_sort.rshift;
+  const float ci_limit = d_sort_keys[leaf_sort.cj_sort_start] - leaf_sort.ci_reach + leaf_sort.rshift;
   int left = 0;
   int right = leaf_sort.ci_sort_count;
   while (left < right) {
     const int middle = left + (right - left) / 2;
-    if (d_sort_entries[leaf_sort.ci_sort_start + middle].d <= ci_limit)
+    if (d_sort_keys[leaf_sort.ci_sort_start + middle] <= ci_limit)
       left = middle + 1;
     else
       right = middle;
   }
   leaf_sort.ci_first = left;
-  const float cj_limit = d_sort_entries[leaf_sort.ci_sort_start + leaf_sort.ci_sort_count - 1].d + leaf_sort.cj_reach - leaf_sort.rshift;
+  const float cj_limit = d_sort_keys[leaf_sort.ci_sort_start + leaf_sort.ci_sort_count - 1] + leaf_sort.cj_reach - leaf_sort.rshift;
   left = 0;
   right = leaf_sort.cj_sort_count;
   while (left < right) {
     const int middle = left + (right - left) / 2;
-    if (d_sort_entries[leaf_sort.cj_sort_start + middle].d < cj_limit)
+    if (d_sort_keys[leaf_sort.cj_sort_start + middle] < cj_limit)
       left = middle + 1;
     else
       right = middle;
@@ -135,6 +114,25 @@ __global__ void cuda_kernel_prepare_density_target_ranges(
   leaf_sort.cj_last = left - 1;
   leaf_sort.dx_max = 0.f;
   d_leaf_sort_metadata[leaf_id] = leaf_sort;
+}
+
+/**
+ * @brief Pack density sort keys and values into gpu_sort_entry for validation
+ *
+ * @param d_sort_keys Sorted directional projection keys
+ * @param d_sort_values Sorted packed particle indices
+ * @param d_sort_entries Output validation entries
+ * @param n_sort_entries Number of entries to pack
+ */
+__global__ void cuda_kernel_pack_density_sort_entries(
+    const float *__restrict__ d_sort_keys,
+    const int *__restrict__ d_sort_values,
+    struct gpu_sort_entry *__restrict__ d_sort_entries,
+    const int n_sort_entries) {
+  const int sort_position = blockIdx.x * blockDim.x + threadIdx.x;
+  if (sort_position >= n_sort_entries) return;
+  d_sort_entries[sort_position].d = d_sort_keys[sort_position];
+  d_sort_entries[sort_position].i = d_sort_values[sort_position];
 }
 
 /**
@@ -377,7 +375,7 @@ __device__ __forceinline__ float get_sorted_source_boundary(const float i_sort_d
 }
 
 /* Find the sorted source range required by the targets in this CUDA block */
-__device__ __forceinline__ void get_sorted_source_range(const struct gpu_sort_entry * __restrict__ d_sort_entries,
+__device__ __forceinline__ void get_sorted_source_range_entries(const struct gpu_sort_entry * __restrict__ d_sort_entries,
     float *s_boundary, const int j_sort_start, const int j_sort_count, const float i_source_boundary, const bool source_from_left,
     const int tid, int *block_j_first, int *block_j_last) {
 
@@ -428,6 +426,62 @@ __device__ __forceinline__ void get_sorted_source_range(const struct gpu_sort_en
   __syncthreads();
 }
 
+/* Find the sorted source range required by the targets in this CUDA block */
+__device__ __forceinline__ void get_sorted_source_range_keys(const float *__restrict__ d_sort_keys, float *s_boundary, const int j_sort_start, const int j_sort_count, const float i_source_boundary, const bool source_from_left, const int tid, int *block_j_first, int *block_j_last) {
+  /* Store one source boundary per target thread */
+  s_boundary[tid] = i_source_boundary;
+  __syncthreads();
+
+  /* Reduce the target boundaries to the source range required by this CUDA block */
+  for (int offset = GPU_THREAD_BLOCK_SIZE >> 1; offset > 0; offset >>= 1) {
+    if (tid < offset) {
+      if (source_from_left)
+        s_boundary[tid] = fmaxf(s_boundary[tid], s_boundary[tid + offset]);
+      else
+        s_boundary[tid] = fminf(s_boundary[tid], s_boundary[tid + offset]);
+    }
+    __syncthreads();
+  }
+
+  /* Find the sorted source range required by at least one target in this CUDA block */
+  if (tid == 0) {
+    if (source_from_left) {
+      int left = 0;
+      int right = j_sort_count;
+
+      while (left < right) {
+        const int middle = left + (right - left) / 2;
+
+        if (d_sort_keys[j_sort_start + middle] < s_boundary[0])
+          left = middle + 1;
+        else
+          right = middle;
+      }
+
+      *block_j_first = 0;
+      *block_j_last = left;
+
+    } else {
+      int left = 0;
+      int right = j_sort_count;
+
+      while (left < right) {
+        const int middle = left + (right - left) / 2;
+
+        if (d_sort_keys[j_sort_start + middle] <= s_boundary[0])
+          left = middle + 1;
+        else
+          right = middle;
+      }
+
+      *block_j_first = left;
+      *block_j_last = j_sort_count;
+    }
+  }
+
+  __syncthreads();
+}
+
 /**
  * @brief Naive kernel computing the density interactions of a single particle
  * assigning one CUDA thread to each particle in cell i and looping over cell j
@@ -444,7 +498,8 @@ __device__ __forceinline__ void get_sorted_source_range(const struct gpu_sort_en
 __device__ __forceinline__ void neighbour_interactions_density_sorted(
     const struct gpu_part_send_d *__restrict__ d_parts_send,
     struct gpu_part_recv_d *__restrict__ d_parts_recv,
-    const struct gpu_sort_entry *__restrict__ d_sort_entries,
+    const float *__restrict__ d_sort_keys,
+    const int *__restrict__ d_sort_values,
     int i_sort_start, int i_sort_first, int i_sort_count,
     int j_sort_start, int j_sort_count,
     const float dx_max, const float rshift, const bool source_from_left,
@@ -476,10 +531,13 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
   int i_id = -1;
   /* Get the target particle's position along the pair sort direction */
   float i_sort_d = 0.f;
+
   if (i_in_range) {
-    const struct gpu_sort_entry i_sort = d_sort_entries[i_sort_start + i_sort_id];
-    i_id = i_sort.i;
-    i_sort_d = i_sort.d;
+
+  const int i_sort_position = i_sort_start + i_sort_id;
+  i_id = d_sort_values[i_sort_position];
+  i_sort_d = d_sort_keys[i_sort_position];
+
   }
 
   int i_has_neighbour = 0;
@@ -513,10 +571,12 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
 
   /* Calculate the furthest sorted source position which can interact with this target */
   const float i_reach = hi * kernel_gamma;
-  const float i_source_boundary = get_sorted_source_boundary(i_sort_d, i_reach, dx_max, rshift, source_from_left, i_in_range);
+  const float i_source_boundary = get_sorted_source_boundary(i_sort_d, i_reach, dx_max, rshift,
+      source_from_left, i_in_range);
 
   /* Find the source range required by the targets in this CUDA block */
-  get_sorted_source_range(d_sort_entries, s_boundary, j_sort_start, j_sort_count, i_source_boundary, source_from_left, tid, &block_j_first, &block_j_last);
+  get_sorted_source_range_keys(d_sort_keys, s_boundary, j_sort_start, j_sort_count, i_source_boundary,
+      source_from_left, tid, &block_j_first, &block_j_last);
 
   /* Prep output */
   /* rho, rho_dh, wcount, wcount_dh */
@@ -538,7 +598,7 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
 
     for (int t = tid; t < tileCount0; t += GPU_THREAD_BLOCK_SIZE) {
       const int j_sort_id = base0 + t;
-      const int gj = d_sort_entries[j_sort_start + j_sort_id].i;
+      const int gj = d_sort_values[j_sort_start + j_sort_id];
       __pipeline_memcpy_async(&s_x_y[0 * GPU_THREAD_BLOCK_SIZE + t],
                               &d_parts_send[gj].p_data.x_y, sizeof(double2));
       __pipeline_memcpy_async(&s_z_h[0 * GPU_THREAD_BLOCK_SIZE + t],
@@ -579,7 +639,7 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
       /*Now issue pre-fetch for next data set*/
       for (int t = tid; t < nextCnt; t += GPU_THREAD_BLOCK_SIZE) {
         const int j_sort_id = nextBase + t;
-        const int gj = d_sort_entries[j_sort_start + j_sort_id].i;
+        const int gj = d_sort_values[j_sort_start + j_sort_id];
         __pipeline_memcpy_async(&s_x_y[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
                                 &d_parts_send[gj].p_data.x_y, sizeof(double2));
         __pipeline_memcpy_async(&s_z_h[nextBuf * GPU_THREAD_BLOCK_SIZE + t],
@@ -596,17 +656,19 @@ __device__ __forceinline__ void neighbour_interactions_density_sorted(
 #pragma unroll 4
       for (int t = 0; t < tileCount; ++t) {
 
-        /*grab the particle's index in the buffer array*/
-        const int j_sort_id = base + t;
         /* Get the source particle's sorted position and packed particle index */
-        const struct gpu_sort_entry j_sort = d_sort_entries[j_sort_start + j_sort_id];
+        const int j_sort_id = base + t;
+        const int j_sort_position = j_sort_start + j_sort_id;
+        const float j_sort_d = d_sort_keys[j_sort_position];
+        const int j_idx = d_sort_values[j_sort_position];
+
         /* Skip source particles which cannot reach this target particle */
         if (source_from_left) {
-          if (j_sort.d >= i_source_boundary) continue;
+          if (j_sort_d >= i_source_boundary) continue;
         } else {
-          if (j_sort.d <= i_source_boundary) continue;
+          if (j_sort_d <= i_source_boundary) continue;
         }
-        const int j_idx = j_sort.i;
+
         /* Exclude self contribution. This happens at a later step. */
         if (j_idx == i_id) continue;
 
@@ -903,7 +965,8 @@ __global__ void cuda_kernel_density(
     struct gpu_part_recv_d *__restrict__ d_parts_recv,
     const int4 *__restrict__ d_cell_i_j_start_end,
     const int4 *__restrict__ d_block_leaf_id,
-    const struct gpu_sort_entry *__restrict__ d_sort_entries,
+    const float *__restrict__ d_sort_keys,
+    const int *__restrict__ d_sort_values,
     const struct gpu_leaf_sort_metadata *__restrict__ d_leaf_sort_metadata,
     const double3 space_dim, const int tester_param) {
 
@@ -1038,14 +1101,14 @@ __global__ void cuda_kernel_density(
   /*Testing to see if the kernel works*/
   /* Use sorted target particles for pair interactions */
   /* Interact the reduced ci target range with the complete cj source cell */
-  neighbour_interactions_density_sorted(d_parts_send, d_parts_recv, d_sort_entries, leaf_sort.ci_sort_start,
+  neighbour_interactions_density_sorted(d_parts_send, d_parts_recv, d_sort_keys, d_sort_values, leaf_sort.ci_sort_start,
       leaf_sort.ci_first, ci_target_count, leaf_sort.cj_sort_start, leaf_sort.cj_sort_count, leaf_sort.dx_max,
       leaf_sort.rshift, true /*Source range comes from the low end of cj*/, ci_target_shift, cj_source_shift,
       b_id_local, tid);
 
   /* Repeat for the opposite interaction direction */
   /* Interact the reduced cj target range with the complete ci source cell */
-  neighbour_interactions_density_sorted(d_parts_send, d_parts_recv, d_sort_entries, leaf_sort.cj_sort_start,
+  neighbour_interactions_density_sorted(d_parts_send, d_parts_recv, d_sort_keys, d_sort_values, leaf_sort.cj_sort_start,
       0, cj_target_count, leaf_sort.ci_sort_start, leaf_sort.ci_sort_count, leaf_sort.dx_max, leaf_sort.rshift,
       false /*Source range comes from the high end of ci*/, cj_target_shift, ci_source_shift, b_id_local, tid);
   return;
@@ -1498,7 +1561,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient_sorted(
   const float i_source_boundary = get_sorted_source_boundary(i_sort_d, i_reach, dx_max, rshift, source_from_left, i_in_range);
 
   /* Find the source range required by the targets in this CUDA block */
-  get_sorted_source_range(d_sort_entries, s_boundary, j_sort_start, j_sort_count, i_source_boundary, source_from_left, tid, &block_j_first, &block_j_last);
+  get_sorted_source_range_entries(d_sort_entries, s_boundary, j_sort_start, j_sort_count, i_source_boundary, source_from_left, tid, &block_j_first, &block_j_last);
 
   /* Cosmology terms for the signal velocity */
   const float fac_mu = d_pow_three_gamma_minus_five_over_two(d_a);

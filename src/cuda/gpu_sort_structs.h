@@ -1,9 +1,6 @@
 #ifndef CUDA_GPU_SORT_STRUCTS_H
 #define CUDA_GPU_SORT_STRUCTS_H
 
-/* Maximum number of entries handled by the shared-memory sort */
-#define GPU_SHARED_SORT_MAX_ENTRIES 4096
-
 /*! Sort entry used by GPU pair interactions */
 struct gpu_sort_entry {
   /* Particle position projected along the sort direction */

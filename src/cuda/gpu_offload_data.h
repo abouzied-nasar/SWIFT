@@ -114,6 +114,22 @@ struct gpu_offload_data {
     struct gpu_sort_request *sort_requests;
     /* Device copy of the compact directional sort requests */
     struct gpu_sort_request *d_sort_requests;
+    /* Input keys for density segmented sorting */
+    float *d_density_sort_keys_in;
+    /* Output keys for density segmented sorting */
+    float *d_density_sort_keys_out;
+    /* Input values for density segmented sorting */
+    int *d_density_sort_values_in;
+    /* Output values for density segmented sorting */
+    int *d_density_sort_values_out;
+    /* Contiguous density segmented sort boundaries */
+    int *d_density_sort_offsets;
+    /* Temporary storage used by the density segmented sort */
+    void *d_density_sort_temp_storage;
+    /* Number of bytes allocated for density segmented sort temporary storage */
+    size_t density_sort_temp_storage_bytes;
+    /* Whether this offload buffer owns density segmented sort storage */
+    int has_density_sort_storage;
     /* GPU sort request index for each unique cell and sort direction */
     int *sort_request_index;
     /* Maximum particle count in a single sort request */
@@ -131,9 +147,8 @@ struct gpu_offload_data {
 };
 
 void gpu_data_buffers_init(struct gpu_offload_data *buf,
-                           const struct gpu_global_pack_params *params,
-                           const size_t send_struct_size,
-                           const size_t recv_struct_size);
+    const struct gpu_global_pack_params *params, const size_t send_struct_size,
+     const size_t recv_struct_size, const int allocate_density_sort);
 void gpu_data_buffers_init_step(struct gpu_offload_data *buf);
 void gpu_data_buffers_reset(struct gpu_offload_data *buf);
 void gpu_data_buffers_free(struct gpu_offload_data *buf);

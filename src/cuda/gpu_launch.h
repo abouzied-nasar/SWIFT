@@ -23,21 +23,38 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 #include "gpu_part_structs.h"
 #include "gpu_sort_structs.h"
 
 #include <cuda_runtime.h>
 
-void gpu_launch_prepare_density_sorts(
+cudaError_t gpu_density_segmented_sort_query(
+    void *d_temp_storage, size_t *temp_storage_bytes,
+    const float *d_keys_in, float *d_keys_out,
+    const int *d_values_in, int *d_values_out,
+    const size_t n_items, const int n_segments,
+    const int *d_offsets, cudaStream_t stream);
+
+cudaError_t gpu_launch_prepare_density_sorts(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     const struct gpu_sort_request* __restrict__ d_sort_requests,
-    struct gpu_sort_entry* __restrict__ d_sort_entries,
+    float* __restrict__ d_sort_keys_in, float* __restrict__ d_sort_keys_out,
+    int* __restrict__ d_sort_values_in, int* __restrict__ d_sort_values_out,
+    int* __restrict__ d_sort_offsets, void* d_sort_temp_storage,
+    const size_t sort_temp_storage_bytes, const size_t n_sort_entries,
     const int n_sort_requests, cudaStream_t stream);
 
 void gpu_launch_prepare_density_target_ranges(
-    const struct gpu_sort_entry* __restrict__ d_sort_entries,
+    const float* __restrict__ d_sort_keys,
     struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
     const int n_leaves, cudaStream_t stream);
+
+void gpu_launch_pack_density_sort_entries(
+    const float* __restrict__ d_sort_keys,
+    const int* __restrict__ d_sort_values,
+    struct gpu_sort_entry* __restrict__ d_sort_entries,
+    const int n_sort_entries, cudaStream_t stream);
 
 void gpu_launch_density(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
@@ -46,7 +63,8 @@ void gpu_launch_density(
     int num_blocks_x,
     const int4* __restrict__ d_cell_i_j_start_end,
     const int4* __restrict__ d_block_leaf_id,
-    const struct gpu_sort_entry* __restrict__ d_sort_entries,
+    const float* __restrict__ d_sort_keys,
+    const int* __restrict__ d_sort_values,
     const struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
     const double3 space_dim,
     cudaStream_t stream, const int tester_param);

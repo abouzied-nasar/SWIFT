@@ -192,13 +192,13 @@ void *runner_main_cuda(void *data) {
 
   gpu_data_buffers_init(&gpu_buf_dens, &gpu_pack_params,
                         sizeof(struct gpu_part_send_d),
-                        sizeof(struct gpu_part_recv_d));
+                        sizeof(struct gpu_part_recv_d), 1);
   gpu_data_buffers_init(&gpu_buf_grad, &gpu_pack_params,
                         sizeof(struct gpu_part_send_g),
-                        sizeof(struct gpu_part_recv_g));
+                        sizeof(struct gpu_part_recv_g), 0);
   gpu_data_buffers_init(&gpu_buf_forc, &gpu_pack_params,
                         sizeof(struct gpu_part_send_f),
-                        sizeof(struct gpu_part_recv_f));
+                        sizeof(struct gpu_part_recv_f), 0);
 
   /* Create streams so that we can off-load different batches of work in
    * different streams and get some con-CURRENCY! Events used to maximise

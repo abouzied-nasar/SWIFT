@@ -147,9 +147,17 @@ void gpu_init_thread(struct engine *e, const int cpuid) {
   /* Memory required per leaf computation launched */
   double mem_req_leaf_computation = sizeof(int4) + 3 * sizeof(struct gpu_leaf_sort_metadata);
 
-  /* Memory required per CUDA block launched including the worst-case
-    *directional sort storage associated with that block */
-  double mem_req_CUDA_block = sizeof(int*) + 3 * 2 * GPU_THREAD_BLOCK_SIZE * sizeof(struct gpu_sort_entry);
+  /* This is memory required for the sorting and to use CUDA's radix sorts
+   * TODO: Will need updating with #ifdefs or something if memory required is different for HIP APIs*/
+  /* Existing directional sort storage for density, gradient and force */
+  const double existing_sort_bytes_per_entry = sizeof(struct gpu_sort_entry);
+  /* Density segmented sort input and output key/value storage */
+  const double density_segmented_sort_bytes_per_entry = 2 * sizeof(float) + 2 * sizeof(int);
+  /* Conservative density segmented sort temporary storage allowance */
+  const double density_segmented_sort_temp_bytes_per_entry = 2 * density_segmented_sort_bytes_per_entry;
+  /* Memory required per CUDA block launched including worst-case directional sort storage */
+  double mem_req_CUDA_block = sizeof(int*) + 2 * GPU_THREAD_BLOCK_SIZE * (3 * existing_sort_bytes_per_entry
+      + density_segmented_sort_bytes_per_entry + density_segmented_sort_temp_bytes_per_entry);
 
   /* Now we need to figure out how much memory to assign to what */
   /* We need one instance of block_ID per GPU_THREAD_BLOCK_SIZE particles */
