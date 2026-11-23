@@ -117,6 +117,92 @@ __global__ void cuda_kernel_prepare_density_target_ranges(
 }
 
 /**
+ * @brief Calculate the number of density CUDA blocks required by each leaf
+ *
+ * @param d_cell_i_j_start_end Packed cell start and end metadata
+ * @param d_leaf_sort_metadata Per-leaf directional sort metadata
+ * @param d_leaf_block_counts Number of CUDA blocks required by each leaf
+ * @param n_leaves Number of packed leaf computations
+ */
+__global__ void cuda_kernel_prepare_density_block_counts(
+ const int4 *__restrict__ d_cell_i_j_start_end,
+ const struct gpu_leaf_sort_metadata *__restrict__ d_leaf_sort_metadata,
+ int *__restrict__ d_leaf_block_counts,
+ const int n_leaves) {
+
+  const int leaf_id = blockIdx.x * blockDim.x + threadIdx.x;
+  if (leaf_id >= n_leaves) return;
+
+  const int4 cell_se = d_cell_i_j_start_end[leaf_id];
+  const int ci_start = cell_se.x;
+  const int ci_end = cell_se.y;
+  const int cj_start = cell_se.z;
+
+  /* Self computations do not have directional sorts */
+  if (ci_start == cj_start) {
+    const int count = ci_end - ci_start - 1;
+    d_leaf_block_counts[leaf_id] = (count + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+    return;
+  }
+
+  const struct gpu_leaf_sort_metadata leaf_sort = d_leaf_sort_metadata[leaf_id];
+  const int ci_target_count = leaf_sort.ci_sort_count - leaf_sort.ci_first;
+  const int cj_target_count = leaf_sort.cj_last + 1;
+  const int ci_blocks = (ci_target_count + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+  const int cj_blocks = (cj_target_count + GPU_THREAD_BLOCK_SIZE - 1) / GPU_THREAD_BLOCK_SIZE;
+
+  d_leaf_block_counts[leaf_id] = max(ci_blocks, cj_blocks);
+}
+
+/**
+ * @brief Calculate the total number of pruned density CUDA blocks
+ *
+ * @param d_leaf_block_counts Number of blocks required by each leaf
+ * @param d_leaf_block_offsets Exclusive block offset for each leaf
+ * @param d_n_density_blocks Exact total number of density blocks
+ * @param n_leaves Number of packed leaf computations
+ */
+__global__ void cuda_kernel_prepare_density_block_total(
+ const int *__restrict__ d_leaf_block_counts,
+ const int *__restrict__ d_leaf_block_offsets,
+ int *__restrict__ d_n_density_blocks,
+ const int n_leaves) {
+
+  if (blockIdx.x != 0 || threadIdx.x != 0) return;
+  if (n_leaves == 0) {
+    d_n_density_blocks[0] = 0;
+    return;
+  }
+
+  const int last_leaf = n_leaves - 1;
+  d_n_density_blocks[0] = d_leaf_block_offsets[last_leaf] +
+      d_leaf_block_counts[last_leaf];
+}
+
+/**
+ * @brief Populate the compact density CUDA block worklist
+ *
+ * @param d_leaf_block_counts Number of blocks required by each leaf
+ * @param d_leaf_block_offsets Exclusive block offset for each leaf
+ * @param d_block_leaf_id Compact density block worklist
+ * @param n_leaves Number of packed leaf computations
+ */
+__global__ void cuda_kernel_prepare_density_block_worklist(
+ const int *__restrict__ d_leaf_block_counts,
+ const int *__restrict__ d_leaf_block_offsets,
+ int4 *__restrict__ d_block_leaf_id,
+ const int n_leaves) {
+
+  const int leaf_id = blockIdx.x * blockDim.x + threadIdx.x;
+  if (leaf_id >= n_leaves) return;
+
+  const int leaf_blocks = d_leaf_block_counts[leaf_id];
+  const int block_start = d_leaf_block_offsets[leaf_id];
+  for (int local_block = 0; local_block < leaf_blocks; local_block++)
+    d_block_leaf_id[block_start + local_block] = make_int4(leaf_id, local_block, 0, 0);
+}
+
+/**
  * @brief Pack density sort keys and values into gpu_sort_entry for validation
  *
  * @param d_sort_keys Sorted directional projection keys
@@ -976,11 +1062,8 @@ __global__ void cuda_kernel_density(
   const int bid = blockIdx.x;
   /* What is the leaf computation this block will work on? */
   const int leafid = d_block_leaf_id[bid].x;
-  /*In case we need more than one block to run this leaf computation we need to
-   * know where in the group of blocks acting on a cell we are. bid_0 is the id
-   * of the first block acting on this cell*/
-  const int bid_0 = d_block_leaf_id[bid].y;
-
+  /* CUDA block index local to this leaf computation */
+  const int b_id_local = d_block_leaf_id[bid].y;
   /* Get the directional sort metadata for this leaf computation */
   const struct gpu_leaf_sort_metadata leaf_sort = d_leaf_sort_metadata[leafid];
 
@@ -993,9 +1076,6 @@ __global__ void cuda_kernel_density(
   const int cj_start = cell_se.z;
   const int cj_end = cell_se.w;
 
-  /*We can now find our block index in a local reference to this cell*/
-  /* CUDA block index local to this leaf computation. */
-  const int b_id_local = bid - bid_0;
   /*This thread's ID within the block*/
   const int tid = threadIdx.x;
 
@@ -1076,9 +1156,14 @@ __global__ void cuda_kernel_density(
 
   /* Get the number of sorted ci particles which can potentially reach cj */
   const int ci_target_count = leaf_sort.ci_sort_count - leaf_sort.ci_first;
-
   /* Get the number of sorted cj particles which can potentially reach ci */
   const int cj_target_count = leaf_sort.cj_last + 1;
+
+  /* Get the number of CUDA blocks required by each pruned target range */
+  const int ci_target_blocks = (ci_target_count + GPU_THREAD_BLOCK_SIZE - 1)
+      /GPU_THREAD_BLOCK_SIZE;
+  const int cj_target_blocks = (cj_target_count + GPU_THREAD_BLOCK_SIZE - 1)/
+      GPU_THREAD_BLOCK_SIZE;
 
   /* Check that the reduced density target ranges are valid */
   if ((ci_target_count < 0 ||
@@ -1101,16 +1186,20 @@ __global__ void cuda_kernel_density(
   /*Testing to see if the kernel works*/
   /* Use sorted target particles for pair interactions */
   /* Interact the reduced ci target range with the complete cj source cell */
-  neighbour_interactions_density_sorted(d_parts_send, d_parts_recv, d_sort_keys, d_sort_values, leaf_sort.ci_sort_start,
-      leaf_sort.ci_first, ci_target_count, leaf_sort.cj_sort_start, leaf_sort.cj_sort_count, leaf_sort.dx_max,
-      leaf_sort.rshift, true /*Source range comes from the low end of cj*/, ci_target_shift, cj_source_shift,
-      b_id_local, tid);
+
+  if (b_id_local < ci_target_blocks)
+    neighbour_interactions_density_sorted(d_parts_send, d_parts_recv, d_sort_keys, d_sort_values, leaf_sort.ci_sort_start,
+        leaf_sort.ci_first, ci_target_count, leaf_sort.cj_sort_start, leaf_sort.cj_sort_count, leaf_sort.dx_max,
+        leaf_sort.rshift, true /*Source range comes from the low end of cj*/, ci_target_shift, cj_source_shift,
+        b_id_local, tid);
 
   /* Repeat for the opposite interaction direction */
   /* Interact the reduced cj target range with the complete ci source cell */
-  neighbour_interactions_density_sorted(d_parts_send, d_parts_recv, d_sort_keys, d_sort_values, leaf_sort.cj_sort_start,
-      0, cj_target_count, leaf_sort.ci_sort_start, leaf_sort.ci_sort_count, leaf_sort.dx_max, leaf_sort.rshift,
-      false /*Source range comes from the high end of ci*/, cj_target_shift, ci_source_shift, b_id_local, tid);
+
+  if (b_id_local < cj_target_blocks)
+    neighbour_interactions_density_sorted(d_parts_send, d_parts_recv, d_sort_keys, d_sort_values, leaf_sort.cj_sort_start,
+        0, cj_target_count, leaf_sort.ci_sort_start, leaf_sort.ci_sort_count, leaf_sort.dx_max, leaf_sort.rshift,
+        false /*Source range comes from the high end of ci*/, cj_target_shift, ci_source_shift, b_id_local, tid);
   return;
 
   /* Cell i is much larger than cell j: Blocks map over cell i. */

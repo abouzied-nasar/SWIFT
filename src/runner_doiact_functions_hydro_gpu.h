@@ -1169,15 +1169,59 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
       error("CUDA density segmented sort failed: CUDA error '%s' for task_subtype %s cpuid=%d sort_entries=%d sort_requests=%d",
           cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid, md->n_sort_entries_packed,
           gpu_md->n_sort_requests);
+
     /* Derive density target ranges from the fresh GPU sort keys */
     gpu_launch_prepare_density_target_ranges(gpu_md->d_density_sort_keys_out, gpu_md->d_leaf_sort_metadata,
         leaves_packed, stream[0]);
 
+    /* Calculate the exact number of pruned density blocks required by each leaf */
+    gpu_launch_prepare_density_block_counts(gpu_md->d_cell_i_j_start_end, gpu_md->d_leaf_sort_metadata,
+        gpu_md->d_density_leaf_block_counts, leaves_packed, stream[0]);
+
+    /* Scan the per-leaf block counts and calculate the exact total block count */
+    cu_error = gpu_launch_scan_density_block_counts(gpu_md->d_density_leaf_block_counts, gpu_md->d_density_leaf_block_offsets,
+        gpu_md->d_density_n_blocks, gpu_md->d_density_sort_temp_storage, gpu_md->density_sort_temp_storage_bytes, leaves_packed,
+        stream[0]);
+
+    if (cu_error != cudaSuccess)
+      error("CUDA density block-count scan failed: CUDA error '%s' for task_subtype %s cpuid=%d leaves=%d",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid, leaves_packed);
+
+    /* Populate the compact density block worklist */
+    gpu_launch_prepare_density_block_worklist(gpu_md->d_density_leaf_block_counts, gpu_md->d_density_leaf_block_offsets,
+        gpu_md->d_block_leaf_id, leaves_packed, stream[0]);
+
+    cu_error = cudaGetLastError();
+    if (cu_error != cudaSuccess)
+      error("CUDA density block worklist preparation failed: CUDA error '%s' for task_subtype %s cpuid=%d leaves=%d",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid, leaves_packed);
+
+    /* Copy back the exact density block count required for the kernel launch */
+    int n_density_blocks = 0;
+    cu_error = cudaMemcpyAsync(&n_density_blocks, gpu_md->d_density_n_blocks, sizeof(int), cudaMemcpyDeviceToHost, stream[0]);
+    if (cu_error != cudaSuccess)
+      error("CUDA density block-count copy failed: CUDA error '%s' for task_subtype %s cpuid=%d leaves=%d",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid, leaves_packed);
+
+    /* Wait for the exact density block count before launching the interaction kernel */
+    cu_error = cudaStreamSynchronize(stream[0]);
+    if (cu_error != cudaSuccess)
+      error("CUDA density block preparation failed: CUDA error '%s' for task_subtype %s cpuid=%d leaves=%d",
+          cudaGetErrorString(cu_error), subtaskID_names[task_subtype], r->cpuid, leaves_packed);
+
+#ifdef SWIFT_DEBUG_CHECKS
+
+    if (n_density_blocks < 0 || n_density_blocks > n_blocks)
+      error("Invalid pruned density block count: pruned=%d conservative=%d leaves=%d cpuid=%d", n_density_blocks, n_blocks, leaves_packed, r->cpuid);
+
+    message("GPU density blocks: conservative=%d pruned=%d leaves=%d", n_blocks, n_density_blocks, leaves_packed);
+
+#endif
     /*"Once more unto the breach dear friends, once more!"
      *Issue instruction to launch GPU computations*/
-    gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H, n_blocks, gpu_md->d_cell_i_j_start_end,
-        gpu_md->d_block_leaf_id, gpu_md->d_density_sort_keys_out, gpu_md->d_density_sort_values_out,
-        gpu_md->d_leaf_sort_metadata, space_dim, stream[0], tester_param);
+    if (n_density_blocks > 0)
+      gpu_launch_density(buf->d_parts_send_d, buf->d_parts_recv_d, d_a, d_H, n_density_blocks, gpu_md->d_cell_i_j_start_end, gpu_md->d_block_leaf_id,
+          gpu_md->d_density_sort_keys_out, gpu_md->d_density_sort_values_out, gpu_md->d_leaf_sort_metadata, space_dim, stream[0], tester_param);
 
     /*"The wheel is come full circle; I am here"
      *  Results are ready to copy back to CPU BUFFERS */

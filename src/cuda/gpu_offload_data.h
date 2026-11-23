@@ -106,6 +106,12 @@ struct gpu_offload_data {
     int4 *block_leaf_id;
     /*Device copy*/
     int4 *d_block_leaf_id;
+    /* Device counter for the exact number of pruned density blocks */
+    int *d_density_n_blocks;
+    /* Number of pruned density blocks required by each leaf */
+    int *d_density_leaf_block_counts;
+    /* Exclusive block offset for each density leaf */
+    int *d_density_leaf_block_offsets;
     /* CPU-side compact directional sort entries for packed pair leaves */
     struct gpu_sort_entry *sort_entries;
     /* Device copy of the compact directional sort entries */

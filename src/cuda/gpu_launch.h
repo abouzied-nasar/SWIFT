@@ -36,6 +36,18 @@ cudaError_t gpu_density_segmented_sort_query(
     const size_t n_items, const int n_segments,
     const int *d_offsets, cudaStream_t stream);
 
+size_t gpu_density_segmented_sort_temp_storage_bytes(const size_t n_items,
+    const int n_segments);
+
+void gpu_launch_prepare_density_block_worklist(
+ const int* __restrict__ d_leaf_block_counts,
+ const int* __restrict__ d_leaf_block_offsets,
+ int4* __restrict__ d_block_leaf_id,
+ const int n_leaves,
+ cudaStream_t stream);
+
+size_t gpu_density_block_scan_temp_storage_bytes(const int n_leaves);
+
 cudaError_t gpu_launch_prepare_density_sorts(
     const struct gpu_part_send_d* __restrict__ d_parts_send,
     const struct gpu_sort_request* __restrict__ d_sort_requests,
@@ -49,6 +61,21 @@ void gpu_launch_prepare_density_target_ranges(
     const float* __restrict__ d_sort_keys,
     struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
     const int n_leaves, cudaStream_t stream);
+
+void gpu_launch_prepare_density_block_counts(
+ const int4* __restrict__ d_cell_i_j_start_end,
+ const struct gpu_leaf_sort_metadata* __restrict__ d_leaf_sort_metadata,
+ int* __restrict__ d_leaf_block_counts,
+ const int n_leaves, cudaStream_t stream);
+
+cudaError_t gpu_launch_scan_density_block_counts(
+ const int* __restrict__ d_leaf_block_counts,
+ int* __restrict__ d_leaf_block_offsets,
+ int* __restrict__ d_n_density_blocks,
+ void* d_temp_storage,
+ const size_t temp_storage_bytes,
+ const int n_leaves,
+ cudaStream_t stream);
 
 void gpu_launch_pack_density_sort_entries(
     const float* __restrict__ d_sort_keys,

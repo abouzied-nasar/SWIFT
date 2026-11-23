@@ -29,6 +29,7 @@
  * error: this declaration may not have extern "C" linkage */
 #include <cuda_pipeline.h>
 #include <cub/device/device_segmented_sort.cuh>
+#include <cub/device/device_scan.cuh>
 
 /* ifdef __cplusplus prevents name mangling. C code sees exact names
  of functions rather than mangled template names produced by C++ */
@@ -47,6 +48,45 @@ extern "C" {
 /* #include <cuda_profiler_api.h> */
 /* #include <cuda_runtime.h> */
 
+cudaError_t gpu_launch_scan_density_block_counts(
+ const int *__restrict__ d_leaf_block_counts,
+ int *__restrict__ d_leaf_block_offsets,
+ int *__restrict__ d_n_density_blocks,
+ void *d_temp_storage,
+ const size_t temp_storage_bytes,
+ const int n_leaves,
+ cudaStream_t stream) {
+
+  if (n_leaves == 0) {
+    return cudaMemsetAsync(d_n_density_blocks, 0, sizeof(int), stream);
+  }
+
+  size_t scan_temp_storage_bytes = temp_storage_bytes;
+  cudaError_t cu_error = cub::DeviceScan::ExclusiveSum(d_temp_storage, scan_temp_storage_bytes,
+      d_leaf_block_counts, d_leaf_block_offsets, n_leaves, stream);
+  if (cu_error != cudaSuccess)
+    return cu_error;
+
+  cuda_kernel_prepare_density_block_total<<<1, 1, 0, stream>>>(d_leaf_block_counts,
+      d_leaf_block_offsets, d_n_density_blocks, n_leaves);
+  return cudaGetLastError();
+}
+
+void gpu_launch_prepare_density_block_worklist(
+ const int *__restrict__ d_leaf_block_counts,
+ const int *__restrict__ d_leaf_block_offsets,
+ int4 *__restrict__ d_block_leaf_id,
+ const int n_leaves,
+ cudaStream_t stream) {
+
+  if (n_leaves == 0) return;
+
+  const int n_threads = GPU_THREAD_BLOCK_SIZE;
+  const int n_blocks = (n_leaves + n_threads - 1) / n_threads;
+  cuda_kernel_prepare_density_block_worklist<<<n_blocks, n_threads, 0, stream>>>(d_leaf_block_counts,
+      d_leaf_block_offsets, d_block_leaf_id, n_leaves);
+}
+
 size_t gpu_density_segmented_sort_temp_storage_bytes(
     const size_t n_items, const int n_segments) {
 
@@ -61,6 +101,18 @@ size_t gpu_density_segmented_sort_temp_storage_bytes(
 
   return temp_storage_bytes;
 }
+
+size_t gpu_density_block_scan_temp_storage_bytes(const int n_leaves) {
+
+ if (n_leaves == 0) return 0;
+
+ size_t temp_storage_bytes = 0;
+ const cudaError_t cu_error = cub::DeviceScan::ExclusiveSum(NULL, temp_storage_bytes, (const int *)NULL, (int *)NULL, n_leaves);
+ if (cu_error != cudaSuccess) return 0;
+ return temp_storage_bytes;
+
+}
+
 
 cudaError_t gpu_density_segmented_sort_query(
     void *d_temp_storage, size_t *temp_storage_bytes,
@@ -109,6 +161,20 @@ void gpu_launch_prepare_density_target_ranges(
  const int n_threads = GPU_THREAD_BLOCK_SIZE;
  const int n_blocks = (n_leaves + n_threads - 1) / n_threads;
  cuda_kernel_prepare_density_target_ranges<<<n_blocks, n_threads, 0, stream>>>(d_sort_keys, d_leaf_sort_metadata, n_leaves);
+
+}
+
+void gpu_launch_prepare_density_block_counts(
+ const int4 *__restrict__ d_cell_i_j_start_end,
+ const struct gpu_leaf_sort_metadata *__restrict__ d_leaf_sort_metadata,
+ int *__restrict__ d_leaf_block_counts,
+ const int n_leaves, cudaStream_t stream) {
+
+ if (n_leaves == 0) return;
+
+ const int n_threads = GPU_THREAD_BLOCK_SIZE;
+ const int n_blocks = (n_leaves + n_threads - 1) / n_threads;
+ cuda_kernel_prepare_density_block_counts<<<n_blocks, n_threads, 0, stream>>>(d_cell_i_j_start_end, d_leaf_sort_metadata, d_leaf_block_counts, n_leaves);
 
 }
 

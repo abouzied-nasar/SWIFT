@@ -67,6 +67,9 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf, const struct gpu_global
   buf->gpu_md.d_density_sort_offsets = NULL;
   buf->gpu_md.d_density_sort_temp_storage = NULL;
   buf->gpu_md.density_sort_temp_storage_bytes = 0;
+  buf->gpu_md.d_density_n_blocks = NULL;
+  buf->gpu_md.d_density_leaf_block_counts = NULL;
+  buf->gpu_md.d_density_leaf_block_offsets = NULL;
 
   /* Now allocate arrays */
   cudaError_t cu_error;
@@ -163,6 +166,9 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf, const struct gpu_global
 
   /* Allocate density segmented sort key, value and offset storage */
   if (allocate_density_sort) {
+    cu_error = cudaMalloc((void **)&buf->gpu_md.d_density_n_blocks, sizeof(int));
+    if (cu_error != cudaSuccess)
+      error("Failed to allocate density block counter: CUDA error '%s' bytes=%zu", cudaGetErrorString(cu_error), sizeof(int));
     cu_error = cudaMalloc((void **)&buf->gpu_md.d_density_sort_keys_in, sort_buffer_size * sizeof(float));
     if (cu_error != cudaSuccess)
       error("Failed to allocate density segmented sort input keys: CUDA error '%s' bytes=%zu", cudaGetErrorString(cu_error), sort_buffer_size * sizeof(float));
@@ -201,6 +207,20 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf, const struct gpu_global
         sort_buffer_size, sort_request_capacity,
         buf->gpu_md.d_density_sort_offsets, 0);
 
+    cu_error = cudaMalloc((void **)&buf->gpu_md.d_density_leaf_block_counts,
+        params->leaf_buffer_size * sizeof(int));
+    if (cu_error != cudaSuccess)
+      error("Failed to allocate density leaf block counts: CUDA error '%s' "
+          "bytes=%zu", cudaGetErrorString(cu_error),
+          (size_t)params->leaf_buffer_size * sizeof(int));
+
+    cu_error = cudaMalloc((void **)&buf->gpu_md.d_density_leaf_block_offsets,
+        params->leaf_buffer_size * sizeof(int));
+    if (cu_error != cudaSuccess)
+      error("Failed to allocate density leaf block offsets: CUDA error '%s' "
+          "bytes=%zu", cudaGetErrorString(cu_error),
+          (size_t)params->leaf_buffer_size * sizeof(int));
+
     if (cu_error != cudaSuccess)
       error(
           "Failed to query density segmented sort temporary storage: "
@@ -214,8 +234,14 @@ void gpu_data_buffers_init(struct gpu_offload_data *buf, const struct gpu_global
           "entries=%zu segments=%d",
           sort_buffer_size, sort_request_capacity);
 
+    const size_t density_sort_temp_storage_bytes =
+        gpu_density_segmented_sort_temp_storage_bytes(sort_buffer_size, sort_request_capacity);
+    const size_t density_block_scan_temp_storage_bytes =
+        gpu_density_block_scan_temp_storage_bytes(params->leaf_buffer_size);
+
     buf->gpu_md.density_sort_temp_storage_bytes =
-        temp_storage_bytes;
+        density_sort_temp_storage_bytes > density_block_scan_temp_storage_bytes ?
+            density_sort_temp_storage_bytes : density_block_scan_temp_storage_bytes;
 
     cu_error = cudaMalloc(
         (void **)&buf->gpu_md.d_density_sort_temp_storage,
@@ -349,6 +375,16 @@ void gpu_data_buffers_free(struct gpu_offload_data *buf) {
   swift_assert(cu_error == cudaSuccess);
 
   if (buf->gpu_md.has_density_sort_storage) {
+
+    cu_error = cudaFree(buf->gpu_md.d_density_leaf_block_counts);
+    swift_assert(cu_error == cudaSuccess);
+
+    cu_error = cudaFree(buf->gpu_md.d_density_leaf_block_offsets);
+    swift_assert(cu_error == cudaSuccess);
+
+    cu_error = cudaFree(buf->gpu_md.d_density_n_blocks);
+    swift_assert(cu_error == cudaSuccess);
+
     cu_error = cudaFree(buf->gpu_md.d_density_sort_keys_in);
     swift_assert(cu_error == cudaSuccess);
 
