@@ -53,7 +53,7 @@ extern "C" {
  * @param num_blocks_x number of thread blocks to use in x-dimension
  * @param d_cell_i_j_start_end index of first and last particles of cells i and j within
  * the buffer arrays
- * d_block_leaf_id index of leaf computation to work on for each CUDA block launched
+ * @param d_block_leaf_id index of leaf computation to work on for each CUDA block launched
  * @param space_dim the dimensions of the space (box) containing the simulation
  * @param stream cuda stream to use
  */
@@ -89,7 +89,7 @@ void gpu_launch_density(
  * @param num_blocks_x number of thread blocks to use in x-dimension
  * @param d_cell_i_j_start_end index of first and last particles of cells i and j within
  * the buffer arrays
- * d_block_leaf_id index of leaf computation to work on for each CUDA block launched
+ * @param d_block_leaf_id index of leaf computation to work on for each CUDA block launched
  * @param space_dim the dimensions of the space (box) containing the simulation
  * @param stream cuda stream to use
  */
@@ -124,7 +124,7 @@ void gpu_launch_gradient(
  * @param num_blocks_x number of thread blocks to use in x-dimension
  * @param d_cell_i_j_start_end index of first and last particles of cells i and j within
  * the buffer arrays
- * d_block_leaf_id index of leaf computation to work on for each CUDA block launched
+ * @param d_block_leaf_id index of leaf computation to work on for each CUDA block launched
  * @param space_dim the dimensions of the space (box) containing the simulation
  * @param stream cuda stream to use
  */

@@ -43,11 +43,6 @@ typedef double4 swift_double4;
 #endif
 #endif
 
-/*Let the user know which version of CUDA we compile with*/
-#define STRINGIFY_(x) #x
-#define STRINGIFY(x) STRINGIFY_(x)
-#pragma message("CUDART_VERSION = " STRINGIFY(CUDART_VERSION))
-
 /*! Container for particle data required for density calcs */
 struct gpu_part_data_d {
 #ifdef WITH_CUDA

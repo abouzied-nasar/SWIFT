@@ -292,12 +292,21 @@ __global__ void cuda_kernel_density(
     const double disty = cj_loc.x.y - ci_loc.x.y;
     const double distz = cj_loc.x.z - ci_loc.x.z;
 
-    if (distx < -space_dim.x * 0.5)      shift.x =  space_dim.x;
-    else if (distx >  space_dim.x * 0.5)  shift.x = -space_dim.x;
-    if (disty < -space_dim.y * 0.5)      shift.y =  space_dim.y;
-    else if (disty >  space_dim.y * 0.5)  shift.y = -space_dim.y;
-    if (distz < -space_dim.z * 0.5)      shift.z =  space_dim.z;
-    else if (distz >  space_dim.z * 0.5)  shift.z = -space_dim.z;
+    if (distx < -space_dim.x * 0.5){
+      shift.x =  space_dim.x;
+    }else if (distx >  space_dim.x * 0.5){
+      shift.x = -space_dim.x;
+    }
+    if (disty < -space_dim.y * 0.5){
+      shift.y =  space_dim.y;
+    }else if (disty >  space_dim.y * 0.5){
+      shift.y = -space_dim.y;
+    }
+    if (distz < -space_dim.z * 0.5){
+      shift.z =  space_dim.z;
+    }else if (distz >  space_dim.z * 0.5){
+      shift.z = -space_dim.z;
+    }
 
     const double3 shift_i_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
     const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
@@ -612,12 +621,21 @@ __global__ void cuda_kernel_gradient(
     const double disty = cj_loc.x.y - ci_loc.x.y;
     const double distz = cj_loc.x.z - ci_loc.x.z;
 
-    if (distx < -space_dim.x * 0.5)      shift.x =  space_dim.x;
-    else if (distx >  space_dim.x * 0.5)  shift.x = -space_dim.x;
-    if (disty < -space_dim.y * 0.5)      shift.y =  space_dim.y;
-    else if (disty >  space_dim.y * 0.5)  shift.y = -space_dim.y;
-    if (distz < -space_dim.z * 0.5)      shift.z =  space_dim.z;
-    else if (distz >  space_dim.z * 0.5)  shift.z = -space_dim.z;
+    if (distx < -space_dim.x * 0.5){
+      shift.x =  space_dim.x;
+    }else if (distx >  space_dim.x * 0.5){
+      shift.x = -space_dim.x;
+    }
+    if (disty < -space_dim.y * 0.5){
+      shift.y =  space_dim.y;
+    }else if (disty >  space_dim.y * 0.5){
+      shift.y = -space_dim.y;
+    }
+    if (distz < -space_dim.z * 0.5){
+      shift.z =  space_dim.z;
+    }else if (distz >  space_dim.z * 0.5){
+      shift.z = -space_dim.z;
+    }
 
     const double3 shift_i_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
     const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};
@@ -1034,12 +1052,21 @@ __global__ void cuda_kernel_force(
     const double disty = cj_loc.x.y - ci_loc.x.y;
     const double distz = cj_loc.x.z - ci_loc.x.z;
 
-    if (distx < -space_dim.x * 0.5)      shift.x =  space_dim.x;
-    else if (distx >  space_dim.x * 0.5)  shift.x = -space_dim.x;
-    if (disty < -space_dim.y * 0.5)      shift.y =  space_dim.y;
-    else if (disty >  space_dim.y * 0.5)  shift.y = -space_dim.y;
-    if (distz < -space_dim.z * 0.5)      shift.z =  space_dim.z;
-    else if (distz >  space_dim.z * 0.5)  shift.z = -space_dim.z;
+    if (distx < -space_dim.x * 0.5){
+      shift.x =  space_dim.x;
+    }else if (distx >  space_dim.x * 0.5){
+      shift.x = -space_dim.x;
+    }
+    if (disty < -space_dim.y * 0.5){
+      shift.y =  space_dim.y;
+    }else if (disty >  space_dim.y * 0.5){
+      shift.y = -space_dim.y;
+    }
+    if (distz < -space_dim.z * 0.5){
+      shift.z =  space_dim.z;
+    }else if (distz >  space_dim.z * 0.5){
+      shift.z = -space_dim.z;
+    }
 
     const double3 shift_i_res = {shift.x + cj_loc.x.x, shift.y + cj_loc.x.y, shift.z + cj_loc.x.z};
     const double3 shift_j_res = {cj_loc.x.x, cj_loc.x.y, cj_loc.x.z};

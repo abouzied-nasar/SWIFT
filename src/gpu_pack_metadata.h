@@ -68,7 +68,6 @@ struct gpu_pack_metadata {
   struct hash_table{
     struct hash_entry * entry;
     uintptr_t capacity;
-    int count;
   } hash_table;
 
   /*Array to guide each leaf computation to it's cell's/s' index in the

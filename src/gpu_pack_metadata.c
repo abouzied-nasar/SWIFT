@@ -70,7 +70,6 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
    * We will only ever have pack_size entries to hash through so pack_size gives us enough slots
    * However, if we have >50% unique cells out of all cells we hash through hashing can become inifeccient
    * The factor of 10 is overkill but gives us plenty of space*/
-  /*TODO: */
   uintptr_t hash_size = params->pack_size * 10;
   md->hash_table.entry = calloc(hash_size, sizeof(struct hash_entry));
 
@@ -94,7 +93,6 @@ void gpu_pack_metadata_init(struct gpu_pack_metadata *md,
 
   /*Initialise metadata*/
   md->hash_table.capacity = hash_size;
-  md->hash_table.count = 0;
   md->hash_size = hash_size;
   md->task_n_leaves = 0;
   md->tasks_in_list = 0;
@@ -139,7 +137,6 @@ void gpu_pack_metadata_reset(struct gpu_pack_metadata *md,
   md->launch_leftovers = 0;
   md->n_unique = 0;
   md->hash_table.capacity = md->hash_size;
-  md->hash_table.count = 0;
   md->n_blocks_packed = 0;
 
   for(uintptr_t i = 0; i < md->hash_size; i++){

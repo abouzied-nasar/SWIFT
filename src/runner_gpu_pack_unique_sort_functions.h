@@ -98,7 +98,6 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
    * Makes sense to have a separate copy for readability when finalising
    * the packing before we offload*/
   md->unique_cells[unique_count] = (struct cell *)c;
-  md->hash_table.count++;
   int c_count = c->hydro.count;
   /*Store where ci starts*/
   md->unique_start_end[unique_count].x = md->count_parts_unique;
