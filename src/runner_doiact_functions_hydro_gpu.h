@@ -620,11 +620,9 @@ __attribute__((always_inline)) INLINE static void runner_gpu_pack_and_launch(
         md->task_n_leaves);
 #endif
 
-  /*TODO: Note: This was md->n_leaves not md->n_leaves_packed, come back to this after
-   * editing the function to follow unique sorting algo*/
-  /* Keep track of index of first leaf cell pairs in lists per super-level pair
-   * task in case we are packing more than one super-level task into this
-   * buffer. */
+  /* Keep track of index of first leaf-level computation for task tind and add to a list of first
+   * leaf computations of each task we encounter before off-loading. Needed since we recurse for each task
+   * and also should pack more than one task into offload buffers for efficient offloading. */
   task_first_packed_leaf[tind] = md->n_leaves_packed;
   /* Same for the first particle index in particle buffers */
   md->task_first_packed_part[tind] = md->count_parts;

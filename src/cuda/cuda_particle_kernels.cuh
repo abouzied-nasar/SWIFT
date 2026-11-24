@@ -40,7 +40,6 @@ extern "C" {
 /**
  * @brief Naive kernel computing the density interactions of a single particle
  *
- * @param pid index of particle to compute density for in the data arrays
  * @param d_parts_send array of particle data received from CPU
  * @param d_parts_recv array of particle data to write results into
  * @param i_start, i_end. First and last particles of cell i
@@ -245,7 +244,7 @@ __device__ __forceinline__ void neighbour_interactions_density(
 /**
  * @brief Naive kernel computing the density interactions of a single particle
  *
- * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_send array of particle data received from CPU
  * @param d_parts_recv array of particle data to write results into
  * @param d_a current cosmological expansion factor
  * @param d_H current Hubble constant
@@ -330,7 +329,6 @@ __global__ void cuda_kernel_density(
 /**
  * @brief Naive kernel computing the gradient interactions of a single particle
  *
- * @param pid index of particle to compute density for in the data arrays
  * @param d_parts_send array of particle data received from CPU
  * @param d_parts_recv array of particle data to write results into
  * @param i_start first particle in cell i
@@ -566,7 +564,7 @@ __device__ __forceinline__ void neighbour_interactions_gradient(
 /**
  * @brief Naive kernel computing the gradient interactions of a single particle per thread
  *
- * @param d_pars_send array of particle data received from CPU
+ * @param d_parts_send array of particle data received from CPU
  * @param d_parts_recv array of particle data to write results into
  * @param d_a current cosmological expansion factor
  * @param d_H current Hubble constant
