@@ -55,7 +55,7 @@
  * previous task.
  * @param task_subtype this task's subtype
  */
-__attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
+__attribute__((always_inline)) INLINE static void runner_gpu_unpack(
     const struct runner *r, struct scheduler *s,
     struct gpu_offload_data *restrict buf, const int npacked,
     const enum task_subtypes task_subtype) {
@@ -67,49 +67,30 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_pre_sorted(
   /*Let's unpack the unique particle data first.
    * We get on to enqueueing dependencies after this*/
   int unpack_index = 0;
-  if(task_subtype == task_subtype_gpu_density){
-    for(int i = 0; i < md->n_unique; i++){
-      struct cell * c = md->unique_cells[i];
-      const int count = c->hydro.count;
-      while(cell_locktree(c)){
-        ;
-      }
-      if (cell_is_active_hydro(c, e))
-      gpu_unpack_part_density(c, buf->parts_recv_d, unpack_index,
-          count, e);
-      unpack_index += count + 1;
-      cell_unlocktree(c);
-    }
-  }
-  else if(task_subtype == task_subtype_gpu_force){
-    for(int i = 0; i < md->n_unique; i++){
-      struct cell * c = md->unique_cells[i];
-      const int count = c->hydro.count;
-      while(cell_locktree(c)){
-        ;
-      }
-      if (cell_is_active_hydro(c, e))
-      gpu_unpack_part_force(c, buf->parts_recv_f, unpack_index,
-          count, e);
-      unpack_index += count + 1;
-      cell_unlocktree(c);
-    }
-  }
-  else if(task_subtype == task_subtype_gpu_gradient){
-    for(int i = 0; i < md->n_unique; i++){
-      struct cell * c = md->unique_cells[i];
-      const int count = c->hydro.count;
-      while(cell_locktree(c)){
-        ;
-      }
-      if (cell_is_active_hydro(c, e))
-      gpu_unpack_part_gradient(c, buf->parts_recv_g, unpack_index,
-          count, e);
-      unpack_index += count + 1;
-      cell_unlocktree(c);
-    }
-  }
 
+  for(int i = 0; i < md->n_unique; i++){
+    struct cell * c = md->unique_cells[i];
+    const int count = c->hydro.count;
+    while(cell_locktree(c)){
+      ;
+    }
+    if (cell_is_active_hydro(c, e)){
+      if(task_subtype == task_subtype_gpu_density){
+        gpu_unpack_part_density(c, buf->parts_recv_d, unpack_index,
+            count, e);
+      }
+      else if(task_subtype == task_subtype_gpu_gradient){
+        gpu_unpack_part_gradient(c, buf->parts_recv_g, unpack_index,
+            count, e);
+      }
+      else if(task_subtype == task_subtype_gpu_force){
+        gpu_unpack_part_force(c, buf->parts_recv_f, unpack_index,
+            count, e);
+      }
+    }
+    unpack_index += count + 1;
+    cell_unlocktree(c);
+  }
 
   /* Loop over all tasks that we have offloaded */
   for (int tid = 0; tid < md->tasks_in_list; tid++) {
@@ -155,7 +136,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_density(
 
   TIMER_TIC;
 
-  runner_gpu_unpack_pre_sorted(r, s, buf, npacked, task_subtype_gpu_density);
+  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_density);
 
   TIMER_TOC(timer_gpu_unpack_d);
 }
@@ -176,7 +157,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_unpack_gradient(
 
   TIMER_TIC;
 
-  runner_gpu_unpack_pre_sorted(r, s, buf, npacked, task_subtype_gpu_gradient);
+  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_gradient);
 
   TIMER_TOC(timer_gpu_unpack_g);
 }
@@ -198,7 +179,7 @@ runner_dopair_gpu_unpack_force(const struct runner *r, struct scheduler *s,
 
   TIMER_TIC;
 
-  runner_gpu_unpack_pre_sorted(r, s, buf, npacked, task_subtype_gpu_force);
+  runner_gpu_unpack(r, s, buf, npacked, task_subtype_gpu_force);
 
   TIMER_TOC(timer_gpu_unpack_f);
 }
