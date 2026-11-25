@@ -35,7 +35,7 @@ __attribute__((always_inline)) INLINE static uintptr_t hash_func(const struct ce
  *
  * @param c the cell's pointer
  * @param unique_count how many unique cells have we listed so far
- * @param h_id the index of the cell c in our hash table
+ * @param h_id the hash table index where the cell will be inserted
  * @param ht struct containing all the information above
  */
 __attribute__((always_inline)) INLINE static void hash_insert(const struct cell *restrict c, const int unique_count, const uintptr_t h_id, struct hash_entry * ht) {
@@ -48,21 +48,20 @@ __attribute__((always_inline)) INLINE static void hash_insert(const struct cell 
 /* @brief Linearly probe the hash table to find the cell or space for a new cell
  *
  * @param c the cell's pointer
- * @param h_id the initial hash table index and final probed index
+ * @param h_id INPUT: the initial hash table index. As OUTPUT: final probed index
  * @param ht the hash table
  * @param hash_size the size of our hash_table
  *
  * @return 1 if the cell already exists in the hash table, otherwise 0
  */
-__attribute__((always_inline)) INLINE static int hash_lin_probe(const struct cell *restrict c, uintptr_t *h_id, struct hash_entry *ht, const uintptr_t hash_size) {
+__attribute__((always_inline)) INLINE static int hash_lin_probe(const struct cell *restrict c, uintptr_t *h_id, const struct hash_entry *restrict ht, const uintptr_t hash_size) {
 
   uintptr_t h_id_val = *h_id;
 #ifdef SWIFT_DEBUG_CHECKS
   const uintptr_t start = h_id_val;
 #endif
-  /* TODO: If this becomes a large overhead look into optimising the hashing but unlikely */
+  /* TODO: If this becomes a large overhead look into optimising the probing but unlikely */
   while(ht[h_id_val].occupied){
-
     if(ht[h_id_val].c == c){
       *h_id = h_id_val;
       return 1;
@@ -92,11 +91,18 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 
   /*Get the hash using the cell's pointer address*/
   struct gpu_pack_metadata *md = &buf->md;
+#ifdef SWIFT_DEBUG_CHECKS
+  if(hash_size == 0)
+    error("Hash table size must be greater than zero. Check your GPU configuration setup");
+#endif
   uintptr_t h_id = hash_func(c, hash_size);
 
   const int n_leaves_packed = md->n_leaves_packed;
-  int unique_count = md->n_unique;
-
+  const int unique_count = md->n_unique;
+  /* Check to see if we've exceeded the size of the hash table. Very un-likely but leave outside of SWIFT_DEBUG_CHECKS
+   * as a fail-safe */
+  if(md->n_unique >= hash_size)
+    error("Hash table full");
   const int cell_already_present = hash_lin_probe(c, &h_id, ht, hash_size);
   if(cell_already_present){
     if(ij == 0 /*Flag for when we work on ci ij = 0*/){
@@ -111,7 +117,7 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
    * Makes sense to have a separate copy for readability when finalising
    * the packing before we offload*/
   md->unique_cells[unique_count] = (struct cell *)c;
-  int c_count = c->hydro.count;
+  const int c_count = c->hydro.count;
   /*Store where ci starts*/
   md->unique_start_end[unique_count].x = md->count_parts_unique;
   /*Store where ci ends*/
@@ -172,7 +178,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_particles_in_unique_l
   /* Grab some handles. */
   /* packing data and metadata */
   struct gpu_pack_metadata *md = &buf->md;
-  const struct gpu_md *gpu_md = &buf->gpu_md;
+  struct gpu_md *gpu_md = &buf->gpu_md;
   const int cii_count = cii->hydro.count;
   const int cjj_count = cjj->hydro.count;
 
