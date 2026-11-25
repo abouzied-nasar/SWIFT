@@ -104,10 +104,10 @@ struct gpu_pack_metadata {
   /*! Count how many (super-level) tasks we've identified for packing */
   int tasks_in_list;
 
-  /*! How many particles have been packed */
+  /*! How many particles have we seen while packing (non-unique) */
   int count_parts;
 
-  /*! How many particles have been packed */
+  /*! How many particles are unique and have been packed */
   int count_parts_unique;
 
   /*! How many (pairs of) leaf cells we have alread packed (their particle data

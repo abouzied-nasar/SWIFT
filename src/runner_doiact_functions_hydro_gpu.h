@@ -444,25 +444,6 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch(
 
 }
 
-/* @brief Copy the metadata for where each cell (i and j) begins and ends for each leaf computation we want to offload
- * into cell_i_j_start_end buffers we can copy to GPU and use to orchestrate it's computations
- *
- * @param buf Struct pointing to CPU and GPU buffers for particle data and the GPU orchestration metadata*/
-__attribute__((always_inline)) INLINE static void finalise_gpu_metadata(
-    struct gpu_offload_data *restrict buf) {
-
-  const struct gpu_pack_metadata *md = &buf->md;
-  struct gpu_md *gpu_md = &buf->gpu_md;
-  for(int i = 0; i < md->n_leaves_packed; i++){
-	  int index_i = md->leaf_cell_indices_in_unique_list[i].x;
-	  int index_j = md->leaf_cell_indices_in_unique_list[i].y;
-	  gpu_md->cell_i_j_start_end[i].x = md->unique_start_end[index_i].x;
-	  gpu_md->cell_i_j_start_end[i].y = md->unique_start_end[index_i].y;
-	  gpu_md->cell_i_j_start_end[i].z = md->unique_start_end[index_j].x;
-	  gpu_md->cell_i_j_start_end[i].w = md->unique_start_end[index_j].y;
-  }
-}
-
 /**
  * @brief Wrapper to launch density tasks on the GPU.
  *
@@ -479,7 +460,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_density(
   /*Expand the start/end list from only the unique_start_end array into
    * the full metadata required by GPU threads.
    * This counts as packing but can only be done once we're ready to launch*/
-  finalise_gpu_metadata(buf);
+  gpu_finalise_packing(buf);
 
   TIMER_TIC;
 
@@ -504,7 +485,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_gradient(
   /*Expand the start/end list from only the unique_start_end array into
     * the full metadata required by GPU threads.
 	* This counts as packing but can only be done once we're ready to launch*/
-  finalise_gpu_metadata(buf);
+  gpu_finalise_packing(buf);
 
   TIMER_TIC;
 
@@ -529,7 +510,7 @@ __attribute__((always_inline)) INLINE static void runner_gpu_launch_force(
   /*Expand the start/end list from only the unique_start_end array into
     * the full metadata required by GPU threads.
 	* This counts as packing but can only be done once we're ready to launch*/
-  finalise_gpu_metadata(buf);
+  gpu_finalise_packing(buf);
 
   TIMER_TIC;
 
