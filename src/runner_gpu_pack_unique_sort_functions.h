@@ -99,10 +99,11 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
 
   const int n_leaves_packed = md->n_leaves_packed;
   const int unique_count = md->n_unique;
-  /* Check to see if we've exceeded the size of the hash table. Very un-likely but leave outside of SWIFT_DEBUG_CHECKS
+  /* Check to see if we've exceeded the size of the hash table. VERY un-likely but leave outside of SWIFT_DEBUG_CHECKS
    * as a fail-safe */
   if(md->n_unique >= hash_size)
     error("Hash table full");
+
   const int cell_already_present = hash_lin_probe(c, &h_id, ht, hash_size);
   if(cell_already_present){
     if(ij == 0 /*Flag for when we work on ci ij = 0*/){
@@ -113,9 +114,7 @@ __attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const str
     return;
   }
 
-  /* Keep track of unique cells in md:
-   * Makes sense to have a separate copy for readability when finalising
-   * the packing before we offload*/
+  /* Keep track of unique cells in md. This will be sent to the GPU */
   md->unique_cells[unique_count] = (struct cell *)c;
   const int c_count = c->hydro.count;
   /*Store where ci starts*/
@@ -225,13 +224,10 @@ __attribute__((always_inline)) INLINE static void gpu_pack_particles_in_unique_l
   }
 
   /*Check to see we've not somehow gone over the number of blocks we allocated*/
-  /*TODO: Put in debug checks ifdef. Leave for now while dev'ing*/
-  ///////////////////////////////////////////////////////////////////////
   int n_blocks_max = (md->params.part_buffer_size + GPU_THREAD_BLOCK_SIZE - 1)/GPU_THREAD_BLOCK_SIZE;
   md->n_blocks_packed += n_blocks_current;
   if(md->n_blocks_packed > n_blocks_max)
 	  error("exceeded n_block_max due to insufficient gpu_part_buffer_size. Increase gpu_part_buffer_size in your *.yml file");
-  ///////////////////////////////////////////////////////////////////////
 
   /*Get a pointer to the full hash table and it's size */
   struct hash_entry * ht = md->hash_table.entry;
