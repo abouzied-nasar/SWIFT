@@ -45,8 +45,40 @@ __attribute__((always_inline)) INLINE static void hash_insert(const struct cell 
     ht[h_id].occupied = 1;
 }
 
-/* @brief Lookup in hash table
+/* @brief Linearly probe the hash table to find the cell or space for a new cell
  *
+ * @param c the cell's pointer
+ * @param h_id the initial hash table index and final probed index
+ * @param ht the hash table
+ * @param hash_size the size of our hash_table
+ *
+ * @return 1 if the cell already exists in the hash table, otherwise 0
+ */
+__attribute__((always_inline)) INLINE static int hash_lin_probe(const struct cell *restrict c, uintptr_t *h_id, struct hash_entry *ht, const uintptr_t hash_size) {
+
+  uintptr_t h_id_val = *h_id;
+#ifdef SWIFT_DEBUG_CHECKS
+  const uintptr_t start = h_id_val;
+#endif
+  /* TODO: If this becomes a large overhead look into optimising the hashing but unlikely */
+  while(ht[h_id_val].occupied){
+
+    if(ht[h_id_val].c == c){
+      *h_id = h_id_val;
+      return 1;
+    }
+    /* Check the next hash table index */
+    h_id_val = (h_id_val + 1) % hash_size;
+#ifdef SWIFT_DEBUG_CHECKS
+    if(h_id_val == start)
+      error("hash table full");
+#endif
+  }
+  *h_id = h_id_val;
+  return 0;
+}
+/* @brief Lookup a cell using hash table. If cell is already found, update metadata and move on
+ * otherwise, update metadata and pack cell's contents into a list of unique particles
  * @param c the cell's pointer
  * @param hash_size the size of our hash_table
  * @param ht struct containing all the information above
@@ -54,44 +86,25 @@ __attribute__((always_inline)) INLINE static void hash_insert(const struct cell 
  * @param ij switch for checking ci when ij == 0 and cj when ij == 1
  * @param task_subtype What kind of task are we packing
  */
-__attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const struct cell *restrict c, const int hash_size,
+__attribute__((always_inline)) INLINE static void hash_lookup_and_pack(const struct cell *restrict c, const uintptr_t hash_size,
         struct hash_entry *restrict ht, struct gpu_offload_data *restrict buf, const int ij,
         const enum task_subtypes task_subtype) {
 
   /*Get the hash using the cell's pointer address*/
   struct gpu_pack_metadata *md = &buf->md;
   uintptr_t h_id = hash_func(c, hash_size);
-#ifdef SWIFT_DEBUG_CHECKS
-  uintptr_t start = h_id;
-#endif
+
   const int n_leaves_packed = md->n_leaves_packed;
   int unique_count = md->n_unique;
-  /*Do a linear probe of hash table. Not the most efficient method but fit for our purpose
-   * TODO: If this becomes a large overhead look into optimising the hashing but unlikely*/
-  while(ht[h_id].occupied){
-    /*If we already have a cell hashed to h_id.
-     * Return it's index in the array of
-     * unique cells*/
-    if (ht[h_id].c == c){
-      /*We found this cell's hash value exists -> Not unique.
-       * The hash_lookup returns it's position in the sorted list
-       * (not in the hash table)*/
-      /*Check if this is ci*/
-      if(ij == 0 /*Flag for when we work on ci ij = 0*/){
-        md->leaf_cell_indices_in_unique_list[n_leaves_packed].x = ht[h_id].index;
-      }
-      /*cell is cj ij = 1*/
-      else{
-        md->leaf_cell_indices_in_unique_list[n_leaves_packed].y = ht[h_id].index;
-      }
-      return;
+
+  const int cell_already_present = hash_lin_probe(c, &h_id, ht, hash_size);
+  if(cell_already_present){
+    if(ij == 0 /*Flag for when we work on ci ij = 0*/){
+      md->leaf_cell_indices_in_unique_list[n_leaves_packed].x = ht[h_id].index;
+    } else {
+      md->leaf_cell_indices_in_unique_list[n_leaves_packed].y = ht[h_id].index;
     }
-    /*Check if the next hash table index is free*/
-    h_id = (h_id + 1) % hash_size;
-#ifdef SWIFT_DEBUG_CHECKS
-    if(h_id == start)
-        error("hash table full");
-#endif
+    return;
   }
 
   /* Keep track of unique cells in md:
@@ -216,7 +229,7 @@ __attribute__((always_inline)) INLINE static void gpu_pack_particles_in_unique_l
 
   /*Get a pointer to the full hash table and it's size */
   struct hash_entry * ht = md->hash_table.entry;
-  const int hash_size = md->hash_size;
+  const uintptr_t hash_size = md->hash_size;
 
   /*Check if ci has already been listed.
    * If so, return where it's unique copy
