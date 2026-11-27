@@ -64,7 +64,7 @@ void test_no_cosmo(struct engine *e, const char *name, const int with_assert) {
   for (int i = 0; i < Ntest; i++) {
     /* Test last value */
     if (with_assert) {
-      assert(fabs(output_time - time_values[i]) < tol);
+      swift_assert(fabs(output_time - time_values[i]) < tol);
     }
 
     /* Set current time */
@@ -102,7 +102,7 @@ void test_cosmo(struct engine *e, const char *name, const int with_assert) {
   for (int i = 0; i < Ntest; i++) {
     /* Test last value */
     if (with_assert) {
-      assert(fabs(output_time - a_values[i]) < tol);
+      swift_assert(fabs(output_time - a_values[i]) < tol);
     }
 
     /* Set current time */

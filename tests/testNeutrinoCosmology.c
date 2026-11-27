@@ -165,7 +165,7 @@ int main(int argc, char *argv[]) {
       /* check accuracy */
       double rel_err = (my_a - a) / a;
       message("Accuracy of %g at a=%g", rel_err, a);
-      assert(fabs(rel_err) < TOLERANCE);
+      swift_assert(fabs(rel_err) < TOLERANCE);
     }
 
     if (testnr == 0) {
@@ -187,9 +187,10 @@ int main(int argc, char *argv[]) {
          */
         time2 *= 365.25 / 365.0;
 
-        assert(fabs(a1 - a2) / (a1 + a2) < EXTERNAL_TOLERANCE);
-        assert(fabs(time1 - time2) / (time1 + time2) < EXTERNAL_TOLERANCE);
-        assert(fabs(Onu1 - Onu2) / (Onu1 + Onu2) < EXTERNAL_TOLERANCE);
+        swift_assert(fabs(a1 - a2) / (a1 + a2) < EXTERNAL_TOLERANCE);
+        swift_assert(fabs(time1 - time2) / (time1 + time2) <
+                     EXTERNAL_TOLERANCE);
+        swift_assert(fabs(Onu1 - Onu2) / (Onu1 + Onu2) < EXTERNAL_TOLERANCE);
 
         message("At a = %e: (%e, %e, %e)", a1, a1 / a2, time1 / time2,
                 Onu1 / Onu2);
@@ -206,7 +207,7 @@ int main(int argc, char *argv[]) {
     /* check accuracy */
     double err = (times1[j] - times2[j]) / times1[j];
     message("Agreement of %g at step %i", err, j);
-    assert(fabs(err) < TOLERANCE);
+    swift_assert(fabs(err) < TOLERANCE);
   }
 
   /* For the massive neutrino cosmology 3, check that it reproduces
@@ -238,7 +239,7 @@ int main(int argc, char *argv[]) {
       cosmo.Omega_g * cosmo.N_eff * (7. / 8.) * pow(4. / 11., 4. / 3.);
   double err = (Omega_nu_early - Omega_nu_r) / Omega_nu_early;
   message("Accuracy of %g of the relativistic limit", err);
-  assert(fabs(err) < TOLERANCE);
+  swift_assert(fabs(err) < TOLERANCE);
 
   /* Zeta function and other constants */
   const double zeta3 = 1.202056903159594;
@@ -257,7 +258,7 @@ int main(int argc, char *argv[]) {
   }
   double err2 = (Omega_nu_late - Omega_nu_nr) / Omega_nu_late;
   message("Accuracy of %g of the non-relativistic limit", err2);
-  assert(fabs(err2) < 1e-5);
+  swift_assert(fabs(err2) < 1e-5);
 
   message("Neutrino cosmology test successful.");
 
