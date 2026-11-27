@@ -41,6 +41,12 @@ HIP_FLAGS = $(HIP_CFLAGS) -D__HIP_PLATFORM_AMD__ -DWITH_HIP
 # Build the libswiftsim library and a convenience library just for the gravity tasks
 lib_LTLIBRARIES = libswiftsim.la
 noinst_LTLIBRARIES = libgrav.la
+# Optional Kokkos variant, alongside the existing CPU/CUDA variants.
+if HAVEKOKKOS
+lib_LTLIBRARIES += libswiftsim_kokkos.la
+noinst_LTLIBRARIES += libswift_kokkos.la
+endif
+
 # Build a MPI-enabled version too?
 if HAVEMPI
 lib_LTLIBRARIES += libswiftsim_mpi.la
@@ -592,6 +598,20 @@ libswiftsim_la_SOURCES = $(AM_SOURCES) $(CPU_SOURCES)
 libswiftsim_la_CFLAGS = $(AM_CFLAGS)
 libswiftsim_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) -version-info 0:0:0
 libswiftsim_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) libgrav.la
+
+# Kokkos implementation is compiled by CXX; the simulation remains C.
+if HAVEKOKKOS
+libswift_kokkos_la_SOURCES = kokkos/swift_kokkos.cpp kokkos/swift_kokkos.h
+libswift_kokkos_la_CPPFLAGS = $(AM_CPPFLAGS) $(KOKKOS_CPPFLAGS)
+libswift_kokkos_la_CXXFLAGS = $(AM_CXXFLAGS) $(KOKKOS_CXXFLAGS)
+libswift_kokkos_la_LIBADD = $(KOKKOS_LIBS)
+libswift_kokkos_la_LDFLAGS = $(KOKKOS_LDFLAGS)
+
+libswiftsim_kokkos_la_SOURCES = $(AM_SOURCES) $(CPU_SOURCES)
+libswiftsim_kokkos_la_CFLAGS = $(AM_CFLAGS) -DWITH_KOKKOS
+libswiftsim_kokkos_la_LDFLAGS = $(AM_LDFLAGS) $(EXTRA_LIBS) -version-info 0:0:0
+libswiftsim_kokkos_la_LIBADD = $(GRACKLE_LIBS) $(VELOCIRAPTOR_LIBS) libgrav.la
+endif
 
 # Sources and flags for MPI library
 libswiftsim_mpi_la_SOURCES = $(AM_SOURCES) $(CPU_SOURCES)
