@@ -165,6 +165,38 @@ __device__ void d_kernel_deval(float u, float *__restrict__ W,
   *dW_dx = dw_dx * kernel_constant * kernel_gamma_inv_dim_plus_one;
 }
 
+/* @brief Atomic maximum for two floats using CUDA compare-and-swap.
+ *
+ * @param addr Pointer to where we want to store the maximum value in global memory
+ * @param val  The value a CUDA thread calculates based on looping through a particle's neighbours
+ */
+__device__ void atomicMaxFloat(float* addr, float val) {
+
+  /* Get a pointer to the float value's bits as stored in global memory but as an integer */
+  int* addr_as_int = (int*)addr;
+  /* Make a local copy of the bitwise representation of the value in global memory as an int */
+  int old = *addr_as_int;
+  /* The value we assume to currently be in global memory */
+  int assumed;
+
+  /* Check to see if we should even try to swap the current max in global memory.
+   * If we need to try, we loop until we successfully update the value or another
+   * thread has updated it with a value greater than or equal to ours */
+  while(val > __int_as_float(old)) {
+
+    /* We first assume that the old value has not changed */
+    assumed = old;
+    /* Try to replace the value only if it is still equal to assumed.
+     * If another thread has changed it, old is replaced with that new value */
+    /* Reinterpret val's bits as an int for atomicCAS without changing the stored float representation. */
+    old = atomicCAS(addr_as_int, assumed, __float_as_int(val));
+    /* If old is equal to assumed, no other thread changed the value in addr before our
+     * atomic operation and we have successfully updated the maximum */
+    if(old == assumed)
+      break;
+  }
+}
+
 #ifdef __cplusplus
 }
 #endif
